@@ -1,0 +1,305 @@
+"""Cockpit view for the flight game: ships, radar and gauges on the round
+240x240 screen (origin at the centre, y down).
+
+Measured on the badge, a filled rectangle costs about 0.03 ms, a line about
+0.35 ms and a piece of text about 4 ms. So everything that is drawn every
+frame is built from rectangles where it can be, including the numbers, and
+text is kept for messages that only show now and then.
+"""
+import math
+
+FOCAL = 208.0    # pixels; gives a field of view of about 60 degrees
+NEAR = 30.0      # nothing closer than this is drawn
+TAU = 2 * math.pi
+WIRE_MIN = 8.0   # ships that look smaller than this (pixels) are drawn as a marker
+
+RADAR_Y = 88
+RADAR_RX = 58
+RADAR_RY = 24
+RADAR_RANGE = 10000.0
+_RADAR = tuple(
+    (RADAR_RX * math.cos(i * TAU / 24) - 0.75, RADAR_Y + RADAR_RY * math.sin(i * TAU / 24) - 0.75)
+    for i in range(24)
+)
+
+WHITE = (1, 1, 1)
+DIM = (0.2, 0.2, 0.26)
+GREEN = (0.3, 1, 0.4)
+YELLOW = (1, 0.85, 0.2)
+RED = (1, 0.25, 0.2)
+ORANGE = (1, 0.55, 0.1)
+CYAN = (0.3, 0.9, 1)
+MAGENTA = (1, 0.3, 1)
+GREY = (0.7, 0.7, 0.75)
+COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": MAGENTA, "pmissile": CYAN}
+
+# seven-segment digits: which of the segments a-g are lit for 0-9
+_SEGS = ("abcdef", "bc", "abged", "abgcd", "fgbc", "afgcd", "afgedc", "abc", "abcdefg", "abcdfg")
+
+
+def _digit_rects(w, h, t):
+    """For each digit, the rectangles (x, y, w, h) that draw it in a w by h cell."""
+    half = (h - t) / 2.0
+    seg = {
+        "a": (0, 0, w, t),
+        "b": (w - t, 0, t, half + t),
+        "c": (w - t, half, t, half + t),
+        "d": (0, h - t, w, t),
+        "e": (0, half, t, half + t),
+        "f": (0, 0, t, half + t),
+        "g": (0, half, w, t),
+    }
+    return tuple(tuple(seg[c] for c in segs) for segs in _SEGS)
+
+
+_BIG = (7, 11, 2, _digit_rects(7, 11, 2))      # (width, height, thickness, rectangles)
+_SMALL = (4, 7, 1, _digit_rects(4, 7, 1))
+
+
+def number(ctx, value, x, y, font=_BIG, align=0):
+    """Draw a whole number out of rectangles in the current colour. (x, y) is
+    the top of the number: its centre for align 0, its left edge for align -1,
+    its right edge for align 1. Returns the width drawn."""
+    w, h, t, rects = font
+    s = str(int(value))
+    step = w + t + 1
+    width = len(s) * step - (t + 1)
+    if align == 0:
+        x -= width / 2.0
+    elif align > 0:
+        x -= width
+    for ch in s:
+        if ch != "-":
+            for rx, ry, rw, rh in rects[ord(ch) - 48]:
+                ctx.rectangle(x + rx, y + ry, rw, rh).fill()
+        x += step
+    return width
+
+
+def text(ctx, s, x, y, size, rgb):
+    ctx.font_size = size
+    ctx.text_align = ctx.CENTER
+    ctx.text_baseline = ctx.MIDDLE
+    ctx.rgb(*rgb).move_to(x, y).text(s)
+
+
+def draw_ship(ctx, o):
+    """Draw one object. Returns True if any of it was on screen."""
+    z = o.z
+    if z < NEAR:
+        return False
+    bp = o.bp
+    x = o.x
+    y = o.y
+    k = FOCAL / z
+    sx = x * k
+    sy = -y * k
+    pr = bp.size * k    # how big it looks, in pixels
+    if sx - pr > 120 or sx + pr < -120 or sy - pr > 120 or sy + pr < -120:
+        return False
+    ctx.rgb(*(RED if o.hit > 0 else COLOUR[o.kind]))
+    if pr < 2.5:        # too far away to make out: a dot
+        ctx.rectangle(sx - 1, sy - 1, 2, 2).fill()
+        return True
+    if pr < WIRE_MIN:   # middle distance: a small marker, much cheaper than lines
+        ctx.rectangle(sx - pr, sy - 0.75, 2 * pr, 1.5).fill()
+        h = pr * 0.5
+        ctx.rectangle(sx - 0.75, sy - h, 1.5, 2 * h).fill()
+        return True
+
+    m = o.m
+    m0, m1, m2, m3, m4, m5, m6, m7, m8 = m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8]
+    pts = []
+    for vx, vy, vz in bp.verts:
+        pz = z + vx * m2 + vy * m5 + vz * m8
+        if pz < NEAR:
+            pts.append(None)    # behind the viewer
+        else:
+            k = FOCAL / pz
+            pts.append(((x + vx * m0 + vy * m3 + vz * m6) * k,
+                        -(y + vx * m1 + vy * m4 + vz * m7) * k))
+
+    # Elite's hidden-line rule: a face shows if its normal points back along
+    # the line from the viewer to the ship. A zero normal always shows.
+    vis = []
+    for nx, ny, nz in bp.normals:
+        vis.append(
+            (nx == 0 and ny == 0 and nz == 0)
+            or (nx * m0 + ny * m3 + nz * m6) * x
+            + (nx * m1 + ny * m4 + nz * m7) * y
+            + (nx * m2 + ny * m5 + nz * m8) * z < 0
+        )
+
+    ctx.begin_path()
+    for a, b, f1, f2 in bp.edges:
+        if vis[f1] or vis[f2]:
+            p = pts[a]
+            q = pts[b]
+            if p is not None and q is not None:
+                ctx.move_to(p[0], p[1])
+                ctx.line_to(q[0], q[1])
+    ctx.stroke()
+    return True
+
+
+def _enemy_beam(ctx, o):
+    """An enemy laser: from the ship's gun to your cockpit, which is just
+    below the view, so the beam runs off the bottom of the screen."""
+    bp = o.bp
+    m = o.m
+    vx, vy, vz = bp.verts[bp.gun] if bp.gun < len(bp.verts) else (0, 0, 0)
+    pz = o.z + vx * m[2] + vy * m[5] + vz * m[8]
+    if pz < NEAR:
+        return
+    k = FOCAL / pz
+    gx = (o.x + vx * m[0] + vy * m[3] + vz * m[6]) * k
+    gy = -(o.y + vx * m[1] + vy * m[4] + vz * m[7]) * k
+    if gy > 120:
+        return
+    ctx.line_width = 2.5
+    ctx.rgb(*ORANGE)
+    ctx.begin_path()
+    ctx.move_to(gx, gy)
+    ctx.line_to(gx * 0.25, 126)
+    ctx.stroke()
+    ctx.line_width = 1.5
+
+
+def draw(ctx, g, ms=None, ring=True):
+    """Draw the whole cockpit for Game g. ms is the frame time to show, or None."""
+    draw_world(ctx, g)
+    draw_hud(ctx, g, ms, ring)
+
+
+def draw_world(ctx, g):
+    """Space, ships, explosions and laser beams."""
+    ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+    ctx.line_width = 1.5
+
+    # stardust, so speed and turning can be seen
+    ctx.rgb(*GREY)
+    for p in g.dust:
+        if p[2] > NEAR:
+            k = FOCAL / p[2]
+            ctx.rectangle(p[0] * k, -p[1] * k, 1.5, 1.5).fill()
+
+    for o in g.objs:
+        draw_ship(ctx, o)
+        if o.beam > 0:
+            _enemy_beam(ctx, o)
+
+    for boom in g.booms:
+        fade = 1.0 - boom.t / boom.life
+        if fade <= 0:
+            continue
+        ctx.rgb(1, 0.5 + 0.5 * fade, 0.2 * fade)
+        for p in boom.parts:
+            if p[2] > NEAR:
+                k = FOCAL / p[2]
+                ctx.rectangle(p[0] * k - 1, -p[1] * k - 1, 2.5, 2.5).fill()
+
+    if g.beam > 0:      # the player's twin lasers meet at the crosshair
+        ctx.rgb(*RED)
+        ctx.begin_path()
+        ctx.move_to(-60, 100)
+        ctx.line_to(0, 0)
+        ctx.move_to(60, 100)
+        ctx.line_to(0, 0)
+        ctx.stroke()
+
+    t = g.lock
+    if t is not None and t.z > NEAR:    # missile target: a box made of four bars
+        k = FOCAL / t.z
+        h = t.bp.size * k + 3
+        if h < 7:
+            h = 7
+        elif h > 45:
+            h = 45
+        bx = t.x * k
+        by = -t.y * k
+        ctx.rgb(*GREEN)
+        ctx.rectangle(bx - h, by - h, 2 * h, 1.5).fill()
+        ctx.rectangle(bx - h, by + h - 1.5, 2 * h, 1.5).fill()
+        ctx.rectangle(bx - h, by - h, 1.5, 2 * h).fill()
+        ctx.rectangle(bx + h - 1.5, by - h, 1.5, 2 * h).fill()
+
+
+def _vbar(ctx, x, frac, rgb):
+    ctx.rgb(*DIM).rectangle(x, -30, 6, 60).fill()
+    if frac > 0:
+        if frac > 1:
+            frac = 1
+        h = 60 * frac
+        ctx.rgb(*rgb).rectangle(x, 30 - h, 6, h).fill()
+
+
+def draw_hud(ctx, g, ms=None, ring=True):
+    """Crosshair, gauges, radar and numbers. ring: flash a red ring when hit
+    (for badges where the LEDs can't be used for that)."""
+    # crosshair
+    ctx.rgb(*GREEN)
+    ctx.rectangle(6, -0.75, 8, 1.5).fill()
+    ctx.rectangle(-14, -0.75, 8, 1.5).fill()
+    ctx.rectangle(-0.75, 6, 1.5, 8).fill()
+    ctx.rectangle(-0.75, -14, 1.5, 8).fill()
+
+    # gauges: speed and laser heat on the left, shield and energy on the right
+    _vbar(ctx, -112, g.speed / 40.0, GREEN)
+    _vbar(ctx, -103, g.heat, RED if g.hot else YELLOW)
+    _vbar(ctx, 97, g.shield / 100.0, CYAN)
+    _vbar(ctx, 106, g.hull / 100.0, GREEN if g.hull > 30 else RED)
+
+    # missiles left
+    for i in range(4):
+        ctx.rgb(*(GREEN if i < g.missiles else DIM)).rectangle(-70 + i * 9, 56, 6, 4).fill()
+
+    # radar: across is left-right, up the ellipse is ahead, sticks show height
+    ctx.rgb(0.38, 0.38, 0.48)
+    for px, py in _RADAR:
+        ctx.rectangle(px, py, 1.5, 1.5).fill()
+    ctx.rectangle(-RADAR_RX, RADAR_Y - 0.5, 2 * RADAR_RX, 1).fill()
+    ctx.rectangle(-0.5, RADAR_Y - RADAR_RY, 1, 2 * RADAR_RY).fill()
+    r2 = RADAR_RANGE * RADAR_RANGE
+    for o in g.objs:
+        if o.x * o.x + o.z * o.z > r2:
+            continue
+        bx = o.x / RADAR_RANGE * RADAR_RX
+        by = RADAR_Y - o.z / RADAR_RANGE * RADAR_RY
+        h = o.y / RADAR_RANGE * 22
+        if h > 22:
+            h = 22
+        elif h < -6:
+            h = -6
+        ctx.rgb(*(RED if o.kind == "ship" else COLOUR[o.kind]))   # hostile ships in red
+        if h >= 0:
+            ctx.rectangle(bx - 0.5, by - h, 1, h).fill()
+        else:
+            ctx.rectangle(bx - 0.5, by, 1, -h).fill()
+        ctx.rectangle(bx - 1.5, by - h - 1.5, 3, 3).fill()
+
+    # wave (yellow) and score (white), as one centred row of digits
+    wave = str(g.wave)
+    score = str(g.score)
+    width = (len(wave) + len(score)) * 10 - 6 + 9
+    x = -width / 2.0
+    ctx.rgb(*YELLOW)
+    x += number(ctx, g.wave, x, -102, _BIG, -1) + 9
+    ctx.rgb(*WHITE)
+    number(ctx, g.score, x, -102, _BIG, -1)
+    if ms is not None:      # frame time in ms, small, just above
+        ctx.rgb(*GREY)
+        number(ctx, ms, 0, -114, _SMALL)
+
+    if g.over:
+        ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -42, 200, 100).fill()
+        text(ctx, "GAME OVER", 0, -22, 26, RED)
+        text(ctx, "SCORE %d   KILLS %d" % (g.score, g.kills), 0, 6, 14, WHITE)
+        text(ctx, "C: fly again", 0, 30, 12, GREY)
+        text(ctx, "F: menu", 0, 46, 12, GREY)
+    elif g.msg_t > 0:
+        text(ctx, g.msg, 0, -66, 14, YELLOW)
+
+    if ring and g.flash > 0:     # just been hit
+        ctx.line_width = 6
+        ctx.rgb(*RED).arc(0, 0, 116, 0, TAU, 0).stroke()
+        ctx.line_width = 1.5

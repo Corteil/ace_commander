@@ -1,11 +1,11 @@
 [app]
-name = "Elite Demo"
+name = "Elite"
 category = "Games"
 
 [entry]
-class = "EliteDemo"
+class = "Elite"
 
 [metadata]
 author = "Corteil"
-description = "Hidden-line wireframe Elite ships, flown by tilting the badge, the joystick or a keyboard."
-version = "4"
+description = "Wireframe space combat with the ships of BBC Micro Elite: fly by tilt, joystick or keyboard, plus a ship viewer."
+version = "13"

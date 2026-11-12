@@ -1,2 +1,2 @@
-from .app import EliteDemo
-__all__ = ['EliteDemo']
+from .app import Elite
+__all__ = ['Elite']

@@ -52,6 +52,30 @@ def number(text):
 SUBLABELS = ("_VERTICES", "_EDGES", "_FACES")
 BORROW = re.compile(r"SHIP_([A-Z0-9_]+?)_EDGES\s*-\s*SHIP_([A-Z0-9_]+)")
 NO_FACE = 15  # an edge between "face 15" and "face 15" belongs to no face
+EQU = re.compile(r"^\s*EQU[BW]\s+([^\\]*)")
+HEADER_BYTES = 18  # values in a ship's header, counting each EQUW as one
+
+
+def header_value(text):
+    """One header value. Offsets written as LO(...) / HI(...) aren't needed."""
+    if "LO(" in text or "HI(" in text:
+        return 0
+    text = re.sub(r"%([01]+)", lambda m: str(int(m.group(1), 2)), text)
+    try:
+        return number(text)
+    except (ValueError, SyntaxError):
+        return 0
+
+
+def stats(rec):
+    """(canisters, hit area, gun vertex, explosion count, bounty, visibility
+    distance, max energy, max speed, laser power, missiles) from the header,
+    or None if the header wasn't the usual shape."""
+    h = rec["header"]
+    if len(h) != HEADER_BYTES:
+        return None
+    return (h[0], h[1], h[5] // 4, max(0, (h[6] - 6) // 4), h[9], h[11],
+            h[12], h[13], (h[17] >> 3) & 7, h[17] & 7)
 
 
 def finish(ships):
@@ -89,9 +113,12 @@ def scan_file(path):
             if m:
                 name = m.group(1)
                 if name.endswith(SUBLABELS):
-                    pass  # still inside the current ship's data
+                    # still inside the current ship's data, but past its header
+                    if current is not None:
+                        current["in_header"] = False
                 elif name.startswith("SHIP_"):
                     current = {"verts": [], "edges": [], "faces": [],
+                               "header": [], "in_header": True,
                                "where": "%s:%d" % (path, lineno)}
                     found.append((name, current))
                 else:
@@ -104,6 +131,11 @@ def scan_file(path):
             m = BORROW.search(line)
             if m and m.group(1) != m.group(2) and m.group(2) == found[-1][0][5:]:
                 current["edges_from"] = "SHIP_" + m.group(1)
+            if current["in_header"]:
+                m = EQU.match(line)
+                if m:
+                    current["header"].append(header_value(m.group(1)))
+                    continue
             m = MACRO.match(line)
             if not m:
                 continue
@@ -193,8 +225,10 @@ def main():
         "Derived from Elite (c) Acornsoft 1984. For personal use only: do not",
         "publish this file.",
         "",
-        "Each entry is (name, vertices, edges, face normals), where an edge is",
-        '(vertex, vertex, face, face).',
+        "Each entry is (name, vertices, edges, face normals, stats). An edge is",
+        "(vertex, vertex, face, face). stats is (canisters, hit area, gun vertex,",
+        "explosion count, bounty, visibility distance, max energy, max speed,",
+        "laser power, missiles), or None.",
         '"""',
         "SHIPS = (",
     ]
@@ -203,7 +237,8 @@ def main():
         out.append("    (%r," % display_name(n))
         out.append("     %r," % (tuple(s["verts"]),))
         out.append("     %r," % (tuple(s["edges"]),))
-        out.append("     %r)," % (tuple(s["faces"]),))
+        out.append("     %r," % (tuple(s["faces"]),))
+        out.append("     %r)," % (stats(s),))
     out.append(")")
     with open(args.output, "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")

@@ -3,4 +3,9 @@
 ship_data.py
 
 __pycache__/
+badge_log.txt
 *.pyc
+
+# made by the tests
+tests/noship/
+tests/shots/
