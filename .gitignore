@@ -1,0 +1,6 @@
+# Derived from Acornsoft's Elite, which has no licence: generate it locally
+# with tools/import_ships.py and don't commit or publish it.
+ship_data.py
+
+__pycache__/
+*.pyc

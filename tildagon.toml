@@ -1,0 +1,11 @@
+[app]
+name = "Elite Demo"
+category = "Games"
+
+[entry]
+class = "EliteDemo"
+
+[metadata]
+author = "Corteil"
+description = "Hidden-line wireframe Elite ships, flown by tilting the badge, the joystick or a keyboard."
+version = "4"
