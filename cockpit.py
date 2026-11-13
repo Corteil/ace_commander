@@ -344,7 +344,7 @@ def draw_hud(ctx, g, ms=None, ring=True):
         ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -42, 200, 100).fill()
         text(ctx, "GAME OVER", 0, -22, 26, RED)
         text(ctx, "SCORE %d   KILLS %d" % (g.score, g.kills), 0, 6, 14, WHITE)
-        text(ctx, "C: fly again", 0, 30, 12, GREY)
+        text(ctx, g.again, 0, 30, 12, GREY)
         text(ctx, "F: title screen", 0, 46, 12, GREY)
     elif g.msg_t > 0:
         text(ctx, g.msg, 0, -66, 14, YELLOW)

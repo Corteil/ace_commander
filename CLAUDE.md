@@ -2,7 +2,7 @@
 
 Notes for picking this project up in a new session. Last updated at the end of the first
 working session, 2026-11-12 (build 13); updated 2026-11-13 (build 16: renamed, on a Pi, design
-phase 1 built) and again that night (build 20: DEBUG page, missile lock, first part of phase 2).
+phase 1 built) and again that night (build 21: DEBUG page, missile lock, most of phase 2).
 
 ## What this is
 
@@ -12,9 +12,10 @@ of BBC Micro Elite. Brian's constraints: plain MicroPython, **no custom firmware
 C or `@micropython.viper` is welcome only if measurements show it would help.
 
 Built from `DESIGN.md`: phase 1 (title screen, saved commander with rank, three levels, new
-button layout) and the first part of phase 2 (galaxy, local chart in the in-flight menu,
-hyperspace, fuel). Not built yet: the rest of phase 2 (galactic chart, system data screen,
-arriving docked, so nowhere to refuel), then docking and trading (phases 3 to 6).
+button layout) and most of phase 2 (galaxy, local chart in the in-flight menu, hyperspace,
+fuel, arriving docked at a status screen that refuels). Not built yet: the rest of phase 2
+(galactic chart, system data screen, the docked screens as tabs), then a real station and
+trading (phases 3 to 6).
 
 ## Files
 
@@ -179,9 +180,16 @@ of a real flight, not from a harness.
    fuel and saves.** Run over the REPL on the badge (not yet played by hand): making the
    galaxy 290 ms once, opening the chart 185 ms the first time, drawing it 14 ms, a change
    of selected system 28 ms (`Galaxy.system` twists the seeds from the start), the arrival
-   streaks 11 ms. Still to do in phase 2: the galactic
-   chart, the system data screen, and arriving docked (a first docked Status screen that
-   refuels). Until then the only refuel is REFILL FUEL on the DEBUG page.
+   streaks 11 ms.
+   **Build 21 adds arriving docked.** After a jump `Game.arriving` is the number of ships
+   to destroy (`max_hostile` for the level); when it reaches 0 no more come, and once none
+   are left `dock_t` counts `DOCK_TIME` down and `Game.docked` is set. `app._dock` fills the
+   tank (free until there is money to make), saves and shows mode `docked`. CONTINUE and
+   NEW COMMANDER go to `docked` too, unless a flight was left part-way; every launch is a
+   fresh `Game.reset()`. GAME OVER + C docks a commander where they last arrived. Brian
+   asked for REFILL FUEL to stay on the DEBUG page; DOCK NOW is there too.
+   Still to do in phase 2: the galactic chart, the system data screen, and the docked
+   screens as tabs (the chart while docked).
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
@@ -203,6 +211,8 @@ by itself is faster than one fill for all of them (3.5 against 7.7 ms). Flight a
 - Tilt axis directions (`TILT_PITCH_SIGN`, `TILT_ROLL_SIGN`, `TILT_SWAP_AXES`).
 - The local chart and hyperspace (build 20): cursor speed (`CURSOR_SPEED` in `chart.py`),
   whether the ring and dots read well, the streaks on arriving.
+- Arriving and docking (build 21): whether 3 / 4 / 5 ships is the right fight, and
+  `DOCK_TIME`.
 - Whether `deploy.bat`'s copy step reports failures properly (the log step is known to work).
 
 Confirmed by Brian on 2026-11-13: F is faster and E slower; the LEDs flash on a hit and the

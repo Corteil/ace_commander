@@ -318,6 +318,29 @@ g.jumped = False
 for _ in range(int(game.WARP_TIME / DT) + 2):
     g.step(DT, 0, 0, 0, False, False)
 assert g.warp <= 0 and not g.jumped
+# after a jump: as many ships as attack at once must go, then docking
+assert g.arriving == g.max_hostile and not g.docked
+g.spawn_t = 0.0
+for _ in range(g.max_hostile):
+    for _ in range(3000):
+        g.step(DT, 0, 0, 0, False, False)
+        ships = [o for o in g.objs if o.kind == "ship"]
+        if ships:
+            break
+    assert ships, "ships come to meet you"
+    g.shield = g.hull = 100.0
+    g._kill(ships[0])
+for o in g.objs:
+    if o.kind == "ship":
+        g._kill(o)
+g.god = True
+n = 0
+while not g.docked:
+    g.step(DT, 0, 0, 0, False, False)
+    n += 1
+    assert n < 400 and not any(o.kind == "ship" and not o.dead for o in g.objs)
+assert abs(n * DT - game.DOCK_TIME) <= 4 * DT and g.arriving is None, n * DT
+g.god = False; g.docked = False
 g.start_jump(); g._hurt(1e6); g.step(DT, 0, 0, 0, False, False)
 assert g.over and g.jump_t == 0 and not g.jumped, "no jump once destroyed"
 g.start_jump(); assert g.jump_t == 0

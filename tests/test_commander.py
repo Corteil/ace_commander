@@ -34,6 +34,12 @@ def fpick(a, label):
     tick(a, fresh=["C"])
 
 
+def launch(a):
+    assert a.mode == "docked", a.mode
+    tick(a, fresh=["C"])
+    assert a.mode == "flight" and a.career and not a.docked
+
+
 # ---- ranks and levels -------------------------------------------------------
 assert commander.thresholds(2) == (0, 8, 16, 32, 64, 128, 512, 2560, 6400), "hardest is the original"
 assert commander.thresholds(0)[-1] == 1280 and commander.thresholds(1)[-1] == 3200
@@ -110,6 +116,13 @@ tick(a, fresh=["JOYRIGHT"]); assert a.level == 0
 tick(a, fresh=["F"]); assert a.mode == "menu" and a.cmdr is None, "F backs out without making one"
 choose(a, "NEW COMMANDER")
 tick(a, fresh=["JOYLEFT"]); tick(a, fresh=["C"])
+assert a.mode == "docked" and a.docked, "a new commander starts docked"
+tx = texts(a)
+assert "DOCKED" in tx and "LAVE" in tx and "HARMLESS" in tx and "C: LAUNCH" in tx, tx
+assert "Dictatorship" in tx and "Rich Agricultural, tech 5" in tx and "fuel 7.0 LY   100.0 Cr" in tx, tx
+tick(a, fresh=["F"]); assert a.mode == "menu"
+choose(a, "CONTINUE"); assert a.mode == "docked", "F and back again is still docked"
+tick(a, fresh=["A"]); assert a.mode == "flight", "A launches too"
 assert a.mode == "flight" and a.career and a.cmdr.level == 0 and a.game.level == 0
 assert commander.load(SAVE).level == 0, "saved as soon as it is made"
 g = a.game
@@ -154,6 +167,8 @@ tick(a, fresh=["A"]); assert "STATUS" not in texts(a)
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
 assert a.mode == "menu" and commander.load(SAVE).kills == 6
 choose(a, "CONTINUE")
+assert a.mode == "docked" and a.cmdr.kills == 6, "practice kills aren't banked by docking"
+launch(a)
 assert a.career and a.game.level == 0 and a.game.kills == 0
 
 # dying saves; flying again keeps the commander
@@ -161,8 +176,14 @@ g = a.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
 kill(g, 2); tick(a)
 g._hurt(1000.0); tick(a)
 assert g.over and commander.load(SAVE).kills == 8, "saved at game over"
-tick(a, fresh=["C"]); assert not g.over and a.career and a.cmdr.kills == 8
+assert "C: back to the station" in texts(a)
+tick(a, fresh=["C"]); assert a.mode == "docked" and a.cmdr.kills == 8
+launch(a); assert not g.over and g.kills == 0
 kill(g); tick(a); assert a.cmdr.kills == 9
+
+# a flight left part-way for the title screen carries on
+fpick(a, "PAUSE MENU"); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); assert a.mode == "menu"
+choose(a, "CONTINUE"); assert a.mode == "flight" and g.kills == 1 and not a.docked
 
 # a new app instance (the badge restarted) finds the commander
 fpick(a, "PAUSE MENU")
@@ -172,6 +193,7 @@ assert b.cmdr.kills == 9 and b.cmdr.level == 0 and b.choices()[0] == "CONTINUE"
 choose(b, "NEW COMMANDER")
 assert any("replaces your saved commander" in t for t in texts(b))
 tick(b, fresh=["JOYRIGHT"]); tick(b, fresh=["C"])
+launch(b)
 assert b.cmdr.kills == 0 and b.cmdr.level == 2 and b.game.level == 2
 assert commander.load(SAVE).level == 2
 
@@ -179,7 +201,7 @@ assert commander.load(SAVE).level == 2
 mod.SAVE_PATH = os.path.join(HERE, "no", "such", "folder", "x.json")
 c = ace_commander.AceCommander()
 assert c.cmdr is None
-choose(c, "NEW COMMANDER"); tick(c, fresh=["C"])
+choose(c, "NEW COMMANDER"); tick(c, fresh=["C"]); launch(c)
 assert c.mode == "flight" and c.career
 kill(c.game); tick(c); c.game._hurt(1000.0); tick(c)
 assert c.cmdr.kills == 1
@@ -190,6 +212,7 @@ print("new commander, rank, status, save, continue, practice kept apart: ok")
 mod.SAVE_PATH = SAVE
 d = ace_commander.AceCommander()
 choose(d, "NEW COMMANDER"); tick(d, fresh=["JOYLEFT"]); tick(d, fresh=["C"])    # EASY
+launch(d)
 g = d.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
 
 def debug(a, line):
@@ -242,7 +265,7 @@ bad = commander.Commander.from_dict({"system": 999, "fuel": 500})
 assert bad.system is None and bad.fuel == 70
 
 e = ace_commander.AceCommander()
-choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
+choose(e, "NEW COMMANDER"); tick(e, fresh=["C"]); launch(e)
 g = e.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
 gal = e.galaxy
 assert e.cmdr.system == 7 and gal.system(7).name == "LAVE" and e.cmdr.fuel == 70
@@ -286,7 +309,8 @@ for _ in range(200):
         break
 assert e.cmdr.system == 129 and e.cmdr.fuel == 70 - d129, (e.cmdr.system, e.cmdr.fuel)
 assert set("HYPERSPACE %d" % n for n in (5, 4, 3, 2, 1)) <= seen, seen
-assert g.msg == "ZAONCE" and g.warp > 0 and not g.objs and not g.jumped and g.kills == 2
+assert g.msg == "ZAONCE: 4 SHIPS TO CLEAR" and g.arriving == 4, g.msg
+assert g.warp > 0 and not g.objs and not g.jumped and g.kills == 2
 saved = commander.load(SAVE)
 assert (saved.system, saved.fuel, saved.kills) == (129, 70 - d129, 2), "arriving saves"
 texts(e)        # the streaks draw
@@ -314,9 +338,51 @@ e.chart.cx, e.chart.cy = [(float(px), float(py)) for px, py, i, d in e.chart.dot
 e.chart._select(); tick(e, fresh=["C"]); assert g.jump_t > 0
 g._hurt(5000.0); tick(e); tick(e)
 assert g.over and g.jump_t == 0 and e.cmdr.system == 129
+assert g.again == "C: back to the station"
+tick(e, fresh=["C"]); assert e.mode == "docked" and e.cmdr.fuel == 70, "docking fills the tank"
+assert "ZAONCE" in texts(e)
+
+# arriving: clear the ships that meet you and you are docked
+launch(e)
+g.spawn_t = g.rock_t = 1e9
+assert g.arriving is None and g.kills == 0
+fpick(e, "LOCAL CHART")
+e.chart.cx, e.chart.cy = [(float(px), float(py)) for px, py, i, d in e.chart.dots if i == 7][0]
+e.chart._select(); tick(e, fresh=["C"])
+for _ in range(200):
+    tick(e)
+    if e.cmdr.system == 7:
+        break
+assert e.cmdr.system == 7 and g.arriving == 4 and e.cmdr.fuel == 70 - d129
+g.spawn_t = 1e9
+kill(g, 3); tick(e)
+assert g.arriving == 1 and g.dock_t == 0 and e.mode == "flight"
+o = game.Obj(g.types["SIDEWINDER"], "ship", 0.0, 0.0, 3000.0); g.objs.append(o)
+o2 = game.Obj(g.types["SIDEWINDER"], "ship", 500.0, 0.0, 3000.0); g.objs.append(o2)
+g._kill(o); tick(e); tick(e)
+assert g.arriving == 0 and g.dock_t == 0, "not while a ship is still about"
+g._kill(o2); tick(e); tick(e)
+assert g.msg == "ALL CLEAR: DOCKING" and g.dock_t > 0 and e.mode == "flight"
+g.spawn_t = 0.0
+for _ in range(200):
+    tick(e)
+    if e.mode == "docked":
+        break
+assert e.mode == "docked" and e.docked and not any(x.kind == "ship" for x in g.objs), "no more come"
+assert e.cmdr.fuel == 70 and e.cmdr.kills == 2 + 5
+saved = commander.load(SAVE)
+assert (saved.system, saved.fuel, saved.kills) == (7, 70, 7), "docking saves"
+tx = texts(e)
+assert "LAVE" in tx and "DOCKED" in tx
+launch(e)
+assert e.game.arriving is None and e.game.kills == 0 and not e.game.docked
+debug(e, "DOCK NOW"); assert e.mode == "docked" and not e.paused
+print("arriving, clearing the ships, docking, refuelling: ok")
+
 f = ace_commander.AceCommander()
 choose(f, "CONTINUE")
-assert f.cmdr.system == 129 and f.galaxy is not None
+assert f.mode == "docked"
+assert f.cmdr.system == 7 and f.galaxy is not None
 # practice has no chart, and neither does a commander without game_data.py
 choose_p = ace_commander.AceCommander()
 choose(choose_p, "COMBAT PRACTICE")
@@ -324,8 +390,11 @@ assert "LOCAL CHART" not in choose_p._fitems_top()
 gd = mod.game_data; mod.game_data = None
 n = ace_commander.AceCommander()
 choose(n, "CONTINUE")
-assert n.galaxy is None and "LOCAL CHART" not in n._fitems_top()
-tick(n, fresh=["A"]); fpick(n, "STATUS"); texts(n)
+assert n.mode == "docked" and n.galaxy is None
+assert "COMMANDER" in texts(n) and "LAVE" not in texts(n)
+launch(n)
+assert "LOCAL CHART" not in n._fitems_top()
+fpick(n, "STATUS"); texts(n)
 mod.game_data = gd
 os.remove(SAVE)
 print("local chart, hyperspace countdown, fuel, arriving saves: ok")

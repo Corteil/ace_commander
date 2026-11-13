@@ -57,6 +57,8 @@ bs.choose(a, "NEW COMMANDER")
 shot(a, "1d_level.png")
 tick(a, fresh=["CONFIRM"])
 a.cmdr.add_kills(140)
+shot(a, "1e_docked.png")
+tick(a, fresh=["CONFIRM"])
 g = a.game
 g.spawn_t = g.rock_t = 1e9
 g.objs[:] = []
@@ -117,11 +119,14 @@ shot(a, "4g_chart_too_far.png")
 tick(a, fresh=["A"])
 objs = g.objs[:]
 g.objs[:] = []
-g.warp = 0.9; g.say("ZAONCE", 3.0)
+g.lock = None
+g.warp = 0.9; g.say("ZAONCE: 4 SHIPS TO CLEAR", 3.0)
 shot(a, "4h_arriving.png")
 g.warp = 0.3
 shot(a, "4i_arriving_late.png")
 g.warp = 0.0
+g.say("ALL CLEAR: DOCKING", 3.0)
+shot(a, "4j_all_clear.png")
 g.objs[:] = objs
 g._hurt(1000.0)
 tick(a)

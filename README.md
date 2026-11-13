@@ -18,8 +18,9 @@ The title screen, with a ship tumbling under the name, offers:
 Joystick left / right changes the choice, C selects it and F leaves the app.
 
 A commander is somewhere in a galaxy of 256 star systems and can jump between them by
-hyperspace (see [Hyperspace](#hyperspace)). Not in yet: stations, docking and trading, so
-there is nowhere to refuel. The plan for those is in [DESIGN.md](DESIGN.md).
+hyperspace (see [Hyperspace](#hyperspace)). Continue and New commander start you docked:
+C or A launches, F goes back to the title screen. Not in yet: a station to fly to, and
+trading. The plan for those is in [DESIGN.md](DESIGN.md).
 
 This is a fan-made game inspired by Elite. It is not official, licensed or endorsed. See
 [Credits and original material](#credits-and-original-material).
@@ -43,7 +44,7 @@ commander's rank, kills, star system and fuel) and a **Pause menu**, where you s
 steering between JOYSTICK and TILT or quit to the title screen.
 
 The menu also has a **Debug** page of cheats for testing: invincibility, kill all enemies,
-next wave, add an enemy, refill missiles, refill fuel and +10 kills. Kills made there count towards your
+next wave, add an enemy, refill missiles, refill fuel, +10 kills and dock now. Kills made there count towards your
 commander's rank. Set `DEBUG_MENU = False` in `app.py` to hide it.
 
 With TILT, tilting the badge steers and the joystick still works. D then does two jobs: a
@@ -75,7 +76,14 @@ The game resumes with a five-second countdown, then you arrive in the new system
 everything from the old one left behind. The jump uses fuel for its distance, and the
 commander is saved on arriving. Combat practice has no chart.
 
-There is no way to refuel yet except **Refill fuel** on the Debug page.
+There is no station to fly to yet, so arriving works like this: ships come to meet you
+(3, 4 or 5 of them by level), and once that many are destroyed and none are left you are
+docked. Docking fills the tank for nothing and saves the commander. The docked screen shows
+the system, your rank, fuel and credits. If you are destroyed, C takes you back to the
+station you last reached.
+
+Launching without jumping gives the endless fight as before; jump when you want to move on.
+The Debug page has **Refill fuel** and **Dock now** as shortcuts.
 
 The galaxy needs `game_data.py` (see [Ships and galaxy data](#ships-and-galaxy-data)).
 Without it the game still runs, with no Local chart.
@@ -173,8 +181,8 @@ the two faces it sits between points back at the viewer.
 - `tests/` - tests that run on a PC with stand-ins for the badge: `python tests/run_all.py`.
 - `CLAUDE.md` - project notes: firmware facts, measurements and what's next.
 - `DESIGN.md` - design for the rest of the game. Phase 1 (title screen, commander, levels,
-  new buttons) is built, and so is the first part of phase 2 (galaxy, local chart,
-  hyperspace); docking and trading are not.
+  new buttons) is built, and so is most of phase 2 (galaxy, local chart, hyperspace,
+  arriving docked); a station to fly to and trading are not.
 
 ## Install
 
