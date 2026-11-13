@@ -7,7 +7,10 @@ custom firmware.
 The menu offers **Flight** (fight waves of pirates, shoot rocks, scoop cargo) and
 **Ship viewer** (every ship, one at a time, spinning).
 
-Not in yet: docking, trading, the galaxy.
+Not in yet: docking, trading, the galaxy. The plan for those is in [DESIGN.md](DESIGN.md).
+
+This is a fan-made game inspired by Elite. It is not official, licensed or endorsed. See
+[Credits and original material](#credits-and-original-material).
 
 ## Flight controls
 
@@ -109,9 +112,32 @@ the two faces it sits between points back at the viewer.
 - `tools/import_ships.py` - makes `ship_data.py`. Stays on your PC.
 - `tests/` - tests that run on a PC with stand-ins for the badge: `python tests/run_all.py`.
 - `CLAUDE.md` - project notes: firmware facts, measurements and what's next.
+- `DESIGN.md` - draft design for docking, trading and the galaxy. Not built yet.
 
 ## Install
 
 Copy `__init__.py app.py game.py cockpit.py viewer.py bench.py ship_data.py tildagon.toml
 metadata.json` to `/apps/elite_demo/` on the badge (for example with `mpremote fs cp`),
 then restart it. On Windows, `deploy.bat all` does this.
+
+## Credits and original material
+
+Elite was written by David Braben and Ian Bell and published by Acornsoft in 1984. This
+project is a fan-made game inspired by it, for the EMF Camp badge.
+
+- **Code:** written from scratch in MicroPython. It contains no original Elite code and
+  nothing translated from it.
+- **Ideas re-implemented in new code:** the hidden-line rule, steering by rotating the
+  universe around the player, the radar with height sticks, and the ship names. One message,
+  "RIGHT ON COMMANDER!", is a line from the original.
+- **Ship models and stats:** these are the original's own data and are **not in this repo**.
+  The game needs them to run, so each user generates `ship_data.py` locally (see
+  [Ships](#ships)) from Mark Moxon's annotated source at [bbcelite.com](https://elite.bbcelite.com/).
+  That source repo has no licence, which is why the generated file is git-ignored and should
+  not be published.
+- **Badge firmware:** `tests/badge_stubs.py` mirrors the button-matching rules of the
+  [badge firmware](https://github.com/emfcamp/badge-2024-software) so the tests behave like
+  the badge.
+
+"No original code" is not the same as "no legal issue". The ship data and the name are the
+parts someone could object to, so neither should go into the badge app store as they are.

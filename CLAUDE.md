@@ -114,6 +114,9 @@ confirmed. Build 13 adds `gc N used N free N` to each `PERF` line (it times one
 3. Rules cost about 1.2 ms per object. Build 13 skips rotation maths when not turning;
    check what that saved.
 4. Then gameplay: balance has only been judged by a crude autopilot in `tests/test_game.py`.
+5. The rest of the game (title screen with a tumbling ship, galaxy, docking, trading,
+   equipment) is drafted in `DESIGN.md`, with 11 open decisions at the end. Brian asked for
+   the tumbling-ship title screen specifically. Nothing in it is built.
 
 ## Not yet confirmed on the badge
 
@@ -135,6 +138,11 @@ on screen. Enemy lasers run from the ship's gun to the bottom of the screen (the
 `github.com/markmoxon/elite-source-code-bbc-micro-disc`, which has no licence. It is
 gitignored and must not be committed, published or put in the badge app store. Brian
 generated it from his own clone. The converter that reads it is fine to publish.
+
+The GitHub repo (`Corteil/elite_demo`) is **public** as of 2026-11-13, so check every commit
+for Elite-derived data before pushing. Describe the project as a fan-made game inspired by
+Elite, written from scratch, not as a port: no original code is used. The README's
+"Credits and original material" section has the proposed wording (Brian has not signed it off).
 
 ## Pitfalls for an agent working here
 
