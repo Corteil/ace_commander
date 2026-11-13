@@ -1,7 +1,8 @@
 # Design for the rest of Ace Commander
 
 First draft, 2026-11-13, with Brian's decisions of the same day written in (see
-[Decisions](#decisions)). Nothing in this document has been built or tested yet.
+[Decisions](#decisions)). Phase 1 is built and has been played on the badge (build 15);
+nothing after it has been built or tested yet.
 
 ## Summary
 
@@ -214,8 +215,8 @@ that commander.
 
 | Level | Kills for each rank | Enemies |
 | --- | --- | --- |
-| Easiest | A fraction of the original's (suggested: a tenth, so 640 for the top rank) | Fewer at once, worse aim, less damage |
-| Middle | Between the two (suggested: a quarter, 1,600) | As in today's wave game |
+| Easiest | A fifth of the original's: 1,280 for the top rank. (A tenth was tried and Brian found the ranks came too fast) | Fewer at once, worse aim, less damage |
+| Middle | Half of the original's: 3,200 | As in today's wave game |
 | Hardest | The original's, 6,400 for the top rank | More at once, better aim, more damage |
 
 The level changes nothing else: money, prices and docking are the same on all three. The
@@ -398,7 +399,7 @@ order puts the visible, low-risk work first and the parts that depend on decisio
 | Phase | Adds | What you can do at the end |
 | --- | --- | --- |
 | 0. Finish the speed work | Read build 13's log, fix the stutter if garbage collection is the cause | Fly without a hitch every few seconds |
-| 1. Title and commander | Tumbling-ship title screen, commander with save and load, the new screen flow | Start from the title, keep a commander between sessions |
+| 1. Title and commander (built) | Tumbling-ship title screen, commander with save and load, the new screen flow | Start from the title, keep a commander between sessions |
 | 2. Galaxy and jumps | Galaxy generation, both charts, system data, status screen, hyperspace, fuel | Launch, fight, jump to another system, arrive docked |
 | 3. Station and trade | Station, planet, compass, docking, market, cargo, bounties | Fly in and dock yourself, and make money trading |
 | 4. Equipment | The equipment screen and each item's effect | Spend the money on a better ship |
@@ -430,7 +431,9 @@ All eleven were decided by Brian on 2026-11-13.
 | 10 | Running without Elite data | Authentic data only for now | Phase 6 |
 | 11 | Name | Ace Commander | Done |
 
-Still to agree: the names of the three levels and their exact numbers.
+Still to agree: the names of the three levels and their exact numbers. Build 15 uses EASY,
+NORMAL and HARD, with the original's kill counts divided by 5, 2 and 1, and enemies that
+come 3, 4 or 5 at a time and hit 0.7, 1 or 1.3 times as often and as hard.
 
 Two things also need an answer from the badge: whether F and E are the right way round for
 speed, and whether the LEDs flash on a hit and recover afterwards.

@@ -1,7 +1,7 @@
 # Ace Commander for the EMF Tildagon / Spaceagon badge
 
 Notes for picking this project up in a new session. Last updated at the end of the first
-working session, 2026-11-12 (build 13); updated 2026-11-13 (build 14, renamed, on a Pi).
+working session, 2026-11-12 (build 13); updated 2026-11-13 (build 15: renamed, on a Pi, design phase 1 built).
 
 ## What this is
 
@@ -10,14 +10,18 @@ board): a wireframe flight combat game plus a ship viewer, using the ship geomet
 of BBC Micro Elite. Brian's constraints: plain MicroPython, **no custom firmware build**.
 C or `@micropython.viper` is welcome only if measurements show it would help.
 
-Not built yet: docking, trading, the galaxy.
+Built from `DESIGN.md`: phase 1 (title screen, saved commander with rank, three levels, new
+button layout). Not built yet: docking, trading, the galaxy (phases 2 to 6).
 
 ## Files
 
 - `app.py` - menu, input (`Pad`), frame loop (`run`), LEDs, pause, PERF logging.
 - `game.py` - game rules. No badge imports, so it runs on a PC.
 - `cockpit.py` - flight view, HUD, radar. Built from rectangles (see Speed).
-- `viewer.py` - ship viewer. `bench.py` - the menu's "Speed test".
+- `viewer.py` - ship viewer. `bench.py` - the title screen's "Speed test".
+- `title.py` - title screen: block-letter name from rectangles, tumbling ship, one menu line.
+- `commander.py` - the saved commander (level, kills, rank). Rules only, no badge imports.
+  Saved to `commander.json` next to the app (gitignored).
 - `ship_data.py` - generated, **gitignored** (see Licensing). 31 ships.
 - `tools/import_ships.py` - makes `ship_data.py` from the Elite source.
 - `tools/badge_log.py`, `deploy.bat` - copy to the badge, restart it, save its serial output
@@ -131,10 +135,20 @@ top). So this is a frame-rate cost of up to 11%, not a visible stutter.
 3. Rules cost about 1.2 ms per object. Build 13 skips rotation maths when not turning;
    check what that saved.
 4. Then gameplay: balance has only been judged by a crude autopilot in `tests/test_game.py`.
-5. The rest of the game (title screen with a tumbling ship, galaxy, docking, trading,
-   equipment) is drafted in `DESIGN.md`. Its 11 decisions were all made on 2026-11-13 (table at the end);
-   the level names and numbers are still open. Brian asked for
-   the tumbling-ship title screen specifically. Nothing in it is built.
+5. `DESIGN.md` has the rest of the game in phases, with all 11 decisions made. **Phase 1 is
+   built (build 15) and Brian played it on the badge on 2026-11-13: title screen, new
+   commander, rank messages, status, save and continue, and tap / hold D all worked.**
+   Next is phase 2 (galaxy and jumps).
+6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
+   said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
+   (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
+7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
+   `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
+
+Measured on the badge in build 15: the title screen takes about 29 ms to draw (clear 7,
+133 title rectangles 3.5, the one menu text 9.6, the ship the rest). Filling each rectangle
+by itself is faster than one fill for all of them (3.5 against 7.7 ms). Flight averaged
+51 ms a frame over five minutes.
 
 ## Not yet confirmed on the badge
 
@@ -146,8 +160,9 @@ top). So this is a frame-rate cost of up to 11%, not a visible stutter.
 
 ## Controls (Brian's choices)
 
-Joystick steers by default. C or joystick press fires, B missile, F/E speed up/down,
-A pause, D re-zero tilt. Hostile ships red on the radar. Hit flash on the LEDs, not a ring
+Joystick steers by default. C or joystick press fires, D missile, B energy bomb (not built
+yet, says so), F/E speed up/down, A in-flight menu (status, and a pause menu with steering
+and quit). In tilt steering a tap on D re-zeroes and a hold fires the missile. Hostile ships red on the radar. Hit flash on the LEDs, not a ring
 on screen. Enemy lasers run from the ship's gun to the bottom of the screen (the cockpit).
 
 ## Licensing

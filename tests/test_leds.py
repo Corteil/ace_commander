@@ -27,7 +27,7 @@ assert mod.tildagonos is not None
 a = ace_commander.AceCommander()
 tick(a); tick(a, fresh=["DOWN"]); tick(a, fresh=["UP"])
 assert bus.events == [] and leds.writes == 0, "menu leaves the LEDs alone"
-tick(a, fresh=["CONFIRM"])          # into flight
+bs.choose(a, "COMBAT PRACTICE")     # into flight
 g = a.game
 g.spawn_t = g.rock_t = 1e9
 tick(a)
@@ -54,11 +54,12 @@ print("hit flash on LEDs, fading", seen, ": ok")
 g._hurt(10.0); tick(a); assert leds.values[5] == (255, 0, 0)
 tick(a, fresh=["A"]); tick(a)                       # paused
 assert a.paused and leds.values == RED12(0)
-tick(a, fresh=["CANCEL"])                           # to the menu
+tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])  # PAUSE MENU
+tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])  # QUIT TO TITLE
 assert a.mode == "menu" and bus.events == ["PatternDisable", "PatternEnable"]
 tick(a); tick(a)
 assert bus.events == ["PatternDisable", "PatternEnable"]
-tick(a, fresh=["CONFIRM"]); tick(a)                 # back in
+bs.choose(a, "COMBAT PRACTICE"); tick(a)                 # back in
 assert bus.events[-1] == "PatternDisable" and len(bus.events) == 3
 g._hurt(1000.0); tick(a)
 assert g.over and leds.values == RED12(48), "dim red at game over"
@@ -67,7 +68,7 @@ assert bus.events[-1] == "PatternEnable"
 print("pause, menu and game over hand the LEDs back: ok")
 
 # the LEDs failing mid-game must not crash, and brings the ring back
-tick(a, fresh=["CONFIRM"]); tick(a)
+bs.choose(a, "COMBAT PRACTICE"); tick(a)
 leds.fail = True
 a.game._hurt(5.0)
 tick(a)
@@ -83,7 +84,7 @@ import ace_commander
 mod = ace_commander.app
 mod.USE_LEDS = False
 a = ace_commander.AceCommander()
-tick(a, fresh=["CONFIRM"]); tick(a)
+bs.choose(a, "COMBAT PRACTICE"); tick(a)
 a.game._hurt(5.0); tick(a)
 assert bus.events == [] and leds.writes == 0 and arcs(a) == 1
 print("USE_LEDS = False keeps the ring: ok")
@@ -94,7 +95,7 @@ import ace_commander
 mod = ace_commander.app
 assert mod.tildagonos is None
 a = ace_commander.AceCommander()
-tick(a, fresh=["CONFIRM"]); tick(a)
+bs.choose(a, "COMBAT PRACTICE"); tick(a)
 a.game._hurt(5.0); tick(a)
 assert arcs(a) == 1
 print("no LED modules: ring fallback: ok")

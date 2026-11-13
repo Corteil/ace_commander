@@ -4,8 +4,18 @@ A flight combat game and ship viewer for the EMF Tildagon / Spaceagon badge, dra
 hidden-line wireframes using the ships of BBC Micro Elite. Plain MicroPython: no C and no
 custom firmware.
 
-The menu offers **Flight** (fight waves of pirates, shoot rocks, scoop cargo) and
-**Ship viewer** (every ship, one at a time, spinning).
+The title screen, with a ship tumbling under the name, offers:
+
+- **New commander** / **Continue** - fight waves of pirates, shoot rocks and scoop cargo as
+  a saved commander. Your kills earn a rank, from Harmless up to Elite. A new commander picks
+  one of three levels, which sets how many kills each rank takes and how tough the enemies
+  are, and can't be changed afterwards. There is one commander; it is saved in
+  `commander.json` next to the app when you quit to the title screen or are destroyed.
+- **Combat practice** - the same fight with nothing kept.
+- **Ship viewer** - every ship, one at a time, spinning.
+- **Speed test** - times kinds of drawing on the badge.
+
+Joystick left / right changes the choice, C selects it and F leaves the app.
 
 Not in yet: docking, trading, the galaxy. The plan for those is in [DESIGN.md](DESIGN.md).
 
@@ -20,23 +30,27 @@ Written for the 2026 Spaceagon: the joystick steers and the lettered buttons do 
 |---|---|
 | Joystick | pitch and roll |
 | C, or press the joystick (hold) | lasers |
-| B | fire a missile at the boxed target |
+| D | fire a missile at the boxed target |
+| B | energy bomb (not in the game yet) |
 | F / E | speed up / slow down |
-| A | pause |
-| D | re-zero tilt (only when steering by tilt) |
+| A | in-flight menu, which pauses the game |
 
-On the pause screen: C or A resumes, F goes back to the menu, and joystick left / right
-switches steering between JOYSTICK and TILT. With TILT, tilting the badge steers and the
-joystick still works. To start in tilt mode, set `TILT_DEFAULT = True` in `app.py`.
+In the in-flight menu the joystick moves up and down, C selects, F goes back and A
+resumes. It has **Status** (your commander's rank and kills) and a **Pause menu**, where you
+switch steering between JOYSTICK and TILT or quit to the title screen.
+
+With TILT, tilting the badge steers and the joystick still works. D then does two jobs: a
+tap re-zeroes the tilt and holding it for about half a second fires the missile
+(`HOLD_MISSILE` in `app.py`). To start in tilt mode, set `TILT_DEFAULT = True` in `app.py`.
 
 Keyboard: `W` / `S` or up / down pitch, `A` / `D` or left / right roll, `E` / `Q` speed
-up / down, `F` or space lasers, `M` missile, `P` pause.
+up / down, `F` or space lasers, `M` missile, `P` in-flight menu.
 
-To use other buttons, change `BTN_SPEED_UP`, `BTN_SPEED_DOWN`, `BTN_MISSILE`, `BTN_PAUSE`
-and `BTN_REZERO` near the top of `app.py`.
+To use other buttons, change `BTN_SPEED_UP`, `BTN_SPEED_DOWN`, `BTN_MISSILE`, `BTN_BOMB`
+and `BTN_MENU` near the top of `app.py`.
 
 On firmware without the joystick's own button names, the game falls back to tilt steering
-with UP / DOWN for speed, LEFT for a missile and CANCEL to pause.
+with UP / DOWN for speed, LEFT for a missile, RIGHT to re-zero and CANCEL for the menu.
 
 ## The screen
 
@@ -102,7 +116,9 @@ the two faces it sits between points back at the viewer.
 
 ## Files
 
-- `app.py` - menu, input (tilt, buttons, keyboard), pause.
+- `app.py` - moves between the screens; input (tilt, buttons, keyboard); in-flight menu.
+- `title.py` - the title screen: block-letter name, tumbling ship, one-line menu.
+- `commander.py` - the saved commander: level, kills, rank. No badge imports.
 - `game.py` - the flight game's rules, with no badge imports so it can be tested on a PC.
 - `cockpit.py` - draws the flight view, radar and gauges.
 - `viewer.py` - the ship viewer.
@@ -112,12 +128,13 @@ the two faces it sits between points back at the viewer.
 - `tools/import_ships.py` - makes `ship_data.py`. Stays on your PC.
 - `tests/` - tests that run on a PC with stand-ins for the badge: `python tests/run_all.py`.
 - `CLAUDE.md` - project notes: firmware facts, measurements and what's next.
-- `DESIGN.md` - draft design for docking, trading and the galaxy. Not built yet.
+- `DESIGN.md` - design for the rest of the game. Phase 1 (title screen, commander, levels,
+  new buttons) is built; docking, trading and the galaxy are not.
 
 ## Install
 
-Copy `__init__.py app.py game.py cockpit.py viewer.py bench.py ship_data.py tildagon.toml
-metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
+Copy `__init__.py app.py game.py cockpit.py viewer.py bench.py title.py commander.py
+ship_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
 then restart it. On Windows, `deploy.bat all` does this.
 
 ## Credits and original material

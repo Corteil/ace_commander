@@ -4,6 +4,7 @@ ship_data.py
 
 __pycache__/
 badge_log.txt
+commander.json
 *.pyc
 
 # made by the tests

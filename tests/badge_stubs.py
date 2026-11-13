@@ -133,6 +133,13 @@ def press(names):
     _down = names
 
 
+def choose(a, label):
+    """Pick a title screen choice by name."""
+    assert a.mode == "menu", a.mode
+    a.menu = a.choices().index(label)
+    tick(a, fresh=["CONFIRM"])
+
+
 def tick(a, held=(), fresh=(), ms=40):
     """One update with these buttons down. `fresh` ones are let go straight after."""
     press(set(held) | set(fresh))
