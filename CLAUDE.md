@@ -124,6 +124,17 @@ free" does not mean collections are rare. `gc.mem_alloc()` itself takes 15 ms.
 Brian could not feel the hitch in build 14 (he could with build 13's forced collection on
 top). So this is a frame-rate cost of up to 11%, not a visible stutter.
 
+**Build 16 in a real flight (2026-11-13, 66 windows):**
+
+| Objects | Average frame | Slow frames per 60 | Each one is over by | Time lost |
+|---|---|---|---|---|
+| 1-3 | 38 ms | 0.7 | 71 ms | 2% |
+| 5-9 | 46 ms | 2.5 | 66 ms | 6% |
+| 10+ | 50 ms | 3.3 | 65 ms | 7% |
+
+So collections are about half as frequent as in build 14 and the average frame is 3 to 5 ms
+shorter, for the changes below.
+
 **Where the garbage comes from (build 16, measured on the badge).** Every float result on
 this port is a new 16-byte heap object; small whole numbers are free. To measure a function,
 collect, `gc.disable()`, call it a few times, read `gc.mem_alloc()`, `gc.enable()`. Without
