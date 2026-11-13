@@ -96,6 +96,11 @@ def merge(ships, found):
     """Add one file's ships. The same ship appears in several files (one per
     disc variant), so keep the first copy and warn if a later one differs."""
     for name, rec in found:
+        if not rec["verts"]:
+            # a label with no geometry, e.g. the loader's ".SHIP_MISSILE" in
+            # front of an INCBIN; which file comes first depends on the
+            # filesystem, so it must not shadow the real definition
+            continue
         old = ships.get(name)
         if old is None:
             ships[name] = rec
