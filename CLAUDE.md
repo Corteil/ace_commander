@@ -176,7 +176,10 @@ of a real flight, not from a harness.
    **Phase 2, first part, is build 20 (2026-11-13): a commander is at a star system with
    fuel; LOCAL CHART in the in-flight menu picks a target; `Game.start_jump()` counts down
    5 s, clears the objects and sets `jumped`; `app._arrive` moves the commander, takes the
-   fuel and saves. Tested on a PC only when written.** Still to do in phase 2: the galactic
+   fuel and saves.** Run over the REPL on the badge (not yet played by hand): making the
+   galaxy 290 ms once, opening the chart 185 ms the first time, drawing it 14 ms, a change
+   of selected system 28 ms (`Galaxy.system` twists the seeds from the start), the arrival
+   streaks 11 ms. Still to do in phase 2: the galactic
    chart, the system data screen, and arriving docked (a first docked Status screen that
    refuels). Until then the only refuel is REFILL FUEL on the DEBUG page.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
