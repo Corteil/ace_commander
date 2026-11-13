@@ -139,5 +139,6 @@ project is a fan-made game inspired by it, for the EMF Camp badge.
   [badge firmware](https://github.com/emfcamp/badge-2024-software) so the tests behave like
   the badge.
 
-"No original code" is not the same as "no legal issue". The ship data and the name are the
-parts someone could object to, so neither should go into the badge app store as they are.
+"No original code" is not the same as "no legal issue". The ship data is the part someone
+could object to, so it should not go into the badge app store. The game was first called
+Elite and was renamed Ace Commander to keep clear of the original's name.

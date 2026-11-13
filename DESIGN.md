@@ -1,6 +1,7 @@
-# Design for the rest of the game
+# Design for the rest of Ace Commander
 
-First draft, 2026-11-13. Nothing in this document has been built or tested yet.
+First draft, 2026-11-13, with Brian's decisions of the same day written in (see
+[Decisions](#decisions)). Nothing in this document has been built or tested yet.
 
 ## Summary
 
@@ -54,12 +55,13 @@ does. It replaces the plain three-line menu.
   and does not just spin. It uses the ship viewer's drawing code, so there is little new work.
 - **Which ship:** the Cobra Mk III first. After about 8 seconds it flies off toward the
   viewer and another ship takes its place. The original showed the Cobra, then a Mamba.
-- **Title:** ELITE in large block letters built from rectangles, so it costs almost nothing
+- **Title:** ACE COMMANDER in block letters built from rectangles, so it costs almost nothing
   per frame.
 - **Menu:** one line under the ship showing the current choice, with arrows either side.
   Joystick left and right change it, C selects it, F exits to the badge menu.
 - **Choices:** Continue (if a saved commander exists), New commander, Combat practice
   (today's wave game), Ship viewer, Speed test.
+- **New commander** asks for a level first (see [Levels](#levels)).
 
 Showing one menu line keeps this screen to one or two pieces of text. With today's five
 lines of text the ship would tumble at about 12 frames a second; with one line the estimate
@@ -153,21 +155,23 @@ an end: you launch from the station and you finish by docking at one.
 view. This is the original's launch, minus the tunnel animation.
 
 **Travel inside a system.** You arrive from hyperspace some distance from the planet and fly
-in, with encounters on the way. The distance is set so the trip takes about a minute at full
+in, with encounters on the way. The distance is set so the trip takes about two minutes at full
 speed. A jump drive cuts the empty stretches: hold speed-up at full speed with nothing on
 the radar and you move 8 times faster until something appears.
 
-**Docking.** Three options, in order of difficulty:
+**Docking.** All three styles are built. The player picks one in the in-flight menu and can
+change it at any time; it is saved with the commander and has no effect on rank. A new
+commander starts on B.
 
 | Option | How it works | Trade-off |
 | --- | --- | --- |
 | A. Authentic | Line up with the slot, match the station's rotation, fly in | True to the original, but hard with a digital joystick at 15 to 20 frames a second |
-| B. Assisted (recommended) | Approach the slot face within a cone, under a speed limit, and the station pulls you in | Keeps the skill of the approach, drops the roll matching |
+| B. Assisted (the default) | Approach the slot face within a cone, under a speed limit, and the station pulls you in | Keeps the skill of the approach, drops the roll matching |
 | C. Automatic | Get close enough and you are docked | No skill, no frustration |
 
-With option B the docking computer is still worth buying: it docks you from anywhere near
-the station. Hitting the station outside the cone, or too fast, damages you and bounces you
-off.
+With A and B the docking computer is still worth buying: it docks you from anywhere near
+the station. With C it does nothing. In A and B, hitting the station outside the slot or
+cone, or too fast, damages you and bounces you off.
 
 **Hyperspace.** Pick a target on the local chart, either while docked or from the in-flight
 menu. A short countdown runs, fuel is deducted, a burst of streaks plays, and you arrive in
@@ -200,7 +204,22 @@ the ship data.
 **Rank** follows your kill count. From memory the ladder is Harmless, Mostly Harmless
 (8 kills), Poor (16), Average (32), Above Average (64), Competent (128), Dangerous (512),
 Deadly (2,560) and Elite (6,400). Elite at 6,400 kills is a very long game on a badge, so
-the thresholds may want scaling down.
+the thresholds depend on the level.
+
+### Levels
+
+A new commander picks one of three levels. It is saved with the commander, shown on the
+status screen and cannot be changed afterwards, so a rank always means the same thing for
+that commander.
+
+| Level | Kills for each rank | Enemies |
+| --- | --- | --- |
+| Easiest | A fraction of the original's (suggested: a tenth, so 640 for the top rank) | Fewer at once, worse aim, less damage |
+| Middle | Between the two (suggested: a quarter, 1,600) | As in today's wave game |
+| Hardest | The original's, 6,400 for the top rank | More at once, better aim, more damage |
+
+The level changes nothing else: money, prices and docking are the same on all three. The
+level names and the exact numbers are still to be agreed.
 
 **Combat practice.** Today's wave game stays as a separate choice on the title screen. It
 gives a quick fight with no commander at stake, and it is the test bed for tuning speed and
@@ -236,36 +255,38 @@ against the source.
   original.
 - **One laser:** only the front laser exists, because there is only a front view.
 - **ECM and energy bomb:** the original puts each on its own key. Here the ECM fires by
-  itself when a missile gets close, and the energy bomb is a choice on the in-flight menu.
+  itself when a missile gets close, and the energy bomb (the "flash bomb") is on B.
 - **Left out:** sun skimming for free fuel. It needs heat and altitude gauges, which don't
   fit the HUD.
 
 ## Controls
 
-Flight keeps the current controls. The only button with a new job is D, which is free in
-joystick steering today.
+Flight changes three buttons from today's game: A opens the in-flight menu, which has the
+pause screen inside it; B fires the energy bomb; and the missile moves from B to D.
 
 | Control | Flight | Docked screens | Title screen |
 | --- | --- | --- | --- |
 | Joystick up / down | Pitch | Move through a list, or move the chart cursor | |
 | Joystick left / right | Roll | Change screen, or move the chart cursor | Change menu choice |
 | C or joystick press | Lasers | Buy, or select | Select |
-| B | Missile | Sell | |
+| B | Energy bomb, once fitted | Sell | |
 | F | Speed up. Hold at full speed for the jump drive | Back | Exit to the badge menu |
 | E | Slow down | | |
-| A | Pause | Launch, from the Status screen | |
-| D | In-flight menu | | |
+| A | In-flight menu (pauses the game) | Launch, from the Status screen | |
+| D | Missile. In tilt steering: tap to re-zero tilt, hold to fire a missile | | |
 
-**In-flight menu (D).** The game pauses and offers: local chart and hyperspace, status,
-energy bomb if fitted, and docking computer if fitted and the station is near. This keeps
-rare actions off the six buttons.
+**In-flight menu (A).** The game pauses and offers: resume, local chart and hyperspace,
+status, docking computer if fitted and the station is near, docking style, and a pause
+sub-menu with today's pause options (steering by joystick or tilt, back to the title
+screen). This keeps rare actions off the six buttons.
 
 **Chart cursor.** On the two chart screens the joystick moves the cursor in all four
 directions, so it cannot also change screen. E and B step to the previous and next screen
 there.
 
-**Tilt steering** stays as an option on the pause screen. In tilt mode D is taken by
-re-zero, so the in-flight menu moves onto the pause screen.
+**Tilt steering** stays as an option in the pause sub-menu. In tilt mode D does two jobs: a
+tap re-zeros the tilt and holding it fires a missile. The hold time needs tuning on the
+badge so that a re-zero never fires one by accident.
 
 **Keyboard.** The existing flight keys stay. The docked screens could take the first letter
 of each screen as a shortcut, but nothing depends on a keyboard.
@@ -330,11 +351,13 @@ of the Elite source into a file that git ignores. This section is not legal advi
 ships are missing. For the galaxy and market there is a second option: ship the repo with
 its own invented seeds, name syllables and goods, so it runs as an Elite-like game for
 anyone, and becomes authentic Elite when the generated files are present. That is more work,
-and it only matters if others are to run it.
+and it only matters if others are to run it. Decided: authentic data only for now.
 
-**The name.** As far as we know, "Elite" is a trademark of the company behind the current
-Elite games; the register has not been checked. It would matter for the badge app store,
-where a different name would be the safe choice.
+**The name.** The game is called Ace Commander. As far as we know, "Elite" is a trademark
+of the company behind the current Elite games (the register has not been checked), so the
+app does not use it as its name. A web search on 2026-11-13 found no game called Ace
+Commander; trademark registers were not searched. The top rank is still called Elite, as in
+the original.
 
 ## Code structure, saved games and testing
 
@@ -385,26 +408,29 @@ order puts the visible, low-risk work first and the parts that depend on decisio
 In phase 2 there is no station to fly to yet, so arriving in a system docks you after you
 clear the encounter on the way. Phase 3 replaces that with real docking.
 
-Phases 1 and 2 need no decisions beyond the title screen details. Phase 3 needs the docking
-choice.
+Phase 1 now includes the level choice for a new commander, and the button changes (A menu,
+B bomb, D missile) are best made there too, in Combat practice. Phase 3 builds all three
+docking styles.
 
-## Open decisions
+## Decisions
 
-None of these has been decided. Each has a recommendation.
+All eleven were decided by Brian on 2026-11-13.
 
-| # | Decision | Options | Recommendation | Needed by |
-| --- | --- | --- | --- | --- |
-| 1 | Title screen ship | Cobra Mk III only, or Cobra then other ships in turn | Cobra first, then others in turn | Phase 1 |
-| 2 | Title menu | One line with arrows, or the full list beside a smaller ship | One line with arrows, for frame rate | Phase 1 |
-| 3 | Keep today's wave game | Keep as Combat practice, or drop it | Keep | Phase 1 |
-| 4 | Rank thresholds | Original (Elite at 6,400 kills), or scaled down for a badge | Scale down, amount to be agreed | Phase 1 |
-| 5 | Trip length inside a system | About a minute with a jump drive, or shorter | About a minute | Phase 2 |
-| 6 | Docking | A authentic, B assisted, C automatic | B assisted | Phase 3 |
-| 7 | Views | Front only, or add rear | Front only | Phase 3 |
-| 8 | D button | In-flight menu, or something else | In-flight menu | Phase 2 |
-| 9 | ECM | Fires by itself, or a manual control | Fires by itself | Phase 4 |
-| 10 | Running without Elite data | Authentic data only, or also original stand-in content | Authentic only for now | Phase 6 |
-| 11 | Name if published | Keep "Elite", or pick another name for the app store | Decide before publishing to the app store | Before publishing |
+| # | Decision | Decided | Needed by |
+| --- | --- | --- | --- |
+| 1 | Title screen ship | Cobra Mk III first, then other ships in turn | Phase 1 |
+| 2 | Title menu | One line with arrows | Phase 1 |
+| 3 | Today's wave game | Keep, as Combat practice | Phase 1 |
+| 4 | Rank thresholds | Three levels, picked when creating a commander. The level sets the kills needed for each rank and how tough the enemies are, and nothing else | Phase 1 |
+| 5 | Trip length inside a system | About two minutes at full speed, with the jump drive | Phase 2 |
+| 6 | Docking | All three styles (authentic, assisted, automatic), switchable at any time from the in-flight menu | Phase 3 |
+| 7 | Views | Front only | Phase 3 |
+| 8 | Buttons | A opens the in-flight menu, with the pause screen as a sub-menu. B fires the energy bomb. D fires a missile; in tilt steering a tap on D re-zeros and a hold fires | Phase 1 |
+| 9 | ECM | Fires by itself | Phase 4 |
+| 10 | Running without Elite data | Authentic data only for now | Phase 6 |
+| 11 | Name | Ace Commander | Done |
+
+Still to agree: the names of the three levels and their exact numbers.
 
 Two things also need an answer from the badge: whether F and E are the right way round for
 speed, and whether the LEDs flash on a hit and recover afterwards.
