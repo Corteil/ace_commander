@@ -1,26 +1,33 @@
 """Ace Commander for the EMF Tildagon / Spaceagon badge: a flight combat game and a
 ship viewer, drawn as hidden-line wireframes with the original ship data.
 
+Title screen
+    Joystick left / right changes the choice, C (or press the joystick)
+    selects it, F leaves the app. CONTINUE and NEW COMMANDER fly as a saved
+    commander, whose kills earn a rank; COMBAT PRACTICE is the same fight with
+    nothing kept.
+
 Flight (2026 Spaceagon)
     Joystick      pitch and roll
     C, or press the joystick    fire lasers (hold)
-    B             fire a missile at the boxed target
+    D             fire a missile at the boxed target
+    B             energy bomb (not in the game yet)
     F / E         speed up / slow down
-    A             pause
-    D             re-zero tilt (only when steering by tilt)
-The pause screen can switch steering to TILT: then tilting the badge steers,
-and the joystick still works. The badge's LEDs flash red when you are hit.
+    A             in-flight menu, which pauses the game
+With tilt steering (chosen in the in-flight menu) tilting the badge steers and
+the joystick still works; then a tap on D re-zeroes the tilt and holding D
+fires the missile. The badge's LEDs flash red when you are hit.
 
-Pause screen
-    C or A resume, F back to the menu, joystick left / right changes steering
+In-flight menu
+    Joystick up / down moves, C selects, F goes back, A resumes
 
 Keyboard
     W / S or up / down pitch, A / D or left / right roll, E / Q speed up /
-    down, F or SPACE lasers, M missile, P pause
+    down, F or SPACE lasers, M missile, P in-flight menu
 
 Ship viewer
     Joystick or buttons turn the ship, CONFIRM (or N) next ship, P previous
-    ship, CANCEL back to the menu.
+    ship, CANCEL back to the title screen.
 
 Ships come from ship_data.py, next to this file. Make it with
 tools/import_ships.py from your own copy of the Elite source.
@@ -36,7 +43,7 @@ import app
 from events.input import BUTTON_TYPES, ButtonDownEvent, ButtonUpEvent
 from system.eventbus import eventbus
 
-from . import bench, cockpit, game, viewer
+from . import bench, cockpit, commander, game, title, viewer
 
 try:
     import imu
@@ -73,9 +80,10 @@ except Exception:
 # Flight buttons (letters as printed on the badge)
 BTN_SPEED_UP = "F"
 BTN_SPEED_DOWN = "E"
-BTN_MISSILE = "B"
-BTN_PAUSE = "A"
-BTN_REZERO = "D"
+BTN_MISSILE = "D"      # with tilt steering: tap to re-zero the tilt, hold to fire
+BTN_BOMB = "B"
+BTN_MENU = "A"
+HOLD_MISSILE = 0.45    # seconds D must be held to fire a missile when steering by tilt
 
 # Tilt control. Values are in g (1 g = 9.81 m/s^2). The axis directions are a
 # first guess, so flip the signs if things tilt the wrong way.
@@ -89,12 +97,21 @@ TILT_SWAP_AXES = False  # True if the badge's x axis should pitch, y roll
 INVERT_PITCH = False    # False: joystick up raises the nose. True: up dives.
 SHOW_FRAME_TIME = True  # small frame time (ms) at the top of the flight screen
 USE_LEDS = True         # flash the badge's LEDs red when hit (else a ring on screen)
-FAST_FRAMES = True      # in flight and the viewer, don't wait 50 ms between frames
+FAST_FRAMES = True      # on the title screen, in flight and in the viewer, don't wait
+                        # 50 ms between frames
 PERF_LOG = 60           # print a PERF line to the console every this many flight
                         # frames (0 = never)
 PERF_SLOW = 25          # ms over the average that makes a frame count as slow
 
-MENU = ("FLIGHT", "SHIP VIEWER", "SPEED TEST")
+# where the commander is saved: next to this file
+try:
+    SAVE_PATH = __file__.rsplit("/", 1)[0] + "/commander.json"
+    if not SAVE_PATH.startswith("/") and ":" not in SAVE_PATH:
+        SAVE_PATH = "/" + SAVE_PATH     # the badge gives a path relative to /
+except Exception:
+    SAVE_PATH = "/apps/ace_commander/commander.json"
+
+LEVEL_NOTE = ("fewer, weaker enemies", "the standard fight", "more, deadlier enemies")
 ANY = ("up", "down", "left", "right")           # joystick, buttons or arrow keys
 STICK = ("j_up", "j_down", "j_left", "j_right")  # the joystick only
 ARROWS = ("k_UP", "k_DOWN", "k_LEFT", "k_RIGHT")
@@ -204,10 +221,19 @@ class AceCommander(app.App):
     def __init__(self):
         super().__init__()
         self.pad = Pad(self)
-        self.mode = "menu"      # menu | flight | viewer | bench
+        self.mode = "menu"      # menu (the title screen) | level | flight | viewer | bench
         self.bench = None
-        self.menu = 0
+        self.menu = 0           # which title screen choice is showing
+        self.title = title.Title(SHIPS) if SHIPS else None
+        self.cmdr = commander.load(SAVE_PATH)   # the saved commander, or None
+        self.level = 1          # the level showing on the new-commander screen
         self.game = None
+        self.career = False     # the current game counts towards the commander
+        self.banked = 0         # this game's kills already given to the commander
+        self.saved_over = False
+        self.fmenu = 0          # which in-flight menu line is highlighted
+        self.fsub = None        # None, "status" or "pause": the in-flight menu page
+        self.d_t = None         # how long D has been down, when steering by tilt
         self.viewer = None
         self.paused = False
         self.tilt_ok = imu is not None   # the accelerometer is there and working
@@ -240,15 +266,17 @@ class AceCommander(app.App):
 
     async def run(self, render_update):
         """The badge's own loop waits 50 ms after every update before the next
-        one, which caps any app at about 14 frames a second. In flight and the
-        viewer this asks for a redraw directly and carries on as soon as it
-        has been drawn. Menus, and anything unexpected, use the normal path."""
+        one, which caps any app at about 14 frames a second. On the title
+        screen, in flight and in the viewer this asks for a redraw directly and
+        carries on as soon as it has been drawn. The other screens, and
+        anything unexpected, use the normal path."""
         last = _ms()
         while True:
             now = _ms()
             self.update(_diff(now, last))
             last = now
-            if self.fast and (self.mode == "flight" or self.mode == "viewer"):
+            if self.fast and (self.mode == "flight" or self.mode == "viewer"
+                              or (self.mode == "menu" and self.title is not None)):
                 try:
                     scheduler.render_needed.set()
                     await asyncio.sleep(0)      # the renderer and other tasks run here
@@ -363,7 +391,8 @@ class AceCommander(app.App):
 
     def update(self, delta):
         t0 = _us()
-        self.ms += (delta - self.ms) * 0.1
+        if not self.paused:     # the pause menu shows it, so keep it still there
+            self.ms += (delta - self.ms) * 0.1
         pad = self.pad
         hit = pad.hit
         cancel = hit("cancel")
@@ -374,28 +403,33 @@ class AceCommander(app.App):
             if cancel:
                 pad.clear()
                 self.minimise()
-            elif not SHIPS:
-                pass    # nothing to choose without ship_data.py
-            elif hit("up"):
-                self.menu = (self.menu - 1) % len(MENU)
-            elif hit("down"):
-                self.menu = (self.menu + 1) % len(MENU)
+            elif SHIPS:     # nothing to choose without ship_data.py
+                if self.title is None:
+                    self.title = title.Title(SHIPS)
+                items = self.choices()
+                if self.menu >= len(items):
+                    self.menu = 0
+                if hit("left") or hit("up"):
+                    self.menu = (self.menu - 1) % len(items)
+                elif hit("right") or hit("down"):
+                    self.menu = (self.menu + 1) % len(items)
+                elif confirm:
+                    self._choose(items[self.menu])
+                self.title.step(dt)
+        elif self.mode == "level":
+            if cancel:
+                self.mode = "menu"
+            elif hit("left") or hit("up"):
+                self.level = (self.level - 1) % len(commander.LEVELS)
+            elif hit("right") or hit("down"):
+                self.level = (self.level + 1) % len(commander.LEVELS)
             elif confirm:
-                self.zero = None
-                if self.menu == 0:
-                    if self.game is None:
-                        self.game = game.Game(SHIPS)
-                    elif self.game.over:
-                        self.game.reset()
-                    self.paused = False
-                    self.mode = "flight"
-                elif self.menu == 1:
-                    if self.viewer is None:
-                        self.viewer = viewer.Viewer(SHIPS)
-                    self.mode = "viewer"
-                else:
-                    self.bench = bench.Bench()
-                    self.mode = "bench"
+                self.cmdr = commander.Commander(self.level)
+                self.cmdr.save(SAVE_PATH)
+                if self.game is not None:
+                    self.game.over = True   # a new commander starts a new fight
+                self.menu = 0       # CONTINUE is now the first choice
+                self._start_flight(True)
         elif self.mode == "viewer":
             self._update_viewer(dt, cancel, confirm)
         elif self.mode == "bench":
@@ -413,6 +447,70 @@ class AceCommander(app.App):
             if flying and PERF_LOG:
                 self._perf(delta, _diff(_us(), t0) / 1000.0)
         pad.end_frame()
+
+    def choices(self):
+        """The title screen's choices, in order."""
+        items = ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "SPEED TEST"]
+        if self.cmdr is not None:
+            items.insert(0, "CONTINUE")
+        return items
+
+    def _choose(self, item):
+        if item == "CONTINUE":
+            self._start_flight(True)
+        elif item == "NEW COMMANDER":
+            self.level = 1
+            self.mode = "level"
+        elif item == "COMBAT PRACTICE":
+            self._start_flight(False)
+        elif item == "SHIP VIEWER":
+            self.zero = None
+            if self.viewer is None:
+                self.viewer = viewer.Viewer(SHIPS)
+            self.mode = "viewer"
+        else:
+            self.bench = bench.Bench()
+            self.mode = "bench"
+
+    def _start_flight(self, career):
+        """Go into flight: as the commander, or for practice. A game that was
+        left part-way carries on if it is the same kind."""
+        level = self.cmdr.level if career else 1
+        g = self.game
+        if g is None:
+            self.game = g = game.Game(SHIPS, level)
+            self.banked = 0
+        elif g.over or career != self.career or g.level != level:
+            g.set_level(level)
+            g.reset()
+            self.banked = 0
+        self.career = career
+        self.saved_over = False
+        self.zero = None
+        self.d_t = None
+        self.paused = False
+        self.fsub = None
+        self.mode = "flight"
+
+    def _bank(self):
+        """Give the commander the kills made since the last call."""
+        g = self.game
+        if self.career and self.cmdr is not None and g.kills > self.banked:
+            rank = self.cmdr.add_kills(g.kills - self.banked)
+            self.banked = g.kills
+            if rank and not g.over:
+                g.say("RANK: " + rank, 3.0)
+
+    def _save(self):
+        if self.career and self.cmdr is not None:
+            self._bank()
+            self.cmdr.save(SAVE_PATH)
+
+    def _to_title(self):
+        self._save()
+        self.paused = False
+        self.fsub = None
+        self.mode = "menu"
 
     def _perf(self, delta, update_ms):
         """Every PERF_LOG flight frames, print where the time went.
@@ -474,33 +572,32 @@ class AceCommander(app.App):
         held = pad.held
         g = self.game
         new = FB is not None    # joystick and lettered buttons are told apart
-        pause = hit(BTN_PAUSE) if new else cancel
+        menu = hit(BTN_MENU) if new else cancel
         if hit("k_P"):
-            pause = True
+            menu = True
 
         if g.over:
+            if not self.saved_over:
+                self.saved_over = True
+                self._save()
             if confirm:
                 g.reset()
+                self.banked = 0
+                self.saved_over = False
                 self.zero = None
             elif cancel:
-                self.mode = "menu"
+                self._to_title()
             else:
                 g.step(dt, 0.0, 0.0, 0.0, False, False)   # let the wreckage drift
             return False
         if self.paused:
-            if confirm or (pause and new):
-                self.paused = False
-                self.zero = None
-            elif cancel:
-                self.paused = False
-                self.mode = "menu"
-            elif hit("j_left" if new else "left") or hit("j_right" if new else "right"):
-                if self.tilt_ok:
-                    self.use_tilt = not self.use_tilt
-                    self.zero = None
+            self._update_fmenu(new, menu, cancel, confirm)
             return False
-        if pause:
+        if menu:
             self.paused = True
+            self.fmenu = 0
+            self.fsub = None
+            self.d_t = None
             return False
 
         tilt = self.use_tilt and self.tilt_ok
@@ -511,10 +608,24 @@ class AceCommander(app.App):
                 throttle += 1.0
             if held(BTN_SPEED_DOWN):
                 throttle -= 1.0
-            if hit(BTN_MISSILE):
-                missile = True
-            if tilt and hit(BTN_REZERO):
-                self.zero = None
+            if not tilt:
+                self.d_t = None
+                if hit(BTN_MISSILE):
+                    missile = True
+            else:               # a tap on D re-zeroes the tilt, holding it fires
+                if hit(BTN_MISSILE):
+                    self.d_t = 0.0
+                if self.d_t is not None:
+                    if held(BTN_MISSILE):
+                        self.d_t += dt
+                        if self.d_t >= HOLD_MISSILE:
+                            missile = True
+                            self.d_t = None
+                    else:
+                        self.zero = None
+                        self.d_t = None
+            if hit(BTN_BOMB):
+                g.say("NO ENERGY BOMB")
             roll, jy = self._steer(tilt, STICK, True)
         elif tilt:              # older firmware: the d-pad is free for speed and missiles
             if held("up"):
@@ -541,7 +652,70 @@ class AceCommander(app.App):
         rules = _diff(_us(), t0) / 1000.0
         self.t_step += (rules - self.t_step) * 0.1
         self.p_rules += rules
+        if self.career:
+            self._bank()
         return True
+
+    # ---- in-flight menu ---------------------------------------------------
+
+    def _fitems(self):
+        """The lines on the current page of the in-flight menu."""
+        if self.fsub == "pause":
+            stick = "JOYSTICK" if FB is not None else "STICK"
+            if self.tilt_ok:
+                steer = "STEER: " + ("TILT" if self.use_tilt else stick)
+            else:
+                steer = "STEER: %s (no tilt sensor)" % stick
+            return [steer, "QUIT TO TITLE"]
+        if self.career:
+            return ["RESUME", "STATUS", "PAUSE MENU"]
+        return ["RESUME", "PAUSE MENU"]
+
+    def _resume(self):
+        self.paused = False
+        self.fsub = None
+        self.zero = None
+
+    def _update_fmenu(self, new, menu, cancel, confirm):
+        hit = self.pad.hit
+        if menu and new:        # A closes the menu from any page
+            self._resume()
+            return
+        if self.fsub == "status":
+            if confirm or cancel:
+                self.fsub = None
+            return
+        items = self._fitems()
+        if hit("j_up" if new else "up"):
+            self.fmenu = (self.fmenu - 1) % len(items)
+        elif hit("j_down" if new else "down"):
+            self.fmenu = (self.fmenu + 1) % len(items)
+        elif cancel:
+            if self.fsub is None:
+                self._resume()
+            else:
+                self.fmenu = len(self._fitems_top()) - 1    # back on PAUSE MENU
+                self.fsub = None
+        elif self.fsub == "pause":
+            side = hit("j_left" if new else "left") or hit("j_right" if new else "right")
+            if self.fmenu == 0:
+                if (confirm or side) and self.tilt_ok:
+                    self.use_tilt = not self.use_tilt
+                    self.zero = None
+            elif confirm:
+                self._to_title()
+        elif confirm:
+            item = items[self.fmenu]
+            if item == "RESUME":
+                self._resume()
+            elif item == "STATUS":
+                self.fsub = "status"
+            else:
+                self.fsub = "pause"
+                self.fmenu = 0
+
+    def _fitems_top(self):
+        return ["RESUME", "STATUS", "PAUSE MENU"] if self.career else ["RESUME", "PAUSE MENU"]
 
     # ---- draw -------------------------------------------------------------
 
@@ -558,53 +732,79 @@ class AceCommander(app.App):
             cockpit.draw_hud(ctx, self.game, self.ms if SHOW_FRAME_TIME else None,
                              not self.leds_on)
             if self.paused:
-                self._draw_pause(ctx)
+                self._draw_fmenu(ctx)
             else:
                 world = _diff(t1, t0) / 1000.0
                 hud = _diff(_us(), t1) / 1000.0
                 self.t_world += (world - self.t_world) * 0.1
                 self.t_hud += (hud - self.t_hud) * 0.1
                 self.p_draw += world + hud
+        elif self.mode == "level":
+            self._draw_level(ctx)
         else:
             self._draw_menu(ctx)
         ctx.restore()
 
     def _draw_menu(self, ctx):
+        if not SHIPS or self.title is None:
+            text = cockpit.text
+            ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+            text(ctx, "ACE", 0, -74, 34, cockpit.WHITE)
+            text(ctx, "COMMANDER", 0, -46, 18, cockpit.WHITE)
+            if not SHIPS:
+                text(ctx, "ship_data.py", 0, -10, 16, cockpit.YELLOW)
+                text(ctx, "not found", 0, 10, 16, cockpit.YELLOW)
+                text(ctx, "copy it next to app.py", 0, 36, 12, cockpit.GREY)
+            return
+        items = self.choices()
+        self.title.draw(ctx, items[self.menu % len(items)])
+
+    def _draw_level(self, ctx):
         text = cockpit.text
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "ACE", 0, -74, 34, cockpit.WHITE)
-        text(ctx, "COMMANDER", 0, -46, 18, cockpit.WHITE)
-        if not SHIPS:
-            text(ctx, "ship_data.py", 0, -10, 16, cockpit.YELLOW)
-            text(ctx, "not found", 0, 10, 16, cockpit.YELLOW)
-            text(ctx, "copy it next to app.py", 0, 36, 12, cockpit.GREY)
-            return
-        for i, label in enumerate(MENU):
-            y = -14 + i * 27
-            if i == 0 and self.game is not None and not self.game.over:
-                label = "CONTINUE"
-            if i == self.menu:
-                ctx.rgb(*cockpit.DIM).rectangle(-80, y - 13, 160, 26).fill()
-            text(ctx, label, 0, y, 18, cockpit.GREEN if i == self.menu else cockpit.GREY)
-        text(ctx, "CONFIRM: choose", 0, 74, 12, cockpit.GREY)
-        text(ctx, "CANCEL: exit", 0, 89, 12, cockpit.GREY)
+        text(ctx, "NEW COMMANDER", 0, -70, 18, cockpit.WHITE)
+        text(ctx, "LEVEL", 0, -34, 13, cockpit.GREY)
+        ctx.rgb(*cockpit.DIM).rectangle(-80, -24, 160, 30).fill()
+        text(ctx, "< %s >" % commander.LEVELS[self.level], 0, -9, 20, cockpit.GREEN)
+        text(ctx, LEVEL_NOTE[self.level], 0, 20, 12, cockpit.YELLOW)
+        top = commander.thresholds(self.level)[-1]
+        text(ctx, "top rank at %d kills" % top, 0, 36, 12, cockpit.YELLOW)
+        if self.cmdr is not None:
+            text(ctx, "replaces your saved commander", 0, 58, 11, cockpit.RED)
+        text(ctx, "C: start   F: back", 0, 80, 12, cockpit.GREY)
 
-    def _draw_pause(self, ctx):
+    def _draw_fmenu(self, ctx):
         text = cockpit.text
         ctx.rgba(0, 0, 0, 0.85).rectangle(-100, -80, 200, 142).fill()
-        text(ctx, "PAUSED", 0, -44, 22, cockpit.WHITE)
-        stick = "JOYSTICK" if FB is not None else "STICK"
-        if self.tilt_ok:
-            steer = "TILT" if self.use_tilt else stick
-            text(ctx, "steer: %s  (LEFT/RIGHT)" % steer, 0, -16, 12, cockpit.YELLOW)
+        if self.fsub == "status":
+            c = self.cmdr
+            text(ctx, "COMMANDER", 0, -60, 18, cockpit.WHITE)
+            text(ctx, c.rank(), 0, -34, 16, cockpit.GREEN)
+            text(ctx, "%d kills   level: %s" % (c.kills, commander.LEVELS[c.level]),
+                 0, -12, 12, cockpit.YELLOW)
+            nxt = c.next_rank()
+            if nxt:
+                text(ctx, "%d more for %s" % (nxt[1], nxt[0]), 0, 6, 12, cockpit.YELLOW)
+            text(ctx, "this flight: %d kills, wave %d" % (self.game.kills, self.game.wave),
+                 0, 26, 11, cockpit.GREY)
+            text(ctx, "C or F: back", 0, 48, 12, cockpit.GREY)
+            return
+        pause = self.fsub == "pause"
+        text(ctx, "PAUSE MENU" if pause else "PAUSED", 0, -60, 18, cockpit.WHITE)
+        items = self._fitems()
+        for i, label in enumerate(items):
+            y = -32 + i * 22
+            if i == self.fmenu:
+                ctx.rgb(*cockpit.DIM).rectangle(-96, y - 10, 192, 20).fill()
+            text(ctx, label, 0, y, 13, cockpit.GREEN if i == self.fmenu else cockpit.GREY)
+        if pause:
+            # where the time goes: whole frame, game rules, and my drawing calls
+            text(ctx, "frame %d  rules %d" % (self.ms, self.t_step), 0, 20, 11, cockpit.GREY)
+            text(ctx, "world %d  hud %d  objs %d" % (
+                self.t_world, self.t_hud, len(self.game.objs)), 0, 34, 11, cockpit.GREY)
+            text(ctx, "C: change   F: back", 0, 52, 11, cockpit.GREY)
         else:
-            text(ctx, "steer: %s (no tilt sensor)" % stick, 0, -16, 12, cockpit.YELLOW)
-        text(ctx, "C: resume", 0, 6, 12, cockpit.GREY)
-        text(ctx, "F: menu", 0, 22, 12, cockpit.GREY)
-        # where the time goes: whole frame, game rules, and my drawing calls
-        text(ctx, "frame %d  rules %d" % (self.ms, self.t_step), 0, 40, 11, cockpit.GREY)
-        text(ctx, "world %d  hud %d  objs %d" % (
-            self.t_world, self.t_hud, len(self.game.objs)), 0, 54, 11, cockpit.GREY)
+            text(ctx, "C: choose   A: resume", 0, 52, 11, cockpit.GREY)
 
 
 __app_export__ = AceCommander

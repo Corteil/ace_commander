@@ -44,6 +44,15 @@ TIERS = (
 )
 ROCKS = ("ASTEROID", "BOULDER")
 
+# What the level changes: (most hostile ships at once, how often enemy lasers
+# hit compared with level 1, how much damage they and their missiles do
+# compared with level 1). Level 1 is the game as it was before levels.
+LEVELS = (
+    (3, 0.7, 0.7),
+    (4, 1.0, 1.0),
+    (5, 1.3, 1.3),
+)
+
 
 def _rnd(a, b):
     return a + (b - a) * random.random()
@@ -180,7 +189,8 @@ class Boom:
 
 
 class Game:
-    def __init__(self, ships):
+    def __init__(self, ships, level=1):
+        self.set_level(level)
         self.types = {}
         for entry in ships:
             bp = Blueprint(entry)
@@ -194,6 +204,11 @@ class Game:
         self.fallback = [bp for bp in self.types.values()
                          if bp.laser and bp.speed and bp.name not in tiered]
         self.reset()
+
+    def set_level(self, level):
+        """0 easiest to 2 hardest. Takes effect straight away."""
+        self.level = max(0, min(len(LEVELS) - 1, int(level)))
+        self.max_hostile, self.aim_k, self.damage_k = LEVELS[self.level]
 
     def reset(self):
         self.objs = []
@@ -366,8 +381,8 @@ class Game:
                         if bp.laser and aim > 0.96 and o.cool <= 0:
                             o.cool = _rnd(0.5, 1.1)
                             o.beam = 0.2
-                            if random.random() < min(0.7, 0.3 + 0.05 * self.wave):
-                                self._hurt(3.0 + bp.laser * 2.5)
+                            if random.random() < min(0.7, 0.3 + 0.05 * self.wave) * self.aim_k:
+                                self._hurt((3.0 + bp.laser * 2.5) * self.damage_k)
                         if (o.missiles and self.missile_bp and aim > 0.9
                                 and random.random() < 0.12 * dt):
                             o.missiles -= 1
@@ -389,7 +404,7 @@ class Game:
             o.t -= dt
             if o.t <= 0 or (d < 150 and not self.over):
                 if o.t > 0:
-                    self._hurt(30.0)
+                    self._hurt(30.0 * self.damage_k)
                 self._boom(o.x, o.y, o.z, 8)
                 o.dead = True
                 return
@@ -606,7 +621,7 @@ class Game:
         count = len(self.objs) + len(self.new)
         self.spawn_t -= dt
         # more ships at once in later waves, and the longer the game goes on
-        want = min(4, 1 + (self.wave + int(self.time / 60)) // 2)
+        want = min(self.max_hostile, 1 + (self.wave + int(self.time / 60)) // 2)
         if self.spawn_t <= 0 and hostile < want and count < MAX_OBJECTS:
             self.spawn_t = _rnd(2.0, 5.0)
             self._spawn_ship()

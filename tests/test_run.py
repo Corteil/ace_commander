@@ -97,11 +97,17 @@ async def main():
     assert c["normal"] == 0 and s.renders == 40
     print("viewer uses the fast path: ok")
 
-    # menu keeps the badge's normal pacing
+    # the title screen has a tumbling ship, so it uses the fast path too
     s = Sched()
     a, c = await drive(s, "menu")
+    assert c["normal"] == 0 and s.renders == 40, c
+    print("title screen uses the fast path: ok")
+
+    # the other screens keep the badge's normal pacing
+    s = Sched()
+    a, c = await drive(s, "level")
     assert c["normal"] == 40, c
-    print("menu uses the normal path: ok")
+    print("the level screen uses the normal path: ok")
 
     # not in the foreground: hand over to the normal path, which waits
     s = Sched(foreground=False)

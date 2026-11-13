@@ -37,10 +37,26 @@ def place(g, name, kind, x, y, z, nose):
 
 
 random.seed(3)
+ace_commander.app.SAVE_PATH = os.path.join(OUT, "render_commander.json")
+if os.path.exists(ace_commander.app.SAVE_PATH):
+    os.remove(ace_commander.app.SAVE_PATH)
+for n in os.listdir(OUT):
+    if n.endswith(".png"):
+        os.remove(os.path.join(OUT, n))
 a = ace_commander.AceCommander()
-shot(a, "1_menu.png")
-
+for _ in range(60):         # let the Cobra arrive and tumble a bit
+    tick(a)
+shot(a, "1_title.png")
+a.title.t = ace_commander.title.T_IN + ace_commander.title.T_HOLD + 0.62
+tick(a, fresh=["RIGHT"])
+shot(a, "1b_title_flyby.png")
+a.title.t = 0.55; tick(a)
+shot(a, "1c_title_arriving.png")
+tick(a, fresh=["LEFT"])
+bs.choose(a, "NEW COMMANDER")
+shot(a, "1d_level.png")
 tick(a, fresh=["CONFIRM"])
+a.cmdr.add_kills(140)
 g = a.game
 g.spawn_t = g.rock_t = 1e9
 g.objs[:] = []
@@ -74,14 +90,22 @@ g.flash = 0.0
 
 tick(a, fresh=["A"])
 tick(a)
-shot(a, "4_pause.png")
-tick(a, fresh=["CONFIRM"])
+shot(a, "4_menu.png")
+tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])
+shot(a, "4b_status.png")
+tick(a, fresh=["CONFIRM"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])
+shot(a, "4c_pause_menu.png")
+tick(a, fresh=["A"])
 g._hurt(1000.0)
 tick(a)
 shot(a, "5_gameover.png")
 
 tick(a, fresh=["CANCEL"])
-tick(a, fresh=["DOWN"]); tick(a, fresh=["CONFIRM"])
+shot(a, "5b_title_continue.png")
+bs.choose(a, "NEW COMMANDER")
+shot(a, "5c_level_replace.png")
+tick(a, fresh=["CANCEL"])
+bs.choose(a, "SHIP VIEWER")
 shot(a, "6_viewer_cobra.png")
 for _ in range(3):
     tick(a, fresh=["CONFIRM"])
@@ -93,7 +117,7 @@ shot(a, "7_viewer_thargoid.png")
 from PIL import Image
 names = sorted(n for n in os.listdir(OUT) if n[0].isdigit())
 tiles = [Image.open(os.path.join(OUT, n)).resize((360, 360)) for n in names]
-sheet = Image.new("RGB", (360 * 4, 360 * 2), (40, 40, 48))
+sheet = Image.new("RGB", (360 * 4, 360 * ((len(tiles) + 3) // 4)), (40, 40, 48))
 for i, t in enumerate(tiles):
     sheet.paste(t, ((i % 4) * 360, (i // 4) * 360))
 sheet.save(os.path.join(OUT, "sheet.png"))

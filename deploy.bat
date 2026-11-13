@@ -4,7 +4,7 @@ rem to badge_log.txt.  "deploy.bat all" also copies ship_data.py.
 cd /d "%~dp0"
 rem The badge's serial port. Change this if Windows gives it another number.
 set BADGE_PORT=COM13
-set FILES=__init__.py app.py game.py cockpit.py viewer.py bench.py tildagon.toml metadata.json
+set FILES=__init__.py app.py game.py cockpit.py viewer.py bench.py title.py commander.py tildagon.toml metadata.json
 if /i "%1"=="all" set FILES=%FILES% ship_data.py
 
 echo Copying to the badge...

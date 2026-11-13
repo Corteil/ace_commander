@@ -15,12 +15,11 @@ mod = ace_commander.app
 a = ace_commander.AceCommander()
 c = CountCtx(); a.draw(c)
 labels = [t[0] for t in c.texts]
-assert labels[:5] == ["ACE", "COMMANDER", "FLIGHT", "SHIP VIEWER", "SPEED TEST"], labels
+assert labels == ["< NEW COMMANDER >"], labels
 for s, (x, y), size in c.texts:
     assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5, (s, y)
-tick(a, fresh=["UP"]); assert a.menu == 2, "UP from the top wraps to the bottom"
-tick(a, fresh=["DOWN"]); assert a.menu == 0
-tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"]); assert a.menu == 2
+tick(a, fresh=["UP"]); assert a.menu == 3, "back from the first choice wraps to the last"
+assert a.choices()[a.menu] == "SPEED TEST"
 out = io.StringIO()
 with contextlib.redirect_stdout(out):
     tick(a, fresh=["CONFIRM"])
