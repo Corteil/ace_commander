@@ -92,6 +92,7 @@ USE_LEDS = True         # flash the badge's LEDs red when hit (else a ring on sc
 FAST_FRAMES = True      # in flight and the viewer, don't wait 50 ms between frames
 PERF_LOG = 60           # print a PERF line to the console every this many flight
                         # frames (0 = never)
+PERF_SLOW = 25          # ms over the average that makes a frame count as slow
 
 MENU = ("FLIGHT", "SHIP VIEWER", "SPEED TEST")
 ANY = ("up", "down", "left", "right")           # joystick, buttons or arrow keys
@@ -230,6 +231,10 @@ class AceCommander(app.App):
         self.p_update = 0.0
         self.p_rules = 0.0
         self.p_draw = 0.0
+        self.p_avg = 60.0   # last window's average frame, ms
+        self.p_nslow = 0
+        self.p_slow = []
+        self.p_skip = True  # the first flight frame follows a menu frame
 
     # ---- frame loop -------------------------------------------------------
 
@@ -410,24 +415,41 @@ class AceCommander(app.App):
         pad.end_frame()
 
     def _perf(self, delta, update_ms):
-        """Every PERF_LOG flight frames, print where the time went."""
+        """Every PERF_LOG flight frames, print where the time went.
+
+        A frame counts as slow if it took PERF_SLOW ms longer than the last
+        window's average; the line lists how long each slow one took (up to
+        8). Nothing here forces a garbage collection, so a slow frame is the
+        badge's own doing. Printing and reading the heap size take a while,
+        so the frame after each line is left out."""
+        if self.p_skip:
+            self.p_skip = False
+            return
         self.p_n += 1
         self.p_frame += delta
         if delta > self.p_max:
             self.p_max = delta
+        if delta > self.p_avg + PERF_SLOW:
+            self.p_nslow += 1
+            if len(self.p_slow) < 8:
+                self.p_slow.append(int(delta))
         self.p_update += update_ms
         if self.p_n >= PERF_LOG:
             n = self.p_n
-            used = getattr(gc, "mem_alloc", lambda: 0)()
+            self.p_avg = self.p_frame / n
             t0 = _us()
-            gc.collect()
-            gc_ms = _diff(_us(), t0) / 1000.0
+            used = getattr(gc, "mem_alloc", lambda: 0)()
+            free = getattr(gc, "mem_free", lambda: 0)()
+            mem_ms = _diff(_us(), t0) / 1000.0
             print("PERF frame %.0f max %.0f update %.1f rules %.1f draw %.1f objs %d fast %d"
-                  " gc %.0f used %d free %d" % (
-                      self.p_frame / n, self.p_max, self.p_update / n, self.p_rules / n,
+                  " slow %d %s used %d free %d memcall %.1f" % (
+                      self.p_avg, self.p_max, self.p_update / n, self.p_rules / n,
                       self.p_draw / n, len(self.game.objs), 1 if self.fast else 0,
-                      gc_ms, used, getattr(gc, "mem_free", lambda: 0)()))
+                      self.p_nslow, self.p_slow, used, free, mem_ms))
             self.p_n = 0
+            self.p_nslow = 0
+            self.p_slow = []
+            self.p_skip = True
             self.p_frame = self.p_max = self.p_update = self.p_rules = self.p_draw = 0.0
 
     def _update_viewer(self, dt, cancel, confirm):
