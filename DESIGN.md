@@ -215,8 +215,8 @@ that commander.
 
 | Level | Kills for each rank | Enemies |
 | --- | --- | --- |
-| Easiest | A fraction of the original's (suggested: a tenth, so 640 for the top rank) | Fewer at once, worse aim, less damage |
-| Middle | Between the two (suggested: a quarter, 1,600) | As in today's wave game |
+| Easiest | A fifth of the original's: 1,280 for the top rank. (A tenth was tried and Brian found the ranks came too fast) | Fewer at once, worse aim, less damage |
+| Middle | Half of the original's: 3,200 | As in today's wave game |
 | Hardest | The original's, 6,400 for the top rank | More at once, better aim, more damage |
 
 The level changes nothing else: money, prices and docking are the same on all three. The
@@ -432,7 +432,7 @@ All eleven were decided by Brian on 2026-11-13.
 | 11 | Name | Ace Commander | Done |
 
 Still to agree: the names of the three levels and their exact numbers. Build 15 uses EASY,
-NORMAL and HARD, with the original's kill counts divided by 10, 4 and 1, and enemies that
+NORMAL and HARD, with the original's kill counts divided by 5, 2 and 1, and enemies that
 come 3, 4 or 5 at a time and hit 0.7, 1 or 1.3 times as often and as hard.
 
 Two things also need an answer from the badge: whether F and E are the right way round for

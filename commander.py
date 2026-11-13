@@ -12,7 +12,7 @@ import json
 # how many kills each rank needs here, and how tough the enemies are in
 # game.py. The names and the divisors are placeholders until they are agreed.
 LEVELS = ("EASY", "NORMAL", "HARD")
-RANK_DIVISOR = (10, 4, 1)    # the original's kill counts are divided by this
+RANK_DIVISOR = (5, 2, 1)    # the original's kill counts are divided by this
 
 # rank, and the kills it takes in the original game
 RANKS = (

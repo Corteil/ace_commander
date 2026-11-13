@@ -28,15 +28,16 @@ def texts(a):
 
 # ---- ranks and levels -------------------------------------------------------
 assert commander.thresholds(2) == (0, 8, 16, 32, 64, 128, 512, 2560, 6400), "hardest is the original"
-assert commander.thresholds(0)[-1] == 640 and commander.thresholds(1)[-1] == 1600
+assert commander.thresholds(0)[-1] == 1280 and commander.thresholds(1)[-1] == 3200
+assert commander.thresholds(0)[5] == 26, "Competent on the easiest level"
 for level in range(3):
     t = commander.thresholds(level)
     assert t[0] == 0 and all(b > a for a, b in zip(t, t[1:])), t
 c = commander.Commander(0)
-assert c.rank() == "HARMLESS" and c.next_rank() == ("MOSTLY HARMLESS", 1)
-assert c.add_kills(1) == "MOSTLY HARMLESS"
+assert c.rank() == "HARMLESS" and c.next_rank() == ("MOSTLY HARMLESS", 2)
+assert c.add_kills(1) is None and c.add_kills(1) == "MOSTLY HARMLESS"
 assert c.add_kills(0) is None
-c.add_kills(700)
+c.add_kills(1300)
 assert c.rank() == "ELITE" and c.next_rank() is None
 c = commander.Commander(2)
 assert c.add_kills(7) is None and c.add_kills(1) == "MOSTLY HARMLESS"
@@ -93,7 +94,7 @@ assert a.cmdr is None and "CONTINUE" not in a.choices()
 choose(a, "NEW COMMANDER")
 assert a.mode == "level" and a.level == 1
 tx = texts(a)
-assert "< NORMAL >" in tx and "top rank at 1600 kills" in tx
+assert "< NORMAL >" in tx and "top rank at 3200 kills" in tx
 assert not any("replaces" in t for t in tx)
 tick(a, fresh=["JOYLEFT"]); assert a.level == 0 and "< EASY >" in texts(a)
 tick(a, fresh=["JOYLEFT"]); assert a.level == 2 and "top rank at 6400 kills" in texts(a)
@@ -114,21 +115,23 @@ def kill(g, n=1):
         g._kill(o)
 
 kill(g); tick(a)
-assert a.cmdr.kills == 1 and g.msg == "RANK: MOSTLY HARMLESS", (a.cmdr.kills, g.msg)
+assert a.cmdr.kills == 1 and not g.msg.startswith("RANK"), (a.cmdr.kills, g.msg)
+kill(g); tick(a)
+assert a.cmdr.kills == 2 and g.msg == "RANK: MOSTLY HARMLESS", (a.cmdr.kills, g.msg)
 kill(g, 4); tick(a)
-assert a.cmdr.kills == 5 and a.cmdr.rank() == "AVERAGE"
+assert a.cmdr.kills == 6 and a.cmdr.rank() == "AVERAGE"
 assert commander.load(SAVE).kills == 0, "not written every kill"
 tick(a, fresh=["A"])
 tx = texts(a)
 assert "STATUS" in tx
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); assert a.fsub == "status"
 tx = texts(a)
-assert "AVERAGE" in tx and any("5 kills" in t and "EASY" in t for t in tx), tx
+assert "AVERAGE" in tx and any("6 kills" in t and "EASY" in t for t in tx), tx
 assert any("more for ABOVE AVERAGE" in t for t in tx)
 tick(a, fresh=["C"]); assert a.fsub is None and a.paused
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); assert a.fsub == "pause"
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
-assert a.mode == "menu" and commander.load(SAVE).kills == 5, "quitting to the title saves"
+assert a.mode == "menu" and commander.load(SAVE).kills == 6, "quitting to the title saves"
 assert a.choices()[0] == "CONTINUE" and a.menu == 0
 assert texts(a) == ["< CONTINUE >"]
 
@@ -136,10 +139,10 @@ assert texts(a) == ["< CONTINUE >"]
 choose(a, "COMBAT PRACTICE")
 assert not a.career and a.game.level == 1 and a.game.kills == 0
 kill(a.game, 3); tick(a)
-assert a.cmdr.kills == 5
+assert a.cmdr.kills == 6
 tick(a, fresh=["A"]); assert "STATUS" not in texts(a)
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
-assert a.mode == "menu" and commander.load(SAVE).kills == 5
+assert a.mode == "menu" and commander.load(SAVE).kills == 6
 choose(a, "CONTINUE")
 assert a.career and a.game.level == 0 and a.game.kills == 0
 
@@ -147,15 +150,15 @@ assert a.career and a.game.level == 0 and a.game.kills == 0
 g = a.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
 kill(g, 2); tick(a)
 g._hurt(1000.0); tick(a)
-assert g.over and commander.load(SAVE).kills == 7, "saved at game over"
-tick(a, fresh=["C"]); assert not g.over and a.career and a.cmdr.kills == 7
-kill(g); tick(a); assert a.cmdr.kills == 8
+assert g.over and commander.load(SAVE).kills == 8, "saved at game over"
+tick(a, fresh=["C"]); assert not g.over and a.career and a.cmdr.kills == 8
+kill(g); tick(a); assert a.cmdr.kills == 9
 
 # a new app instance (the badge restarted) finds the commander
 tick(a, fresh=["A"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); assert a.mode == "menu"
 b = ace_commander.AceCommander()
-assert b.cmdr.kills == 8 and b.cmdr.level == 0 and b.choices()[0] == "CONTINUE"
+assert b.cmdr.kills == 9 and b.cmdr.level == 0 and b.choices()[0] == "CONTINUE"
 choose(b, "NEW COMMANDER")
 assert any("replaces your saved commander" in t for t in texts(b))
 tick(b, fresh=["JOYRIGHT"]); tick(b, fresh=["C"])
