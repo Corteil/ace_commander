@@ -140,7 +140,7 @@ on screen. Enemy lasers run from the ship's gun to the bottom of the screen (the
 gitignored and must not be committed, published or put in the badge app store. Brian
 generated it from his own clone. The converter that reads it is fine to publish.
 
-The GitHub repo (`Corteil/elite_demo`; the app is now Ace Commander, package `ace_commander`)
+The GitHub repo (`Corteil/ace_commander`, called `elite_demo` until 2026-11-13)
 is **public** as of 2026-11-13, so check every commit
 for Elite-derived data before pushing. Describe the project as a fan-made game inspired by
 Elite, written from scratch, not as a port: no original code is used. The README's
