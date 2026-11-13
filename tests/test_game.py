@@ -300,4 +300,27 @@ g = game.Game(())
 for _ in range(500):
     g.step(DT, 0.2, 0.1, 0.0, True, True)
 print("missing stats / one ship / no ships: ok")
+# hyperspace ------------------------------------------------------------------
+g = fresh()
+put(g, "PYTHON", "ship", 300, 100, 4000, True)
+g.step(DT, 0, 0, 0, False, False)
+assert g.lock is not None
+g.start_jump()
+n = 0
+while not g.jumped:
+    g.step(DT, 0, 0, 0, False, False)
+    n += 1
+    assert n < 1000
+assert abs(n * DT - game.JUMP_COUNT) <= 2 * DT, n * DT
+assert not g.objs and not g.new and g.lock is None and not g.locked and g.jump_t == 0
+assert g.warp > 0 and g.spawn_t >= 5.0, "a quiet moment on arriving"
+g.jumped = False
+for _ in range(int(game.WARP_TIME / DT) + 2):
+    g.step(DT, 0, 0, 0, False, False)
+assert g.warp <= 0 and not g.jumped
+g.start_jump(); g._hurt(1e6); g.step(DT, 0, 0, 0, False, False)
+assert g.over and g.jump_t == 0 and not g.jumped, "no jump once destroyed"
+g.start_jump(); assert g.jump_t == 0
+g.reset(); assert g.jump_t == 0 and g.warp == 0 and not g.jumped
+print("hyperspace countdown, jump, arrival: ok")
 print("ALL GAME TESTS PASSED")

@@ -17,7 +17,9 @@ The title screen, with a ship tumbling under the name, offers:
 
 Joystick left / right changes the choice, C selects it and F leaves the app.
 
-Not in yet: docking, trading, the galaxy. The plan for those is in [DESIGN.md](DESIGN.md).
+A commander is somewhere in a galaxy of 256 star systems and can jump between them by
+hyperspace (see [Hyperspace](#hyperspace)). Not in yet: stations, docking and trading, so
+there is nowhere to refuel. The plan for those is in [DESIGN.md](DESIGN.md).
 
 This is a fan-made game inspired by Elite. It is not official, licensed or endorsed. See
 [Credits and original material](#credits-and-original-material).
@@ -36,11 +38,12 @@ Written for the 2026 Spaceagon: the joystick steers and the lettered buttons do 
 | A | in-flight menu, which pauses the game |
 
 In the in-flight menu the joystick moves up and down, C selects, F goes back and A
-resumes. It has **Status** (your commander's rank and kills) and a **Pause menu**, where you
-switch steering between JOYSTICK and TILT or quit to the title screen.
+resumes. It has the **Local chart** (see [Hyperspace](#hyperspace)), **Status** (your
+commander's rank, kills, star system and fuel) and a **Pause menu**, where you switch
+steering between JOYSTICK and TILT or quit to the title screen.
 
 The menu also has a **Debug** page of cheats for testing: invincibility, kill all enemies,
-next wave, add an enemy, refill missiles and +10 kills. Kills made there count towards your
+next wave, add an enemy, refill missiles, refill fuel and +10 kills. Kills made there count towards your
 commander's rank. Set `DEBUG_MENU = False` in `app.py` to hide it.
 
 With TILT, tilting the badge steers and the joystick still works. D then does two jobs: a
@@ -55,6 +58,27 @@ and `BTN_MENU` near the top of `app.py`.
 
 On firmware without the joystick's own button names, the game falls back to tilt steering
 with UP / DOWN for speed, LEFT for a missile, RIGHT to re-zero and CANCEL for the menu.
+
+## Hyperspace
+
+A commander starts at Lave with a full tank, which is 7 light years of fuel. To jump to
+another star system:
+
+1. Press A and choose **Local chart**. The green cross in the middle is where you are, the
+   ring is how far your fuel reaches, and each dot is a star system (white if you can reach
+   it, grey if not).
+2. Move the yellow cursor with the joystick. The system nearest the cursor gets a box, with
+   its name at the top and its distance at the bottom.
+3. Press C to jump there, or F to go back.
+
+The game resumes with a five-second countdown, then you arrive in the new system with
+everything from the old one left behind. The jump uses fuel for its distance, and the
+commander is saved on arriving. Combat practice has no chart.
+
+There is no way to refuel yet except **Refill fuel** on the Debug page.
+
+The galaxy needs `game_data.py` (see [Ships and galaxy data](#ships-and-galaxy-data)).
+Without it the game still runs, with no Local chart.
 
 ## The screen
 
@@ -97,7 +121,7 @@ Near the top of `app.py`:
 
 Speeds, damage, ranges and how fast enemies turn are constants at the top of `game.py`.
 
-## Ships
+## Ships and galaxy data
 
 The app has no ships of its own. It reads `ship_data.py`, which you generate from your own
 copy of the Elite source (31 ships, with each one's energy, speed, laser and missiles).
@@ -117,6 +141,15 @@ source repo it comes from has no licence, so it is listed in `.gitignore`. Make 
    Add `--list` to see which ships it finds.
 3. That writes `ship_data.py` in the current folder.
 
+The galaxy works the same way. `game_data.py` holds the three seed numbers every star system
+is worked out from, the letter pairs their names are built from, and where a new commander
+starts. It is also derived from Elite and also **not in this repo**. Make it from the same
+source:
+
+```
+python3 tools/import_galaxy.py path/to/elite-source-code-bbc-micro-disc
+```
+
 Hidden lines are removed the way the original game does it: an edge is drawn only if one of
 the two faces it sits between points back at the viewer.
 
@@ -124,23 +157,29 @@ the two faces it sits between points back at the viewer.
 
 - `app.py` - moves between the screens; input (tilt, buttons, keyboard); in-flight menu.
 - `title.py` - the title screen: block-letter name, tumbling ship, one-line menu.
-- `commander.py` - the saved commander: level, kills, rank. No badge imports.
+- `commander.py` - the saved commander: level, kills, rank, star system, fuel. No badge
+  imports.
+- `galaxy.py` - works out the 256 star systems from three seed numbers. No badge imports.
+- `chart.py` - the local chart.
 - `game.py` - the flight game's rules, with no badge imports so it can be tested on a PC.
 - `cockpit.py` - draws the flight view, radar and gauges.
 - `viewer.py` - the ship viewer.
 - `bench.py` - the menu's Speed test: times kinds of drawing on the badge.
 - `deploy.bat` - double-click to copy the app to the badge, restart it, and save what the
-  badge prints to `badge_log.txt` (`deploy.bat all` also copies `ship_data.py`).
+  badge prints to `badge_log.txt` (`deploy.bat all` also copies `ship_data.py` and
+  `game_data.py`).
 - `tools/import_ships.py` - makes `ship_data.py`. Stays on your PC.
+- `tools/import_galaxy.py` - makes `game_data.py`. Stays on your PC.
 - `tests/` - tests that run on a PC with stand-ins for the badge: `python tests/run_all.py`.
 - `CLAUDE.md` - project notes: firmware facts, measurements and what's next.
 - `DESIGN.md` - design for the rest of the game. Phase 1 (title screen, commander, levels,
-  new buttons) is built; docking, trading and the galaxy are not.
+  new buttons) is built, and so is the first part of phase 2 (galaxy, local chart,
+  hyperspace); docking and trading are not.
 
 ## Install
 
 Copy `__init__.py app.py game.py cockpit.py viewer.py bench.py title.py commander.py
-ship_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
+galaxy.py chart.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
 then restart it. On Windows, `deploy.bat all` does this.
 
 ## Credits and original material

@@ -26,6 +26,14 @@ def texts(a):
     return [t[0] for t in c.texts]
 
 
+def fpick(a, label):
+    """Open the in-flight menu if it isn't, and press C on this line of it."""
+    if not a.paused:
+        tick(a, fresh=["A"])
+    a.fmenu = a._fitems().index(label)
+    tick(a, fresh=["C"])
+
+
 # ---- ranks and levels -------------------------------------------------------
 assert commander.thresholds(2) == (0, 8, 16, 32, 64, 128, 512, 2560, 6400), "hardest is the original"
 assert commander.thresholds(0)[-1] == 1280 and commander.thresholds(1)[-1] == 3200
@@ -124,12 +132,14 @@ assert commander.load(SAVE).kills == 0, "not written every kill"
 tick(a, fresh=["A"])
 tx = texts(a)
 assert "STATUS" in tx
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); assert a.fsub == "status"
+assert a._fitems() == ["RESUME", "LOCAL CHART", "STATUS", "PAUSE MENU", "DEBUG"], a._fitems()
+fpick(a, "STATUS"); assert a.fsub == "status"
 tx = texts(a)
 assert "AVERAGE" in tx and any("6 kills" in t and "EASY" in t for t in tx), tx
 assert any("more for ABOVE AVERAGE" in t for t in tx)
+assert any(t.startswith("LAVE") and "fuel 7.0 LY" in t for t in tx), tx
 tick(a, fresh=["C"]); assert a.fsub is None and a.paused
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); assert a.fsub == "pause"
+fpick(a, "PAUSE MENU"); assert a.fsub == "pause"
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
 assert a.mode == "menu" and commander.load(SAVE).kills == 6, "quitting to the title saves"
 assert a.choices()[0] == "CONTINUE" and a.menu == 0
@@ -155,7 +165,7 @@ tick(a, fresh=["C"]); assert not g.over and a.career and a.cmdr.kills == 8
 kill(g); tick(a); assert a.cmdr.kills == 9
 
 # a new app instance (the badge restarted) finds the commander
-tick(a, fresh=["A"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+fpick(a, "PAUSE MENU")
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); assert a.mode == "menu"
 b = ace_commander.AceCommander()
 assert b.cmdr.kills == 9 and b.cmdr.level == 0 and b.choices()[0] == "CONTINUE"
@@ -222,4 +232,101 @@ assert "DEBUG" not in d._fitems_top()
 mod.DEBUG_MENU = True
 os.remove(SAVE)
 print("debug cheats: ok")
+
+# ---- the local chart, hyperspace and fuel -----------------------------------
+c1 = commander.Commander(1)
+assert c1.system is None and c1.fuel == 70
+old = commander.Commander.from_dict({"version": 1, "level": 2, "kills": 5})
+assert old.system is None and old.fuel == 70, "a phase 1 save still loads"
+bad = commander.Commander.from_dict({"system": 999, "fuel": 500})
+assert bad.system is None and bad.fuel == 70
+
+e = ace_commander.AceCommander()
+choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
+g = e.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
+gal = e.galaxy
+assert e.cmdr.system == 7 and gal.system(7).name == "LAVE" and e.cmdr.fuel == 70
+fpick(e, "LOCAL CHART")
+assert e.fsub == "chart" and e.chart.here == 7
+tx = texts(e)
+assert "LAVE" in tx and "YOU ARE HERE" in tx and "FUEL 7.0" in tx, tx
+tick(e, fresh=["C"]); assert e.fsub == "chart" and g.jump_t == 0, "can't jump to where you are"
+reach = dict((i, dist) for dist, i in gal.in_range(7, 70))
+assert all((0 < d <= 70) == (i in reach) for _, _, i, d in e.chart.dots if i != 7)
+# every system in range is on the chart and inside the ring
+for px, py, i, d in e.chart.dots:
+    if i in reach:
+        assert (px * px + py * py) ** 0.5 <= 70 * 1.25 + 3, (i, px, py)
+assert set(reach) <= set(dot[2] for dot in e.chart.dots)
+# steer the cursor to Zaonce (129) with the joystick and jump there
+zx, zy = [(px, py) for px, py, i, d in e.chart.dots if i == 129][0]
+for _ in range(400):
+    ch = e.chart
+    if ch.sel[2] == 129:
+        break
+    held = []
+    if abs(ch.cx - zx) > 2:
+        held.append("JOYRIGHT" if zx > ch.cx else "JOYLEFT")
+    if abs(ch.cy - zy) > 2:
+        held.append("JOYDOWN" if zy > ch.cy else "JOYUP")
+    tick(e, held=held)
+assert e.chart.sel[2] == 129, e.chart.sel
+tx = texts(e)
+d129 = reach[129]
+assert "ZAONCE" in tx and ("%d.%d LY   C: JUMP" % (d129 // 10, d129 % 10)) in tx, tx
+tick(e, fresh=["C"])
+assert not e.paused and e.fsub is None and g.jump_t > 0 and g.msg == "HYPERSPACE 5"
+kill(g, 2)
+o = game.Obj(g.types["SIDEWINDER"], "ship", 0.0, 0.0, 3000.0); g.objs.append(o)
+seen = set()
+for _ in range(200):
+    tick(e)
+    seen.add(g.msg)
+    if e.cmdr.system == 129:
+        break
+assert e.cmdr.system == 129 and e.cmdr.fuel == 70 - d129, (e.cmdr.system, e.cmdr.fuel)
+assert set("HYPERSPACE %d" % n for n in (5, 4, 3, 2, 1)) <= seen, seen
+assert g.msg == "ZAONCE" and g.warp > 0 and not g.objs and not g.jumped and g.kills == 2
+saved = commander.load(SAVE)
+assert (saved.system, saved.fuel, saved.kills) == (129, 70 - d129, 2), "arriving saves"
+texts(e)        # the streaks draw
+for _ in range(60):
+    tick(e)
+assert g.warp <= 0
+# the chart is now centred on Zaonce, and less fuel reaches fewer systems
+fpick(e, "LOCAL CHART")
+assert e.chart.here == 129 and "ZAONCE" in texts(e)
+far = [dot for dot in e.chart.dots if dot[3] > e.cmdr.fuel]
+assert far, "something is out of range now"
+e.chart.cx, e.chart.cy = float(far[0][0]), float(far[0][1]); e.chart._select()
+if e.chart.sel[3] > e.cmdr.fuel:
+    assert any("TOO FAR" in t for t in texts(e))
+    tick(e, fresh=["C"]); assert e.fsub == "chart" and g.jump_t == 0, "no jump without the fuel"
+tick(e, fresh=["F"])
+assert e.fsub is None and e._fitems()[e.fmenu] == "LOCAL CHART" and e.chart is None
+tick(e, fresh=["A"])
+e.cmdr.fuel = 3
+debug(e, "REFILL FUEL"); assert e.cmdr.fuel == 70
+tick(e, fresh=["A"])
+# dying stops a countdown; quitting to the title and coming back keeps the system
+fpick(e, "LOCAL CHART")
+e.chart.cx, e.chart.cy = [(float(px), float(py)) for px, py, i, d in e.chart.dots if i == 7][0]
+e.chart._select(); tick(e, fresh=["C"]); assert g.jump_t > 0
+g._hurt(5000.0); tick(e); tick(e)
+assert g.over and g.jump_t == 0 and e.cmdr.system == 129
+f = ace_commander.AceCommander()
+choose(f, "CONTINUE")
+assert f.cmdr.system == 129 and f.galaxy is not None
+# practice has no chart, and neither does a commander without game_data.py
+choose_p = ace_commander.AceCommander()
+choose(choose_p, "COMBAT PRACTICE")
+assert "LOCAL CHART" not in choose_p._fitems_top()
+gd = mod.game_data; mod.game_data = None
+n = ace_commander.AceCommander()
+choose(n, "CONTINUE")
+assert n.galaxy is None and "LOCAL CHART" not in n._fitems_top()
+tick(n, fresh=["A"]); fpick(n, "STATUS"); texts(n)
+mod.game_data = gd
+os.remove(SAVE)
+print("local chart, hyperspace countdown, fuel, arriving saves: ok")
 print("ALL COMMANDER TESTS PASSED")

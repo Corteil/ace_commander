@@ -60,6 +60,11 @@ try:
 except Exception:
     SHIPS = ()
 
+try:    # the galaxy's starting numbers, made by tools/import_galaxy.py
+    from . import game_data
+except Exception:
+    game_data = None
+
 try:    # the joystick's directions and buttons A-F, told apart from each other
     from events.joystick import JOYSTICK_BUTTON_TYPES as JOY
     from frontboards.common import FRONTBOARD_BUTTON_TYPES as FB
@@ -233,7 +238,11 @@ class AceCommander(app.App):
         self.banked = 0         # this game's kills already given to the commander
         self.saved_over = False
         self.fmenu = 0          # which in-flight menu line is highlighted
-        self.fsub = None        # None, "status", "pause" or "debug": the in-flight menu page
+        self.fsub = None        # None, "status", "chart", "pause" or "debug": the menu page
+        self.galaxy = None      # made the first time a commander flies
+        self.chart = None       # the local chart, while it is open
+        self.jump_to = None     # (system, distance) the hyperspace countdown is for
+        self.dt = 0.0           # seconds since the last update
         self.d_t = None         # how long D has been down, when steering by tilt
         self.viewer = None
         self.paused = False
@@ -398,7 +407,7 @@ class AceCommander(app.App):
         hit = pad.hit
         cancel = hit("cancel")
         confirm = hit("confirm")
-        dt = delta / 1000.0
+        self.dt = dt = delta / 1000.0
 
         if self.mode == "menu":
             if cancel:
@@ -486,12 +495,43 @@ class AceCommander(app.App):
             g.reset()
             self.banked = 0
         self.career = career
+        if career:
+            self._place()
+        self.jump_to = None
+        g.jump_t = 0.0
         self.saved_over = False
         self.zero = None
         self.d_t = None
         self.paused = False
         self.fsub = None
         self.mode = "flight"
+
+    def _place(self):
+        """Make the galaxy, and put a commander who is nowhere yet at the
+        starting system. Without game_data.py there is no galaxy."""
+        if game_data is None:
+            return
+        if self.galaxy is None:
+            from . import galaxy
+            self.galaxy = galaxy.Galaxy(game_data.SEEDS, game_data.PAIRS)
+        c = self.cmdr
+        if c.system is None:
+            c.system = self.galaxy.find(*game_data.START_XY) or 0
+            c.fuel = min(commander.MAX_FUEL, game_data.START_FUEL)
+
+    def _arrive(self):
+        """The game has just jumped: move the commander and use the fuel."""
+        g = self.game
+        g.jumped = False
+        to = self.jump_to
+        self.jump_to = None
+        c = self.cmdr
+        if to is None or not self.career or c is None or self.galaxy is None:
+            return
+        c.system = to[0]
+        c.fuel = max(0, c.fuel - to[1])
+        self._save()
+        g.say(self.galaxy.system(c.system).name, 3.0)
 
     def _bank(self):
         """Give the commander the kills made since the last call."""
@@ -583,6 +623,7 @@ class AceCommander(app.App):
                 self._save()
             if confirm:
                 g.reset()
+                self.jump_to = None
                 self.banked = 0
                 self.saved_over = False
                 self.zero = None
@@ -653,6 +694,8 @@ class AceCommander(app.App):
         rules = _diff(_us(), t0) / 1000.0
         self.t_step += (rules - self.t_step) * 0.1
         self.p_rules += rules
+        if g.jumped:
+            self._arrive()
         if self.career:
             self._bank()
         return True
@@ -671,7 +714,7 @@ class AceCommander(app.App):
         if self.fsub == "debug":
             return ["INVINCIBLE: " + ("ON" if self.game.god else "OFF"),
                     "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
-                    "REFILL MISSILES", "+10 KILLS"]
+                    "REFILL MISSILES", "REFILL FUEL", "+10 KILLS"]
         return self._fitems_top()
 
     def _debug(self, item):
@@ -696,6 +739,9 @@ class AceCommander(app.App):
         elif item == "REFILL MISSILES":
             if g.missile_bp:
                 g.missiles = 4
+        elif item == "REFILL FUEL":
+            if self.career and self.cmdr is not None:
+                self.cmdr.fuel = commander.MAX_FUEL
         elif item == "+10 KILLS":
             g.kills += 10
         if self.career:
@@ -714,6 +760,9 @@ class AceCommander(app.App):
         if self.fsub == "status":
             if confirm or cancel:
                 self.fsub = None
+            return
+        if self.fsub == "chart":
+            self._update_chart(new, cancel, confirm)
             return
         items = self._fitems()
         if hit("j_up" if new else "up"):
@@ -744,6 +793,10 @@ class AceCommander(app.App):
                 self._resume()
             elif item == "STATUS":
                 self.fsub = "status"
+            elif item == "LOCAL CHART":
+                from . import chart
+                self.chart = chart.Chart(self.galaxy, self.cmdr.system, self.cmdr.fuel)
+                self.fsub = "chart"
             elif item == "DEBUG":
                 self.fsub = "debug"
                 self.fmenu = 0
@@ -751,8 +804,33 @@ class AceCommander(app.App):
                 self.fsub = "pause"
                 self.fmenu = 0
 
+    def _update_chart(self, new, cancel, confirm):
+        """The local chart: the joystick moves the cursor, C jumps to the
+        selected system if the fuel will reach it, F goes back."""
+        if cancel:
+            self.fmenu = self._fitems_top().index("LOCAL CHART")
+            self.fsub = None
+            self.chart = None
+            return
+        ch = self.chart
+        if confirm:
+            to = ch.target()
+            if to is not None:
+                self.jump_to = to
+                self.game.start_jump()
+                self.chart = None
+                self._resume()
+            return
+        jx, jy = self._steer(False, STICK if new else ANY, new)
+        ch.move(jx, jy, self.dt)
+
     def _fitems_top(self):
-        items = ["RESUME", "STATUS", "PAUSE MENU"] if self.career else ["RESUME", "PAUSE MENU"]
+        items = ["RESUME"]
+        if self.career:
+            if self.galaxy is not None:
+                items.append("LOCAL CHART")
+            items.append("STATUS")
+        items.append("PAUSE MENU")
         if DEBUG_MENU:
             items.append("DEBUG")
         return items
@@ -766,6 +844,10 @@ class AceCommander(app.App):
         elif self.mode == "bench":
             self.bench.draw(ctx)
         elif self.mode == "flight":
+            if self.paused and self.fsub == "chart":
+                self.chart.draw(ctx)
+                ctx.restore()
+                return
             t0 = _us()
             cockpit.draw_world(ctx, self.game)
             t1 = _us()
@@ -825,17 +907,21 @@ class AceCommander(app.App):
             nxt = c.next_rank()
             if nxt:
                 text(ctx, "%d more for %s" % (nxt[1], nxt[0]), 0, 6, 12, cockpit.YELLOW)
+            if self.galaxy is not None:
+                text(ctx, "%s   fuel %d.%d LY" % (
+                    self.galaxy.system(c.system).name, c.fuel // 10, c.fuel % 10),
+                    0, 23, 12, cockpit.CYAN)
             text(ctx, "this flight: %d kills, wave %d" % (self.game.kills, self.game.wave),
-                 0, 26, 11, cockpit.GREY)
-            text(ctx, "C or F: back", 0, 48, 12, cockpit.GREY)
+                 0, 38, 11, cockpit.GREY)
+            text(ctx, "C or F: back", 0, 53, 11, cockpit.GREY)
             return
         if self.fsub == "debug":
             ctx.rgba(0, 0, 0, 0.85).rectangle(-100, 62, 200, 16).fill()
             text(ctx, "DEBUG", 0, -66, 16, cockpit.RED)
             for i, label in enumerate(self._fitems()):
-                y = -44 + i * 18
+                y = -47 + i * 16
                 if i == self.fmenu:
-                    ctx.rgb(*cockpit.DIM).rectangle(-96, y - 9, 192, 18).fill()
+                    ctx.rgb(*cockpit.DIM).rectangle(-96, y - 8, 192, 16).fill()
                 text(ctx, label, 0, y, 12, cockpit.GREEN if i == self.fmenu else cockpit.GREY)
             text(ctx, "C: do it   F: back", 0, 66, 11, cockpit.GREY)
             return
@@ -843,9 +929,9 @@ class AceCommander(app.App):
         text(ctx, "PAUSE MENU" if pause else "PAUSED", 0, -60, 18, cockpit.WHITE)
         items = self._fitems()
         for i, label in enumerate(items):
-            y = -32 + i * 22
+            y = -36 + i * 18
             if i == self.fmenu:
-                ctx.rgb(*cockpit.DIM).rectangle(-96, y - 10, 192, 20).fill()
+                ctx.rgb(*cockpit.DIM).rectangle(-96, y - 9, 192, 18).fill()
             text(ctx, label, 0, y, 13, cockpit.GREEN if i == self.fmenu else cockpit.GREY)
         if pause:
             # where the time goes: whole frame, game rules, and my drawing calls
@@ -854,7 +940,7 @@ class AceCommander(app.App):
                 self.t_world, self.t_hud, len(self.game.objs)), 0, 34, 11, cockpit.GREY)
             text(ctx, "C: change   F: back", 0, 52, 11, cockpit.GREY)
         else:
-            text(ctx, "C: choose   A: resume", 0, 52, 11, cockpit.GREY)
+            text(ctx, "C: choose   A: resume", 0, 54, 11, cockpit.GREY)
 
 
 __app_export__ = AceCommander

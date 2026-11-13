@@ -189,6 +189,14 @@ def _enemy_beam(ctx, o):
     ctx.line_width = 1.5
 
 
+# the hyperspace streaks: (direction x, y times 256, starting radius in pixels)
+_WARP_T = 1.2       # the same as game.WARP_TIME
+_STREAKS = tuple(
+    (int(256 * math.cos(i * TAU / 18 + 0.2)), int(256 * math.sin(i * TAU / 18 + 0.2)),
+     8 + (i * 29) % 34)
+    for i in range(18))
+
+
 def draw(ctx, g, ms=None, ring=True):
     """Draw the whole cockpit for Game g. ms is the frame time to show, or None."""
     draw_world(ctx, g)
@@ -206,6 +214,19 @@ def draw_world(ctx, g):
         z = int(p[2])
         if z > INEAR:
             ctx.rectangle(int(p[0]) * IFOCAL // z, -(int(p[1]) * IFOCAL // z), 1.5, 1.5).fill()
+
+    if g.warp > 0:      # just out of hyperspace: streaks rushing out from the centre
+        k = 256 - int(g.warp * 256 / _WARP_T)       # 0 at the start to 256 at the end
+        if k < 0:
+            k = 0
+        ctx.rgb(*CYAN)
+        ctx.begin_path()
+        for dx, dy, r0 in _STREAKS:
+            a = r0 + (k * 40 >> 8)
+            b = a + 12 + (k * 110 >> 8)
+            ctx.move_to(dx * a >> 8, dy * a >> 8)
+            ctx.line_to(dx * b >> 8, dy * b >> 8)
+        ctx.stroke()
 
     for o in g.objs:
         draw_ship(ctx, o)

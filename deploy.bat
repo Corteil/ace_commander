@@ -1,11 +1,11 @@
 @echo off
 rem Copy the app to the badge, restart it, then save what the badge prints
-rem to badge_log.txt.  "deploy.bat all" also copies ship_data.py.
+rem to badge_log.txt.  "deploy.bat all" also copies ship_data.py and game_data.py.
 cd /d "%~dp0"
 rem The badge's serial port. Change this if Windows gives it another number.
 set BADGE_PORT=COM13
-set FILES=__init__.py app.py game.py cockpit.py viewer.py bench.py title.py commander.py tildagon.toml metadata.json
-if /i "%1"=="all" set FILES=%FILES% ship_data.py
+set FILES=__init__.py app.py game.py cockpit.py viewer.py bench.py title.py commander.py galaxy.py chart.py tildagon.toml metadata.json
+if /i "%1"=="all" set FILES=%FILES% ship_data.py game_data.py
 
 echo Copying to the badge...
 mpremote connect %BADGE_PORT% fs mkdir :/apps/ace_commander > nul 2>&1

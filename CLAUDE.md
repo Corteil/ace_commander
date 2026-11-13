@@ -1,7 +1,8 @@
 # Ace Commander for the EMF Tildagon / Spaceagon badge
 
 Notes for picking this project up in a new session. Last updated at the end of the first
-working session, 2026-11-12 (build 13); updated 2026-11-13 (build 16: renamed, on a Pi, design phase 1 built).
+working session, 2026-11-12 (build 13); updated 2026-11-13 (build 16: renamed, on a Pi, design
+phase 1 built) and again that night (build 20: DEBUG page, missile lock, first part of phase 2).
 
 ## What this is
 
@@ -11,7 +12,9 @@ of BBC Micro Elite. Brian's constraints: plain MicroPython, **no custom firmware
 C or `@micropython.viper` is welcome only if measurements show it would help.
 
 Built from `DESIGN.md`: phase 1 (title screen, saved commander with rank, three levels, new
-button layout). Not built yet: docking, trading, the galaxy (phases 2 to 6).
+button layout) and the first part of phase 2 (galaxy, local chart in the in-flight menu,
+hyperspace, fuel). Not built yet: the rest of phase 2 (galactic chart, system data screen,
+arriving docked, so nowhere to refuel), then docking and trading (phases 3 to 6).
 
 ## Files
 
@@ -20,10 +23,13 @@ button layout). Not built yet: docking, trading, the galaxy (phases 2 to 6).
 - `cockpit.py` - flight view, HUD, radar. Built from rectangles (see Speed).
 - `viewer.py` - ship viewer. `bench.py` - the title screen's "Speed test".
 - `title.py` - title screen: block-letter name from rectangles, tumbling ship, one menu line.
-- `commander.py` - the saved commander (level, kills, rank). Rules only, no badge imports.
-  Saved to `commander.json` next to the app (gitignored).
-- `ship_data.py` - generated, **gitignored** (see Licensing). 31 ships.
-- `tools/import_ships.py` - makes `ship_data.py` from the Elite source.
+- `commander.py` - the saved commander (level, kills, rank, star system, fuel). Rules only,
+  no badge imports. Saved to `commander.json` next to the app (gitignored).
+- `galaxy.py` - the 256 star systems, worked out from three seeds. Rules only.
+- `chart.py` - the local chart (imported the first time it is opened).
+- `ship_data.py`, `game_data.py` - generated, **gitignored** (see Licensing). 31 ships; the
+  galaxy's seeds, name letter pairs and starting place. Both must be copied to the badge.
+- `tools/import_ships.py`, `tools/import_galaxy.py` - make those two from the Elite source.
 - `tools/badge_log.py`, `deploy.bat` - copy to the badge, restart it, save its serial output
   to `badge_log.txt`.
 - `tests/` - PC test suite with stand-ins for the badge firmware.
@@ -167,11 +173,18 @@ of a real flight, not from a harness.
 5. `DESIGN.md` has the rest of the game in phases, with all 11 decisions made. **Phase 1 is
    built (build 15) and Brian played it on the badge on 2026-11-13: title screen, new
    commander, rank messages, status, save and continue, and tap / hold D all worked.**
-   Next is phase 2 (galaxy and jumps).
+   **Phase 2, first part, is build 20 (2026-11-13): a commander is at a star system with
+   fuel; LOCAL CHART in the in-flight menu picks a target; `Game.start_jump()` counts down
+   5 s, clears the objects and sets `jumped`; `app._arrive` moves the commander, takes the
+   fuel and saves. Tested on a PC only when written.** Still to do in phase 2: the galactic
+   chart, the system data screen, and arriving docked (a first docked Status screen that
+   refuels). Until then the only refuel is REFILL FUEL on the DEBUG page.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
-8. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
+8. Missile lock (build 19): the diamond is red, then green after `LOCK_TIME` (2 s, Brian's
+   choice after playing with 1 s) and only then will D fire.
+9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
@@ -184,11 +197,14 @@ by itself is faster than one fill for all of them (3.5 against 7.7 ms). Flight a
 
 ## Not yet confirmed on the badge
 
-- Whether the LED pattern comes back on leaving flight. (Confirmed 2026-11-13: F is faster
-  and E slower, and the LEDs flash on a hit.)
 - Tilt axis directions (`TILT_PITCH_SIGN`, `TILT_ROLL_SIGN`, `TILT_SWAP_AXES`).
-- Whether cross markers switch to wireframes at a good distance (`WIRE_MIN` in `cockpit.py`).
+- The local chart and hyperspace (build 20): cursor speed (`CURSOR_SPEED` in `chart.py`),
+  whether the ring and dots read well, the streaks on arriving.
 - Whether `deploy.bat`'s copy step reports failures properly (the log step is known to work).
+
+Confirmed by Brian on 2026-11-13: F is faster and E slower; the LEDs flash on a hit and the
+badge's own pattern comes back on leaving flight; ships switch from cross markers to
+wireframes at a distance that looks fine (`WIRE_MIN`).
 
 ## Controls (Brian's choices)
 
@@ -199,8 +215,8 @@ on screen. Enemy lasers run from the ship's gun to the bottom of the screen (the
 
 ## Licensing
 
-`ship_data.py` is derived from Elite (c) Acornsoft 1984, via
-`github.com/markmoxon/elite-source-code-bbc-micro-disc`, which has no licence. It is
+`ship_data.py` and `game_data.py` are derived from Elite (c) Acornsoft 1984, via
+`github.com/markmoxon/elite-source-code-bbc-micro-disc`, which has no licence. They are
 gitignored and must not be committed, published or put in the badge app store. Brian
 generated it from his own clone. The converter that reads it is fine to publish.
 

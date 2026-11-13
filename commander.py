@@ -2,7 +2,8 @@
 tests on a PC.
 
 Phase 1 holds the level, the kill count and the rank that follows from it.
-Credits, cargo, fuel and equipment arrive with the later phases; the fields
+Phase 2 adds the star system the commander is in and the fuel in the tank.
+Credits, cargo and equipment arrive with the later phases; the fields
 that already have a decided starting value (credits, docking style) are saved
 now so old saves stay readable.
 """
@@ -28,7 +29,8 @@ RANKS = (
 )
 
 DOCKING = ("A", "B", "C")    # authentic, assisted, automatic
-VERSION = 1
+VERSION = 2
+MAX_FUEL = 70       # tenths of a light year: a full tank is 7.0 light years
 
 
 def thresholds(level):
@@ -51,6 +53,8 @@ class Commander:
         self.kills = 0
         self.credits = 100.0
         self.docking = "B"
+        self.system = None      # which star system the commander is in (None: the start)
+        self.fuel = MAX_FUEL    # tenths of a light year
         self._needs = thresholds(self.level)
 
     def rank_index(self):
@@ -82,7 +86,8 @@ class Commander:
 
     def to_dict(self):
         return {"version": VERSION, "level": self.level, "kills": self.kills,
-                "credits": self.credits, "docking": self.docking}
+                "credits": self.credits, "docking": self.docking,
+                "system": self.system, "fuel": self.fuel}
 
     @classmethod
     def from_dict(cls, d):
@@ -91,6 +96,10 @@ class Commander:
         c.credits = float(d.get("credits", 100.0))
         if d.get("docking") in DOCKING:
             c.docking = d["docking"]
+        s = d.get("system")
+        if isinstance(s, int) and 0 <= s < 256:
+            c.system = s
+        c.fuel = max(0, min(MAX_FUEL, int(d.get("fuel", MAX_FUEL))))
         return c
 
     def save(self, path):

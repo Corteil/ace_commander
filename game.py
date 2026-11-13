@@ -25,6 +25,8 @@ LASER_COOL = 0.16      # heat lost per second
 AIM_ASSIST = 0.05      # a shot hits anything within this slope of the crosshair
 
 MISSILE_DAMAGE = 150.0
+JUMP_COUNT = 5.0           # seconds of countdown before a hyperspace jump
+WARP_TIME = 1.2            # seconds the streaks last on arriving
 LOCK_TIME = 2.0            # seconds a ship must stay in the sights before a missile locks
 MISSILE_SPEED = 1100.0     # world units per second
 PMISSILE_SPEED = 1700.0
@@ -260,10 +262,47 @@ class Game:
         self.lock = None       # the ship in the missile sights
         self.lock_t = 0.0      # how long it has been there
         self.locked = False    # long enough: a missile can be fired at it
+        self.jump_t = 0.0      # > 0 while the hyperspace countdown runs
+        self.warp = 0.0        # > 0 while the streaks of a jump are drawn
+        self.jumped = False    # set when a jump happens; whoever started it clears it
 
     def say(self, msg, t=2.0):
         self.msg = msg
         self.msg_t = t
+
+    # ---- hyperspace -------------------------------------------------------
+
+    def start_jump(self):
+        """Start (or restart) the countdown to a hyperspace jump. Where the
+        jump goes is the caller's business: it watches for self.jumped."""
+        if not self.over:
+            self.jump_t = JUMP_COUNT
+            self.say("HYPERSPACE %d" % int(JUMP_COUNT), 1.5)
+
+    def _hyper(self, dt):
+        if self.jump_t <= 0:
+            return
+        before = int(self.jump_t + 0.999)
+        self.jump_t -= dt
+        if self.jump_t > 0:
+            left = int(self.jump_t + 0.999)
+            if left != before:
+                self.say("HYPERSPACE %d" % left, 1.5)
+            return
+        # the jump: everything here is left behind
+        self.jump_t = 0.0
+        self.objs = []
+        self.new = []
+        self.booms = []
+        self.lock = None
+        self.lock_t = 0.0
+        self.locked = False
+        self.beam = 0.0
+        self.warp = WARP_TIME
+        self.jumped = True
+        self.spawn_t = _rnd(5.0, 8.0)   # a quiet moment on arriving
+        self.rock_t = _rnd(6, 12)
+        self.msg_t = 0.0
 
     # ---- one step of the simulation ---------------------------------------
 
@@ -279,7 +318,10 @@ class Game:
             self.flash -= dt
         if self.beam > 0:
             self.beam -= dt
+        if self.warp > 0:
+            self.warp -= dt
         if self.over:
+            self.jump_t = 0.0
             pitch = roll = 0.0
             throttle = -1.0
             fire = missile = False
@@ -301,6 +343,7 @@ class Game:
             self._weapons(dt, fire, missile)
             self._regen(dt)
             self._director(dt)
+            self._hyper(dt)
 
         if self.new:
             self.objs.extend(self.new)
