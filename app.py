@@ -101,6 +101,7 @@ FAST_FRAMES = True      # on the title screen, in flight and in the viewer, don'
                         # 50 ms between frames
 PERF_LOG = 60           # print a PERF line to the console every this many flight
                         # frames (0 = never)
+DEBUG_MENU = True       # show DEBUG, a page of cheats for testing, in the in-flight menu
 PERF_SLOW = 25          # ms over the average that makes a frame count as slow
 
 # where the commander is saved: next to this file
@@ -232,7 +233,7 @@ class AceCommander(app.App):
         self.banked = 0         # this game's kills already given to the commander
         self.saved_over = False
         self.fmenu = 0          # which in-flight menu line is highlighted
-        self.fsub = None        # None, "status" or "pause": the in-flight menu page
+        self.fsub = None        # None, "status", "pause" or "debug": the in-flight menu page
         self.d_t = None         # how long D has been down, when steering by tilt
         self.viewer = None
         self.paused = False
@@ -667,9 +668,38 @@ class AceCommander(app.App):
             else:
                 steer = "STEER: %s (no tilt sensor)" % stick
             return [steer, "QUIT TO TITLE"]
+        if self.fsub == "debug":
+            return ["INVINCIBLE: " + ("ON" if self.game.god else "OFF"),
+                    "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
+                    "REFILL MISSILES", "+10 KILLS"]
+        return self._fitems_top()
+
+    def _debug(self, item):
+        """Do one of the DEBUG page's cheats. Kills made this way count like
+        any others, so with a commander they raise the rank."""
+        g = self.game
+        if item.startswith("INVINCIBLE"):
+            g.god = not g.god
+            if g.god:
+                g.shield = g.hull = 100.0
+        elif item == "KILL ALL ENEMIES":
+            for o in list(g.objs):
+                if o.kind == "ship" or o.kind == "missile":
+                    g._kill(o)
+        elif item == "NEXT WAVE":
+            g.wave += 1
+            g.wave_kills = 0
+            g.say("WAVE %d" % g.wave, 2.5)
+        elif item == "ADD AN ENEMY":
+            if len(g.objs) + len(g.new) < game.MAX_OBJECTS:
+                g._spawn_ship()
+        elif item == "REFILL MISSILES":
+            if g.missile_bp:
+                g.missiles = 4
+        elif item == "+10 KILLS":
+            g.kills += 10
         if self.career:
-            return ["RESUME", "STATUS", "PAUSE MENU"]
-        return ["RESUME", "PAUSE MENU"]
+            self._bank()
 
     def _resume(self):
         self.paused = False
@@ -694,7 +724,8 @@ class AceCommander(app.App):
             if self.fsub is None:
                 self._resume()
             else:
-                self.fmenu = len(self._fitems_top()) - 1    # back on PAUSE MENU
+                self.fmenu = self._fitems_top().index(
+                    "DEBUG" if self.fsub == "debug" else "PAUSE MENU")
                 self.fsub = None
         elif self.fsub == "pause":
             side = hit("j_left" if new else "left") or hit("j_right" if new else "right")
@@ -704,18 +735,27 @@ class AceCommander(app.App):
                     self.zero = None
             elif confirm:
                 self._to_title()
+        elif self.fsub == "debug":
+            if confirm:
+                self._debug(items[self.fmenu])
         elif confirm:
             item = items[self.fmenu]
             if item == "RESUME":
                 self._resume()
             elif item == "STATUS":
                 self.fsub = "status"
+            elif item == "DEBUG":
+                self.fsub = "debug"
+                self.fmenu = 0
             else:
                 self.fsub = "pause"
                 self.fmenu = 0
 
     def _fitems_top(self):
-        return ["RESUME", "STATUS", "PAUSE MENU"] if self.career else ["RESUME", "PAUSE MENU"]
+        items = ["RESUME", "STATUS", "PAUSE MENU"] if self.career else ["RESUME", "PAUSE MENU"]
+        if DEBUG_MENU:
+            items.append("DEBUG")
+        return items
 
     # ---- draw -------------------------------------------------------------
 
@@ -788,6 +828,16 @@ class AceCommander(app.App):
             text(ctx, "this flight: %d kills, wave %d" % (self.game.kills, self.game.wave),
                  0, 26, 11, cockpit.GREY)
             text(ctx, "C or F: back", 0, 48, 12, cockpit.GREY)
+            return
+        if self.fsub == "debug":
+            ctx.rgba(0, 0, 0, 0.85).rectangle(-100, 62, 200, 16).fill()
+            text(ctx, "DEBUG", 0, -66, 16, cockpit.RED)
+            for i, label in enumerate(self._fitems()):
+                y = -44 + i * 18
+                if i == self.fmenu:
+                    ctx.rgb(*cockpit.DIM).rectangle(-96, y - 9, 192, 18).fill()
+                text(ctx, label, 0, y, 12, cockpit.GREEN if i == self.fmenu else cockpit.GREY)
+            text(ctx, "C: do it   F: back", 0, 66, 11, cockpit.GREY)
             return
         pause = self.fsub == "pause"
         text(ctx, "PAUSE MENU" if pause else "PAUSED", 0, -60, 18, cockpit.WHITE)

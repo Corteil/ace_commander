@@ -175,4 +175,51 @@ kill(c.game); tick(c); c.game._hurt(1000.0); tick(c)
 assert c.cmdr.kills == 1
 os.remove(SAVE)
 print("new commander, rank, status, save, continue, practice kept apart: ok")
+
+# ---- the DEBUG page of cheats -----------------------------------------------
+mod.SAVE_PATH = SAVE
+d = ace_commander.AceCommander()
+choose(d, "NEW COMMANDER"); tick(d, fresh=["JOYLEFT"]); tick(d, fresh=["C"])    # EASY
+g = d.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
+
+def debug(a, line):
+    """Open the in-flight menu, go to DEBUG and press C on this line of it."""
+    if not a.paused:
+        tick(a, fresh=["A"])
+    if a.fsub != "debug":
+        a.fsub = None
+        a.fmenu = a._fitems_top().index("DEBUG")
+        tick(a, fresh=["C"])
+    assert a.fsub == "debug"
+    a.fmenu = [i for i, s in enumerate(a._fitems()) if s.startswith(line)][0]
+    tick(a, fresh=["C"])
+
+tick(d, fresh=["A"])
+assert texts(d)[-1] != "" and "DEBUG" in texts(d)
+debug(d, "INVINCIBLE")
+tx = texts(d)
+assert "INVINCIBLE: ON" in tx and "+10 KILLS" in tx and g.god
+tick(d, fresh=["A"]); assert not d.paused
+g._hurt(5000.0); tick(d)
+assert not g.over and g.hull == 100.0 and g.flash > 0, "hits flash but do no damage"
+debug(d, "+10 KILLS")
+assert d.cmdr.kills == 10 and d.cmdr.rank() == "AVERAGE", "cheated kills raise the rank"
+debug(d, "ADD AN ENEMY"); debug(d, "ADD AN ENEMY")
+tick(d, fresh=["A"]); tick(d)
+assert sum(1 for o in g.objs if o.kind == "ship") == 2
+debug(d, "KILL ALL ENEMIES")
+tick(d, fresh=["A"]); tick(d)
+assert not any(o.kind == "ship" for o in g.objs) and d.cmdr.kills == 12
+g.missiles = 0; w = g.wave
+debug(d, "REFILL MISSILES"); debug(d, "NEXT WAVE")
+assert g.missiles == 4 and g.wave == w + 1
+debug(d, "INVINCIBLE"); assert not g.god
+tick(d, fresh=["F"]); assert d.fsub is None and d._fitems()[d.fmenu] == "DEBUG", "F goes back"
+tick(d, fresh=["A"])
+g._hurt(5000.0); tick(d); assert g.over, "and with it off you can die again"
+mod.DEBUG_MENU = False
+assert "DEBUG" not in d._fitems_top()
+mod.DEBUG_MENU = True
+os.remove(SAVE)
+print("debug cheats: ok")
 print("ALL COMMANDER TESTS PASSED")
