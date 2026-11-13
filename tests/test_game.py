@@ -227,6 +227,7 @@ def autopilot(g):
     return pitch, roll, 0.3 if d > 2500 else -0.3, aimed, False
 
 total_kills = 0
+worst_ortho = 0.0
 for seed in range(6):
     random.seed(100 + seed)
     g = game.Game(SHIPS)
@@ -235,11 +236,16 @@ for seed in range(6):
         p, r, th, f, ms = autopilot(g)
         g.step(DT, p, r, th, f, ms)
         for o in g.objs:
-            assert all(math.isfinite(v) for v in (o.x, o.y, o.z)) and ortho_error(o.m) < 1e-4
+            assert all(math.isfinite(v) for v in (o.x, o.y, o.z))
+            worst_ortho = max(worst_ortho, ortho_error(o.m))
     total_kills += g.kills
     print("  seed %d: %3.0fs  kills %2d  wave %d  score %4d  %s" % (
         seed, g.time, g.kills, g.wave, g.score, "destroyed" if g.over else "alive"))
 assert total_kills >= 6, total_kills
+# steering turns everything in whole-number steps of 1/16384, so directions are a
+# little out of true; this is how far, as a fraction (0.01 would be 1%)
+print("  worst direction error %.5f" % worst_ortho)
+assert worst_ortho < 0.01, worst_ortho
 print("autopilot games: %d kills in total: ok" % total_kills)
 
 # 8. soak: random thrashing for a long time ---------------------------------

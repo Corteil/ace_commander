@@ -1,7 +1,7 @@
 # Ace Commander for the EMF Tildagon / Spaceagon badge
 
 Notes for picking this project up in a new session. Last updated at the end of the first
-working session, 2026-11-12 (build 13); updated 2026-11-13 (build 15: renamed, on a Pi, design phase 1 built).
+working session, 2026-11-12 (build 13); updated 2026-11-13 (build 16: renamed, on a Pi, design phase 1 built).
 
 ## What this is
 
@@ -124,14 +124,32 @@ free" does not mean collections are rare. `gc.mem_alloc()` itself takes 15 ms.
 Brian could not feel the hitch in build 14 (he could with build 13's forced collection on
 top). So this is a frame-rate cost of up to 11%, not a visible stutter.
 
+**Where the garbage comes from (build 16, measured on the badge).** Every float result on
+this port is a new 16-byte heap object; small whole numbers are free. To measure a function,
+collect, `gc.disable()`, call it a few times, read `gc.mem_alloc()`, `gc.enable()`. Without
+the disable a collection runs part-way and the figure comes out far too small (this fooled
+one measurement). With 12 objects close enough to be wireframes, bytes per frame:
+
+| Part | Build 15 | Build 16 | What changed |
+|---|---|---|---|
+| `cockpit.draw_world` | 28,000 | 700 | vertex, dust and explosion maths in whole numbers; screen positions in whole pixels |
+| `cockpit.draw_hud` | 3,600 | 750 | radar blips in whole numbers |
+| `Game._rotate` (turning) | 12,500 | 5,300 | positions in quarter units, directions times 16384; dust and explosion dots are whole numbers |
+| `Game._think` | 13,400 | 6,400 | a ship re-plans on one frame in three (`THINK_EVERY`), staggered; it moves every frame |
+| Whole frame, turning | about 59,000 | about 15,000 | |
+
+Side effects: wireframes land on whole pixels (within a pixel of before); directions drift
+by up to 0.35% in the tests, and rocks and canisters are squared up again in turn. Drawing
+also got about 25% quicker. A REPL harness on a freshly booted badge has a small heap and
+collects every few frames whatever you do, so judge the result from `slow` in the PERF lines
+of a real flight, not from a harness.
+
 ## Next steps
 
 1. Done: builds 13 and 14 were run and read; see above.
-2. Optional, for frame rate: cut float garbage in the hot loops: `Game._rotate`,
-   `Game._think`, `_turn`, `_ortho` in `game.py`, and the vertex loop in `cockpit.draw_ship`.
-   Options: integer fixed-point, `@micropython.viper` on integer arrays (no firmware build
-   needed), or updating enemy AI on alternate frames. Growing the heap would make collections
-   rarer but each one longer, which is likely to feel worse.
+2. Done in build 16: float garbage cut by about three quarters (table above). What is left
+   is mostly `_turn` / `_ortho` on the frames a ship re-plans, and storing results back as
+   floats in `_rotate`. Going further means keeping object state in whole numbers.
 3. Rules cost about 1.2 ms per object. Build 13 skips rotation maths when not turning;
    check what that saved.
 4. Then gameplay: balance has only been judged by a crude autopilot in `tests/test_game.py`.
