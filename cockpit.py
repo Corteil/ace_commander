@@ -233,20 +233,23 @@ def draw_world(ctx, g):
         ctx.stroke()
 
     t = g.lock
-    if t is not None and t.z > NEAR:    # missile target: a box made of four bars
-        k = FOCAL / t.z
-        h = t.bp.size * k + 3
-        if h < 7:
-            h = 7
-        elif h > 45:
-            h = 45
-        bx = t.x * k
-        by = -t.y * k
-        ctx.rgb(*GREEN)
-        ctx.rectangle(bx - h, by - h, 2 * h, 1.5).fill()
-        ctx.rectangle(bx - h, by + h - 1.5, 2 * h, 1.5).fill()
-        ctx.rectangle(bx - h, by - h, 1.5, 2 * h).fill()
-        ctx.rectangle(bx + h - 1.5, by - h, 1.5, 2 * h).fill()
+    if t is not None and t.z > NEAR:    # missile sights: a diamond round the ship,
+        k = FOCAL / t.z                 # red until the missile has locked on, then green
+        h = int(t.bp.size * k) + 5
+        if h < 9:
+            h = 9
+        elif h > 48:
+            h = 48
+        bx = int(t.x * k)
+        by = -int(t.y * k)
+        ctx.rgb(*(GREEN if g.locked else RED))
+        ctx.begin_path()
+        ctx.move_to(bx, by - h)
+        ctx.line_to(bx + h, by)
+        ctx.line_to(bx, by + h)
+        ctx.line_to(bx - h, by)
+        ctx.line_to(bx, by - h)
+        ctx.stroke()
 
 
 def _vbar(ctx, x, frac, rgb):

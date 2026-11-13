@@ -82,6 +82,9 @@ for _ in range(4):
 g.say("INCOMING MISSILE")
 a.ms = 41.0
 shot(a, "2_flight.png")
+g.locked = True
+shot(a, "2b_flight_locked.png")
+g.locked = False
 
 g.flash = 0.2
 g.beam = 0.0

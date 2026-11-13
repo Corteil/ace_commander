@@ -145,7 +145,25 @@ assert g.missiles == 4 and g.msg == "NO TARGET"
 o = put(g, "PYTHON", "ship", 300, 100, 4000, True)
 o.state = "break"; o.t = 99; o.aim = [1.0, 0.0, 0.0]
 g.step(DT, 0, 0, 0, False, False)
-assert g.lock is o
+assert g.lock is o and not g.locked, "in the sights, but not locked yet"
+g.step(DT, 0, 0, 0, False, True)
+assert g.missiles == 4 and g.msg == "NO LOCK", "a missile won't fire before it has locked"
+n = 2
+while not g.locked:
+    g.step(DT, 0, 0, 0, False, False)
+    n += 1
+assert abs(n * DT - game.LOCK_TIME) <= 2 * DT, "locks after %.2f s" % (n * DT)
+# another ship coming nearer the crosshair starts the lock again
+other = put(g, "SIDEWINDER", "ship", 0, 0, 5000, True)
+other.state = "break"; other.t = 99; other.aim = [1.0, 0.0, 0.0]
+g.step(DT, 0, 0, 0, False, False)
+assert g.lock is other and not g.locked and g.lock_t == 0.0
+other.dead = True
+g.step(DT, 0, 0, 0, False, False)
+assert g.lock is o and not g.locked
+for _ in range(int(game.LOCK_TIME / DT) + 2):
+    g.step(DT, 0, 0, 0, False, False)
+assert g.locked and g.lock is o
 g.step(DT, 0, 0, 0, False, True)
 assert g.missiles == 3 and any(x.kind == "pmissile" for x in g.objs)
 e0 = o.energy

@@ -25,6 +25,7 @@ LASER_COOL = 0.16      # heat lost per second
 AIM_ASSIST = 0.05      # a shot hits anything within this slope of the crosshair
 
 MISSILE_DAMAGE = 150.0
+LOCK_TIME = 1.0            # seconds a ship must stay in the sights before a missile locks
 MISSILE_SPEED = 1100.0     # world units per second
 PMISSILE_SPEED = 1700.0
 TURN_RATE = 1.1            # how fast enemy ships can turn, radians per second
@@ -256,7 +257,9 @@ class Game:
         self.over = False
         self.msg = "WAVE 1"
         self.msg_t = 2.5
-        self.lock = None       # the ship a missile would chase
+        self.lock = None       # the ship in the missile sights
+        self.lock_t = 0.0      # how long it has been there
+        self.locked = False    # long enough: a missile can be fired at it
 
     def say(self, msg, t=2.0):
         self.msg = msg
@@ -305,6 +308,7 @@ class Game:
         self.objs = [o for o in self.objs if not o.dead]
         if self.lock is not None and self.lock.dead:
             self.lock = None
+            self.locked = False
 
     def _rotate(self, a, b, fwd):
         """Steer: pitch everything by a, roll it by b, and slide it fwd closer.
@@ -579,7 +583,15 @@ class Game:
         if self.hot and self.heat < 0.5:
             self.hot = False
         self.cool -= dt
-        self.lock = self._pick(0.35)
+        t = self._pick(0.35)
+        if t is None or t is not self.lock:    # a new ship, or none: start again
+            self.lock = t
+            self.lock_t = 0.0
+            self.locked = False
+        elif not self.locked:
+            self.lock_t += dt
+            if self.lock_t >= LOCK_TIME:
+                self.locked = True
 
         if fire and not self.hot and self.cool <= 0:
             self.cool = LASER_PERIOD
@@ -611,6 +623,8 @@ class Game:
             t = self.lock
             if t is None or t.dead:
                 self.say("NO TARGET", 1.0)
+            elif not self.locked:
+                self.say("NO LOCK", 1.0)
             else:
                 self.missiles -= 1
                 o = Obj(self.missile_bp, "pmissile", 0.0, -40.0, 80.0)
@@ -665,6 +679,7 @@ class Game:
             self.hull = 0.0
             self.over = True
             self.lock = None
+            self.locked = False
             self._boom(0.0, 0.0, 150.0, 20)
             self.say("GAME OVER", 1e9)
 
