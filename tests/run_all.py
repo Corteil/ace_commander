@@ -1,8 +1,8 @@
 """Run every test. From the repo folder:  python tests/run_all.py
 
 Needs ship_data.py in the repo folder (make it with tools/import_ships.py), and
-the repo folder itself must be called elite_demo, because the tests import the
-app as the package `elite_demo`. render.py also needs Pillow.
+the repo folder itself must be called ace_commander, because the tests import the
+app as the package `ace_commander`. render.py also needs Pillow.
 """
 import os
 import subprocess

@@ -1,11 +1,11 @@
 [app]
-name = "Elite"
+name = "Ace Commander"
 category = "Games"
 
 [entry]
-class = "Elite"
+class = "AceCommander"
 
 [metadata]
 author = "Corteil"
-description = "Wireframe space combat with the ships of BBC Micro Elite: fly by tilt, joystick or keyboard, plus a ship viewer."
+description = "Wireframe space combat inspired by BBC Micro Elite: fly by tilt, joystick or keyboard, plus a ship viewer."
 version = "13"

@@ -1,6 +1,6 @@
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)            # the app folder, which must be named elite_demo
+REPO = os.path.dirname(HERE)            # the app folder, which must be named ace_commander
 PARENT = os.path.dirname(REPO)
 sys.path.insert(0, HERE)
 sys.path.insert(0, PARENT)
@@ -21,10 +21,10 @@ def arcs(a):
 # ---- with LEDs available ---------------------------------------------------
 bs.install()
 leds, bus = bs.install_leds()
-import elite_demo
-mod = elite_demo.app
+import ace_commander
+mod = ace_commander.app
 assert mod.tildagonos is not None
-a = elite_demo.Elite()
+a = ace_commander.AceCommander()
 tick(a); tick(a, fresh=["DOWN"]); tick(a, fresh=["UP"])
 assert bus.events == [] and leds.writes == 0, "menu leaves the LEDs alone"
 tick(a, fresh=["CONFIRM"])          # into flight
@@ -79,10 +79,10 @@ print("LED failure falls back to the ring: ok")
 # ---- USE_LEDS off ----------------------------------------------------------
 bs.install()
 leds, bus = bs.install_leds()
-import elite_demo
-mod = elite_demo.app
+import ace_commander
+mod = ace_commander.app
 mod.USE_LEDS = False
-a = elite_demo.Elite()
+a = ace_commander.AceCommander()
 tick(a, fresh=["CONFIRM"]); tick(a)
 a.game._hurt(5.0); tick(a)
 assert bus.events == [] and leds.writes == 0 and arcs(a) == 1
@@ -90,10 +90,10 @@ print("USE_LEDS = False keeps the ring: ok")
 
 # ---- firmware without the LED modules --------------------------------------
 bs.install()
-import elite_demo
-mod = elite_demo.app
+import ace_commander
+mod = ace_commander.app
 assert mod.tildagonos is None
-a = elite_demo.Elite()
+a = ace_commander.AceCommander()
 tick(a, fresh=["CONFIRM"]); tick(a)
 a.game._hurt(5.0); tick(a)
 assert arcs(a) == 1

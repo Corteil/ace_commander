@@ -1,4 +1,4 @@
-# Elite
+# Ace Commander
 
 A flight combat game and ship viewer for the EMF Tildagon / Spaceagon badge, drawn as
 hidden-line wireframes using the ships of BBC Micro Elite. Plain MicroPython: no C and no
@@ -117,7 +117,7 @@ the two faces it sits between points back at the viewer.
 ## Install
 
 Copy `__init__.py app.py game.py cockpit.py viewer.py bench.py ship_data.py tildagon.toml
-metadata.json` to `/apps/elite_demo/` on the badge (for example with `mpremote fs cp`),
+metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
 then restart it. On Windows, `deploy.bat all` does this.
 
 ## Credits and original material
@@ -139,5 +139,6 @@ project is a fan-made game inspired by it, for the EMF Camp badge.
   [badge firmware](https://github.com/emfcamp/badge-2024-software) so the tests behave like
   the badge.
 
-"No original code" is not the same as "no legal issue". The ship data and the name are the
-parts someone could object to, so neither should go into the badge app store as they are.
+"No original code" is not the same as "no legal issue". The ship data is the part someone
+could object to, so it should not go into the badge app store. The game was first called
+Elite and was renamed Ace Commander to keep clear of the original's name.

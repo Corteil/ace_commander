@@ -1,6 +1,6 @@
 import io, os, sys, contextlib
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)            # the app folder, which must be named elite_demo
+REPO = os.path.dirname(HERE)            # the app folder, which must be named ace_commander
 PARENT = os.path.dirname(REPO)
 sys.path.insert(0, HERE); sys.path.insert(0, PARENT)
 import badge_stubs as bs
@@ -10,12 +10,12 @@ tick = bs.tick
 
 
 bs.install()
-import elite_demo
-mod = elite_demo.app
-a = elite_demo.Elite()
+import ace_commander
+mod = ace_commander.app
+a = ace_commander.AceCommander()
 c = CountCtx(); a.draw(c)
 labels = [t[0] for t in c.texts]
-assert labels[:4] == ["ELITE", "FLIGHT", "SHIP VIEWER", "SPEED TEST"], labels
+assert labels[:5] == ["ACE", "COMMANDER", "FLIGHT", "SHIP VIEWER", "SPEED TEST"], labels
 for s, (x, y), size in c.texts:
     assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5, (s, y)
 tick(a, fresh=["UP"]); assert a.menu == 2, "UP from the top wraps to the bottom"
