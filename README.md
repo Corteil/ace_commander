@@ -63,7 +63,7 @@ with UP / DOWN for speed, LEFT for a missile, RIGHT to re-zero and CANCEL for th
 - Right bars: shield (blue) and energy (green). Shields soak up hits and recharge after a
   few seconds without damage; when energy runs out the game is over.
 - Green squares: missiles left. A diamond marks the ship in the missile sights: red at
-  first, green once it has stayed there for a second and the missile has locked on. D only
+  first, green once it has stayed there for two seconds and the missile has locked on. D only
   fires at a green diamond; before that it says NO LOCK.
 - Radar at the bottom: left-right is left-right, up the ellipse is ahead, and the stick on
   each blip shows how far above or below you it is. Red is a hostile ship, yellow is cargo,

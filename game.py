@@ -25,7 +25,7 @@ LASER_COOL = 0.16      # heat lost per second
 AIM_ASSIST = 0.05      # a shot hits anything within this slope of the crosshair
 
 MISSILE_DAMAGE = 150.0
-LOCK_TIME = 1.0            # seconds a ship must stay in the sights before a missile locks
+LOCK_TIME = 2.0            # seconds a ship must stay in the sights before a missile locks
 MISSILE_SPEED = 1100.0     # world units per second
 PMISSILE_SPEED = 1700.0
 TURN_RATE = 1.1            # how fast enemy ships can turn, radians per second

@@ -161,6 +161,7 @@ assert g.lock is other and not g.locked and g.lock_t == 0.0
 other.dead = True
 g.step(DT, 0, 0, 0, False, False)
 assert g.lock is o and not g.locked
+o.x = 0.0        # it has been breaking sideways all this time; bring it back into the sights
 for _ in range(int(game.LOCK_TIME / DT) + 2):
     g.step(DT, 0, 0, 0, False, False)
 assert g.locked and g.lock is o
