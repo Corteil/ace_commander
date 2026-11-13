@@ -206,6 +206,7 @@ class Boom:
 class Game:
     def __init__(self, ships, level=1):
         self.set_level(level)
+        self.god = False    # a cheat: hits flash but do no damage
         self.types = {}
         for entry in ships:
             bp = Blueprint(entry)
@@ -654,6 +655,8 @@ class Game:
         if self.over:
             return
         self.flash = 0.3
+        if self.god:
+            return
         self.since_hit = 0.0
         s = damage if damage < self.shield else self.shield
         self.shield -= s

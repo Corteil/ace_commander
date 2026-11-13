@@ -171,6 +171,9 @@ of a real flight, not from a harness.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
+8. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
+   while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
+   each new thing that is slow to reach by playing, and turn it off before publishing.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
 
