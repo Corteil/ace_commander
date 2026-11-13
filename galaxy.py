@@ -16,6 +16,8 @@ GOVERNMENTS = ("Anarchy", "Feudal", "Multi-government", "Dictatorship",
 ECONOMIES = ("Rich Industrial", "Average Industrial", "Poor Industrial",
              "Mainly Industrial", "Mainly Agricultural", "Rich Agricultural",
              "Average Agricultural", "Poor Agricultural")
+from array import array
+
 SIZE = 256
 MAX_FUEL = 70       # tenths of a light year: a full tank is 7.0 light years
 
@@ -82,22 +84,26 @@ class Galaxy:
     def __init__(self, seeds, pairs):
         self.seeds = tuple(seeds)
         self.pairs = pairs
-        # chart positions of all 256 systems: 512 bytes
+        # chart positions of all 256 systems (512 bytes), and each system's
+        # seeds (1.5 KB) so that working one out doesn't start from the beginning
         self.xs = bytearray(SIZE)
         self.ys = bytearray(SIZE)
+        self.all = array("H", bytes(6 * SIZE))
         s0, s1, s2 = self.seeds
         for i in range(SIZE):
             self.xs[i] = s1 >> 8
             self.ys[i] = s0 >> 8
+            self.all[3 * i] = s0
+            self.all[3 * i + 1] = s1
+            self.all[3 * i + 2] = s2
             for _ in range(4):
                 s0, s1, s2 = _twist(s0, s1, s2)
 
     def system(self, index):
         """Work out system number index (0 to 255)."""
-        s0, s1, s2 = self.seeds
-        for _ in range(4 * (index % SIZE)):
-            s0, s1, s2 = _twist(s0, s1, s2)
-        return System(index % SIZE, (s0, s1, s2), self.pairs)
+        i = 3 * (index % SIZE)
+        a = self.all
+        return System(index % SIZE, (a[i], a[i + 1], a[i + 2]), self.pairs)
 
     def distance(self, a, b):
         """Between systems a and b, in tenths of a light year. The chart is

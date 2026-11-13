@@ -18,9 +18,8 @@ The title screen, with a ship tumbling under the name, offers:
 Joystick left / right changes the choice, C selects it and F leaves the app.
 
 A commander is somewhere in a galaxy of 256 star systems and can jump between them by
-hyperspace (see [Hyperspace](#hyperspace)). Continue and New commander start you docked:
-C or A launches, F goes back to the title screen. Not in yet: a station to fly to, and
-trading. The plan for those is in [DESIGN.md](DESIGN.md).
+hyperspace (see [Hyperspace](#hyperspace)). Continue and New commander start you docked
+(see [Docked](#docked)). Not in yet: a station to fly to, and trading. The plan for those is in [DESIGN.md](DESIGN.md).
 
 This is a fan-made game inspired by Elite. It is not official, licensed or endorsed. See
 [Credits and original material](#credits-and-original-material).
@@ -60,10 +59,31 @@ and `BTN_MENU` near the top of `app.py`.
 On firmware without the joystick's own button names, the game falls back to tilt steering
 with UP / DOWN for speed, LEFT for a missile, RIGHT to re-zero and CANCEL for the menu.
 
+## Docked
+
+While docked there are four screens; the small squares at the top show which one is open.
+
+- **Status** - the system you are at, your rank, kills, fuel, credits and hyperspace
+  target. C launches.
+- **Local chart** - the systems round you, as in flight.
+- **Galactic chart** - all 256 systems of the galaxy. The small ring round you is your
+  fuel range.
+- **System data** - government, economy, tech level, population, productivity and size
+  of the target system (or of where you are, with no target).
+
+Joystick left / right changes screen. On the two charts the joystick moves the cursor
+instead, and E / B change screen. On a chart, C makes the selected system your hyperspace
+target and shows its data; C on your own system clears the target. A launches from any
+screen, and F goes back to Status, then to the title screen.
+
+Launching flies you out along the station's hexagonal tunnel (about 2.5 seconds; C skips
+it).
+
 ## Hyperspace
 
-A commander starts at Lave with a full tank, which is 7 light years of fuel. To jump to
-another star system:
+A commander starts at Lave with a full tank, which is 7 light years of fuel. If you picked
+a target while docked and it is in range, the in-flight menu (A) has **Jump: name** just
+below Resume, which starts the jump straight away. Otherwise:
 
 1. Press A and choose **Local chart**. The green cross in the middle is where you are, the
    ring is how far your fuel reaches, and each dot is a star system (white if you can reach
@@ -83,6 +103,9 @@ the system, your rank, fuel and credits. If you are destroyed, C takes you back 
 station you last reached.
 
 Launching without jumping gives the endless fight as before; jump when you want to move on.
+
+The system data screen has no description sentence yet: the original builds it from text
+tables that `game_data.py` doesn't read.
 The Debug page has **Refill fuel** and **Dock now** as shortcuts.
 
 The galaxy needs `game_data.py` (see [Ships and galaxy data](#ships-and-galaxy-data)).
@@ -168,7 +191,8 @@ the two faces it sits between points back at the viewer.
 - `commander.py` - the saved commander: level, kills, rank, star system, fuel. No badge
   imports.
 - `galaxy.py` - works out the 256 star systems from three seed numbers. No badge imports.
-- `chart.py` - the local chart.
+- `chart.py` - the local and galactic charts.
+- `docked.py` - the docked screens.
 - `game.py` - the flight game's rules, with no badge imports so it can be tested on a PC.
 - `cockpit.py` - draws the flight view, radar and gauges.
 - `viewer.py` - the ship viewer.
@@ -181,13 +205,13 @@ the two faces it sits between points back at the viewer.
 - `tests/` - tests that run on a PC with stand-ins for the badge: `python tests/run_all.py`.
 - `CLAUDE.md` - project notes: firmware facts, measurements and what's next.
 - `DESIGN.md` - design for the rest of the game. Phase 1 (title screen, commander, levels,
-  new buttons) is built, and so is most of phase 2 (galaxy, local chart, hyperspace,
-  arriving docked); a station to fly to and trading are not.
+  new buttons) and phase 2 (galaxy, charts, system data, hyperspace, arriving docked) are
+  built; a station to fly to and trading are not.
 
 ## Install
 
 Copy `__init__.py app.py game.py cockpit.py viewer.py bench.py title.py commander.py
-galaxy.py chart.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
+galaxy.py chart.py docked.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
 then restart it. On Windows, `deploy.bat all` does this.
 
 ## Credits and original material

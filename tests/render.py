@@ -58,7 +58,20 @@ shot(a, "1d_level.png")
 tick(a, fresh=["CONFIRM"])
 a.cmdr.add_kills(140)
 shot(a, "1e_docked.png")
+d = a.dock
+d.go(2)
+shot(a, "1f_galactic.png")
+d.target = 147; d.go(1)
+shot(a, "1g_local_docked.png")
+d.go(3)
+shot(a, "1h_system_data.png")
+d.go(0); a.target = 147
+shot(a, "1i_docked_target.png")
 tick(a, fresh=["CONFIRM"])
+for i, ft in enumerate((0.25, 0.6, 0.85, 0.97)):
+    a.launch_t = ft * ace_commander.app.LAUNCH_TIME
+    shot(a, "1j_tunnel_%d.png" % i)
+a.launch_t = 99; tick(a)
 g = a.game
 g.spawn_t = g.rock_t = 1e9
 g.objs[:] = []
@@ -104,6 +117,8 @@ tick(a)
 shot(a, "4_menu.png")
 fpick("STATUS")
 shot(a, "4b_status.png")
+a.fsub = None; tick(a)
+shot(a, "4_menu_jump.png")
 fpick("PAUSE MENU")
 shot(a, "4c_pause_menu.png")
 fpick("DEBUG")

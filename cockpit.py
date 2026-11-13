@@ -197,6 +197,75 @@ _STREAKS = tuple(
     for i in range(18))
 
 
+# the launch tunnel: hexagonal rings one unit apart, the way out of the station
+TUNNEL_RINGS = 12
+TUNNEL_FOCAL = 62.0     # pixels across a ring of radius 1 at distance 1
+TUNNEL_SPIN = 0.5       # radians per second: the station turns as you leave
+_HEX = tuple((math.cos(k * TAU / 6), math.sin(k * TAU / 6)) for k in range(6))
+# stars seen through the mouth of the tunnel: (x, y, distance from the centre)
+def _scatter(n):
+    out = []
+    v = 12345
+    for _ in range(n):
+        v = (v * 1103515245 + 12345) & 0x7FFFFFFF
+        x = (v >> 8) % 221 - 110
+        v = (v * 1103515245 + 12345) & 0x7FFFFFFF
+        y = (v >> 8) % 221 - 110
+        out.append((x, y, int(math.sqrt(x * x + y * y))))
+    return tuple(out)
+
+
+_STARS = _scatter(40)
+
+
+def draw_tunnel(ctx, f, t):
+    """The launch: flying out along a tunnel of hexagons. f goes from 0 at the
+    start to 1 at the mouth; t is the time in seconds, for the spin."""
+    ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+    ctx.line_width = 1.5
+    s = (TUNNEL_RINGS + 1) * f * f      # slow at first, then faster
+    a = t * TUNNEL_SPIN
+    ca = math.cos(a)
+    sa = math.sin(a)
+    corners = [(TUNNEL_FOCAL * (x * ca - y * sa), TUNNEL_FOCAL * (x * sa + y * ca))
+               for x, y in _HEX]
+    # space, through the mouth: as far out as the circle inside the last hexagon
+    z = TUNNEL_RINGS - 1 + 0.6 - s
+    seen = 170 if z < 0.4 else int(0.87 * TUNNEL_FOCAL / z)
+    if seen > 4:
+        ctx.rgb(*GREY)
+        for x, y, r in _STARS:
+            if r < seen:
+                ctx.rectangle(x, y, 1.5, 1.5).fill()
+    near = far = None
+    for i in range(TUNNEL_RINGS):
+        z = i + 0.6 - s
+        if z < 0.4:
+            continue
+        k = 1.0 / z
+        if near is None:
+            near = k
+        far = k
+        b = 1.0 if z < 2 else 2.0 / z      # dimmer further in
+        if i == TUNNEL_RINGS - 1:           # the mouth, with space beyond
+            ctx.rgb(0.3 * b, b, 0.4 * b)
+        else:
+            ctx.rgb(b, b, b)
+        ctx.begin_path()
+        x, y = corners[5]
+        ctx.move_to(int(x * k), int(y * k))
+        for x, y in corners:
+            ctx.line_to(int(x * k), int(y * k))
+        ctx.stroke()
+    if near is not None and far != near:    # the tunnel's six long edges
+        ctx.rgb(*GREY)
+        ctx.begin_path()
+        for x, y in corners:
+            ctx.move_to(int(x * near), int(y * near))
+            ctx.line_to(int(x * far), int(y * far))
+        ctx.stroke()
+
+
 def draw(ctx, g, ms=None, ring=True):
     """Draw the whole cockpit for Game g. ms is the frame time to show, or None."""
     draw_world(ctx, g)

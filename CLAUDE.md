@@ -2,7 +2,7 @@
 
 Notes for picking this project up in a new session. Last updated at the end of the first
 working session, 2026-11-12 (build 13); updated 2026-11-13 (build 16: renamed, on a Pi, design
-phase 1 built) and again that night (build 21: DEBUG page, missile lock, most of phase 2).
+phase 1 built) and again that night (build 22: DEBUG page, missile lock, phase 2).
 
 ## What this is
 
@@ -12,10 +12,9 @@ of BBC Micro Elite. Brian's constraints: plain MicroPython, **no custom firmware
 C or `@micropython.viper` is welcome only if measurements show it would help.
 
 Built from `DESIGN.md`: phase 1 (title screen, saved commander with rank, three levels, new
-button layout) and most of phase 2 (galaxy, local chart in the in-flight menu, hyperspace,
-fuel, arriving docked at a status screen that refuels). Not built yet: the rest of phase 2
-(galactic chart, system data screen, the docked screens as tabs), then a real station and
-trading (phases 3 to 6).
+button layout) and phase 2 (galaxy, local and galactic charts, system data, hyperspace,
+fuel, arriving docked, docked screens as tabs, launch tunnel). Not built yet: a real
+station, docking and trading (phases 3 to 6), and the system description sentence.
 
 ## Files
 
@@ -27,7 +26,8 @@ trading (phases 3 to 6).
 - `commander.py` - the saved commander (level, kills, rank, star system, fuel). Rules only,
   no badge imports. Saved to `commander.json` next to the app (gitignored).
 - `galaxy.py` - the 256 star systems, worked out from three seeds. Rules only.
-- `chart.py` - the local chart (imported the first time it is opened).
+- `chart.py` - the local and galactic charts (imported the first time one is opened).
+- `docked.py` - the docked tabs: Status, Local chart, Galactic chart, System data.
 - `ship_data.py`, `game_data.py` - generated, **gitignored** (see Licensing). 31 ships; the
   galaxy's seeds, name letter pairs and starting place. Both must be copied to the badge.
 - `tools/import_ships.py`, `tools/import_galaxy.py` - make those two from the Elite source.
@@ -188,8 +188,13 @@ of a real flight, not from a harness.
    NEW COMMANDER go to `docked` too, unless a flight was left part-way; every launch is a
    fresh `Game.reset()`. GAME OVER + C docks a commander where they last arrived. Brian
    asked for REFILL FUEL to stay on the DEBUG page; DOCK NOW is there too.
-   Still to do in phase 2: the galactic chart, the system data screen, and the docked
-   screens as tabs (the chart while docked).
+   **Build 22 finishes phase 2:** docked screens as tabs (`docked.Docked`; joystick
+   changes tab, on charts E / B do and C sets `app.target`), the galactic chart
+   (`chart.GalChart`), system data, a JUMP: name line in the in-flight menu when the target
+   is in range, and a hexagon launch tunnel (`cockpit.draw_tunnel`, mode `launch`,
+   `LAUNCH_TIME`). `Galaxy` now caches every system's seeds (1.5 KB), so `system()` no
+   longer twists from the start. Left out: the description sentence ("goat soup"), which
+   needs the original's text tables in `game_data.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
@@ -213,6 +218,8 @@ by itself is faster than one fill for all of them (3.5 against 7.7 ms). Flight a
   whether the ring and dots read well, the streaks on arriving.
 - Arriving and docking (build 21): whether 3 / 4 / 5 ships is the right fight, and
   `DOCK_TIME`.
+- Docked tabs and the launch tunnel (build 22): the galactic chart's cursor speed
+  (`G_CURSOR_SPEED`), the tunnel's look and length.
 - Whether `deploy.bat`'s copy step reports failures properly (the log step is known to work).
 
 Confirmed by Brian on 2026-11-13: F is faster and E slower; the LEDs flash on a hit and the

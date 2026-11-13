@@ -36,7 +36,13 @@ def fpick(a, label):
 
 def launch(a):
     assert a.mode == "docked", a.mode
+    a.dock.go(0)
     tick(a, fresh=["C"])
+    assert a.mode == "launch"
+    for _ in range(200):
+        tick(a)
+        if a.mode != "launch":
+            break
     assert a.mode == "flight" and a.career and not a.docked
 
 
@@ -122,7 +128,9 @@ assert "DOCKED" in tx and "LAVE" in tx and "HARMLESS" in tx and "C: LAUNCH" in t
 assert "Dictatorship" in tx and "Rich Agricultural, tech 5" in tx and "fuel 7.0 LY   100.0 Cr" in tx, tx
 tick(a, fresh=["F"]); assert a.mode == "menu"
 choose(a, "CONTINUE"); assert a.mode == "docked", "F and back again is still docked"
-tick(a, fresh=["A"]); assert a.mode == "flight", "A launches too"
+tick(a, fresh=["A"]); assert a.mode == "launch", "A launches too"
+texts(a)
+tick(a, fresh=["C"]); assert a.mode == "flight", "C skips the tunnel"
 assert a.mode == "flight" and a.career and a.cmdr.level == 0 and a.game.level == 0
 assert commander.load(SAVE).level == 0, "saved as soon as it is made"
 g = a.game
@@ -146,6 +154,7 @@ tick(a, fresh=["A"])
 tx = texts(a)
 assert "STATUS" in tx
 assert a._fitems() == ["RESUME", "LOCAL CHART", "STATUS", "PAUSE MENU", "DEBUG"], a._fitems()
+assert texts(a)
 fpick(a, "STATUS"); assert a.fsub == "status"
 tx = texts(a)
 assert "AVERAGE" in tx and any("6 kills" in t and "EASY" in t for t in tx), tx
@@ -272,7 +281,7 @@ assert e.cmdr.system == 7 and gal.system(7).name == "LAVE" and e.cmdr.fuel == 70
 fpick(e, "LOCAL CHART")
 assert e.fsub == "chart" and e.chart.here == 7
 tx = texts(e)
-assert "LAVE" in tx and "YOU ARE HERE" in tx and "FUEL 7.0" in tx, tx
+assert "LAVE" in tx and "YOU ARE HERE" in tx and "FUEL 7.0 LY" in tx, tx
 tick(e, fresh=["C"]); assert e.fsub == "chart" and g.jump_t == 0, "can't jump to where you are"
 reach = dict((i, dist) for dist, i in gal.in_range(7, 70))
 assert all((0 < d <= 70) == (i in reach) for _, _, i, d in e.chart.dots if i != 7)
@@ -379,10 +388,76 @@ assert e.game.arriving is None and e.game.kills == 0 and not e.game.docked
 debug(e, "DOCK NOW"); assert e.mode == "docked" and not e.paused
 print("arriving, clearing the ships, docking, refuelling: ok")
 
+# ---- the docked tabs, targets, and the jump line in the in-flight menu ----
+d = e.dock
+assert d.tabs == ("STATUS", "LOCAL CHART", "GALACTIC CHART", "SYSTEM DATA") and d.tab == 0
+assert any("< > screens" in t for t in texts(e))
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART" and d.view.verb == "TARGET"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART", "the joystick moves the cursor here"
+tick(e, fresh=["B"]); assert d.name() == "GALACTIC CHART" and len(d.view.dots) == 256
+tx = texts(e)
+assert "GALAXY 1" in tx and "LAVE" in tx and "YOU ARE HERE" in tx, tx
+tick(e, fresh=["B"]); assert d.name() == "SYSTEM DATA" and d.data.name == "LAVE"
+tx = texts(e)
+assert "you are here" in tx and "Dictatorship" in tx and "Population 2.5 billion" in tx, tx
+assert "Productivity 7000 M Cr" in tx and "Radius 4116 km" in tx and "Tech level 5" in tx
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "STATUS", "tabs wrap round"
+tick(e, fresh=["E"]); assert d.name() == "SYSTEM DATA"
+tick(e, fresh=["F"]); assert d.name() == "STATUS" and e.mode == "docked", "F goes back to Status"
+# pick Diso (147) on the galactic chart by steering to it
+d.go(2)
+tx_, ty_ = [(dot[0], dot[1]) for dot in d.view.dots if dot[2] == 147][0]
+for _ in range(400):
+    v = d.view
+    if v.sel[2] == 147:
+        break
+    held = []
+    if abs(v.cx - tx_) > 1:
+        held.append("JOYRIGHT" if tx_ > v.cx else "JOYLEFT")
+    if abs(v.cy - ty_) > 1:
+        held.append("JOYDOWN" if ty_ > v.cy else "JOYUP")
+    tick(e, held=held)
+assert d.view.sel[2] == 147, d.view.sel
+assert "DISO" in texts(e)
+tick(e, fresh=["C"])
+assert e.target == 147 and d.name() == "SYSTEM DATA" and d.data.name == "DISO"
+dd = gal.distance(7, 147)
+tx = texts(e)
+assert "Democracy" in tx and ("%d.%d LY away" % (dd // 10, dd % 10)) in tx, tx
+d.go(0); assert any(t.startswith("target: DISO") for t in texts(e))
+d.go(1); assert d.view.sel[2] == 147, "the chart opens on the target"
+# a far system can be looked up, but not jumped to
+d.go(2)
+far = max(d.view.dots, key=lambda dot: dot[3])
+d.view.cx, d.view.cy = float(far[0]), float(far[1]); d.view._select()
+assert any("TOO FAR  C: DATA" in t for t in texts(e))
+tick(e, fresh=["C"]); assert e.target == far[2] and d.name() == "SYSTEM DATA"
+assert any("too far" in t for t in texts(e))
+launch(e)
+assert not any(s.startswith("JUMP") for s in e._fitems_top()), "no jump line out of range"
+fpick(e, "PAUSE MENU"); tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["C"])
+choose(e, "CONTINUE"); assert e.mode == "flight"   # back in the same flight
+e.target = 147
+assert e._fitems_top()[1] == "JUMP: DISO", e._fitems_top()
+assert texts(e) is not None
+g = e.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
+fpick(e, "JUMP: DISO")
+assert not e.paused and g.jump_t > 0 and e.jump_to == (147, dd)
+assert not any(s.startswith("JUMP") for s in e._fitems_top()), "not twice"
+for _ in range(200):
+    tick(e)
+    if e.cmdr.system == 147:
+        break
+assert e.cmdr.system == 147 and e.target is None and e.cmdr.fuel == 70 - dd
+debug(e, "DOCK NOW")
+assert e.mode == "docked" and e.dock.here.name == "DISO" and e.dock.target is None
+assert e.dock.view is None and e.cmdr.fuel == 70
+print("docked tabs, charts, system data, targets, jump line, launch tunnel: ok")
+
 f = ace_commander.AceCommander()
 choose(f, "CONTINUE")
 assert f.mode == "docked"
-assert f.cmdr.system == 7 and f.galaxy is not None
+assert f.cmdr.system == 147 and f.galaxy is not None
 # practice has no chart, and neither does a commander without game_data.py
 choose_p = ace_commander.AceCommander()
 choose(choose_p, "COMBAT PRACTICE")
@@ -390,8 +465,9 @@ assert "LOCAL CHART" not in choose_p._fitems_top()
 gd = mod.game_data; mod.game_data = None
 n = ace_commander.AceCommander()
 choose(n, "CONTINUE")
-assert n.mode == "docked" and n.galaxy is None
-assert "COMMANDER" in texts(n) and "LAVE" not in texts(n)
+assert n.mode == "docked" and n.galaxy is None and n.dock.tabs == ("STATUS",)
+assert "COMMANDER" in texts(n) and "LAVE" not in texts(n) and "F: title screen" in texts(n)
+tick(n, fresh=["JOYRIGHT"]); tick(n, fresh=["B"]); assert n.dock.tab == 0
 launch(n)
 assert "LOCAL CHART" not in n._fitems_top()
 fpick(n, "STATUS"); texts(n)
