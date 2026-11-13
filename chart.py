@@ -65,13 +65,17 @@ class _Cursor:
         self._select()
 
     def _select(self):
+        # whole numbers: on the badge every float result is a new heap object
+        cx = int(self.cx)
+        cy = int(self.cy)
+        here = self.here
         best = None
         best_d = 1 << 30
         for dot in self.dots:
-            dx = dot[0] - self.cx
-            dy = dot[1] - self.cy
+            dx = dot[0] - cx
+            dy = dot[1] - cy
             d = dx * dx + dy * dy
-            if d < best_d or (d == best_d and dot[2] == self.here):
+            if d < best_d or (d == best_d and dot[2] == here):
                 best_d = d
                 best = dot
         if best is not self.sel:

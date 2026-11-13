@@ -193,7 +193,10 @@ of a real flight, not from a harness.
    (`chart.GalChart`), system data, a JUMP: name line in the in-flight menu when the target
    is in range, and a hexagon launch tunnel (`cockpit.draw_tunnel`, mode `launch`,
    `LAUNCH_TIME`). `Galaxy` now caches every system's seeds (1.5 KB), so `system()` no
-   longer twists from the start. Left out: the description sentence ("goat soup"), which
+   longer twists from the start. Measured over the REPL on the badge: Status and System
+   data take about 90 ms to draw (all text), the local chart 26 ms, the galactic chart 35 ms
+   to draw and 2 to 4 ms per cursor move (52 ms before its search used whole numbers), the
+   tunnel 3 to 55 ms a frame. Left out: the description sentence ("goat soup"), which
    needs the original's text tables in `game_data.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
