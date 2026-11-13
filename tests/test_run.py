@@ -1,6 +1,6 @@
 import asyncio, os, sys, types
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)            # the app folder, which must be named elite_demo
+REPO = os.path.dirname(HERE)            # the app folder, which must be named ace_commander
 PARENT = os.path.dirname(REPO)
 sys.path.insert(0, HERE); sys.path.insert(0, PARENT)
 import badge_stubs as bs
@@ -36,13 +36,13 @@ def load(sched):
         m = types.ModuleType("system.scheduler")
         m.scheduler = sched
         sys.modules["system.scheduler"] = m
-    import elite_demo
-    return elite_demo, elite_demo.app
+    import ace_commander
+    return ace_commander, ace_commander.app
 
 
 async def drive(sched, mode, n=40, other_task=True):
     pkg, mod = load(sched)
-    a = pkg.Elite()
+    a = pkg.AceCommander()
     if mode != "menu":
         a.game = mod.game.Game(mod.SHIPS)
         a.viewer = mod.viewer.Viewer(mod.SHIPS)
@@ -121,7 +121,7 @@ async def main():
     bs.install()
     pkg, mod = load(Sched())
     mod.FAST_FRAMES = False
-    assert not pkg.Elite().fast
+    assert not pkg.AceCommander().fast
     print("FAST_FRAMES = False: ok")
     print("ALL FRAME LOOP TESTS PASSED")
 

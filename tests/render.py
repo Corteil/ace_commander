@@ -4,7 +4,7 @@ import random
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)            # the app folder, which must be named elite_demo
+REPO = os.path.dirname(HERE)            # the app folder, which must be named ace_commander
 PARENT = os.path.dirname(REPO)
 sys.path.insert(0, HERE)
 sys.path.insert(0, PARENT)
@@ -14,8 +14,8 @@ from badge_stubs import PilCtx
 OUT = os.path.join(HERE, "shots")
 os.makedirs(OUT, exist_ok=True)
 bs.install()
-import elite_demo
-mod = elite_demo.app
+import ace_commander
+mod = ace_commander.app
 game = mod.game
 
 
@@ -37,7 +37,7 @@ def place(g, name, kind, x, y, z, nose):
 
 
 random.seed(3)
-a = elite_demo.Elite()
+a = ace_commander.AceCommander()
 shot(a, "1_menu.png")
 
 tick(a, fresh=["CONFIRM"])

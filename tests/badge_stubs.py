@@ -156,7 +156,7 @@ class Imu:
 def install(imu=True, keyboard=True, joystick=True):
     global bus, _down
     for name in list(sys.modules):
-        if name == "elite_demo" or name.startswith("elite_demo."):
+        if name == "ace_commander" or name.startswith("ace_commander."):
             del sys.modules[name]
     bus = Bus()
     _down = set()

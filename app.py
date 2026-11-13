@@ -1,4 +1,4 @@
-"""Elite for the EMF Tildagon / Spaceagon badge: a flight combat game and a
+"""Ace Commander for the EMF Tildagon / Spaceagon badge: a flight combat game and a
 ship viewer, drawn as hidden-line wireframes with the original ship data.
 
 Flight (2026 Spaceagon)
@@ -199,7 +199,7 @@ class Pad:
         self.hits = set()
 
 
-class Elite(app.App):
+class AceCommander(app.App):
     def __init__(self):
         super().__init__()
         self.pad = Pad(self)
@@ -550,7 +550,8 @@ class Elite(app.App):
     def _draw_menu(self, ctx):
         text = cockpit.text
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "ELITE", 0, -58, 40, cockpit.WHITE)
+        text(ctx, "ACE", 0, -74, 34, cockpit.WHITE)
+        text(ctx, "COMMANDER", 0, -46, 18, cockpit.WHITE)
         if not SHIPS:
             text(ctx, "ship_data.py", 0, -10, 16, cockpit.YELLOW)
             text(ctx, "not found", 0, 10, 16, cockpit.YELLOW)
@@ -584,4 +585,4 @@ class Elite(app.App):
             self.t_world, self.t_hud, len(self.game.objs)), 0, 54, 11, cockpit.GREY)
 
 
-__app_export__ = Elite
+__app_export__ = AceCommander

@@ -1,4 +1,4 @@
-"""Elite flight game logic. No badge imports, so it runs and tests on a PC.
+"""Ace Commander flight game logic. No badge imports, so it runs and tests on a PC.
 
 The player sits at the origin looking along +z (x right, y up). As in the
 original game the player never moves: steering rotates everything else, and

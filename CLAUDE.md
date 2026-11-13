@@ -1,4 +1,4 @@
-# Elite for the EMF Tildagon / Spaceagon badge
+# Ace Commander for the EMF Tildagon / Spaceagon badge
 
 Notes for picking this project up in a new session. Last updated at the end of the first
 working session, 2026-11-12 (build 13).
@@ -24,8 +24,8 @@ Not built yet: docking, trading, the galaxy.
   to `badge_log.txt`.
 - `tests/` - PC test suite with stand-ins for the badge firmware.
 
-The repo folder must be called `elite_demo`: the tests import the app as that package, and
-it installs to `/apps/elite_demo/` on the badge.
+The repo folder must be called `ace_commander`: the tests import the app as that package, and
+it installs to `/apps/ace_commander/` on the badge.
 
 ## Working with the badge
 
@@ -64,7 +64,7 @@ Source: `github.com/emfcamp/badge-2024-software`, folder `modules/`. Brian's own
   about 25 controls a frame was a large hidden cost; `Pad` in `app.py` listens for
   `ButtonDownEvent` / `ButtonUpEvent` on `system.eventbus` instead.
 - Frame loop (`modules/app.py`, `modules/system/scheduler/__init__.py`): the default
-  `App.run` awaits `render_update`, which sleeps 50 ms after every update. `Elite.run`
+  `App.run` awaits `render_update`, which sleeps 50 ms after every update. `AceCommander.run`
   overrides it: sets `scheduler.render_needed`, yields once, continues. It falls back to
   `render_update` if anything raises or the app is not foregrounded.
 - LEDs: `tildagonos.leds[1..12]` is the front ring (0 and 13-18 are other LEDs), values

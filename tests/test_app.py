@@ -1,6 +1,6 @@
 import math, os, random, shutil, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)            # the app folder, which must be named elite_demo
+REPO = os.path.dirname(HERE)            # the app folder, which must be named ace_commander
 PARENT = os.path.dirname(REPO)
 sys.path.insert(0, HERE)
 sys.path.insert(0, PARENT)
@@ -12,8 +12,8 @@ G = 9.81
 
 def load(**kw):
     bs.install(**kw)
-    import elite_demo
-    return elite_demo, elite_demo.app
+    import ace_commander
+    return ace_commander, ace_commander.app
 
 
 tick = bs.tick
@@ -42,11 +42,11 @@ def rocks(mod, g):
 
 # ---- menu -----------------------------------------------------------------
 pkg, mod = load()
-a = pkg.Elite()
+a = pkg.AceCommander()
 assert a.overlays == [] and len(mod.SHIPS) == 31
 assert not a.use_tilt, "joystick steering is the default"
 c = frame(a); fits(c)
-assert [t[0] for t in c.texts][:4] == ["ELITE", "FLIGHT", "SHIP VIEWER", "SPEED TEST"]
+assert [t[0] for t in c.texts][:5] == ["ACE", "COMMANDER", "FLIGHT", "SHIP VIEWER", "SPEED TEST"]
 tick(a, fresh=["JOYDOWN"]); assert a.menu == 1
 tick(a, fresh=["JOYUP"]); assert a.menu == 0
 tick(a, fresh=["D"]); assert a.menu == 1          # buttons A and D also move the menu
@@ -245,13 +245,13 @@ print("tilt sensor failure: ok")
 # ---- TILT_DEFAULT -----------------------------------------------------------
 pkg, mod = load()
 mod.TILT_DEFAULT = True
-assert pkg.Elite().use_tilt
+assert pkg.AceCommander().use_tilt
 print("TILT_DEFAULT: ok")
 
 # ---- older firmware: no joystick / lettered-button names --------------------
 pkg, mod = load(joystick=False)
 assert mod.JOY is None and mod.FB is None
-a = pkg.Elite()
+a = pkg.AceCommander()
 assert a.use_tilt, "tilt is the default there"
 tick(a, fresh=["CONFIRM"]); assert a.mode == "flight"
 g = a.game; g.spawn_t = g.rock_t = 1e9
@@ -271,7 +271,7 @@ print("older firmware fallback: ok")
 
 # ---- no accelerometer and no keyboard modules -------------------------------
 pkg, mod = load(imu=False, keyboard=False)
-a = pkg.Elite()
+a = pkg.AceCommander()
 assert not a.use_tilt
 tick(a, fresh=["C"])
 for _ in range(50):
@@ -281,13 +281,13 @@ print("no imu / no keyboard modules: ok")
 # ---- ship_data.py missing ---------------------------------------------------
 tmp = os.path.join(HERE, "noship")
 shutil.rmtree(tmp, ignore_errors=True)
-shutil.copytree(REPO, os.path.join(tmp, "elite_demo"),
+shutil.copytree(REPO, os.path.join(tmp, "ace_commander"),
                 ignore=shutil.ignore_patterns("ship_data.py", "__pycache__", ".git", "tests"))
 sys.path.insert(0, tmp)
 sys.path.remove(PARENT)
 pkg, mod = load()
 assert "noship" in pkg.__file__ and mod.SHIPS == ()
-a = pkg.Elite()
+a = pkg.AceCommander()
 c = frame(a); fits(c)
 assert any(t[0] == "ship_data.py" for t in c.texts)
 tick(a, fresh=["C"]); assert a.mode == "menu"
