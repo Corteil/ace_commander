@@ -22,6 +22,9 @@ _RADAR = tuple(
     for i in range(24)
 )
 
+_RADAR_R = int(RADAR_RANGE)
+_RADAR_R2 = _RADAR_R * _RADAR_R
+
 WHITE = (1, 1, 1)
 DIM = (0.2, 0.2, 0.26)
 GREEN = (0.3, 1, 0.4)
@@ -83,61 +86,82 @@ def text(ctx, s, x, y, size, rgb):
     ctx.rgb(*rgb).move_to(x, y).text(s)
 
 
+# On the badge every float result is a new 16-byte object on the heap, and a
+# frame that makes many of them soon has to stop for a garbage collection.
+# Small whole numbers cost nothing, so the loops below work in whole numbers:
+# positions in world units, directions times 4096, and screen positions in
+# whole pixels.
+IFOCAL = int(FOCAL)
+INEAR = int(NEAR)
+_PX = [0] * 48      # screen x of each vertex of the ship being drawn
+_PY = [0] * 48      # screen y
+_OK = [False] * 48  # False if the vertex is behind the viewer
+_VIS = [False] * 24  # which faces of the ship being drawn can be seen
+
+
 def draw_ship(ctx, o):
     """Draw one object. Returns True if any of it was on screen."""
-    z = o.z
-    if z < NEAR:
+    z = int(o.z)
+    if z < INEAR:
         return False
     bp = o.bp
-    x = o.x
-    y = o.y
-    k = FOCAL / z
-    sx = x * k
-    sy = -y * k
-    pr = bp.size * k    # how big it looks, in pixels
+    x = int(o.x)
+    y = int(o.y)
+    sx = x * IFOCAL // z
+    sy = -(y * IFOCAL // z)
+    pr = bp.isize * IFOCAL // z     # how big it looks, in pixels
     if sx - pr > 120 or sx + pr < -120 or sy - pr > 120 or sy + pr < -120:
         return False
     ctx.rgb(*(RED if o.hit > 0 else COLOUR[o.kind]))
-    if pr < 2.5:        # too far away to make out: a dot
+    if pr < 3:          # too far away to make out: a dot
         ctx.rectangle(sx - 1, sy - 1, 2, 2).fill()
         return True
     if pr < WIRE_MIN:   # middle distance: a small marker, much cheaper than lines
-        ctx.rectangle(sx - pr, sy - 0.75, 2 * pr, 1.5).fill()
-        h = pr * 0.5
-        ctx.rectangle(sx - 0.75, sy - h, 1.5, 2 * h).fill()
+        ctx.rectangle(sx - pr, sy - 1, 2 * pr, 1.5).fill()
+        h = pr // 2
+        ctx.rectangle(sx - 1, sy - h, 1.5, 2 * h).fill()
         return True
 
     m = o.m
-    m0, m1, m2, m3, m4, m5, m6, m7, m8 = m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8]
-    pts = []
+    m0 = int(m[0] * 4096)
+    m1 = int(m[1] * 4096)
+    m2 = int(m[2] * 4096)
+    m3 = int(m[3] * 4096)
+    m4 = int(m[4] * 4096)
+    m5 = int(m[5] * 4096)
+    m6 = int(m[6] * 4096)
+    m7 = int(m[7] * 4096)
+    m8 = int(m[8] * 4096)
+    px = _PX
+    py = _PY
+    ok = _OK
+    i = 0
     for vx, vy, vz in bp.verts:
-        pz = z + vx * m2 + vy * m5 + vz * m8
-        if pz < NEAR:
-            pts.append(None)    # behind the viewer
+        pz = z + ((vx * m2 + vy * m5 + vz * m8) >> 12)
+        if pz < INEAR:
+            ok[i] = False   # behind the viewer
         else:
-            k = FOCAL / pz
-            pts.append(((x + vx * m0 + vy * m3 + vz * m6) * k,
-                        -(y + vx * m1 + vy * m4 + vz * m7) * k))
+            ok[i] = True
+            px[i] = (x + ((vx * m0 + vy * m3 + vz * m6) >> 12)) * IFOCAL // pz
+            py[i] = -((y + ((vx * m1 + vy * m4 + vz * m7) >> 12)) * IFOCAL // pz)
+        i += 1
 
     # Elite's hidden-line rule: a face shows if its normal points back along
     # the line from the viewer to the ship. A zero normal always shows.
-    vis = []
+    vis = _VIS
+    i = 0
     for nx, ny, nz in bp.normals:
-        vis.append(
-            (nx == 0 and ny == 0 and nz == 0)
-            or (nx * m0 + ny * m3 + nz * m6) * x
-            + (nx * m1 + ny * m4 + nz * m7) * y
-            + (nx * m2 + ny * m5 + nz * m8) * z < 0
-        )
+        vis[i] = ((nx == 0 and ny == 0 and nz == 0)
+                  or ((nx * m0 + ny * m3 + nz * m6) >> 8) * x
+                  + ((nx * m1 + ny * m4 + nz * m7) >> 8) * y
+                  + ((nx * m2 + ny * m5 + nz * m8) >> 8) * z < 0)
+        i += 1
 
     ctx.begin_path()
     for a, b, f1, f2 in bp.edges:
-        if vis[f1] or vis[f2]:
-            p = pts[a]
-            q = pts[b]
-            if p is not None and q is not None:
-                ctx.move_to(p[0], p[1])
-                ctx.line_to(q[0], q[1])
+        if (vis[f1] or vis[f2]) and ok[a] and ok[b]:
+            ctx.move_to(px[a], py[a])
+            ctx.line_to(px[b], py[b])
     ctx.stroke()
     return True
 
@@ -179,9 +203,9 @@ def draw_world(ctx, g):
     # stardust, so speed and turning can be seen
     ctx.rgb(*GREY)
     for p in g.dust:
-        if p[2] > NEAR:
-            k = FOCAL / p[2]
-            ctx.rectangle(p[0] * k, -p[1] * k, 1.5, 1.5).fill()
+        z = int(p[2])
+        if z > INEAR:
+            ctx.rectangle(int(p[0]) * IFOCAL // z, -(int(p[1]) * IFOCAL // z), 1.5, 1.5).fill()
 
     for o in g.objs:
         draw_ship(ctx, o)
@@ -194,9 +218,10 @@ def draw_world(ctx, g):
             continue
         ctx.rgb(1, 0.5 + 0.5 * fade, 0.2 * fade)
         for p in boom.parts:
-            if p[2] > NEAR:
-                k = FOCAL / p[2]
-                ctx.rectangle(p[0] * k - 1, -p[1] * k - 1, 2.5, 2.5).fill()
+            z = int(p[2])
+            if z > INEAR:
+                ctx.rectangle(int(p[0]) * IFOCAL // z - 1,
+                              -(int(p[1]) * IFOCAL // z) - 1, 2.5, 2.5).fill()
 
     if g.beam > 0:      # the player's twin lasers meet at the crosshair
         ctx.rgb(*RED)
@@ -259,23 +284,24 @@ def draw_hud(ctx, g, ms=None, ring=True):
         ctx.rectangle(px, py, 1.5, 1.5).fill()
     ctx.rectangle(-RADAR_RX, RADAR_Y - 0.5, 2 * RADAR_RX, 1).fill()
     ctx.rectangle(-0.5, RADAR_Y - RADAR_RY, 1, 2 * RADAR_RY).fill()
-    r2 = RADAR_RANGE * RADAR_RANGE
-    for o in g.objs:
-        if o.x * o.x + o.z * o.z > r2:
+    for o in g.objs:        # in whole numbers, like draw_ship
+        x = int(o.x)
+        z = int(o.z)
+        if x * x + z * z > _RADAR_R2:
             continue
-        bx = o.x / RADAR_RANGE * RADAR_RX
-        by = RADAR_Y - o.z / RADAR_RANGE * RADAR_RY
-        h = o.y / RADAR_RANGE * 22
+        bx = x * RADAR_RX // _RADAR_R
+        by = RADAR_Y - z * RADAR_RY // _RADAR_R
+        h = int(o.y) * 22 // _RADAR_R
         if h > 22:
             h = 22
         elif h < -6:
             h = -6
         ctx.rgb(*(RED if o.kind == "ship" else COLOUR[o.kind]))   # hostile ships in red
         if h >= 0:
-            ctx.rectangle(bx - 0.5, by - h, 1, h).fill()
+            ctx.rectangle(bx, by - h, 1, h).fill()
         else:
-            ctx.rectangle(bx - 0.5, by, 1, -h).fill()
-        ctx.rectangle(bx - 1.5, by - h - 1.5, 3, 3).fill()
+            ctx.rectangle(bx, by, 1, -h).fill()
+        ctx.rectangle(bx - 1, by - h - 1, 3, 3).fill()
 
     # wave (yellow) and score (white), as one centred row of digits
     wave = str(g.wave)

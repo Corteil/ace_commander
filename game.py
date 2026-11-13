@@ -43,6 +43,8 @@ TIERS = (
     ("THARGOID",),
 )
 ROCKS = ("ASTEROID", "BOULDER")
+_INV14 = 1.0 / 16384
+THINK_EVERY = 3        # a ship re-plans on one frame in this many (see Game._think)
 
 # What the level changes: (most hostile ships at once, how often enemy lasers
 # hit compared with level 1, how much damage they and their missiles do
@@ -137,6 +139,7 @@ class Blueprint:
             if d > size2:
                 size2 = d
         self.size = math.sqrt(size2)   # distance of the furthest vertex
+        self.isize = int(self.size + 0.5)
         if stats:
             (self.canisters, area, self.gun, self.explosions, self.bounty,
              self.vis, self.energy, self.speed, self.laser, self.missiles) = stats
@@ -154,6 +157,7 @@ class Blueprint:
 
 class Obj:
     """A ship, missile, rock or cargo canister."""
+    count = 0
 
     def __init__(self, bp, kind, x, y, z):
         self.bp = bp
@@ -174,6 +178,11 @@ class Obj:
         self.beam = 0.0     # > 0 while this ship's laser is drawn
         self.hit = 0.0      # > 0 while flashing from a hit
         self.dead = False
+        # ships work out their steering every THINK_EVERY frames, not all on
+        # the same one
+        Obj.count += 1
+        self.slot = Obj.count % THINK_EVERY
+        self.think_t = 0.0  # time since this ship last did
 
 
 class Boom:
@@ -182,8 +191,14 @@ class Boom:
     def __init__(self, x, y, z, n, spread):
         self.t = 0.0
         self.life = 1.3
+        # each dot is [x, y, z, vx, vy, vz] in whole numbers: see Game._rotate
+        x = int(x)
+        y = int(y)
+        z = int(z)
+        spread = int(spread)
         self.parts = [
-            [x, y, z, _rnd(-spread, spread), _rnd(-spread, spread), _rnd(-spread, spread)]
+            [x, y, z, random.randint(-spread, spread), random.randint(-spread, spread),
+             random.randint(-spread, spread)]
             for _ in range(n)
         ]
 
@@ -214,7 +229,11 @@ class Game:
         self.objs = []
         self.new = []      # objects created during a step, added at its end
         self.booms = []
-        self.dust = [[_rnd(-500, 500), _rnd(-500, 500), _rnd(100, 1500)] for _ in range(10)]
+        self.tick = 0
+        self.frame = 0
+        # dust and explosion dots are whole numbers: see _rotate
+        self.dust = [[random.randint(-500, 500), random.randint(-500, 500),
+                      random.randint(100, 1500)] for _ in range(10)]
         self.speed = 14.0
         self.shield = 100.0
         self.hull = 100.0
@@ -267,6 +286,7 @@ class Game:
         elif self.speed > PLAYER_MAX:
             self.speed = PLAYER_MAX
 
+        self.frame += 1
         self._rotate(pitch * PITCH_RATE * dt, roll * ROLL_RATE * dt, self.speed * SPEED_K * dt)
         for o in self.objs:
             if not o.dead:
@@ -286,80 +306,121 @@ class Game:
             self.lock = None
 
     def _rotate(self, a, b, fwd):
-        """Steer: pitch everything by a, roll it by b, and slide it fwd closer."""
+        """Steer: pitch everything by a, roll it by b, and slide it fwd closer.
+
+        On the badge every float result is a new object for the garbage
+        collector, and this touches every number of every object, so the
+        turning is done in whole numbers: positions in quarter units and
+        directions times 16384. Dust and explosion dots are whole numbers
+        throughout."""
+        ifwd = int(fwd)
         if a == 0.0 and b == 0.0:       # flying straight: no turning to work out
             for o in self.objs:
                 o.z -= fwd
             for boom in self.booms:
                 for p in boom.parts:
-                    p[2] -= fwd
+                    p[2] -= ifwd
             for p in self.dust:
-                p[2] -= fwd
+                p[2] -= ifwd
                 if p[2] < 40:
-                    p[0] = _rnd(-500, 500)
-                    p[1] = _rnd(-500, 500)
-                    p[2] = _rnd(900, 1500)
+                    p[0] = random.randint(-500, 500)
+                    p[1] = random.randint(-500, 500)
+                    p[2] = random.randint(900, 1500)
             return
-        ca, sa = math.cos(a), math.sin(a)
-        cb, sb = math.cos(b), math.sin(b)
+        # sines and cosines times 8192 (for positions) and 16384 (for directions)
+        ca = round(math.cos(a) * 16384)
+        sa = round(math.sin(a) * 16384)
+        cb = round(math.cos(b) * 16384)
+        sb = round(math.sin(b) * 16384)
+        ca2 = ca >> 1
+        sa2 = sa >> 1
+        cb2 = cb >> 1
+        sb2 = sb >> 1
         for o in self.objs:
-            y = o.y * ca - o.z * sa
-            z = o.y * sa + o.z * ca
-            x = o.x
-            o.x = x * cb - y * sb
-            o.y = x * sb + y * cb
-            o.z = z - fwd
+            x = int(o.x * 4)
+            y = int(o.y * 4)
+            z = int(o.z * 4)
+            y, z = (y * ca2 - z * sa2 + 4096) >> 13, (y * sa2 + z * ca2 + 4096) >> 13
+            o.x = ((x * cb2 - y * sb2 + 4096) >> 13) * 0.25
+            o.y = ((x * sb2 + y * cb2 + 4096) >> 13) * 0.25
+            o.z = z * 0.25 - fwd
             m = o.m
             for i in (0, 3, 6):
-                y = m[i + 1] * ca - m[i + 2] * sa
-                z = m[i + 1] * sa + m[i + 2] * ca
-                x = m[i]
-                m[i] = x * cb - y * sb
-                m[i + 1] = x * sb + y * cb
-                m[i + 2] = z
+                x = int(m[i] * 16384)
+                y = int(m[i + 1] * 16384)
+                z = int(m[i + 2] * 16384)
+                y, z = (y * ca - z * sa + 8192) >> 14, (y * sa + z * ca + 8192) >> 14
+                m[i] = ((x * cb - y * sb + 8192) >> 14) * _INV14
+                m[i + 1] = ((x * sb + y * cb + 8192) >> 14) * _INV14
+                m[i + 2] = z * _INV14
             v = o.aim
             if v is not None:
-                y = v[1] * ca - v[2] * sa
-                z = v[1] * sa + v[2] * ca
-                x = v[0]
-                v[0] = x * cb - y * sb
-                v[1] = x * sb + y * cb
-                v[2] = z
+                x = int(v[0] * 16384)
+                y = int(v[1] * 16384)
+                z = int(v[2] * 16384)
+                y, z = (y * ca - z * sa + 8192) >> 14, (y * sa + z * ca + 8192) >> 14
+                v[0] = ((x * cb - y * sb + 8192) >> 14) * _INV14
+                v[1] = ((x * sb + y * cb + 8192) >> 14) * _INV14
+                v[2] = z * _INV14
         for boom in self.booms:
             for p in boom.parts:
                 for i in (0, 3):
-                    y = p[i + 1] * ca - p[i + 2] * sa
-                    z = p[i + 1] * sa + p[i + 2] * ca
                     x = p[i]
-                    p[i] = x * cb - y * sb
-                    p[i + 1] = x * sb + y * cb
+                    y = p[i + 1]
+                    z = p[i + 2]
+                    y, z = (y * ca - z * sa + 8192) >> 14, (y * sa + z * ca + 8192) >> 14
+                    p[i] = (x * cb - y * sb + 8192) >> 14
+                    p[i + 1] = (x * sb + y * cb + 8192) >> 14
                     p[i + 2] = z
-                p[2] -= fwd
+                p[2] -= ifwd
         for p in self.dust:
-            y = p[1] * ca - p[2] * sa
-            z = p[1] * sa + p[2] * ca
             x = p[0]
-            p[0] = x * cb - y * sb
-            p[1] = x * sb + y * cb
-            p[2] = z - fwd
-            if p[2] < 40 or p[2] > 1600 or abs(p[0]) > 700 or abs(p[1]) > 700:
-                p[0] = _rnd(-500, 500)
-                p[1] = _rnd(-500, 500)
-                p[2] = _rnd(900, 1500)
+            y = p[1]
+            z = p[2]
+            y, z = (y * ca - z * sa + 8192) >> 14, (y * sa + z * ca + 8192) >> 14
+            p[0] = (x * cb - y * sb + 8192) >> 14
+            p[1] = (x * sb + y * cb + 8192) >> 14
+            p[2] = z = z - ifwd
+            if z < 40 or z > 1600 or abs(p[0]) > 700 or abs(p[1]) > 700:
+                p[0] = random.randint(-500, 500)
+                p[1] = random.randint(-500, 500)
+                p[2] = random.randint(100, 1500)
+        # the whole-number turning lets directions drift a little out of
+        # true; ships are squared up by their own steering, so every so often
+        # do the same for one of the things that just drift
+        self.tick += 1
+        n = len(self.objs)
+        if n:
+            o = self.objs[self.tick % n]
+            if o.kind == "rock" or o.kind == "can":
+                _ortho(o.m)
 
     def _think(self, o, dt):
         if o.hit > 0:
             o.hit -= dt
         if o.beam > 0:
             o.beam -= dt
+        m = o.m
+        kind = o.kind
+        if kind == "ship":
+            # Steering is the costly part, and makes a lot of work for the
+            # garbage collector, so a ship only re-plans every few frames,
+            # for all the time since it last did. It still moves every frame.
+            o.think_t += dt
+            if (self.frame + o.slot) % THINK_EVERY:
+                v = o.speed * SPEED_K * dt
+                o.x += m[6] * v
+                o.y += m[7] * v
+                o.z += m[8] * v
+                return
+            dt = o.think_t
+            o.think_t = 0.0
         d = math.sqrt(o.x * o.x + o.y * o.y + o.z * o.z)
         if d > DESPAWN:
             o.dead = True
             return
         if d < 1.0:
             d = 1.0
-        m = o.m
-        kind = o.kind
         if kind == "ship":
             bp = o.bp
             tx, ty, tz = -o.x / d, -o.y / d, -o.z / d   # direction to the player
@@ -399,7 +460,7 @@ class Game:
             else:   # flee
                 _turn(m, -tx, -ty, -tz, turn)
             o.speed += (want - o.speed) * min(1.0, 2.0 * dt)
-            v = o.speed * SPEED_K * dt
+            v = o.speed * SPEED_K * dt / THINK_EVERY    # this frame's share
         elif kind == "missile":
             o.t -= dt
             if o.t <= 0 or (d < 150 and not self.over):
@@ -451,10 +512,11 @@ class Game:
             boom.t += dt
             if boom.t < boom.life:
                 keep = True
+                k = int(dt * 1024)
                 for p in boom.parts:
-                    p[0] += p[3] * dt
-                    p[1] += p[4] * dt
-                    p[2] += p[5] * dt
+                    p[0] += (p[3] * k) >> 10
+                    p[1] += (p[4] * k) >> 10
+                    p[2] += (p[5] * k) >> 10
         if self.booms and not keep:
             self.booms = []
         elif self.booms:
