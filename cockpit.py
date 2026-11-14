@@ -202,6 +202,33 @@ TUNNEL_RINGS = 12
 TUNNEL_FOCAL = 62.0     # pixels across a ring of radius 1 at distance 1
 TUNNEL_SPIN = 0.5       # radians per second: the station turns as you leave
 _HEX = tuple((math.cos(k * TAU / 6), math.sin(k * TAU / 6)) for k in range(6))
+# each station has its own colour, for the tunnel's mouth and the badge's LEDs
+# as you launch. No red (the LEDs flash red when you are hit) and no white (the
+# tunnel is white).
+STATION_COLOURS = (GREEN, CYAN, YELLOW, MAGENTA, ORANGE, (0.4, 0.55, 1), (1, 0.5, 0.75),
+                   (0.65, 0.4, 1))
+
+
+def station_colour(system):
+    """The colour of the station at this system (an index, or None)."""
+    if system is None:
+        return GREEN
+    return STATION_COLOURS[((system * 40503) & 0xFFFF) >> 13]     # mixed, 0 to 7
+
+
+def tunnel_glow(f):
+    """How bright the LEDs are at point f (0 to 1) of the launch: a pulse as
+    each ring goes by, then full once you are out of the mouth."""
+    p = (TUNNEL_RINGS + 1) * f * f - 0.2    # ring i goes past when this reaches i
+    if p < 0:
+        return 0.0
+    n = int(p)
+    if n >= TUNNEL_RINGS - 1:
+        return 1.0
+    p -= n
+    return 0.5 * (1 - p) * (1 - p)
+
+
 # stars seen through the mouth of the tunnel: (x, y, distance from the centre)
 def _scatter(n):
     out = []
@@ -218,9 +245,10 @@ def _scatter(n):
 _STARS = _scatter(40)
 
 
-def draw_tunnel(ctx, f, t):
+def draw_tunnel(ctx, f, t, rgb=GREEN):
     """The launch: flying out along a tunnel of hexagons. f goes from 0 at the
-    start to 1 at the mouth; t is the time in seconds, for the spin."""
+    start to 1 at the mouth; t is the time in seconds, for the spin; rgb is
+    the station's colour, for the mouth."""
     ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
     ctx.line_width = 1.5
     s = (TUNNEL_RINGS + 1) * f * f      # slow at first, then faster
@@ -248,7 +276,7 @@ def draw_tunnel(ctx, f, t):
         far = k
         b = 1.0 if z < 2 else 2.0 / z      # dimmer further in
         if i == TUNNEL_RINGS - 1:           # the mouth, with space beyond
-            ctx.rgb(0.3 * b, b, 0.4 * b)
+            ctx.rgb(rgb[0] * b, rgb[1] * b, rgb[2] * b)
         else:
             ctx.rgb(b, b, b)
         ctx.begin_path()

@@ -73,7 +73,7 @@ class Docked:
         c = self.cmdr
         s = self.here
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "DOCKED", 0, -100, 11, cockpit.GREY)
+        text(ctx, "DOCKED", 0, -100, 11, cockpit.station_colour(c.system))
         if s is not None:
             text(ctx, s.name, 0, -80, 22, cockpit.WHITE)
             text(ctx, s.government_name(), 0, -59, 11, cockpit.GREY)

@@ -77,7 +77,9 @@ target and shows its data; C on your own system clears the target. A launches fr
 screen, and F goes back to Status, then to the title screen.
 
 Launching flies you out along the station's hexagonal tunnel (about 2.5 seconds; C skips
-it).
+it). Each station has its own colour, shown on "DOCKED" and on the tunnel's last ring. The
+badge's LEDs pulse in that colour as each ring goes by, flash full as you leave the tunnel,
+then fade.
 
 ## Hyperspace
 

@@ -266,7 +266,8 @@ class AceCommander(app.App):
         self.zero = None                 # accelerometer reading taken as "level"
         self.ms = 0.0                    # smoothed frame time
         self.leds_on = False             # we have taken over the LEDs
-        self.led_level = -1              # red level last written, 0-255
+        self.led_level = None            # (r, g, b) last written, 0-255 each
+        self.glow = 0.0                  # the station's colour fading on the LEDs after launch
         # smoothed time, in ms, spent in the game rules and in drawing calls
         self.t_step = 0.0
         self.t_world = 0.0
@@ -312,8 +313,12 @@ class AceCommander(app.App):
     # ---- LEDs -------------------------------------------------------------
 
     def _leds(self, level):
-        """Set the ring of 12 LEDs to red at level 0-255, taking them over
-        from the badge's own pattern first. Only writes when the level changes."""
+        """Set the ring of 12 LEDs to red at level 0-255."""
+        self._leds_rgb(level, 0, 0)
+
+    def _leds_rgb(self, r, g, b):
+        """Set the ring of 12 LEDs to (r, g, b), 0-255 each, taking them over
+        from the badge's own pattern first. Only writes when the colour changes."""
         if tildagonos is None or not USE_LEDS:
             return
         try:
@@ -324,12 +329,13 @@ class AceCommander(app.App):
                 except Exception:
                     pass
                 self.leds_on = True
-                self.led_level = -1
-            if level != self.led_level:
-                self.led_level = level
+                self.led_level = None
+            rgb = (r, g, b)
+            if rgb != self.led_level:
+                self.led_level = rgb
                 leds = tildagonos.leds
                 for i in range(1, 13):      # the front ring is LEDs 1 to 12
-                    leds[i] = (level, 0, 0)
+                    leds[i] = rgb
                 leds.write()
         except Exception:
             self.leds_on = False
@@ -355,8 +361,19 @@ class AceCommander(app.App):
             self._leds(160)
         elif g.flash > 0:
             self._leds(80)
+        elif self.glow > 0:     # just launched: the station's colour fades away
+            self._leds_station(self.glow)
+            self.glow -= self.dt * 2.0
         else:
             self._leds(0)
+
+    def _leds_station(self, k):
+        """The LEDs in this station's colour, k (0 to 1) of full brightness,
+        in 16 steps so they are written only when the step changes."""
+        k = int(k * 15 + 0.5)
+        rgb = cockpit.station_colour(self.cmdr.system if self.cmdr is not None else None)
+        self._leds_rgb(int(rgb[0] * 255) * k // 15, int(rgb[1] * 255) * k // 15,
+                       int(rgb[2] * 255) * k // 15)
 
     # ---- steering ---------------------------------------------------------
 
@@ -455,7 +472,9 @@ class AceCommander(app.App):
             self._update_docked(dt, cancel, confirm)
         elif self.mode == "launch":
             self.launch_t += dt
+            self._leds_station(cockpit.tunnel_glow(min(1.0, self.launch_t / LAUNCH_TIME)))
             if confirm or self.launch_t >= LAUNCH_TIME:
+                self.glow = 1.0
                 if self.game is not None:
                     self.game.over = True   # every launch is a new flight
                 self.docked = False
@@ -510,6 +529,8 @@ class AceCommander(app.App):
         """Go into flight: as the commander, or for practice. A game that was
         left part-way carries on if it is the same kind."""
         level = self.cmdr.level if career else 1
+        if not career:
+            self.glow = 0.0
         g = self.game
         if g is None:
             self.game = g = game.Game(SHIPS, level)
@@ -984,7 +1005,8 @@ class AceCommander(app.App):
         elif self.mode == "docked":
             self.dock.draw(ctx)
         elif self.mode == "launch":
-            cockpit.draw_tunnel(ctx, min(1.0, self.launch_t / LAUNCH_TIME), self.launch_t)
+            cockpit.draw_tunnel(ctx, min(1.0, self.launch_t / LAUNCH_TIME), self.launch_t,
+                                cockpit.station_colour(self.cmdr.system))
         else:
             self._draw_menu(ctx)
         ctx.restore()

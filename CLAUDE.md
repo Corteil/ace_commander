@@ -196,7 +196,10 @@ of a real flight, not from a harness.
    longer twists from the start. Measured over the REPL on the badge: Status and System
    data take about 90 ms to draw (all text), the local chart 26 ms, the galactic chart 35 ms
    to draw and 2 to 4 ms per cursor move (52 ms before its search used whole numbers), the
-   tunnel 3 to 55 ms a frame. Left out: the description sentence ("goat soup"), which
+   tunnel 3 to 55 ms a frame. Build 23 (Brian's request): each station has a colour
+   (`cockpit.station_colour`, eight, no red or white), used for the tunnel's mouth, the
+   DOCKED label and the LEDs, which pulse per ring (`cockpit.tunnel_glow`), flash full at
+   the mouth and fade over the first half second of flight (`app.glow`). Left out: the description sentence ("goat soup"), which
    needs the original's text tables in `game_data.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
@@ -223,6 +226,7 @@ by itself is faster than one fill for all of them (3.5 against 7.7 ms). Flight a
   `DOCK_TIME`.
 - Docked tabs and the launch tunnel (build 22): the galactic chart's cursor speed
   (`G_CURSOR_SPEED`), the tunnel's look and length.
+- The launch LEDs (build 23): whether the pulses and colours look right on the real LEDs.
 - Whether `deploy.bat`'s copy step reports failures properly (the log step is known to work).
 
 Confirmed by Brian on 2026-11-13: F is faster and E slower; the LEDs flash on a hit and the

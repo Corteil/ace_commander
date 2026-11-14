@@ -77,6 +77,60 @@ assert arcs(a) == 1, "ring is the fallback"
 leds.fail = False
 print("LED failure falls back to the ring: ok")
 
+# ---- the launch: the LEDs pulse in the station's colour --------------------
+cockpit = ace_commander.cockpit
+save = os.path.join(HERE, "shots", "test_leds_commander.json")
+os.makedirs(os.path.dirname(save), exist_ok=True)
+mod.SAVE_PATH = save
+a.game.over = True; tick(a, fresh=["CANCEL"])
+bs.choose(a, "NEW COMMANDER"); tick(a, fresh=["C"])
+assert a.mode == "docked"
+col = cockpit.station_colour(a.cmdr.system)
+assert col != cockpit.RED and len(set(cockpit.station_colour(i) for i in range(256))) == 8
+assert a.dock.here.name == "LAVE"
+c = CountCtx(); a.draw(c)
+assert any(t[0] == "DOCKED" for t in c.texts)
+full = tuple(int(v * 255) for v in col)
+writes = leds.writes
+tick(a, fresh=["C"]); assert a.mode == "launch"
+seen = []
+while a.mode == "launch":
+    v = leds.values[1]
+    if not seen or v != seen[-1]:
+        seen.append(v)
+    tick(a, ms=20)
+assert seen[-1] == full, (seen[-1], full)
+bright = [v for v in seen if v != (0, 0, 0)]
+assert bright and all(v == tuple(x * max(v) // max(full) for x in full) or
+                      max(abs(v[i] - full[i] * max(v) / max(full)) for i in range(3)) <= 18
+                      for v in bright), "always the station's colour"
+peaks = sum(1 for i in range(1, len(seen) - 1) if sum(seen[i]) > sum(seen[i - 1]) and
+            sum(seen[i]) > sum(seen[i + 1]))
+assert peaks >= 5, ("a pulse for each ring", peaks, len(seen))
+assert leds.writes - writes < 200, "not written every frame regardless"
+# out in space the colour fades, then the hit flash still works
+fade = [leds.values[1]]
+for _ in range(30):
+    tick(a)
+    fade.append(leds.values[1])
+assert fade[0] == full and fade[-1] == (0, 0, 0)
+assert all(sum(fade[i + 1]) <= sum(fade[i]) for i in range(len(fade) - 1)), fade
+a.game._hurt(5.0); tick(a); assert leds.values[1] == (255, 0, 0)
+# another station, another colour, in the tunnel's mouth too
+other = [i for i in range(256) if cockpit.station_colour(i) != col][0]
+a.cmdr.system = other
+a.game.over = True; tick(a, fresh=["C"]); assert a.mode == "docked"
+tick(a, fresh=["A"]); assert a.mode == "launch"
+for _ in range(200):
+    if a.mode != "launch":
+        break
+    last = leds.values[1]
+    tick(a, ms=20)
+want = tuple(int(v * 255) for v in cockpit.station_colour(other))
+assert last == want or leds.values[1] == want, (last, want)
+os.remove(save)
+print("launch: LEDs pulse in the station's colour, then fade: ok")
+
 # ---- USE_LEDS off ----------------------------------------------------------
 bs.install()
 leds, bus = bs.install_leds()
