@@ -26,7 +26,6 @@ AIM_ASSIST = 0.05      # a shot hits anything within this slope of the crosshair
 
 MISSILE_DAMAGE = 150.0
 JUMP_COUNT = 5.0           # seconds of countdown before a hyperspace jump
-DOCK_TIME = 3.0            # seconds between the last ship going and being docked
 WARP_TIME = 1.2            # seconds the streaks last on arriving
 LOCK_TIME = 2.0            # seconds a ship must stay in the sights before a missile locks
 MISSILE_SPEED = 1100.0     # world units per second
@@ -37,6 +36,22 @@ FIRE_RANGE = 5500.0
 DESPAWN = 14000.0
 RADAR_RANGE = 10000.0
 MAX_OBJECTS = 14
+
+# A commander's flight is in a star system: a planet, a sun and a space station
+# (see Space). Distances are in world units; the player's top speed is 1000 a
+# second.
+PLANET_SCALE = 4.0         # world units per km of the planet's radius (galaxy.System.radius)
+STATION_ORBIT = 3.0        # the station's distance from the planet's centre, in planet radii
+SUN_DIST = 16.0            # the sun's distance from the planet, in planet radii
+SUN_SIZE = 2.0             # the sun's radius, in planet radii
+ARRIVE_DIST = 120000.0     # a jump arrives this far from the station: two minutes at full speed
+LAUNCH_DIST = 700.0        # a launch leaves you this far out of the station's slot
+SAFE_DIST = 25000.0        # this close to the station no more ships or rocks turn up
+DOCK_DIST = 500.0          # this close to the station's centre and you are docked
+STATION_SPIN = 0.25        # radians per second, about the station's nose
+JUMP_K = 8                 # the jump drive moves you this many times faster
+ENCOUNTER = (25.0, 45.0)   # seconds between groups of ships, outside the safe zone
+DODO_TECH = 10             # systems with this tech level or more have a Dodo station
 
 # enemy ships by difficulty; later waves draw from further down the list
 TIERS = (
@@ -207,6 +222,31 @@ class Boom:
         ]
 
 
+def _rot3(x, y, z, ca, sa, cb, sb):
+    """Pitch a point by the angle with cosine ca and sine sa, then roll it by
+    cb, sb: the same turn as Game._rotate does in whole numbers."""
+    y, z = y * ca - z * sa, y * sa + z * ca
+    return x * cb - y * sb, x * sb + y * cb, z
+
+
+class Space:
+    """The star system a commander flies in: a planet and a sun (spheres, as a
+    centre and a radius) and a space station, an Obj that is kept out of
+    Game.objs. They are far bigger and further away than anything else, beyond
+    the whole numbers Game._rotate uses, so they are turned in floats; there
+    are only three of them."""
+
+    def __init__(self, station_bp, radius, gov):
+        self.px = self.py = self.pz = 0.0   # the planet's centre
+        self.pr = radius
+        self.sx = self.sy = self.sz = 0.0   # the sun's centre
+        self.sr = radius * SUN_SIZE
+        self.station = Obj(station_bp, "station", 0.0, 0.0, 0.0) if station_bp else None
+        self.gov = gov          # the system's government (0 to 7), for the station's colour
+        self.d_station = 1e9    # distance to the station
+        self.safe = False       # within SAFE_DIST of the station
+
+
 class Game:
     def __init__(self, ships, level=1):
         self.set_level(level)
@@ -266,11 +306,12 @@ class Game:
         self.jump_t = 0.0      # > 0 while the hyperspace countdown runs
         self.warp = 0.0        # > 0 while the streaks of a jump are drawn
         self.jumped = False    # set when a jump happens; whoever started it clears it
-        # After a jump there is no station to fly to yet, so you are docked
-        # once the ships that meet you are dealt with.
-        self.arriving = None   # ships still to destroy before docking; None: not arriving
-        self.dock_t = 0.0      # > 0 while "docking" counts down
-        self.docked = False    # set when it has; whoever is watching takes over
+        self.space = None      # the star system (Space), or None: open space, waves of ships
+        self.jumping = False   # the jump drive is on
+        self.fwd = 0           # how far everything slid towards you last step (whole units)
+        self.pending = 0       # ships of the current encounter still to turn up
+        self.encounter_t = 0.0  # time until the next encounter
+        self.docked = False    # set on reaching the station; whoever is watching takes over
         self.again = "C: fly again"     # what C does on the GAME OVER screen
 
     def say(self, msg, t=2.0):
@@ -307,11 +348,116 @@ class Game:
         self.beam = 0.0
         self.warp = WARP_TIME
         self.jumped = True
+        self.space = None       # left behind too; whoever started the jump sets the new one
+        self.jumping = False
+        self.pending = 0
         self.spawn_t = _rnd(5.0, 8.0)   # a quiet moment on arriving
-        self.arriving = self.max_hostile    # as many ships as can attack at once
-        self.dock_t = 0.0
         self.rock_t = _rnd(6, 12)
         self.msg_t = 0.0
+
+    # ---- the star system --------------------------------------------------
+
+    def enter(self, radius_km, station, how, gov=None):
+        """Put the player in a star system. radius_km is the planet's radius
+        (galaxy.System.radius), station the station's ship name, gov the
+        government, for its colour. how is "launch": just out of the
+        station's slot, which faces the planet, so the planet is ahead; or
+        "arrive": out of hyperspace, ARRIVE_DIST from the station, with the
+        planet beyond it and as many ships as can attack at once on the way."""
+        bp = self.types.get(station) or self.types.get("CORIOLIS")
+        r = max(4000.0, radius_km * PLANET_SCALE)
+        sp = Space(bp, r, gov)
+        if how == "launch":
+            sx, sy, sz = 0.0, 0.0, -LAUNCH_DIST
+            ux, uy, uz = 0.0, 0.0, 1.0      # from the station to the planet
+            self.pending = 0
+        else:
+            dx, dy, dz = _unit(_rnd(-0.25, 0.25), _rnd(-0.15, 0.15), 1.0)
+            sx, sy, sz = dx * ARRIVE_DIST, dy * ARRIVE_DIST, dz * ARRIVE_DIST
+            # the planet is beyond the station and off to one side, so the
+            # station isn't lost against it
+            side = _rnd(0.3, 0.6) * random.choice((-1, 1))
+            ux, uy, uz = _unit(dx + side, dy + _rnd(-0.3, 0.3), dz)
+            self.pending = self.max_hostile
+            self.spawn_t = _rnd(5.0, 8.0)
+        k = STATION_ORBIT * r
+        sp.px, sp.py, sp.pz = sx + ux * k, sy + uy * k, sz + uz * k
+        # the sun is on the station's side of the planet, off to one side, so
+        # it is behind you on launching and in view as you turn
+        ax, ay, az = _rnd(-1, 1), _rnd(-0.5, 0.5), _rnd(-1, 1)
+        k = ax * ux + ay * uy + az * uz
+        ax, ay, az = _unit(ax - ux * k, ay - uy * k, az - uz * k)     # at right angles to u
+        k = _rnd(0.5, 1.2)
+        wx, wy, wz = _unit(ax * k - ux, ay * k - uy, az * k - uz)
+        k = SUN_DIST * r
+        sp.sx, sp.sy, sp.sz = sp.px + wx * k, sp.py + wy * k, sp.pz + wz * k
+        st = sp.station
+        if st is not None:
+            st.x, st.y, st.z = sx, sy, sz
+            _look(st.m, ux, uy, uz)         # the slot is on the nose
+        self.space = sp
+        self.encounter_t = _rnd(*ENCOUNTER)
+        self._measure()
+
+    def to_station(self, dist=4000.0):
+        """A cheat: move the star system so the station is dist ahead."""
+        sp = self.space
+        if sp is None or sp.station is None:
+            return
+        st = sp.station
+        dx, dy, dz = -st.x, -st.y, dist - st.z
+        st.x += dx
+        st.y += dy
+        st.z += dz
+        sp.px += dx
+        sp.py += dy
+        sp.pz += dz
+        sp.sx += dx
+        sp.sy += dy
+        sp.sz += dz
+        self._measure()
+
+    def _measure(self):
+        """How far the station is, and so whether this is the safe zone."""
+        sp = self.space
+        st = sp.station
+        if st is None:
+            sp.d_station = 1e9
+        else:
+            sp.d_station = math.sqrt(st.x * st.x + st.y * st.y + st.z * st.z)
+        sp.safe = sp.d_station < SAFE_DIST
+
+    def _near(self):
+        """True if a ship or missile is within radar range. In comparisons
+        only, so no new numbers are made."""
+        r = RADAR_RANGE
+        for o in self.objs:
+            if ((o.kind == "ship" or o.kind == "missile") and -r < o.x < r
+                    and -r < o.y < r and -r < o.z < r):
+                return True
+        return False
+
+    def _space(self, dt):
+        """The station turns; reaching it docks you, and flying into the
+        planet or the sun is the end."""
+        sp = self.space
+        st = sp.station
+        if st is not None:
+            _roll(st.m, STATION_SPIN * dt)
+            if self.frame % 32 == 0:
+                _ortho(st.m)
+        self._measure()
+        if self.over:
+            return
+        if st is not None and sp.d_station < DOCK_DIST:
+            self.docked = True
+            self.jumping = False
+            return
+        if not self.god:
+            for x, y, z, r in ((sp.px, sp.py, sp.pz, sp.pr), (sp.sx, sp.sy, sp.sz, sp.sr)):
+                if x * x + y * y + z * z < r * r:
+                    self._hurt(1e6)
+                    return
 
     # ---- one step of the simulation ---------------------------------------
 
@@ -342,11 +488,22 @@ class Game:
             self.speed = PLAYER_MAX
 
         self.frame += 1
-        self._rotate(pitch * PITCH_RATE * dt, roll * ROLL_RATE * dt, self.speed * SPEED_K * dt)
+        fwd = self.speed * SPEED_K * dt
+        sp = self.space
+        # the jump drive: speed up held at full speed, with no ships about
+        self.jumping = (sp is not None and not self.over and throttle > 0
+                        and self.speed >= PLAYER_MAX and not sp.safe and self.jump_t <= 0
+                        and not self._near())
+        if self.jumping:
+            fwd *= JUMP_K
+        self.fwd = int(fwd)
+        self._rotate(pitch * PITCH_RATE * dt, roll * ROLL_RATE * dt, fwd)
         for o in self.objs:
             if not o.dead:
                 self._think(o, dt)
         self._booms(dt)
+        if sp is not None:
+            self._space(dt)
         if not self.over:
             self._collide()
             self._weapons(dt, fire, missile)
@@ -371,7 +528,13 @@ class Game:
         directions times 16384. Dust and explosion dots are whole numbers
         throughout."""
         ifwd = int(fwd)
+        sp = self.space
         if a == 0.0 and b == 0.0:       # flying straight: no turning to work out
+            if sp is not None:
+                sp.pz -= fwd
+                sp.sz -= fwd
+                if sp.station is not None:
+                    sp.station.z -= fwd
             for o in self.objs:
                 o.z -= fwd
             for boom in self.booms:
@@ -393,6 +556,23 @@ class Game:
         sa2 = sa >> 1
         cb2 = cb >> 1
         sb2 = sb >> 1
+        if sp is not None:      # in floats: see Space
+            fca = ca * _INV14
+            fsa = sa * _INV14
+            fcb = cb * _INV14
+            fsb = sb * _INV14
+            sp.px, sp.py, sp.pz = _rot3(sp.px, sp.py, sp.pz, fca, fsa, fcb, fsb)
+            sp.pz -= fwd
+            sp.sx, sp.sy, sp.sz = _rot3(sp.sx, sp.sy, sp.sz, fca, fsa, fcb, fsb)
+            sp.sz -= fwd
+            st = sp.station
+            if st is not None:
+                st.x, st.y, st.z = _rot3(st.x, st.y, st.z, fca, fsa, fcb, fsb)
+                st.z -= fwd
+                m = st.m
+                for i in (0, 3, 6):
+                    m[i], m[i + 1], m[i + 2] = _rot3(m[i], m[i + 1], m[i + 2],
+                                                     fca, fsa, fcb, fsb)
         for o in self.objs:
             x = int(o.x * 4)
             y = int(o.y * 4)
@@ -694,8 +874,6 @@ class Game:
         if o.kind == "ship":
             self.kills += 1
             self.wave_kills += 1
-            if self.arriving:
-                self.arriving -= 1
             self.score += 10 + bp.bounty // 5
             if self.can_bp and bp.canisters:
                 for _ in range(random.randint(0, min(bp.canisters, 2))):
@@ -753,26 +931,42 @@ class Game:
             if o.kind == "ship" and o.state != "flee" and not o.dead:
                 hostile += 1
         count = len(self.objs) + len(self.new)
+        if self.space is not None:
+            self._encounters(dt, hostile, count)
+            return
         self.spawn_t -= dt
         # more ships at once in later waves, and the longer the game goes on
         want = min(self.max_hostile, 1 + (self.wave + int(self.time / 60)) // 2)
-        if self.arriving is not None:
-            want = min(self.max_hostile, max(want, 2))
-            if self.arriving <= 0:      # no more come; dock when the last has gone
-                want = 0
-                if hostile == 0:
-                    if self.dock_t <= 0:
-                        self.dock_t = DOCK_TIME
-                        self.say("ALL CLEAR: DOCKING", DOCK_TIME)
-                    else:
-                        self.dock_t -= dt
-                        if self.dock_t <= 0:
-                            self.dock_t = 0.0
-                            self.arriving = None
-                            self.docked = True
         if self.spawn_t <= 0 and hostile < want and count < MAX_OBJECTS:
             self.spawn_t = _rnd(2.0, 5.0)
             self._spawn_ship()
+        self.rock_t -= dt
+        if self.rock_t <= 0:
+            self.rock_t = _rnd(9, 18)
+            if count < MAX_OBJECTS - 3:
+                self._spawn_rocks()
+
+    def _encounters(self, dt, hostile, count):
+        """In a star system ships come in groups, a while apart, and none
+        come near the station. The group's ships turn up a second or so
+        apart."""
+        if self.space.safe:
+            self.pending = 0
+            return
+        if self.pending > 0:
+            self.spawn_t -= dt
+            if self.spawn_t <= 0 and count < MAX_OBJECTS:
+                self.spawn_t = _rnd(0.8, 2.0)
+                if self._spawn_ship() is None:
+                    self.pending = 0
+                else:
+                    self.pending -= 1
+        elif hostile == 0:
+            self.encounter_t -= dt
+            if self.encounter_t <= 0:
+                self.encounter_t = _rnd(*ENCOUNTER)
+                self.pending = random.randint(1, self.max_hostile)
+                self.spawn_t = 0.0
         self.rock_t -= dt
         if self.rock_t <= 0:
             self.rock_t = _rnd(9, 18)

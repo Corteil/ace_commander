@@ -318,32 +318,191 @@ g.jumped = False
 for _ in range(int(game.WARP_TIME / DT) + 2):
     g.step(DT, 0, 0, 0, False, False)
 assert g.warp <= 0 and not g.jumped
-# after a jump: as many ships as attack at once must go, then docking
-assert g.arriving == g.max_hostile and not g.docked
-g.spawn_t = 0.0
-for _ in range(g.max_hostile):
-    for _ in range(3000):
-        g.step(DT, 0, 0, 0, False, False)
-        ships = [o for o in g.objs if o.kind == "ship"]
-        if ships:
-            break
-    assert ships, "ships come to meet you"
-    g.shield = g.hull = 100.0
-    g._kill(ships[0])
-for o in g.objs:
-    if o.kind == "ship":
-        g._kill(o)
-g.god = True
-n = 0
-while not g.docked:
-    g.step(DT, 0, 0, 0, False, False)
-    n += 1
-    assert n < 400 and not any(o.kind == "ship" and not o.dead for o in g.objs)
-assert abs(n * DT - game.DOCK_TIME) <= 4 * DT and g.arriving is None, n * DT
-g.god = False; g.docked = False
+# after a jump the old system is left behind; whoever started it sets the new one
+assert g.space is None and g.pending == 0 and not g.docked
 g.start_jump(); g._hurt(1e6); g.step(DT, 0, 0, 0, False, False)
 assert g.over and g.jump_t == 0 and not g.jumped, "no jump once destroyed"
 g.start_jump(); assert g.jump_t == 0
 g.reset(); assert g.jump_t == 0 and g.warp == 0 and not g.jumped
 print("hyperspace countdown, jump, arrival: ok")
+
+
+# ---- the star system: planet, sun, station ----------------------------------
+def dist(x, y, z):
+    return math.sqrt(x * x + y * y + z * z)
+
+
+def geometry(sp):
+    st = sp.station
+    return (dist(sp.px, sp.py, sp.pz), dist(sp.sx, sp.sy, sp.sz), dist(st.x, st.y, st.z),
+            dist(sp.px - st.x, sp.py - st.y, sp.pz - st.z))
+
+
+g = fresh()
+g.enter(5000, "CORIOLIS", "launch", 3)
+sp = g.space; st = sp.station
+R = 5000 * game.PLANET_SCALE
+assert sp.pr == R and sp.sr == R * game.SUN_SIZE and st.bp.name == "CORIOLIS" and sp.gov == 3
+assert (st.x, st.y, st.z) == (0.0, 0.0, -game.LAUNCH_DIST), "just out of the slot, behind you"
+assert abs(sp.pz - (game.STATION_ORBIT * R - game.LAUNCH_DIST)) < 1 and sp.px == sp.py == 0, "planet ahead"
+assert st.m[8] > 0.999, "the slot faces the planet"
+assert sp.safe and g.pending == 0 and not g.docked
+assert abs(dist(sp.sx - sp.px, sp.sy - sp.py, sp.sz - sp.pz) - game.SUN_DIST * R) < 5
+assert sp.sz < 0, "the sun is behind you on launching"
+g.enter(500, "NO SUCH STATION", "launch")
+assert g.space.station.bp.name == "CORIOLIS" and g.space.pr == 4000.0, "fallbacks"
+g.enter(5000, "DODO", "launch")
+assert g.space.station.bp.name == "DODO"
+
+# turning moves the planet, sun and station together, and keeps their shape
+g = fresh(3)
+g.enter(6000, "CORIOLIS", "arrive", 1)
+sp = g.space; st = sp.station
+before = geometry(sp)
+assert abs(before[2] - game.ARRIVE_DIST) < 1 and not sp.safe
+assert abs(before[3] - game.STATION_ORBIT * 6000 * game.PLANET_SCALE) < 2
+g.pending = 0; g.encounter_t = 1e9
+g.speed = 0.0
+for i in range(300):
+    g.step(DT, 0.7 if i < 150 else -0.4, 0.9, -1.0, False, False)
+after = geometry(sp)
+for b, a in zip(before, after):
+    assert abs(a - b) < b * 0.002, (before, after)
+assert ortho_error(st.m) < 0.01
+px, py, pz = sp.px - st.x, sp.py - st.y, sp.pz - st.z
+d = dist(px, py, pz)
+assert (st.m[6] * px + st.m[7] * py + st.m[8] * pz) / d > 0.999, "the slot still faces the planet"
+roof = st.m[3:6]
+for _ in range(25):
+    g.step(DT, 0, 0, 0, False, False)
+assert sum(a * b for a, b in zip(roof, st.m[3:6])) < 0.99, "the station turns about its nose"
+
+# flying forward closes on the station; the jump drive does it JUMP_K times faster
+g = fresh(4)
+g.enter(6000, "CORIOLIS", "arrive")
+g.pending = 0; g.encounter_t = 1e9
+sp = g.space; st = sp.station
+st.x, st.y, st.z = 0.0, 0.0, st.z
+g.speed = game.PLAYER_MAX
+z0 = st.z; g.step(DT, 0, 0, 0, False, False)
+slow = z0 - st.z
+assert not g.jumping and abs(slow - game.PLAYER_MAX * game.SPEED_K * DT) < 0.5
+z0 = st.z; g.step(DT, 0, 0, 1.0, False, False)
+assert g.jumping and abs((z0 - st.z) - slow * game.JUMP_K) < 1, z0 - st.z
+o = put(g, "SIDEWINDER", "ship", 2000, 0, 8000)
+g.step(DT, 0, 0, 1.0, False, False)
+assert not g.jumping, "not with a ship on the radar"
+o.z = 50000.0; g.step(DT, 0, 0, 1.0, False, False)
+assert g.jumping, "ships beyond radar range don't stop it"
+g.objs[:] = []
+r = put(g, "ASTEROID", "rock", 0, 0, 5000)
+g.step(DT, 0, 0, 1.0, False, False)
+assert g.jumping, "rocks don't stop it"
+g.objs[:] = []
+g.speed = game.PLAYER_MAX - 5; g.step(DT, 0, 0, 1.0, False, False)
+assert not g.jumping, "only at full speed"
+g.speed = game.PLAYER_MAX; g.start_jump(); g.step(DT, 0, 0, 1.0, False, False)
+assert not g.jumping, "not during a hyperspace countdown"
+g.jump_t = 0.0
+n = 0
+while not sp.safe:
+    g.step(DT, 0, 0, 1.0, False, False)
+    n += 1
+    assert n < 2000
+g.step(DT, 0, 0, 1.0, False, False)
+assert not g.jumping and sp.d_station > game.SAFE_DIST - slow * game.JUMP_K * 3, "stops at the safe zone"
+print("jump drive: about %.0f s of jumping to the safe zone, at full speed %.0f s" % (
+    n * DT, (game.ARRIVE_DIST - game.SAFE_DIST) / (game.PLAYER_MAX * game.SPEED_K)))
+# then on to the station, which docks you
+while not g.docked:
+    g.step(DT, 0, 0, 1.0, False, False)
+    n += 1
+    assert n < 4000
+assert sp.d_station < game.DOCK_DIST and not g.jumping
+print("flying straight from arriving to docked: %.0f s" % (n * DT))
+
+# encounters: the ships that meet you on arriving, then a group now and then,
+# and none in the safe zone
+g = fresh(5)
+g.set_level(2)
+g.god = True
+g.enter(6000, "CORIOLIS", "arrive")
+assert g.pending == g.max_hostile == 5 and g.spawn_t >= 5.0
+g.speed = 0.0
+seen = 0
+for _ in range(1000):
+    g.step(DT, 0, 0, 0, False, False)
+    seen = max(seen, sum(1 for o in g.objs if o.kind == "ship"))
+    if g.pending == 0:
+        break
+assert g.pending == 0 and seen == 5, seen
+for o in list(g.objs):
+    if o.kind == "ship":
+        g._kill(o)
+g.step(DT, 0, 0, 0, False, False)
+assert g.encounter_t > 0
+gaps = []
+t = 0.0
+quiet = True
+for _ in range(int(200 / DT)):
+    g.step(DT, 0, 0, 0, False, False)
+    t += DT
+    ships = [o for o in g.objs if o.kind == "ship"]
+    if ships and quiet:
+        gaps.append(t)
+        t = 0.0
+        g.step(DT, 0, 0, 0, False, False)
+        for _ in range(200):
+            g.step(DT, 0, 0, 0, False, False)
+        for o in list(g.objs):
+            if o.kind == "ship":
+                g._kill(o)
+        g.objs[:] = [o for o in g.objs if o.kind != "missile"]
+assert len(gaps) >= 3, gaps
+assert all(5 < x < game.ENCOUNTER[1] + 15 for x in gaps), gaps
+print("encounters %d s apart: ok" % (sum(gaps) / len(gaps)))
+g.to_station(game.SAFE_DIST - 2000)
+assert g.space.safe
+g.objs[:] = []
+g.pending = 3; g.encounter_t = 0.0; g.rock_t = 0.0
+for _ in range(int(60 / DT)):
+    g.step(DT, 0, 0, 0, False, False)
+assert not g.objs and g.pending == 0, "nothing turns up in the safe zone"
+
+# docking: close enough to the station; not once destroyed
+g = fresh(6)
+g.enter(6000, "CORIOLIS", "launch")
+g.step(DT, 0, 0, 0, False, False)
+assert not g.docked, "launching doesn't dock you again"
+g.to_station(game.DOCK_DIST - 50)
+assert g.space.station.z == game.DOCK_DIST - 50
+g.step(DT, 0, 0, 0, False, False)
+assert g.docked
+g.docked = False; g._hurt(1e6); g.to_station(100)
+g.step(DT, 0, 0, 0, False, False)
+assert not g.docked
+
+# flying into the planet or the sun is the end, except for the invincible
+for which in ("planet", "sun"):
+    g = fresh(7)
+    g.enter(6000, "CORIOLIS", "launch")
+    sp = g.space
+    if which == "planet":
+        sp.px, sp.py, sp.pz = 0.0, 0.0, sp.pr - 10
+    else:
+        sp.sx, sp.sy, sp.sz = 0.0, 0.0, sp.sr - 10
+    g.god = True; g.step(DT, 0, 0, 0, False, False)
+    assert not g.over
+    g.god = False; g.step(DT, 0, 0, 0, False, False)
+    assert g.over and g.hull == 0, which
+
+# combat practice has no star system: waves as before
+g = fresh(8)
+assert g.space is None
+g.spawn_t = 0.0
+for _ in range(50):
+    g.step(DT, 0, 0, 1.0, False, False)
+assert any(o.kind == "ship" for o in g.objs) and not g.jumping
+g.reset(); assert g.space is None and g.pending == 0
+print("star system: planet, sun, station, safe zone, docking, crashing: ok")
 print("ALL GAME TESTS PASSED")

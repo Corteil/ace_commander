@@ -19,7 +19,9 @@ Joystick left / right changes the choice, C selects it and F leaves the app.
 
 A commander is somewhere in a galaxy of 256 star systems and can jump between them by
 hyperspace (see [Hyperspace](#hyperspace)). Continue and New commander start you docked
-(see [Docked](#docked)). Not in yet: a station to fly to, and trading. The plan for those is in [DESIGN.md](DESIGN.md).
+(see [Docked](#docked)), and you fly through each system to its space station (see
+[In a star system](#in-a-star-system)). Not in yet: docking by hand, and trading. The plan
+for those is in [DESIGN.md](DESIGN.md).
 
 This is a fan-made game inspired by Elite. It is not official, licensed or endorsed. See
 [Credits and original material](#credits-and-original-material).
@@ -43,7 +45,8 @@ commander's rank, kills, star system and fuel) and a **Pause menu**, where you s
 steering between JOYSTICK and TILT or quit to the title screen.
 
 The menu also has a **Debug** page of cheats for testing: invincibility, kill all enemies,
-next wave, add an enemy, refill missiles, refill fuel, +10 kills and dock now. Its title
+next wave, add an enemy, refill missiles, refill fuel, +10 kills, to the station (moves
+the station 4000 units ahead of you) and dock now. Its title
 shows the build number, read from `metadata.json`. Kills made there count towards your
 commander's rank. Set `DEBUG_MENU = False` in `app.py` to hide it.
 
@@ -98,27 +101,50 @@ below Resume, which starts the jump straight away. Otherwise:
 3. Press C to jump there, or F to go back.
 
 The game resumes with a five-second countdown, then you arrive in the new system with
-everything from the old one left behind. The jump uses fuel for its distance, and the
+everything from the old one left behind, a long way from its station (see
+[In a star system](#in-a-star-system)). The jump uses fuel for its distance, and the
 commander is saved on arriving. Combat practice has no chart.
-
-There is no station to fly to yet, so arriving works like this: ships come to meet you
-(3, 4 or 5 of them by level), and once that many are destroyed and none are left you are
-docked. Docking fills the tank for nothing and saves the commander. The docked screen shows
-the system, your rank, fuel and credits. If you are destroyed, C takes you back to the
-station you last reached.
-
-Launching without jumping gives the endless fight as before; jump when you want to move on.
 
 The system data screen has no description sentence yet: the original builds it from text
 tables that `game_data.py` doesn't read.
-The Debug page has **Refill fuel** and **Dock now** as shortcuts.
+The Debug page has **Refill fuel**, **To the station** and **Dock now** as shortcuts.
 
 The galaxy needs `game_data.py` (see [Ships and galaxy data](#ships-and-galaxy-data)).
 Without it the game still runs, with no Local chart.
 
+## In a star system
+
+A commander's flight is in a star system, with a planet (a blue circle, sized from the
+system's radius), a sun (a filled yellow circle) and a space station: a Coriolis, or a
+Dodo where the tech level is 10 or more. The station turns slowly and is drawn in its
+government's colour, with its docking slot facing the planet.
+
+- **Launching** leaves you just outside the slot, facing the planet, with the station
+  behind you.
+- **Arriving** from hyperspace puts you 120,000 units from the station, which is two
+  minutes at full speed, with the planet beyond it. As many ships as can attack at once
+  (3, 4 or 5 by level) come to meet you. After that a group of ships turns up every 25 to
+  45 seconds, but none within 25,000 units of the station (the safe zone).
+- **The jump drive:** hold speed up (F) at full speed with no ships or missiles on the
+  radar and you go 8 times faster; the speed bar turns blue and the stardust turns to
+  streaks. It stops when a ship
+  appears and at the edge of the safe zone. Flying straight from arriving to docked takes
+  about 36 seconds this way.
+- **The compass**, right of the radar, points to the planet, and to the station once you
+  are in the safe zone: a bright dot if it is ahead of you, a dim one if behind.
+- **Docking:** fly up to the station and you are docked. This is the automatic way for now;
+  docking by hand comes next. Docking fills the tank for nothing and saves the commander.
+- Flying into the planet or the sun destroys you. If you are destroyed, C takes you back
+  to the station you last reached.
+
+Combat practice has no star system: just the endless waves of ships.
+
+Distances and times are constants near the top of `game.py` (`ARRIVE_DIST`, `SAFE_DIST`,
+`JUMP_K`, `ENCOUNTER` and the rest).
+
 ## The screen
 
-- Left bars: speed (green) and laser temperature (yellow, red when it has overheated and
+- Left bars: speed (green, blue with the jump drive on) and laser temperature (yellow, red when it has overheated and
   locked out).
 - Right bars: shield (blue) and energy (green). Shields soak up hits and recharge after a
   few seconds without damage; when energy runs out the game is over.
@@ -127,7 +153,7 @@ Without it the game still runs, with no Local chart.
   fires at a green diamond; before that it says NO LOCK.
 - Radar at the bottom: left-right is left-right, up the ellipse is ahead, and the stick on
   each blip shows how far above or below you it is. Red is a hostile ship, yellow is cargo,
-  magenta is a missile, grey is a rock.
+  magenta is a missile, grey is a rock, and the big square is the station, in its colour.
 - Top: the wave in yellow and the score in white. The small number above them is the time
   each frame takes, in ms (`SHOW_FRAME_TIME` in `app.py`).
 - The badge's LEDs flash red when you're hit (`USE_LEDS` in `app.py`; with it off, or if
@@ -210,8 +236,8 @@ the two faces it sits between points back at the viewer.
 - `tests/` - tests that run on a PC with stand-ins for the badge: `python tests/run_all.py`.
 - `CLAUDE.md` - project notes: firmware facts, measurements and what's next.
 - `DESIGN.md` - design for the rest of the game. Phase 1 (title screen, commander, levels,
-  new buttons) and phase 2 (galaxy, charts, system data, hyperspace, arriving docked) are
-  built; a station to fly to and trading are not.
+  new buttons) and phase 2 (galaxy, charts, system data, hyperspace) are built, and phase
+  3 is under way: a station to fly to (build 26). Docking by hand and trading are not built.
 
 ## Install
 

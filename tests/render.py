@@ -135,13 +135,31 @@ tick(a, fresh=["A"])
 objs = g.objs[:]
 g.objs[:] = []
 g.lock = None
-g.warp = 0.9; g.say("ZAONCE: 4 SHIPS TO CLEAR", 3.0)
+launched = g.space
+a._enter_space("arrive")
+g.pending = 0
+g.warp = 0.9; g.say("ZAONCE", 3.0)
 shot(a, "4h_arriving.png")
-g.warp = 0.3
-shot(a, "4i_arriving_late.png")
-g.warp = 0.0
-g.say("ALL CLEAR: DOCKING", 3.0)
-shot(a, "4j_all_clear.png")
+g.warp = 0.0; g.msg_t = 0.0
+shot(a, "4i_arrived.png")
+g.speed = 40.0; g.jumping = True; g.fwd = 400
+for p in g.dust:
+    p[2] = 200 + (p[2] % 1300)
+shot(a, "4j_jump_drive.png")
+g.jumping = False; g.speed = 20.0
+g.to_station(2500.0)
+for _ in range(6):
+    g._space(0.3)
+shot(a, "4k_station.png")
+g.space = launched
+g.speed = 0.0
+for _ in range(int(math.pi / 0.04)):     # turn round to look back at the station
+    g._rotate(0.04 * game.PITCH_RATE, 0.0, 0.0)
+g._measure()
+shot(a, "4l_looking_back.png")
+g.space = launched
+for _ in range(int(math.pi / 0.04)):
+    g._rotate(-0.04 * game.PITCH_RATE, 0.0, 0.0)
 g.objs[:] = objs
 g._hurt(1000.0)
 tick(a)

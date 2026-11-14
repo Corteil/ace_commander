@@ -311,6 +311,9 @@ class PilCtx:
             a, b = self._p(x, y), self._p(x + w, y + h)
             self.d.rectangle([min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1])],
                              fill=self.col)
+        elif self.shape and self.shape[0] == "arc":
+            _, x, y, r = self.shape
+            self.d.ellipse([self._p(x - r, y - r), self._p(x + r, y + r)], fill=self.col)
         self.shape = None
         self.path = []
         return self

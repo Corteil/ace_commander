@@ -2,7 +2,8 @@
 
 Notes for picking this project up in a new session. Last updated at the end of the first
 working session, 2026-11-12 (build 13); updated 2026-11-13 (build 16: renamed, on a Pi, design
-phase 1 built) and again that night (build 22: DEBUG page, missile lock, phase 2).
+phase 1 built) and again that night (build 22: DEBUG page, missile lock, phase 2), and
+2026-11-14 (build 26: phase 3 started, the star system).
 
 ## What this is
 
@@ -13,13 +14,15 @@ C or `@micropython.viper` is welcome only if measurements show it would help.
 
 Built from `DESIGN.md`: phase 1 (title screen, saved commander with rank, three levels, new
 button layout) and phase 2 (galaxy, local and galactic charts, system data, hyperspace,
-fuel, arriving docked, docked screens as tabs, launch tunnel). Not built yet: a real
-station, docking and trading (phases 3 to 6), and the system description sentence.
+fuel, docked screens as tabs, launch tunnel), and the start of phase 3 (build 26: planet,
+sun, station, compass, jump drive, automatic docking). Not built yet: docking by hand,
+trading (the rest of phase 3, then phases 4 to 6), and the system description sentence.
 
 ## Files
 
 - `app.py` - menu, input (`Pad`), frame loop (`run`), LEDs, pause, PERF logging.
-- `game.py` - game rules. No badge imports, so it runs on a PC.
+- `game.py` - game rules, including the star system (`Space`, `Game.enter`). No badge
+  imports, so it runs on a PC.
 - `cockpit.py` - flight view, HUD, radar. Built from rectangles (see Speed).
 - `viewer.py` - ship viewer. `bench.py` - the title screen's "Speed test".
 - `title.py` - title screen: block-letter name from rectangles, tumbling ship, one menu line.
@@ -209,6 +212,31 @@ of a real flight, not from a harness.
    government's name and the LEDs, which pulse per ring (`cockpit.tunnel_glow`), flash full at
    the mouth and fade over the first half second of flight (`app.glow`). Left out: the description sentence ("goat soup"), which
    needs the original's text tables in `game_data.py`.
+   **Build 26 starts phase 3: the star system** (2026-11-14). `Game.space` is a `Space`
+   (planet and sun as centre + radius, the station an `Obj` of kind "station") for career
+   flights; combat practice has none and keeps the waves. They are kept out of `Game.objs`
+   and turned in floats (`_rot3`), because their distances (up to about 10^6) are beyond the
+   cheap whole numbers `_rotate` uses. `app._enter_space` calls `Game.enter(radius_km,
+   station, "launch" / "arrive", government)` on every fresh launch and on arriving.
+   Arriving replaces build 21's "clear the ships and you are docked": the first group is
+   `pending = max_hostile`, then `_encounters` sends a group every `ENCOUNTER` seconds,
+   none in the safe zone. Reaching `DOCK_DIST` of the station sets `Game.docked`
+   (docking option C); hitting the planet or sun is `_hurt(1e6)`. The jump drive
+   (`JUMP_K`) needs speed up held at full speed, no ship or missile within radar range, and
+   being outside the safe zone. New DEBUG cheat: TO THE STATION (`Game.to_station`).
+   The speed test has three circle tests. **Measured over the REPL on the badge (real ctx,
+   not yet played by hand):** filled disc r20 1.3 ms, r100 7.2 ms; circle outline r20
+   2.6 ms, r80 6.2 ms, and 4 to 5 ms for a big one whose edge crosses the screen. Cockpit
+   draw (world + HUD): open space with nothing in it 10.3 ms; launch view (planet r about
+   70) 17.6; arrived (small planet, station a dot) 14.1; station at 2500 19.4, at 900 21.1.
+   Rules per step while turning: 1.05 ms / 480 bytes in open space, 1.9 ms / 2.6 KB in a
+   system (the float turning of three bodies and the station's directions); with the jump
+   drive on 1.1 ms / 1.1 KB. So the planet outline is the main new cost, up to about 7 ms a
+   frame when big; a ring of rectangles would be cheaper if that matters. With the jump
+   drive on the stardust is drawn as streaks (`STREAK_MIN`, two steps of `Game.fwd` long);
+   Brian asked for them and confirmed they look good (2026-11-14). A real flight in a
+   system that day: 36-38 ms a frame with no ships (draw 12.5-14), 38-47 ms with 1-4, one
+   or two collections per 60 frames as before, no errors.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
@@ -217,7 +245,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 25), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 26), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
@@ -232,8 +260,10 @@ by itself is faster than one fill for all of them (3.5 against 7.7 ms). Flight a
 - Tilt axis directions (`TILT_PITCH_SIGN`, `TILT_ROLL_SIGN`, `TILT_SWAP_AXES`).
 - The local chart and hyperspace (build 20): cursor speed (`CURSOR_SPEED` in `chart.py`),
   whether the ring and dots read well, the streaks on arriving.
-- Arriving and docking (build 21): whether 3 / 4 / 5 ships is the right fight, and
-  `DOCK_TIME`.
+- Arriving (build 21, kept in build 26): whether 3 / 4 / 5 ships is the right fight.
+- The star system (build 26): whether the planet, sun, station and compass read well;
+  `ARRIVE_DIST`, `SAFE_DIST`, `JUMP_K`, `ENCOUNTER` and `DOCK_DIST` by feel; the frame
+  rate with the planet in view.
 - Whether `deploy.bat`'s copy step reports failures properly (the log step is known to work).
 
 Confirmed by Brian on 2026-11-13: F is faster and E slower; the LEDs flash on a hit and the

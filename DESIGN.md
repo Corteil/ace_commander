@@ -412,8 +412,23 @@ screens are four tabs for now (Status, Local chart, Galactic chart, System data)
 and Equip ship join them in phases 3 and 4. Docking fills the tank for nothing until there
 is a way to earn credits. The system description sentence is not built.
 
-In phase 2 there is no station to fly to yet, so arriving in a system docks you after you
-clear the encounter on the way. Phase 3 replaces that with real docking.
+Phase 3 is under way. Build 26 adds the star system: planet, sun, a turning station (Coriolis,
+or Dodo at tech level 10 and above), compass, jump drive, encounters a while apart with none
+in the safe zone, and docking as option C (automatic) only: reaching the station docks you.
+It replaces phase 2's "clear the ships that meet you and you are docked". Where build 26
+differs from the plan above, or fills in what it left open:
+
+- The trip: `ARRIVE_DIST` is 120,000 units from the station, two minutes at full speed
+  without the jump drive. With it, a straight run takes about 36 seconds: the drive is off
+  inside the 25,000-unit safe zone (`SAFE_DIST`), which takes 25 seconds to cross.
+- The jump drive stops for ships and missiles on the radar, not rocks or canisters, which
+  turn up often enough to keep it off most of the time.
+- Encounters: on arriving, as many ships as can attack at once; then a group of 1 to that
+  many every 25 to 45 seconds (`ENCOUNTER`) once the last group has gone.
+- The sun is on the station's side of the planet, off to one side, so it is behind you as
+  you launch.
+- Still to build in phase 3: docking options A and B and the menu choice, hitting the
+  station, the market, cargo and bounties.
 
 Phase 1 now includes the level choice for a new commander, and the button changes (A menu,
 B bomb, D missile) are best made there too, in Combat practice. Phase 3 builds all three

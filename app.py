@@ -555,6 +555,7 @@ class AceCommander(app.App):
         if not career:
             self.glow = 0.0
         g = self.game
+        fresh = True
         if g is None:
             self.game = g = game.Game(SHIPS, level)
             self.banked = 0
@@ -562,10 +563,14 @@ class AceCommander(app.App):
             g.set_level(level)
             g.reset()
             self.banked = 0
+        else:
+            fresh = False
         self.career = career
         g.again = "C: back to the station" if career else "C: fly again"
         if career:
             self._place()
+            if fresh or g.space is None:
+                self._enter_space("launch")
         self.jump_to = None
         g.jump_t = 0.0
         self.saved_over = False
@@ -587,6 +592,17 @@ class AceCommander(app.App):
         if c.system is None:
             c.system = self.galaxy.find(*game_data.START_XY) or 0
             c.fuel = min(commander.MAX_FUEL, game_data.START_FUEL)
+
+    def _enter_space(self, how):
+        """Put the game in the commander's star system: "launch" (from the
+        station) or "arrive" (from hyperspace). Without a galaxy there is no
+        system, and the flight is open space with waves of ships."""
+        c = self.cmdr
+        if self.galaxy is None or c is None or c.system is None:
+            return
+        s = self.galaxy.system(c.system)
+        self.game.enter(s.radius, "DODO" if s.tech >= game.DODO_TECH else "CORIOLIS", how,
+                        s.government)
 
     def _dock(self):
         """Show the commander docked at their star system. Docking fills the
@@ -674,7 +690,8 @@ class AceCommander(app.App):
         c.fuel = max(0, c.fuel - to[1])
         self.target = None
         self._save()
-        g.say("%s: %d SHIPS TO CLEAR" % (self.galaxy.system(c.system).name, g.arriving), 4.0)
+        self._enter_space("arrive")
+        g.say(self.galaxy.system(c.system).name, 3.0)
 
     def _bank(self):
         """Give the commander the kills made since the last call."""
@@ -861,7 +878,8 @@ class AceCommander(app.App):
         if self.fsub == "debug":
             return ["INVINCIBLE: " + ("ON" if self.game.god else "OFF"),
                     "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
-                    "REFILL MISSILES", "REFILL FUEL", "+10 KILLS", "DOCK NOW"]
+                    "REFILL MISSILES", "REFILL FUEL", "+10 KILLS", "TO THE STATION",
+                    "DOCK NOW"]
         return self._fitems_top()
 
     def _debug(self, item):
@@ -891,6 +909,8 @@ class AceCommander(app.App):
                 self.cmdr.fuel = commander.MAX_FUEL
         elif item == "+10 KILLS":
             g.kills += 10
+        elif item == "TO THE STATION":
+            g.to_station()
         elif item == "DOCK NOW":
             if self.career and self.cmdr is not None:
                 self._dock()
@@ -1083,14 +1103,14 @@ class AceCommander(app.App):
             text(ctx, "C or F: back", 0, 53, 11, cockpit.GREY)
             return
         if self.fsub == "debug":
-            ctx.rgba(0, 0, 0, 0.85).rectangle(-100, 62, 200, 16).fill()
+            ctx.rgba(0, 0, 0, 0.85).rectangle(-100, 62, 200, 18).fill()
             text(ctx, "DEBUG - BUILD " + build(), 0, -66, 16, cockpit.RED)
             for i, label in enumerate(self._fitems()):
-                y = -49 + i * 14
+                y = -50 + i * 13
                 if i == self.fmenu:
-                    ctx.rgb(*cockpit.DIM).rectangle(-96, y - 7, 192, 14).fill()
+                    ctx.rgb(*cockpit.DIM).rectangle(-96, y - 6.5, 192, 13).fill()
                 text(ctx, label, 0, y, 12, cockpit.GREEN if i == self.fmenu else cockpit.GREY)
-            text(ctx, "C: do it   F: back", 0, 66, 11, cockpit.GREY)
+            text(ctx, "C: do it   F: back", 0, 70, 11, cockpit.GREY)
             return
         pause = self.fsub == "pause"
         text(ctx, "PAUSE MENU" if pause else "PAUSED", 0, -60, 18, cockpit.WHITE)

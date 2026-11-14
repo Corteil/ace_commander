@@ -119,6 +119,22 @@ def t_ring(ctx):
     ctx.rgb(1, 0.25, 0.2).arc(0, 0, 116, 0, 6.2832, 0).stroke()
 
 
+def t_disc_small(ctx):     # a far sun
+    _clear(ctx)
+    ctx.rgb(1, 0.8, 0.25).arc(30, -40, 20, 0, 6.2832, 0).fill()
+
+
+def t_disc_big(ctx):       # a near sun
+    _clear(ctx)
+    ctx.rgb(1, 0.8, 0.25).arc(0, 0, 100, 0, 6.2832, 0).fill()
+
+
+def t_circle(ctx):         # a planet
+    _clear(ctx)
+    ctx.line_width = 1.5
+    ctx.rgb(0.35, 0.6, 1).arc(0, 0, 80, 0, 6.2832, 0).stroke()
+
+
 TESTS = (
     ("nothing", t_nothing),
     ("clear", t_clear),
@@ -131,6 +147,9 @@ TESTS = (
     ("1 text", t_text1),
     ("6 texts", t_text6),
     ("ring", t_ring),
+    ("disc r20", t_disc_small),
+    ("disc r100", t_disc_big),
+    ("circle r80", t_circle),
 )
 
 
@@ -177,7 +196,8 @@ class Bench:
         ctx.text_align = ctx.CENTER
         ctx.text_baseline = ctx.MIDDLE
         ctx.rgb(1, 1, 1)
-        y = -70
+        step = 11
+        y = -(len(self.results) - 1) * step / 2.0
         for name, avg, drawn in self.results:
             ctx.move_to(0, y).text("%s  %d / %d" % (name, avg, drawn))
-            y += 14
+            y += step

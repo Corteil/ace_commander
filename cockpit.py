@@ -12,6 +12,7 @@ FOCAL = 208.0    # pixels; gives a field of view of about 60 degrees
 NEAR = 30.0      # nothing closer than this is drawn
 TAU = 2 * math.pi
 WIRE_MIN = 8.0   # ships that look smaller than this (pixels) are drawn as a marker
+STREAK_MIN = 300  # world units: the shortest stardust streak with the jump drive on
 
 RADAR_Y = 88
 RADAR_RX = 58
@@ -34,7 +35,10 @@ ORANGE = (1, 0.55, 0.1)
 CYAN = (0.3, 0.9, 1)
 MAGENTA = (1, 0.3, 1)
 GREY = (0.7, 0.7, 0.75)
-COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": MAGENTA, "pmissile": CYAN}
+COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": MAGENTA, "pmissile": CYAN,
+          "station": WHITE}
+PLANET = (0.35, 0.6, 1)
+SUN = (1, 0.8, 0.25)
 
 # seven-segment digits: which of the segments a-g are lit for 0-9
 _SEGS = ("abcdef", "bc", "abged", "abgcd", "fgbc", "afgcd", "afgedc", "abc", "abcdefg", "abcdfg")
@@ -99,8 +103,9 @@ _OK = [False] * 48  # False if the vertex is behind the viewer
 _VIS = [False] * 24  # which faces of the ship being drawn can be seen
 
 
-def draw_ship(ctx, o):
-    """Draw one object. Returns True if any of it was on screen."""
+def draw_ship(ctx, o, rgb=None):
+    """Draw one object, in its kind's colour or rgb. Returns True if any of it
+    was on screen."""
     z = int(o.z)
     if z < INEAR:
         return False
@@ -112,7 +117,7 @@ def draw_ship(ctx, o):
     pr = bp.isize * IFOCAL // z     # how big it looks, in pixels
     if sx - pr > 120 or sx + pr < -120 or sy - pr > 120 or sy + pr < -120:
         return False
-    ctx.rgb(*(RED if o.hit > 0 else COLOUR[o.kind]))
+    ctx.rgb(*(RED if o.hit > 0 else rgb or COLOUR[o.kind]))
     if pr < 3:          # too far away to make out: a dot
         ctx.rectangle(sx - 1, sy - 1, 2, 2).fill()
         return True
@@ -316,12 +321,29 @@ def draw_world(ctx, g):
     ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
     ctx.line_width = 1.5
 
-    # stardust, so speed and turning can be seen
-    ctx.rgb(*GREY)
-    for p in g.dust:
-        z = int(p[2])
-        if z > INEAR:
-            ctx.rectangle(int(p[0]) * IFOCAL // z, -(int(p[1]) * IFOCAL // z), 1.5, 1.5).fill()
+    # stardust, so speed and turning can be seen; with the jump drive on, each
+    # speck is a streak back to where it was two steps ago
+    if g.jumping:
+        ctx.rgb(*WHITE)
+        tail = 2 * g.fwd
+        if tail < STREAK_MIN:
+            tail = STREAK_MIN
+        ctx.begin_path()
+        for p in g.dust:
+            z = int(p[2])
+            if z > INEAR:
+                x = int(p[0])
+                y = int(p[1])
+                ctx.move_to(x * IFOCAL // z, -(y * IFOCAL // z))
+                z += tail
+                ctx.line_to(x * IFOCAL // z, -(y * IFOCAL // z))
+        ctx.stroke()
+    else:
+        ctx.rgb(*GREY)
+        for p in g.dust:
+            z = int(p[2])
+            if z > INEAR:
+                ctx.rectangle(int(p[0]) * IFOCAL // z, -(int(p[1]) * IFOCAL // z), 1.5, 1.5).fill()
 
     if g.warp > 0:      # just out of hyperspace: streaks rushing out from the centre
         k = 256 - int(g.warp * 256 / _WARP_T)       # 0 at the start to 256 at the end
@@ -335,6 +357,10 @@ def draw_world(ctx, g):
             ctx.move_to(dx * a >> 8, dy * a >> 8)
             ctx.line_to(dx * b >> 8, dy * b >> 8)
         ctx.stroke()
+
+    sp = g.space
+    if sp is not None:
+        _draw_space(ctx, sp)
 
     for o in g.objs:
         draw_ship(ctx, o)
@@ -381,6 +407,89 @@ def draw_world(ctx, g):
         ctx.stroke()
 
 
+def _sphere(x, y, z, r):
+    """Where a sphere is on screen: (x, y, radius) in pixels, or None if it is
+    behind you, too close to draw as a circle, or off screen."""
+    if z < r * 0.5:
+        return None
+    k = FOCAL / z
+    x *= k
+    y *= -k
+    r *= k
+    if x - r > 120 or x + r < -120 or y - r > 120 or y + r < -120:
+        return None
+    return x, y, r
+
+
+def _covers(c):
+    """True if the circle (x, y, r) covers the whole screen."""
+    x = abs(c[0]) + 120
+    y = abs(c[1]) + 120
+    return x * x + y * y < c[2] * c[2]
+
+
+MAX_ARC = 2000      # pixels: circles bigger than this that don't cover the screen are left out
+
+
+def _draw_space(ctx, sp):
+    """The sun (filled), the planet (an outline, filled black if it is in
+    front of the sun) and the station, in its government's colour."""
+    sun = _sphere(sp.sx, sp.sy, sp.sz, sp.sr)
+    if sun is not None:
+        ctx.rgb(*SUN)
+        if _covers(sun):
+            ctx.rectangle(-120, -120, 240, 240).fill()
+        elif sun[2] < MAX_ARC:
+            ctx.arc(sun[0], sun[1], sun[2], 0, TAU, 0).fill()
+    planet = _sphere(sp.px, sp.py, sp.pz, sp.pr)
+    if planet is not None and not _covers(planet) and planet[2] < MAX_ARC:
+        x, y, r = planet
+        if sun is not None:
+            dx = x - sun[0]
+            dy = y - sun[1]
+            d = r + sun[2]
+            if dx * dx + dy * dy < d * d:   # in front of the sun: hide it
+                ctx.rgb(0, 0, 0).arc(x, y, r, 0, TAU, 0).fill()
+        ctx.rgb(*PLANET).arc(x, y, r, 0, TAU, 0).stroke()
+    if sp.station is not None:
+        draw_ship(ctx, sp.station, station_colour(sp.gov))
+
+
+# the compass, right of the radar: a ring with a dot that points to the planet,
+# or to the station in the safe zone; bright if it is ahead, dim behind
+COMPASS_X = 80
+COMPASS_Y = 60
+COMPASS_R = 9
+_COMPASS = tuple(
+    (COMPASS_X + COMPASS_R * math.cos(i * TAU / 16) - 0.75,
+     COMPASS_Y + COMPASS_R * math.sin(i * TAU / 16) - 0.75)
+    for i in range(16)
+)
+
+
+def _compass(ctx, sp):
+    ctx.rgb(0.38, 0.38, 0.48)
+    for px, py in _COMPASS:
+        ctx.rectangle(px, py, 1.5, 1.5).fill()
+    st = sp.station
+    if sp.safe and st is not None:
+        x, y, z = st.x, st.y, st.z
+        rgb = station_colour(sp.gov)
+    else:
+        x, y, z = sp.px, sp.py, sp.pz
+        rgb = PLANET
+    d = math.sqrt(x * x + y * y + z * z)
+    if d < 1:
+        return
+    k = (COMPASS_R - 2) / d
+    dx = COMPASS_X + int(x * k)
+    dy = COMPASS_Y - int(y * k)
+    if z >= 0:
+        ctx.rgb(*rgb).rectangle(dx - 1.5, dy - 1.5, 3, 3).fill()
+    else:
+        ctx.rgb(rgb[0] * 0.4, rgb[1] * 0.4, rgb[2] * 0.4).rectangle(dx - 1, dy - 1, 2, 2).fill()
+
+
 def _vbar(ctx, x, frac, rgb):
     ctx.rgb(*DIM).rectangle(x, -30, 6, 60).fill()
     if frac > 0:
@@ -401,7 +510,7 @@ def draw_hud(ctx, g, ms=None, ring=True):
     ctx.rectangle(-0.75, -14, 1.5, 8).fill()
 
     # gauges: speed and laser heat on the left, shield and energy on the right
-    _vbar(ctx, -112, g.speed / 40.0, GREEN)
+    _vbar(ctx, -112, g.speed / 40.0, CYAN if g.jumping else GREEN)
     _vbar(ctx, -103, g.heat, RED if g.hot else YELLOW)
     _vbar(ctx, 97, g.shield / 100.0, CYAN)
     _vbar(ctx, 106, g.hull / 100.0, GREEN if g.hull > 30 else RED)
@@ -434,6 +543,23 @@ def draw_hud(ctx, g, ms=None, ring=True):
         else:
             ctx.rectangle(bx, by, 1, -h).fill()
         ctx.rectangle(bx - 1, by - h - 1, 3, 3).fill()
+    sp = g.space
+    if sp is not None:
+        st = sp.station     # far off it is beyond cheap whole numbers, so check first
+        if st is not None and -_RADAR_R < st.x < _RADAR_R and -_RADAR_R < st.z < _RADAR_R:
+            x = int(st.x)
+            z = int(st.z)
+            if x * x + z * z <= _RADAR_R2:
+                bx = x * RADAR_RX // _RADAR_R
+                by = RADAR_Y - z * RADAR_RY // _RADAR_R
+                h = int(max(-6000.0, min(22000.0, st.y))) * 22 // _RADAR_R
+                ctx.rgb(*station_colour(sp.gov))
+                if h >= 0:
+                    ctx.rectangle(bx, by - h, 1, h).fill()
+                else:
+                    ctx.rectangle(bx, by, 1, -h).fill()
+                ctx.rectangle(bx - 2, by - h - 2, 5, 5).fill()
+        _compass(ctx, sp)
 
     # wave (yellow) and score (white), as one centred row of digits
     wave = str(g.wave)

@@ -322,7 +322,9 @@ for _ in range(200):
         break
 assert e.cmdr.system == 129 and e.cmdr.fuel == 70 - d129, (e.cmdr.system, e.cmdr.fuel)
 assert set("HYPERSPACE %d" % n for n in (5, 4, 3, 2, 1)) <= seen, seen
-assert g.msg == "ZAONCE: 4 SHIPS TO CLEAR" and g.arriving == 4, g.msg
+assert g.msg == "ZAONCE" and g.pending == g.max_hostile == 4, g.msg
+assert g.space is not None and abs(g.space.d_station - game.ARRIVE_DIST) < 1
+assert g.space.gov == e.galaxy.system(129).government
 assert g.warp > 0 and not g.objs and not g.jumped and g.kills == 2
 saved = commander.load(SAVE)
 assert (saved.system, saved.fuel, saved.kills) == (129, 70 - d129, 2), "arriving saves"
@@ -355,10 +357,26 @@ assert g.again == "C: back to the station"
 tick(e, fresh=["C"]); assert e.mode == "docked" and e.cmdr.fuel == 70, "docking fills the tank"
 assert "ZAONCE" in texts(e)
 
-# arriving: clear the ships that meet you and you are docked
+# launching puts you outside the station, facing the planet; arriving is far
+# off, and flying up to the station docks you
 launch(e)
 g.spawn_t = g.rock_t = 1e9
-assert g.arriving is None and g.kills == 0
+sp = g.space
+assert sp is not None and sp.station.z == -game.LAUNCH_DIST and sp.pz > 0 and sp.safe
+assert g.kills == 0 and g.pending == 0
+c = CountCtx(); e.draw(c)
+assert c.calls.get("arc", 0) == 1 and not c.texts[1:], "the planet ahead, as one circle"
+g.space.sx, g.space.sy, g.space.sz = 0.0, 0.0, 400000.0      # put the sun behind the planet
+c = CountCtx(); e.draw(c)
+assert c.calls.get("arc", 0) == 3, "sun, the planet filled black in front of it, its outline"
+g.space.sz = -400000.0
+g.jumping = True; g.fwd = 400
+c = CountCtx(); e.draw(c)
+assert c.calls.get("line_to", 0) >= len(g.dust) - 2, "stardust streaks with the jump drive on"
+g.jumping = False; g.fwd = 0
+lave = e.galaxy.system(e.cmdr.system)
+assert sp.pr == max(4000.0, lave.radius * game.PLANET_SCALE)
+assert sp.station.bp.name == ("DODO" if lave.tech >= game.DODO_TECH else "CORIOLIS")
 fpick(e, "LOCAL CHART")
 e.chart.cx, e.chart.cy = [(float(px), float(py)) for px, py, i, d in e.chart.dots if i == 7][0]
 e.chart._select(); tick(e, fresh=["C"])
@@ -366,31 +384,34 @@ for _ in range(200):
     tick(e)
     if e.cmdr.system == 7:
         break
-assert e.cmdr.system == 7 and g.arriving == 4 and e.cmdr.fuel == 70 - d129
-g.spawn_t = 1e9
+assert e.cmdr.system == 7 and e.cmdr.fuel == 70 - d129
+assert g.space is not sp and not g.space.safe and g.pending == g.max_hostile
 kill(g, 3); tick(e)
-assert g.arriving == 1 and g.dock_t == 0 and e.mode == "flight"
-o = game.Obj(g.types["SIDEWINDER"], "ship", 0.0, 0.0, 3000.0); g.objs.append(o)
-o2 = game.Obj(g.types["SIDEWINDER"], "ship", 500.0, 0.0, 3000.0); g.objs.append(o2)
-g._kill(o); tick(e); tick(e)
-assert g.arriving == 0 and g.dock_t == 0, "not while a ship is still about"
-g._kill(o2); tick(e); tick(e)
-assert g.msg == "ALL CLEAR: DOCKING" and g.dock_t > 0 and e.mode == "flight"
-g.spawn_t = 0.0
-for _ in range(200):
-    tick(e)
+g.pending = 0; g.encounter_t = 1e9
+g.objs[:] = [o for o in g.objs if o.kind != "ship"]
+debug(e, "TO THE STATION")
+assert g.space.station.z == 4000.0 and g.space.safe
+tick(e, fresh=["A"])
+for _ in range(400):
+    tick(e, held=["F"])        # F: speed up
     if e.mode == "docked":
         break
-assert e.mode == "docked" and e.docked and not any(x.kind == "ship" for x in g.objs), "no more come"
-assert e.cmdr.fuel == 70 and e.cmdr.kills == 2 + 5
+assert e.mode == "docked" and e.docked, "flying into the station docks you"
+assert e.cmdr.fuel == 70 and e.cmdr.kills == 2 + 3
 saved = commander.load(SAVE)
-assert (saved.system, saved.fuel, saved.kills) == (7, 70, 7), "docking saves"
+assert (saved.system, saved.fuel, saved.kills) == (7, 70, 5), "docking saves"
 tx = texts(e)
 assert "LAVE" in tx and "DOCKED" in tx
 launch(e)
-assert e.game.arriving is None and e.game.kills == 0 and not e.game.docked
+assert e.game.kills == 0 and not e.game.docked and e.game.space.safe
 debug(e, "DOCK NOW"); assert e.mode == "docked" and not e.paused
-print("arriving, clearing the ships, docking, refuelling: ok")
+# practice has no star system, and leaving it for the commander makes one again
+tick(e, fresh=["F"]); assert e.mode == "menu"
+choose(e, "COMBAT PRACTICE"); assert e.game.space is None and not e.career
+e._to_title(); choose(e, "CONTINUE"); assert e.mode == "docked"
+launch(e); assert e.game.space is not None and e.game.space.safe
+debug(e, "DOCK NOW"); assert e.mode == "docked"
+print("launching, arriving, flying to the station, docking, refuelling: ok")
 
 # ---- the docked tabs, targets, and the jump line in the in-flight menu ----
 d = e.dock
