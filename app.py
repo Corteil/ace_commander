@@ -3,9 +3,15 @@ ship viewer, drawn as hidden-line wireframes with the original ship data.
 
 Title screen
     Joystick left / right changes the choice, C (or press the joystick)
-    selects it, F leaves the app. CONTINUE and NEW COMMANDER fly as a saved
-    commander, whose kills earn a rank; COMBAT PRACTICE is the same fight with
-    nothing kept.
+    selects it, F leaves the app. CONTINUE and NEW COMMANDER put a saved
+    commander, whose kills earn a rank, in dock. COMBAT PRACTICE is the same
+    fight with nothing kept.
+
+Docked
+    Joystick left / right changes screen (on the charts the joystick moves
+    the cursor and E / B change screen). C launches from Status, and on a
+    chart makes the selected system the hyperspace target. A launches from
+    any screen. F goes back to Status, then to the title screen.
 
 Flight (2026 Spaceagon)
     Joystick      pitch and roll
@@ -43,7 +49,7 @@ import app
 from events.input import BUTTON_TYPES, ButtonDownEvent, ButtonUpEvent
 from system.eventbus import eventbus
 
-from . import bench, cockpit, commander, game, title, viewer
+from . import bench, cockpit, commander, docked, game, title, viewer
 
 try:
     import imu
@@ -59,6 +65,11 @@ try:
     from .ship_data import SHIPS
 except Exception:
     SHIPS = ()
+
+try:    # the galaxy's starting numbers, made by tools/import_galaxy.py
+    from . import game_data
+except Exception:
+    game_data = None
 
 try:    # the joystick's directions and buttons A-F, told apart from each other
     from events.joystick import JOYSTICK_BUTTON_TYPES as JOY
@@ -101,6 +112,7 @@ FAST_FRAMES = True      # on the title screen, in flight and in the viewer, don'
                         # 50 ms between frames
 PERF_LOG = 60           # print a PERF line to the console every this many flight
                         # frames (0 = never)
+LAUNCH_TIME = 2.5       # seconds of launch tunnel (C skips it)
 DEBUG_MENU = True       # show DEBUG, a page of cheats for testing, in the in-flight menu
 PERF_SLOW = 25          # ms over the average that makes a frame count as slow
 
@@ -222,7 +234,8 @@ class AceCommander(app.App):
     def __init__(self):
         super().__init__()
         self.pad = Pad(self)
-        self.mode = "menu"      # menu (the title screen) | level | flight | viewer | bench
+        # menu (the title screen) | level | docked | launch | flight | viewer | bench
+        self.mode = "menu"
         self.bench = None
         self.menu = 0           # which title screen choice is showing
         self.title = title.Title(SHIPS) if SHIPS else None
@@ -230,10 +243,18 @@ class AceCommander(app.App):
         self.level = 1          # the level showing on the new-commander screen
         self.game = None
         self.career = False     # the current game counts towards the commander
+        self.docked = True      # the commander is at a station, not out in a flight
         self.banked = 0         # this game's kills already given to the commander
         self.saved_over = False
         self.fmenu = 0          # which in-flight menu line is highlighted
-        self.fsub = None        # None, "status", "pause" or "debug": the in-flight menu page
+        self.fsub = None        # None, "status", "chart", "pause" or "debug": the menu page
+        self.galaxy = None      # made the first time a commander flies
+        self.chart = None       # the local chart, while it is open
+        self.jump_to = None     # (system, distance) the hyperspace countdown is for
+        self.dt = 0.0           # seconds since the last update
+        self.dock = None        # the docked screens (docked.Docked), while docked
+        self.target = None      # the system picked for the next hyperspace jump
+        self.launch_t = 0.0     # how far into the launch tunnel
         self.d_t = None         # how long D has been down, when steering by tilt
         self.viewer = None
         self.paused = False
@@ -245,7 +266,8 @@ class AceCommander(app.App):
         self.zero = None                 # accelerometer reading taken as "level"
         self.ms = 0.0                    # smoothed frame time
         self.leds_on = False             # we have taken over the LEDs
-        self.led_level = -1              # red level last written, 0-255
+        self.led_level = None            # (r, g, b) last written, 0-255 each
+        self.glow = 0.0                  # the station's colour fading on the LEDs after launch
         # smoothed time, in ms, spent in the game rules and in drawing calls
         self.t_step = 0.0
         self.t_world = 0.0
@@ -277,6 +299,7 @@ class AceCommander(app.App):
             self.update(_diff(now, last))
             last = now
             if self.fast and (self.mode == "flight" or self.mode == "viewer"
+                              or self.mode == "launch"
                               or (self.mode == "menu" and self.title is not None)):
                 try:
                     scheduler.render_needed.set()
@@ -290,8 +313,12 @@ class AceCommander(app.App):
     # ---- LEDs -------------------------------------------------------------
 
     def _leds(self, level):
-        """Set the ring of 12 LEDs to red at level 0-255, taking them over
-        from the badge's own pattern first. Only writes when the level changes."""
+        """Set the ring of 12 LEDs to red at level 0-255."""
+        self._leds_rgb(level, 0, 0)
+
+    def _leds_rgb(self, r, g, b):
+        """Set the ring of 12 LEDs to (r, g, b), 0-255 each, taking them over
+        from the badge's own pattern first. Only writes when the colour changes."""
         if tildagonos is None or not USE_LEDS:
             return
         try:
@@ -302,12 +329,13 @@ class AceCommander(app.App):
                 except Exception:
                     pass
                 self.leds_on = True
-                self.led_level = -1
-            if level != self.led_level:
-                self.led_level = level
+                self.led_level = None
+            rgb = (r, g, b)
+            if rgb != self.led_level:
+                self.led_level = rgb
                 leds = tildagonos.leds
                 for i in range(1, 13):      # the front ring is LEDs 1 to 12
-                    leds[i] = (level, 0, 0)
+                    leds[i] = rgb
                 leds.write()
         except Exception:
             self.leds_on = False
@@ -333,8 +361,26 @@ class AceCommander(app.App):
             self._leds(160)
         elif g.flash > 0:
             self._leds(80)
+        elif self.glow > 0:     # just launched: the station's colour fades away
+            self._leds_station(self.glow)
+            self.glow -= self.dt * 2.0
         else:
             self._leds(0)
+
+    def _government(self):
+        """The government of the commander's system (0 to 7), or None."""
+        c = self.cmdr
+        if c is None or c.system is None or self.galaxy is None:
+            return None
+        return self.galaxy.system(c.system).government
+
+    def _leds_station(self, k):
+        """The LEDs in this station's colour, k (0 to 1) of full brightness,
+        in 16 steps so they are written only when the step changes."""
+        k = int(k * 15 + 0.5)
+        rgb = cockpit.station_colour(self._government())
+        self._leds_rgb(int(rgb[0] * 255) * k // 15, int(rgb[1] * 255) * k // 15,
+                       int(rgb[2] * 255) * k // 15)
 
     # ---- steering ---------------------------------------------------------
 
@@ -398,7 +444,7 @@ class AceCommander(app.App):
         hit = pad.hit
         cancel = hit("cancel")
         confirm = hit("confirm")
-        dt = delta / 1000.0
+        self.dt = dt = delta / 1000.0
 
         if self.mode == "menu":
             if cancel:
@@ -427,9 +473,18 @@ class AceCommander(app.App):
             elif confirm:
                 self.cmdr = commander.Commander(self.level)
                 self.cmdr.save(SAVE_PATH)
-                if self.game is not None:
-                    self.game.over = True   # a new commander starts a new fight
                 self.menu = 0       # CONTINUE is now the first choice
+                self._dock()
+        elif self.mode == "docked":
+            self._update_docked(dt, cancel, confirm)
+        elif self.mode == "launch":
+            self.launch_t += dt
+            self._leds_station(cockpit.tunnel_glow(min(1.0, self.launch_t / LAUNCH_TIME)))
+            if confirm or self.launch_t >= LAUNCH_TIME:
+                self.glow = 1.0
+                if self.game is not None:
+                    self.game.over = True   # every launch is a new flight
+                self.docked = False
                 self._start_flight(True)
         elif self.mode == "viewer":
             self._update_viewer(dt, cancel, confirm)
@@ -458,7 +513,11 @@ class AceCommander(app.App):
 
     def _choose(self, item):
         if item == "CONTINUE":
-            self._start_flight(True)
+            g = self.game
+            if self.docked or g is None or g.over or not self.career:
+                self._dock()
+            else:               # a flight that was left part-way carries on
+                self._start_flight(True)
         elif item == "NEW COMMANDER":
             self.level = 1
             self.mode = "level"
@@ -477,6 +536,8 @@ class AceCommander(app.App):
         """Go into flight: as the commander, or for practice. A game that was
         left part-way carries on if it is the same kind."""
         level = self.cmdr.level if career else 1
+        if not career:
+            self.glow = 0.0
         g = self.game
         if g is None:
             self.game = g = game.Game(SHIPS, level)
@@ -486,6 +547,11 @@ class AceCommander(app.App):
             g.reset()
             self.banked = 0
         self.career = career
+        g.again = "C: back to the station" if career else "C: fly again"
+        if career:
+            self._place()
+        self.jump_to = None
+        g.jump_t = 0.0
         self.saved_over = False
         self.zero = None
         self.d_t = None
@@ -493,10 +559,111 @@ class AceCommander(app.App):
         self.fsub = None
         self.mode = "flight"
 
+    def _place(self):
+        """Make the galaxy, and put a commander who is nowhere yet at the
+        starting system. Without game_data.py there is no galaxy."""
+        if game_data is None:
+            return
+        if self.galaxy is None:
+            from . import galaxy
+            self.galaxy = galaxy.Galaxy(game_data.SEEDS, game_data.PAIRS)
+        c = self.cmdr
+        if c.system is None:
+            c.system = self.galaxy.find(*game_data.START_XY) or 0
+            c.fuel = min(commander.MAX_FUEL, game_data.START_FUEL)
+
+    def _dock(self):
+        """Show the commander docked at their star system. Docking fills the
+        tank (for nothing, until there is money to be made) and saves."""
+        self._bank()            # before career is set: practice kills don't count
+        self._place()
+        self.career = True
+        c = self.cmdr
+        c.fuel = commander.MAX_FUEL
+        c.save(SAVE_PATH)
+        if self.game is not None:
+            self.game.docked = False
+        if self.target == c.system:
+            self.target = None
+        self.dock = docked.Docked(c, self.galaxy, self.target)
+        self.docked = True
+        self.jump_to = None
+        self.paused = False
+        self.fsub = None
+        self.chart = None
+        self.mode = "docked"
+
+    def _update_docked(self, dt, cancel, confirm):
+        """The docked tabs. The joystick changes tab, except on the charts,
+        where it moves the cursor and E / B change tab instead. C launches
+        from Status and picks a target on a chart. A launches from any tab.
+        F goes back to Status, and from Status to the title screen."""
+        d = self.dock
+        hit = self.pad.hit
+        new = FB is not None
+        if cancel:
+            if d.tab:
+                d.go(0)
+            else:
+                self.mode = "menu"
+            return
+        if new and hit(BTN_MENU):
+            self._launch()
+            return
+        if new and hit(BTN_SPEED_DOWN):
+            d.go(d.tab - 1)
+            return
+        if new and hit(BTN_BOMB):
+            d.go(d.tab + 1)
+            return
+        if d.view is not None:
+            if confirm:
+                d.pick()
+                self.target = d.target
+            else:
+                jx, jy = self._steer(False, STICK if new else ANY, new)
+                d.view.move(jx, jy, dt)
+            return
+        if hit("j_left" if new else "left"):
+            d.go(d.tab - 1)
+        elif hit("j_right" if new else "right"):
+            d.go(d.tab + 1)
+        elif confirm and d.name() == "STATUS":
+            self._launch()
+
+    def _launch(self):
+        self.launch_t = 0.0
+        self.dock = None
+        self.mode = "launch"
+
+    def _jump_ok(self):
+        """The hyperspace target, if the fuel will reach it: (system, distance)."""
+        if self.target is None or self.galaxy is None or not self.career:
+            return None
+        d = self.galaxy.distance(self.cmdr.system, self.target)
+        if 0 < d <= self.cmdr.fuel:
+            return self.target, d
+        return None
+
+    def _arrive(self):
+        """The game has just jumped: move the commander and use the fuel."""
+        g = self.game
+        g.jumped = False
+        to = self.jump_to
+        self.jump_to = None
+        c = self.cmdr
+        if to is None or not self.career or c is None or self.galaxy is None:
+            return
+        c.system = to[0]
+        c.fuel = max(0, c.fuel - to[1])
+        self.target = None
+        self._save()
+        g.say("%s: %d SHIPS TO CLEAR" % (self.galaxy.system(c.system).name, g.arriving), 4.0)
+
     def _bank(self):
         """Give the commander the kills made since the last call."""
         g = self.game
-        if self.career and self.cmdr is not None and g.kills > self.banked:
+        if g is not None and self.career and self.cmdr is not None and g.kills > self.banked:
             rank = self.cmdr.add_kills(g.kills - self.banked)
             self.banked = g.kills
             if rank and not g.over:
@@ -581,8 +748,11 @@ class AceCommander(app.App):
             if not self.saved_over:
                 self.saved_over = True
                 self._save()
-            if confirm:
+            if confirm and self.career:
+                self._dock()
+            elif confirm:
                 g.reset()
+                self.jump_to = None
                 self.banked = 0
                 self.saved_over = False
                 self.zero = None
@@ -653,8 +823,12 @@ class AceCommander(app.App):
         rules = _diff(_us(), t0) / 1000.0
         self.t_step += (rules - self.t_step) * 0.1
         self.p_rules += rules
+        if g.jumped:
+            self._arrive()
         if self.career:
             self._bank()
+            if g.docked:
+                self._dock()
         return True
 
     # ---- in-flight menu ---------------------------------------------------
@@ -671,7 +845,7 @@ class AceCommander(app.App):
         if self.fsub == "debug":
             return ["INVINCIBLE: " + ("ON" if self.game.god else "OFF"),
                     "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
-                    "REFILL MISSILES", "+10 KILLS"]
+                    "REFILL MISSILES", "REFILL FUEL", "+10 KILLS", "DOCK NOW"]
         return self._fitems_top()
 
     def _debug(self, item):
@@ -696,8 +870,15 @@ class AceCommander(app.App):
         elif item == "REFILL MISSILES":
             if g.missile_bp:
                 g.missiles = 4
+        elif item == "REFILL FUEL":
+            if self.career and self.cmdr is not None:
+                self.cmdr.fuel = commander.MAX_FUEL
         elif item == "+10 KILLS":
             g.kills += 10
+        elif item == "DOCK NOW":
+            if self.career and self.cmdr is not None:
+                self._dock()
+                return
         if self.career:
             self._bank()
 
@@ -714,6 +895,9 @@ class AceCommander(app.App):
         if self.fsub == "status":
             if confirm or cancel:
                 self.fsub = None
+            return
+        if self.fsub == "chart":
+            self._update_chart(new, cancel, confirm)
             return
         items = self._fitems()
         if hit("j_up" if new else "up"):
@@ -744,6 +928,17 @@ class AceCommander(app.App):
                 self._resume()
             elif item == "STATUS":
                 self.fsub = "status"
+            elif item == "LOCAL CHART":
+                from . import chart
+                self.chart = chart.Chart(self.galaxy, self.cmdr.system, self.cmdr.fuel,
+                                         self.target)
+                self.fsub = "chart"
+            elif item.startswith("JUMP"):
+                to = self._jump_ok()
+                if to is not None:
+                    self.jump_to = to
+                    self.game.start_jump()
+                self._resume()
             elif item == "DEBUG":
                 self.fsub = "debug"
                 self.fmenu = 0
@@ -751,8 +946,37 @@ class AceCommander(app.App):
                 self.fsub = "pause"
                 self.fmenu = 0
 
+    def _update_chart(self, new, cancel, confirm):
+        """The local chart: the joystick moves the cursor, C jumps to the
+        selected system if the fuel will reach it, F goes back."""
+        if cancel:
+            self.fmenu = self._fitems_top().index("LOCAL CHART")
+            self.fsub = None
+            self.chart = None
+            return
+        ch = self.chart
+        if confirm:
+            to = ch.target()
+            if to is not None:
+                self.jump_to = to
+                self.target = to[0]
+                self.game.start_jump()
+                self.chart = None
+                self._resume()
+            return
+        jx, jy = self._steer(False, STICK if new else ANY, new)
+        ch.move(jx, jy, self.dt)
+
     def _fitems_top(self):
-        items = ["RESUME", "STATUS", "PAUSE MENU"] if self.career else ["RESUME", "PAUSE MENU"]
+        items = ["RESUME"]
+        if self.career:
+            to = self._jump_ok()
+            if to is not None and self.game is not None and self.game.jump_t <= 0:
+                items.append("JUMP: " + self.galaxy.system(to[0]).name)
+            if self.galaxy is not None:
+                items.append("LOCAL CHART")
+            items.append("STATUS")
+        items.append("PAUSE MENU")
         if DEBUG_MENU:
             items.append("DEBUG")
         return items
@@ -766,6 +990,10 @@ class AceCommander(app.App):
         elif self.mode == "bench":
             self.bench.draw(ctx)
         elif self.mode == "flight":
+            if self.paused and self.fsub == "chart":
+                self.chart.draw(ctx)
+                ctx.restore()
+                return
             t0 = _us()
             cockpit.draw_world(ctx, self.game)
             t1 = _us()
@@ -781,6 +1009,11 @@ class AceCommander(app.App):
                 self.p_draw += world + hud
         elif self.mode == "level":
             self._draw_level(ctx)
+        elif self.mode == "docked":
+            self.dock.draw(ctx)
+        elif self.mode == "launch":
+            cockpit.draw_tunnel(ctx, min(1.0, self.launch_t / LAUNCH_TIME), self.launch_t,
+                                cockpit.station_colour(self._government()))
         else:
             self._draw_menu(ctx)
         ctx.restore()
@@ -825,17 +1058,21 @@ class AceCommander(app.App):
             nxt = c.next_rank()
             if nxt:
                 text(ctx, "%d more for %s" % (nxt[1], nxt[0]), 0, 6, 12, cockpit.YELLOW)
+            if self.galaxy is not None:
+                text(ctx, "%s   fuel %d.%d LY" % (
+                    self.galaxy.system(c.system).name, c.fuel // 10, c.fuel % 10),
+                    0, 23, 12, cockpit.CYAN)
             text(ctx, "this flight: %d kills, wave %d" % (self.game.kills, self.game.wave),
-                 0, 26, 11, cockpit.GREY)
-            text(ctx, "C or F: back", 0, 48, 12, cockpit.GREY)
+                 0, 38, 11, cockpit.GREY)
+            text(ctx, "C or F: back", 0, 53, 11, cockpit.GREY)
             return
         if self.fsub == "debug":
             ctx.rgba(0, 0, 0, 0.85).rectangle(-100, 62, 200, 16).fill()
             text(ctx, "DEBUG", 0, -66, 16, cockpit.RED)
             for i, label in enumerate(self._fitems()):
-                y = -44 + i * 18
+                y = -49 + i * 14
                 if i == self.fmenu:
-                    ctx.rgb(*cockpit.DIM).rectangle(-96, y - 9, 192, 18).fill()
+                    ctx.rgb(*cockpit.DIM).rectangle(-96, y - 7, 192, 14).fill()
                 text(ctx, label, 0, y, 12, cockpit.GREEN if i == self.fmenu else cockpit.GREY)
             text(ctx, "C: do it   F: back", 0, 66, 11, cockpit.GREY)
             return
@@ -843,9 +1080,9 @@ class AceCommander(app.App):
         text(ctx, "PAUSE MENU" if pause else "PAUSED", 0, -60, 18, cockpit.WHITE)
         items = self._fitems()
         for i, label in enumerate(items):
-            y = -32 + i * 22
+            y = -40 + i * 16
             if i == self.fmenu:
-                ctx.rgb(*cockpit.DIM).rectangle(-96, y - 10, 192, 20).fill()
+                ctx.rgb(*cockpit.DIM).rectangle(-96, y - 8, 192, 16).fill()
             text(ctx, label, 0, y, 13, cockpit.GREEN if i == self.fmenu else cockpit.GREY)
         if pause:
             # where the time goes: whole frame, game rules, and my drawing calls
@@ -854,7 +1091,7 @@ class AceCommander(app.App):
                 self.t_world, self.t_hud, len(self.game.objs)), 0, 34, 11, cockpit.GREY)
             text(ctx, "C: change   F: back", 0, 52, 11, cockpit.GREY)
         else:
-            text(ctx, "C: choose   A: resume", 0, 52, 11, cockpit.GREY)
+            text(ctx, "C: choose   A: resume", 0, 54, 11, cockpit.GREY)
 
 
 __app_export__ = AceCommander

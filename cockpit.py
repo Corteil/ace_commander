@@ -189,6 +189,122 @@ def _enemy_beam(ctx, o):
     ctx.line_width = 1.5
 
 
+# the hyperspace streaks: (direction x, y times 256, starting radius in pixels)
+_WARP_T = 1.2       # the same as game.WARP_TIME
+_STREAKS = tuple(
+    (int(256 * math.cos(i * TAU / 18 + 0.2)), int(256 * math.sin(i * TAU / 18 + 0.2)),
+     8 + (i * 29) % 34)
+    for i in range(18))
+
+
+# the launch tunnel: hexagonal rings one unit apart, the way out of the station
+TUNNEL_RINGS = 12
+TUNNEL_FOCAL = 62.0     # pixels across a ring of radius 1 at distance 1
+TUNNEL_SPIN = 0.5       # radians per second: the station turns as you leave
+_HEX = tuple((math.cos(k * TAU / 6), math.sin(k * TAU / 6)) for k in range(6))
+# A station's colour says what kind of government runs the system, warm for
+# the dangerous ones and cool for the safe ones, in the order of
+# galaxy.GOVERNMENTS. It is used for the tunnel's mouth and the badge's LEDs as
+# you launch. No red (the LEDs flash red when you are hit) and no white (the
+# tunnel is white).
+STATION_COLOURS = (
+    ORANGE,             # Anarchy
+    YELLOW,             # Feudal
+    MAGENTA,            # Multi-government
+    (1, 0.5, 0.75),     # Dictatorship: pink
+    (0.65, 0.4, 1),     # Communist: violet
+    (0.4, 0.55, 1),     # Confederacy: blue
+    CYAN,               # Democracy
+    GREEN,              # Corporate State
+)
+
+
+def station_colour(government):
+    """The colour of a station in a system with this government (0 to 7), or
+    green if it isn't known."""
+    if government is None:
+        return GREEN
+    return STATION_COLOURS[government & 7]
+
+
+def tunnel_glow(f):
+    """How bright the LEDs are at point f (0 to 1) of the launch: a pulse as
+    each ring goes by, then full once you are out of the mouth."""
+    p = (TUNNEL_RINGS + 1) * f * f - 0.2    # ring i goes past when this reaches i
+    if p < 0:
+        return 0.0
+    n = int(p)
+    if n >= TUNNEL_RINGS - 1:
+        return 1.0
+    p -= n
+    return 0.5 * (1 - p) * (1 - p)
+
+
+# stars seen through the mouth of the tunnel: (x, y, distance from the centre)
+def _scatter(n):
+    out = []
+    v = 12345
+    for _ in range(n):
+        v = (v * 1103515245 + 12345) & 0x7FFFFFFF
+        x = (v >> 8) % 221 - 110
+        v = (v * 1103515245 + 12345) & 0x7FFFFFFF
+        y = (v >> 8) % 221 - 110
+        out.append((x, y, int(math.sqrt(x * x + y * y))))
+    return tuple(out)
+
+
+_STARS = _scatter(40)
+
+
+def draw_tunnel(ctx, f, t, rgb=GREEN):
+    """The launch: flying out along a tunnel of hexagons. f goes from 0 at the
+    start to 1 at the mouth; t is the time in seconds, for the spin; rgb is
+    the station's colour, for the mouth."""
+    ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+    ctx.line_width = 1.5
+    s = (TUNNEL_RINGS + 1) * f * f      # slow at first, then faster
+    a = t * TUNNEL_SPIN
+    ca = math.cos(a)
+    sa = math.sin(a)
+    corners = [(TUNNEL_FOCAL * (x * ca - y * sa), TUNNEL_FOCAL * (x * sa + y * ca))
+               for x, y in _HEX]
+    # space, through the mouth: as far out as the circle inside the last hexagon
+    z = TUNNEL_RINGS - 1 + 0.6 - s
+    seen = 170 if z < 0.4 else int(0.87 * TUNNEL_FOCAL / z)
+    if seen > 4:
+        ctx.rgb(*GREY)
+        for x, y, r in _STARS:
+            if r < seen:
+                ctx.rectangle(x, y, 1.5, 1.5).fill()
+    near = far = None
+    for i in range(TUNNEL_RINGS):
+        z = i + 0.6 - s
+        if z < 0.4:
+            continue
+        k = 1.0 / z
+        if near is None:
+            near = k
+        far = k
+        b = 1.0 if z < 2 else 2.0 / z      # dimmer further in
+        if i == TUNNEL_RINGS - 1:           # the mouth, with space beyond
+            ctx.rgb(rgb[0] * b, rgb[1] * b, rgb[2] * b)
+        else:
+            ctx.rgb(b, b, b)
+        ctx.begin_path()
+        x, y = corners[5]
+        ctx.move_to(int(x * k), int(y * k))
+        for x, y in corners:
+            ctx.line_to(int(x * k), int(y * k))
+        ctx.stroke()
+    if near is not None and far != near:    # the tunnel's six long edges
+        ctx.rgb(*GREY)
+        ctx.begin_path()
+        for x, y in corners:
+            ctx.move_to(int(x * near), int(y * near))
+            ctx.line_to(int(x * far), int(y * far))
+        ctx.stroke()
+
+
 def draw(ctx, g, ms=None, ring=True):
     """Draw the whole cockpit for Game g. ms is the frame time to show, or None."""
     draw_world(ctx, g)
@@ -206,6 +322,19 @@ def draw_world(ctx, g):
         z = int(p[2])
         if z > INEAR:
             ctx.rectangle(int(p[0]) * IFOCAL // z, -(int(p[1]) * IFOCAL // z), 1.5, 1.5).fill()
+
+    if g.warp > 0:      # just out of hyperspace: streaks rushing out from the centre
+        k = 256 - int(g.warp * 256 / _WARP_T)       # 0 at the start to 256 at the end
+        if k < 0:
+            k = 0
+        ctx.rgb(*CYAN)
+        ctx.begin_path()
+        for dx, dy, r0 in _STREAKS:
+            a = r0 + (k * 40 >> 8)
+            b = a + 12 + (k * 110 >> 8)
+            ctx.move_to(dx * a >> 8, dy * a >> 8)
+            ctx.line_to(dx * b >> 8, dy * b >> 8)
+        ctx.stroke()
 
     for o in g.objs:
         draw_ship(ctx, o)
@@ -323,7 +452,7 @@ def draw_hud(ctx, g, ms=None, ring=True):
         ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -42, 200, 100).fill()
         text(ctx, "GAME OVER", 0, -22, 26, RED)
         text(ctx, "SCORE %d   KILLS %d" % (g.score, g.kills), 0, 6, 14, WHITE)
-        text(ctx, "C: fly again", 0, 30, 12, GREY)
+        text(ctx, g.again, 0, 30, 12, GREY)
         text(ctx, "F: title screen", 0, 46, 12, GREY)
     elif g.msg_t > 0:
         text(ctx, g.msg, 0, -66, 14, YELLOW)

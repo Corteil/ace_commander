@@ -57,6 +57,21 @@ bs.choose(a, "NEW COMMANDER")
 shot(a, "1d_level.png")
 tick(a, fresh=["CONFIRM"])
 a.cmdr.add_kills(140)
+shot(a, "1e_docked.png")
+d = a.dock
+d.go(2)
+shot(a, "1f_galactic.png")
+d.target = 147; d.go(1)
+shot(a, "1g_local_docked.png")
+d.go(3)
+shot(a, "1h_system_data.png")
+d.go(0); a.target = 147
+shot(a, "1i_docked_target.png")
+tick(a, fresh=["CONFIRM"])
+for i, ft in enumerate((0.25, 0.6, 0.85, 0.97)):
+    a.launch_t = ft * ace_commander.app.LAUNCH_TIME
+    shot(a, "1j_tunnel_%d.png" % i)
+a.launch_t = 99; tick(a)
 g = a.game
 g.spawn_t = g.rock_t = 1e9
 g.objs[:] = []
@@ -91,16 +106,43 @@ g.beam = 0.0
 shot(a, "3_hit.png")
 g.flash = 0.0
 
+def fpick(label):
+    a.fsub = None
+    a.fmenu = a._fitems().index(label)
+    tick(a, fresh=["CONFIRM"])
+
+
 tick(a, fresh=["A"])
 tick(a)
 shot(a, "4_menu.png")
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])
+fpick("STATUS")
 shot(a, "4b_status.png")
-tick(a, fresh=["CONFIRM"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])
+a.fsub = None; tick(a)
+shot(a, "4_menu_jump.png")
+fpick("PAUSE MENU")
 shot(a, "4c_pause_menu.png")
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])
+fpick("DEBUG")
 shot(a, "4d_debug.png")
+fpick("LOCAL CHART")
+shot(a, "4e_chart_here.png")
+for _ in range(14):
+    tick(a, held=["JOYRIGHT", "JOYUP"])
+tick(a)
+shot(a, "4f_chart_pick.png")
+a.chart.cx, a.chart.cy = -60.0, 62.0; a.chart._select()
+shot(a, "4g_chart_too_far.png")
 tick(a, fresh=["A"])
+objs = g.objs[:]
+g.objs[:] = []
+g.lock = None
+g.warp = 0.9; g.say("ZAONCE: 4 SHIPS TO CLEAR", 3.0)
+shot(a, "4h_arriving.png")
+g.warp = 0.3
+shot(a, "4i_arriving_late.png")
+g.warp = 0.0
+g.say("ALL CLEAR: DOCKING", 3.0)
+shot(a, "4j_all_clear.png")
+g.objs[:] = objs
 g._hurt(1000.0)
 tick(a)
 shot(a, "5_gameover.png")

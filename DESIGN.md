@@ -406,6 +406,12 @@ order puts the visible, low-risk work first and the parts that depend on decisio
 | 5. A living galaxy | Traders, police, legal status, rank, system danger levels, Thargoids | Play the full Elite loop |
 | 6. Extras | Other seven galaxies, mining, original content so the repo runs without Elite data | Optional |
 
+Phase 2 is built (build 22): the galaxy, both charts, system data, hyperspace, fuel,
+arriving docked, the docked screens as tabs, and a hexagon tunnel on launch. The docked
+screens are four tabs for now (Status, Local chart, Galactic chart, System data); Market
+and Equip ship join them in phases 3 and 4. Docking fills the tank for nothing until there
+is a way to earn credits. The system description sentence is not built.
+
 In phase 2 there is no station to fly to yet, so arriving in a system docks you after you
 clear the encounter on the way. Phase 3 replaces that with real docking.
 

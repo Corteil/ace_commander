@@ -300,4 +300,50 @@ g = game.Game(())
 for _ in range(500):
     g.step(DT, 0.2, 0.1, 0.0, True, True)
 print("missing stats / one ship / no ships: ok")
+# hyperspace ------------------------------------------------------------------
+g = fresh()
+put(g, "PYTHON", "ship", 300, 100, 4000, True)
+g.step(DT, 0, 0, 0, False, False)
+assert g.lock is not None
+g.start_jump()
+n = 0
+while not g.jumped:
+    g.step(DT, 0, 0, 0, False, False)
+    n += 1
+    assert n < 1000
+assert abs(n * DT - game.JUMP_COUNT) <= 2 * DT, n * DT
+assert not g.objs and not g.new and g.lock is None and not g.locked and g.jump_t == 0
+assert g.warp > 0 and g.spawn_t >= 5.0, "a quiet moment on arriving"
+g.jumped = False
+for _ in range(int(game.WARP_TIME / DT) + 2):
+    g.step(DT, 0, 0, 0, False, False)
+assert g.warp <= 0 and not g.jumped
+# after a jump: as many ships as attack at once must go, then docking
+assert g.arriving == g.max_hostile and not g.docked
+g.spawn_t = 0.0
+for _ in range(g.max_hostile):
+    for _ in range(3000):
+        g.step(DT, 0, 0, 0, False, False)
+        ships = [o for o in g.objs if o.kind == "ship"]
+        if ships:
+            break
+    assert ships, "ships come to meet you"
+    g.shield = g.hull = 100.0
+    g._kill(ships[0])
+for o in g.objs:
+    if o.kind == "ship":
+        g._kill(o)
+g.god = True
+n = 0
+while not g.docked:
+    g.step(DT, 0, 0, 0, False, False)
+    n += 1
+    assert n < 400 and not any(o.kind == "ship" and not o.dead for o in g.objs)
+assert abs(n * DT - game.DOCK_TIME) <= 4 * DT and g.arriving is None, n * DT
+g.god = False; g.docked = False
+g.start_jump(); g._hurt(1e6); g.step(DT, 0, 0, 0, False, False)
+assert g.over and g.jump_t == 0 and not g.jumped, "no jump once destroyed"
+g.start_jump(); assert g.jump_t == 0
+g.reset(); assert g.jump_t == 0 and g.warp == 0 and not g.jumped
+print("hyperspace countdown, jump, arrival: ok")
 print("ALL GAME TESTS PASSED")

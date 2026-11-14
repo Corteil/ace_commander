@@ -17,7 +17,9 @@ The title screen, with a ship tumbling under the name, offers:
 
 Joystick left / right changes the choice, C selects it and F leaves the app.
 
-Not in yet: docking, trading, the galaxy. The plan for those is in [DESIGN.md](DESIGN.md).
+A commander is somewhere in a galaxy of 256 star systems and can jump between them by
+hyperspace (see [Hyperspace](#hyperspace)). Continue and New commander start you docked
+(see [Docked](#docked)). Not in yet: a station to fly to, and trading. The plan for those is in [DESIGN.md](DESIGN.md).
 
 This is a fan-made game inspired by Elite. It is not official, licensed or endorsed. See
 [Credits and original material](#credits-and-original-material).
@@ -36,11 +38,12 @@ Written for the 2026 Spaceagon: the joystick steers and the lettered buttons do 
 | A | in-flight menu, which pauses the game |
 
 In the in-flight menu the joystick moves up and down, C selects, F goes back and A
-resumes. It has **Status** (your commander's rank and kills) and a **Pause menu**, where you
-switch steering between JOYSTICK and TILT or quit to the title screen.
+resumes. It has the **Local chart** (see [Hyperspace](#hyperspace)), **Status** (your
+commander's rank, kills, star system and fuel) and a **Pause menu**, where you switch
+steering between JOYSTICK and TILT or quit to the title screen.
 
 The menu also has a **Debug** page of cheats for testing: invincibility, kill all enemies,
-next wave, add an enemy, refill missiles and +10 kills. Kills made there count towards your
+next wave, add an enemy, refill missiles, refill fuel, +10 kills and dock now. Kills made there count towards your
 commander's rank. Set `DEBUG_MENU = False` in `app.py` to hide it.
 
 With TILT, tilting the badge steers and the joystick still works. D then does two jobs: a
@@ -55,6 +58,62 @@ and `BTN_MENU` near the top of `app.py`.
 
 On firmware without the joystick's own button names, the game falls back to tilt steering
 with UP / DOWN for speed, LEFT for a missile, RIGHT to re-zero and CANCEL for the menu.
+
+## Docked
+
+While docked there are four screens; the small squares at the top show which one is open.
+
+- **Status** - the system you are at, your rank, kills, fuel, credits and hyperspace
+  target. C launches.
+- **Local chart** - the systems round you, as in flight.
+- **Galactic chart** - all 256 systems of the galaxy. The small ring round you is your
+  fuel range.
+- **System data** - government, economy, tech level, population, productivity and size
+  of the target system (or of where you are, with no target).
+
+Joystick left / right changes screen. On the two charts the joystick moves the cursor
+instead, and E / B change screen. On a chart, C makes the selected system your hyperspace
+target and shows its data; C on your own system clears the target. A launches from any
+screen, and F goes back to Status, then to the title screen.
+
+Launching flies you out along the station's hexagonal tunnel (about 2.5 seconds; C skips
+it). A station's colour shows what kind of government runs the system: orange for an
+anarchy, yellow feudal, magenta multi-government, pink dictatorship, violet communist,
+blue confederacy, cyan democracy and green corporate state. It is on "DOCKED", the
+government's name and the tunnel's last ring, and the badge's LEDs pulse in it as each ring
+goes by, flash full as you leave the tunnel, then fade.
+
+## Hyperspace
+
+A commander starts at Lave with a full tank, which is 7 light years of fuel. If you picked
+a target while docked and it is in range, the in-flight menu (A) has **Jump: name** just
+below Resume, which starts the jump straight away. Otherwise:
+
+1. Press A and choose **Local chart**. The green cross in the middle is where you are, the
+   ring is how far your fuel reaches, and each dot is a star system (white if you can reach
+   it, grey if not).
+2. Move the yellow cursor with the joystick. The system nearest the cursor gets a box, with
+   its name at the top and its distance at the bottom.
+3. Press C to jump there, or F to go back.
+
+The game resumes with a five-second countdown, then you arrive in the new system with
+everything from the old one left behind. The jump uses fuel for its distance, and the
+commander is saved on arriving. Combat practice has no chart.
+
+There is no station to fly to yet, so arriving works like this: ships come to meet you
+(3, 4 or 5 of them by level), and once that many are destroyed and none are left you are
+docked. Docking fills the tank for nothing and saves the commander. The docked screen shows
+the system, your rank, fuel and credits. If you are destroyed, C takes you back to the
+station you last reached.
+
+Launching without jumping gives the endless fight as before; jump when you want to move on.
+
+The system data screen has no description sentence yet: the original builds it from text
+tables that `game_data.py` doesn't read.
+The Debug page has **Refill fuel** and **Dock now** as shortcuts.
+
+The galaxy needs `game_data.py` (see [Ships and galaxy data](#ships-and-galaxy-data)).
+Without it the game still runs, with no Local chart.
 
 ## The screen
 
@@ -97,7 +156,7 @@ Near the top of `app.py`:
 
 Speeds, damage, ranges and how fast enemies turn are constants at the top of `game.py`.
 
-## Ships
+## Ships and galaxy data
 
 The app has no ships of its own. It reads `ship_data.py`, which you generate from your own
 copy of the Elite source (31 ships, with each one's energy, speed, laser and missiles).
@@ -117,6 +176,15 @@ source repo it comes from has no licence, so it is listed in `.gitignore`. Make 
    Add `--list` to see which ships it finds.
 3. That writes `ship_data.py` in the current folder.
 
+The galaxy works the same way. `game_data.py` holds the three seed numbers every star system
+is worked out from, the letter pairs their names are built from, and where a new commander
+starts. It is also derived from Elite and also **not in this repo**. Make it from the same
+source:
+
+```
+python3 tools/import_galaxy.py path/to/elite-source-code-bbc-micro-disc
+```
+
 Hidden lines are removed the way the original game does it: an edge is drawn only if one of
 the two faces it sits between points back at the viewer.
 
@@ -124,23 +192,30 @@ the two faces it sits between points back at the viewer.
 
 - `app.py` - moves between the screens; input (tilt, buttons, keyboard); in-flight menu.
 - `title.py` - the title screen: block-letter name, tumbling ship, one-line menu.
-- `commander.py` - the saved commander: level, kills, rank. No badge imports.
+- `commander.py` - the saved commander: level, kills, rank, star system, fuel. No badge
+  imports.
+- `galaxy.py` - works out the 256 star systems from three seed numbers. No badge imports.
+- `chart.py` - the local and galactic charts.
+- `docked.py` - the docked screens.
 - `game.py` - the flight game's rules, with no badge imports so it can be tested on a PC.
 - `cockpit.py` - draws the flight view, radar and gauges.
 - `viewer.py` - the ship viewer.
 - `bench.py` - the menu's Speed test: times kinds of drawing on the badge.
 - `deploy.bat` - double-click to copy the app to the badge, restart it, and save what the
-  badge prints to `badge_log.txt` (`deploy.bat all` also copies `ship_data.py`).
+  badge prints to `badge_log.txt` (`deploy.bat all` also copies `ship_data.py` and
+  `game_data.py`).
 - `tools/import_ships.py` - makes `ship_data.py`. Stays on your PC.
+- `tools/import_galaxy.py` - makes `game_data.py`. Stays on your PC.
 - `tests/` - tests that run on a PC with stand-ins for the badge: `python tests/run_all.py`.
 - `CLAUDE.md` - project notes: firmware facts, measurements and what's next.
 - `DESIGN.md` - design for the rest of the game. Phase 1 (title screen, commander, levels,
-  new buttons) is built; docking, trading and the galaxy are not.
+  new buttons) and phase 2 (galaxy, charts, system data, hyperspace, arriving docked) are
+  built; a station to fly to and trading are not.
 
 ## Install
 
 Copy `__init__.py app.py game.py cockpit.py viewer.py bench.py title.py commander.py
-ship_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
+galaxy.py chart.py docked.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
 then restart it. On Windows, `deploy.bat all` does this.
 
 ## Credits and original material
