@@ -201,6 +201,52 @@ put(g, "CANISTER", "can", 0, 0, 200)
 for _ in range(60):
     g.step(DT, 0, 0, 0, False, False)
 assert g.cargo == 1 and g.score == 25 and g.shield == 100.0
+# in combat practice a canister recharges the shields, and often holds a missile
+random.seed(4)
+msgs = set()
+g = fresh(); g.missiles = 0
+for k in range(20):
+    g.shield = 30.0
+    put(g, "CANISTER", "can", 0, 0, 200)
+    for _ in range(60):
+        g.step(DT, 0, 0, 0, False, False)
+        if not any(o.kind == "can" for o in g.objs):
+            break
+    assert g.shield == 100.0, "shields recharged"
+    msgs.add(g.msg)
+assert g.missiles == game.MAX_MISSILES, "missiles, up to a full rack"
+assert msgs == {"MISSILE + SHIELDS", "SHIELDS RECHARGED"}, msgs
+# the RELEASE CANISTER cheat: one just ahead that drifts in and is scooped
+g = fresh(); g.shield = 40.0
+c = g.release_canister()
+assert c is not None and c in g.new and c.kind == "can"
+for _ in range(int(10 / DT)):
+    g.step(DT, 0, 0, 0, False, False)
+    if c.dead:
+        break
+assert c.dead and g.shield == 100.0, "it drifts in by itself and is scooped"
+g.objs[:] = [game.Obj(g.types["ASTEROID"], "rock", 0.0, 0.0, 9000.0)
+             for _ in range(game.MAX_OBJECTS)]
+assert g.release_canister() is None, "not past MAX_OBJECTS"
+# with somewhere to put it (a commander's hold): one of the first 8 goods
+got = []
+g = fresh()
+g.scoop = lambda i: (got.append(i), "GOOD %d" % i)[1]
+g.speed = 10.0
+for k in range(40):
+    put(g, "CANISTER", "can", 0, 0, 200)
+    for _ in range(60):
+        g.step(DT, 0, 0, 0, False, False)
+        if not any(o.kind == "can" for o in g.objs):
+            break
+assert len(got) == 40 and g.cargo == 40 and g.msg == "GOOD %d" % got[-1]
+assert set(got) == set(range(game.SCOOP_GOODS)), set(got)
+g.scoop = lambda i: None        # the hold is full: the canister is lost
+put(g, "CANISTER", "can", 0, 0, 200)
+for _ in range(60):
+    g.step(DT, 0, 0, 0, False, False)
+assert g.cargo == 40 and g.msg == "HOLD FULL" and g.shield == 100.0
+assert not any(o.kind == "can" for o in g.objs)
 g = fresh()
 g.speed = 30.0
 rock = put(g, "ASTEROID", "rock", 0, 0, 400)

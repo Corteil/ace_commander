@@ -10,6 +10,7 @@ from badge_stubs import CountCtx
 bs.install()
 import ace_commander
 from ace_commander import commander, game
+from ace_commander import market as market_mod
 mod = ace_commander.app
 tick, choose = bs.tick, bs.choose
 SAVE = os.path.join(HERE, "shots", "test_commander.json")
@@ -186,11 +187,31 @@ assert a.mode == "docked" and a.cmdr.kills == 6, "practice kills aren't banked b
 launch(a)
 assert a.career and a.game.level == 0 and a.game.kills == 0
 
-# dying saves; flying again keeps the commander
+# scooped canisters go into the commander's hold
 g = a.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
+assert g.scoop is not None and sum(a.cmdr.cargo) == 0
+def scoop_one(a):
+    g = a.game
+    g.speed = 10.0
+    g.objs.append(game.Obj(g.types["CANISTER"], "can", 0.0, 0.0, 200.0))
+    for _ in range(60):
+        tick(a)
+        if not any(o.kind == "can" for o in g.objs):
+            return
+scoop_one(a)
+assert sum(a.cmdr.cargo) == 1 and sum(a.cmdr.cargo[:game.SCOOP_GOODS]) == 1
+i = a.cmdr.cargo.index(1)
+assert g.msg == mod.GOODS[i][0], (g.msg, i)
+fpick(a, "STATUS"); assert any("hold 1/20t" in t for t in texts(a)); tick(a, fresh=["C"]); tick(a, fresh=["A"])
+a.cmdr.cargo[12] = 19                   # 19 t of minerals: room for one more
+scoop_one(a); assert market_mod.hold_used(a.cmdr.cargo) == 20
+scoop_one(a); assert market_mod.hold_used(a.cmdr.cargo) == 20 and g.msg == "HOLD FULL"
+# dying saves, and loses the cargo; flying again keeps the commander
+g.objs[:] = []
 kill(g, 2); tick(a)
 g._hurt(1000.0); tick(a)
 assert g.over and commander.load(SAVE).kills == 8, "saved at game over"
+assert sum(a.cmdr.cargo) == 0 and sum(commander.load(SAVE).cargo) == 0, "the cargo is lost with the ship"
 assert "C: back to the station" in texts(a)
 tick(a, fresh=["C"]); assert a.mode == "docked" and a.cmdr.kills == 8
 launch(a); assert not g.over and g.kills == 0
@@ -353,6 +374,13 @@ assert e.fsub is None and e._fitems()[e.fmenu] == "LOCAL CHART" and e.chart is N
 tick(e, fresh=["A"])
 e.cmdr.fuel = 3
 debug(e, "REFILL FUEL"); assert e.cmdr.fuel == 70
+# RELEASE CANISTER puts one just ahead, drifting in to be scooped
+n_cans = sum(1 for o in e.game.objs + e.game.new if o.kind == "can")
+debug(e, "RELEASE CANISTER")
+cans = [o for o in e.game.objs + e.game.new if o.kind == "can"]
+assert len(cans) == n_cans + 1 and 0 < cans[-1].z <= 700 and cans[-1].m[8] < -0.99, "ahead, coming in"
+tx = texts(e)
+assert "RELEASE CANISTER" in tx and "DOCK NOW" in tx and "C: do it   F: back" in tx, tx
 tick(e, fresh=["A"])
 # dying stops a countdown; quitting to the title and coming back keeps the system
 fpick(e, "LOCAL CHART")

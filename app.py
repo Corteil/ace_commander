@@ -72,6 +72,7 @@ try:    # the galaxy's starting numbers, made by tools/import_galaxy.py
 except Exception:
     game_data = None
 GOODS = getattr(game_data, "GOODS", None)   # the market's goods, if game_data.py has them
+SAFE_GREEN = 60         # the LEDs are this green (0-255) in the safe zone round a station
 REPEAT_WAIT = 0.45      # seconds a market button is held before it starts repeating
 REPEAT_EVERY = 0.09     # then once every this many seconds
 
@@ -391,6 +392,8 @@ class AceCommander(app.App):
         elif self.glow > 0:     # just launched: the station's colour fades away
             self._leds_station(self.glow)
             self.glow -= self.dt * 2.0
+        elif g.space is not None and g.space.safe:  # near the station: no ships come here
+            self._leds_rgb(0, SAFE_GREEN, 0)
         else:
             self._leds(0)
 
@@ -585,6 +588,7 @@ class AceCommander(app.App):
             fresh = False
         self.career = career
         g.again = "C: back to the station" if career else "C: fly again"
+        g.scoop = self._scoop if career and self.cmdr is not None else None
         if career:
             self._place()
             if fresh or g.space is None:
@@ -717,6 +721,11 @@ class AceCommander(app.App):
             return True
         self.held_t[name] = t
         return False
+
+    def _scoop(self, i):
+        """A canister scooped in flight: good i into the hold (see Game.scoop)."""
+        from . import market
+        return market.scoop(self.cmdr, GOODS, i)
 
     def _save_docked(self):
         """Save what was bought and sold while docked."""
@@ -867,6 +876,8 @@ class AceCommander(app.App):
         if g.over:
             if not self.saved_over:
                 self.saved_over = True
+                if self.career and self.cmdr is not None:
+                    self.cmdr.cargo = [0] * commander.GOODS     # lost with the ship
                 self._save()
             if confirm and self.career:
                 self._dock()
@@ -974,8 +985,8 @@ class AceCommander(app.App):
         if self.fsub == "debug":
             return ["INVINCIBLE: " + ("ON" if self.game.god else "OFF"),
                     "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
-                    "REFILL MISSILES", "REFILL FUEL", "+10 KILLS", "TO THE STATION",
-                    "DOCK NOW"]
+                    "REFILL MISSILES", "REFILL FUEL", "+10 KILLS", "RELEASE CANISTER",
+                    "TO THE STATION", "DOCK NOW"]
         return self._fitems_top()
 
     def _debug(self, item):
@@ -999,12 +1010,15 @@ class AceCommander(app.App):
                 g._spawn_ship()
         elif item == "REFILL MISSILES":
             if g.missile_bp:
-                g.missiles = 4
+                g.missiles = game.MAX_MISSILES
         elif item == "REFILL FUEL":
             if self.career and self.cmdr is not None:
                 self.cmdr.fuel = commander.MAX_FUEL
         elif item == "+10 KILLS":
             g.kills += 10
+        elif item == "RELEASE CANISTER":
+            if g.release_canister() is None:
+                g.say("TOO MANY OBJECTS")
         elif item == "TO THE STATION":
             g.to_station()
         elif item == "DOCK NOW":
@@ -1206,17 +1220,18 @@ class AceCommander(app.App):
                 text(ctx, "%s   fuel %d.%d LY" % (
                     self.galaxy.system(c.system).name, c.fuel // 10, c.fuel % 10),
                     0, 23, 12, cockpit.CYAN)
-            text(ctx, "this flight: %d kills, wave %d" % (self.game.kills, self.game.wave),
-                 0, 38, 11, cockpit.GREY)
+            from . import market
+            text(ctx, "hold %d/%dt   this flight: %d kills" % (
+                market.hold_used(c.cargo), c.hold, self.game.kills), 0, 38, 11, cockpit.GREY)
             text(ctx, "C or F: back", 0, 53, 11, cockpit.GREY)
             return
         if self.fsub == "debug":
             ctx.rgba(0, 0, 0, 0.85).rectangle(-100, 62, 200, 18).fill()
             text(ctx, "DEBUG - BUILD " + build(), 0, -66, 16, cockpit.RED)
             for i, label in enumerate(self._fitems()):
-                y = -50 + i * 13
+                y = -52 + i * 12
                 if i == self.fmenu:
-                    ctx.rgb(*cockpit.DIM).rectangle(-96, y - 6.5, 192, 13).fill()
+                    ctx.rgb(*cockpit.DIM).rectangle(-96, y - 6, 192, 12).fill()
                 text(ctx, label, 0, y, 12, cockpit.GREEN if i == self.fmenu else cockpit.GREY)
             text(ctx, "C: do it   F: back", 0, 70, 11, cockpit.GREY)
             return

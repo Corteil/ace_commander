@@ -226,7 +226,9 @@ of a real flight, not from a harness.
    none in the safe zone. Reaching `DOCK_DIST` of the station sets `Game.docked`
    (docking option C); hitting the planet or sun is `_hurt(1e6)`. The jump drive
    (`JUMP_K`) needs speed up held at full speed, no ship or missile within radar range, and
-   being outside the safe zone. New DEBUG cheat: TO THE STATION (`Game.to_station`).
+   being outside the safe zone. New DEBUG cheat: TO THE STATION (`Game.to_station`). Build 31
+   adds RELEASE CANISTER (`Game.release_canister`: one 700 ahead, drifting in to be
+   scooped); the DEBUG page lines are 12 px apart so all 10 fit.
    The speed test has three circle tests. **Measured over the REPL on the badge (real ctx,
    not yet played by hand):** filled disc r20 1.3 ms, r100 7.2 ms; circle outline r20
    2.6 ms, r80 6.2 ms, and 4 to 5 ms for a big one whose edge crosses the screen. Cockpit
@@ -312,7 +314,20 @@ of a real flight, not from a harness.
    tab 115 ms (all text, every frame, so held buttons repeat about 6 times a second), a
    buy 0.7 ms. Fuel is still free on docking (the equipment screen comes in phase 4).
    Illegal goods (slaves, narcotics, firearms) are sold like the rest until legal status
-   exists (phase 5). Scooped canisters (`Game.cargo`) don't go into the hold yet.
+   exists (phase 5).
+   **Build 31: scooped cargo into the hold, and green LEDs in the safe zone.** In a career
+   flight `Game.scoop` is `app._scoop` (`market.scoop`): a scooped canister holds a random
+   one of the first `SCOOP_GOODS` (8) goods, food to computers, as in the original (read
+   from the main flight loop, part 8); it goes into the commander's hold and its name is
+   shown, or with no room it is lost ("HOLD FULL", a small explosion, no damage). In
+   combat practice (Brian's request) a canister is a pick-up instead (`Game._pickup`):
+   it recharges the shields to full, and with chance `PICKUP_MISSILE` (0.5) holds a
+   missile too, up to `MAX_MISSILES` (4). Scooping is still free and from any side: needing fuel
+   scoops and the canister below you come with the equipment (phase 4). Being destroyed
+   loses the cargo (cleared before the game-over save). The in-flight status page shows
+   the hold. In the station's safe zone (`Space.safe`) the LEDs are steady green
+   (`SAFE_GREEN`, 60 of 255); a hit's red flash and the station colour fading after launch
+   come first, and paused they are off.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
@@ -321,7 +336,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 30), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 31), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
@@ -346,6 +361,7 @@ by itself is faster than one fill for all of them (3.5 against 7.7 ms). Flight a
 - The docking scene (build 28, confirmed by Brian) with build 29's varied tunnels: whether
   the shapes, morphing and spacings look good on the badge.
 - The market (build 30): the layout on the badge, C / D and the repeat speed.
+- Scooping into the hold, combat practice pick-ups and the green safe-zone LEDs (build 31).
 - Whether `deploy.bat`'s copy step reports failures properly (the log step is known to work).
 
 Confirmed by Brian on 2026-11-13: F is faster and E slower; the LEDs flash on a hit and the

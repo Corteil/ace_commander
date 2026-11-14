@@ -48,6 +48,19 @@ def new(goods, system, economy, r):
             "stock": [stock(g, i, economy, r) for i, g in enumerate(goods)]}
 
 
+def scoop(cmdr, goods, i):
+    """Put one of good i, scooped in flight, into the commander's hold.
+    Returns its name, or None if there is no room."""
+    c = cmdr
+    if i < TONNE_GOODS:
+        if hold_used(c.cargo) >= c.hold:
+            return None
+    elif c.cargo[i] >= UNIT_LIMIT:
+        return None
+    c.cargo[i] += 1
+    return goods[i][0] if goods else "CARGO"
+
+
 def hold_used(cargo):
     """Tonnes of cargo in the hold."""
     return sum(cargo[:TONNE_GOODS])

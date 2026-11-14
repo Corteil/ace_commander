@@ -91,6 +91,9 @@ TIERS = (
 ROCKS = ("ASTEROID", "BOULDER")
 _INV14 = 1.0 / 16384
 THINK_EVERY = 3        # a ship re-plans on one frame in this many (see Game._think)
+SCOOP_GOODS = 8        # a canister holds one of the first this many goods (food to computers)
+MAX_MISSILES = 4       # missiles the player's ship carries
+PICKUP_MISSILE = 0.5   # combat practice: how often a canister holds a missile as well
 
 # What the level changes: (most hostile ships at once, how often enemy lasers
 # hit compared with level 1, how much damage they and their missiles do
@@ -302,6 +305,9 @@ class Game:
         self.set_level(level)
         self.god = False    # a cheat: hits flash but do no damage
         self.docking = "C"  # how docking works: see set_docking
+        # what a scooped canister goes into: a function given the good's number
+        # that returns its name, or None if there is no room; None in practice
+        self.scoop = None
         self.types = {}
         for entry in ships:
             bp = Blueprint(entry)
@@ -342,7 +348,7 @@ class Game:
         self.hot = False       # laser overheated
         self.cool = 0.0
         self.beam = 0.0        # > 0 while the player's laser is drawn
-        self.missiles = 4 if self.missile_bp else 0
+        self.missiles = MAX_MISSILES if self.missile_bp else 0
         self.kills = 0
         self.score = 0
         self.cargo = 0
@@ -905,9 +911,21 @@ class Game:
                 continue
             if o.kind == "can":
                 o.dead = True
-                self.cargo += 1
-                self.score += 25
-                self.say("CARGO SCOOPED")
+                if self.scoop is None:      # practice: a pick-up instead of cargo
+                    self.cargo += 1
+                    self.score += 25
+                    self._pickup()
+                    continue
+                # a canister holds one of the first SCOOP_GOODS goods, as in the
+                # original; with no room for it, it is lost
+                name = self.scoop(random.randrange(SCOOP_GOODS))
+                if name:
+                    self.cargo += 1
+                    self.score += 25
+                    self.say(name)
+                else:
+                    self._boom(o.x, o.y, o.z, 6)
+                    self.say("HOLD FULL")
                 continue
             self._hurt(10.0 + self.speed * 0.5)
             self.speed *= 0.4
@@ -923,6 +941,17 @@ class Game:
                     o.x *= s
                     o.y *= s
                     o.z *= s
+
+    def _pickup(self):
+        """Combat practice: a scooped canister recharges the shields, and
+        sometimes holds a missile too (while there is room on the rack)."""
+        self.shield = 100.0
+        if (self.missile_bp and self.missiles < MAX_MISSILES
+                and random.random() < PICKUP_MISSILE):
+            self.missiles += 1
+            self.say("MISSILE + SHIELDS")
+        else:
+            self.say("SHIELDS RECHARGED")
 
     def _pick(self, cone):
         """The ship nearest the crosshair, within the given slope of it."""
@@ -994,6 +1023,19 @@ class Game:
                 self.new.append(o)
                 self.say("MISSILE AWAY", 1.0)
 
+    def release_canister(self, dist=700.0):
+        """A cheat: a cargo canister just ahead, a little below the
+        crosshair, drifting towards you. Returns it, or None if there are
+        already as many objects as there can be."""
+        if self.can_bp is None or len(self.objs) + len(self.new) >= MAX_OBJECTS:
+            return None
+        c = Obj(self.can_bp, "can", 0.0, -30.0, dist)
+        _look(c.m, 0.0, 0.0, -1.0)
+        c.speed = 3.0
+        c.spin = _rnd(-2, 2)
+        self.new.append(c)
+        return c
+
     def _kill(self, o):
         if o.dead:
             return
@@ -1016,7 +1058,7 @@ class Game:
             if self.wave_kills >= 2 + self.wave:
                 self.wave += 1
                 self.wave_kills = 0
-                if self.missile_bp and self.missiles < 4:
+                if self.missile_bp and self.missiles < MAX_MISSILES:
                     self.missiles += 1
                 self.say("WAVE %d" % self.wave, 2.5)
             elif self.kills % 8 == 0:

@@ -116,9 +116,20 @@ fade = [leds.values[1]]
 for _ in range(30):
     tick(a)
     fade.append(leds.values[1])
-assert fade[0] == full and fade[-1] == (0, 0, 0)
-assert all(sum(fade[i + 1]) <= sum(fade[i]) for i in range(len(fade) - 1)), fade
-a.game._hurt(5.0); tick(a); assert leds.values[1] == (255, 0, 0)
+# just launched you are in the station's safe zone: the colour fades to green
+green = (0, mod.SAFE_GREEN, 0)
+assert a.game.space.safe and fade[0] == full and fade[-1] == green, fade
+before = fade[:fade.index(green)]
+assert all(sum(before[i + 1]) <= sum(before[i]) for i in range(len(before) - 1)), fade
+a.game._hurt(5.0); tick(a); assert leds.values[1] == (255, 0, 0), "a hit still flashes red"
+for _ in range(15):
+    tick(a)
+assert leds.values[1] == green
+a.game.to_station(mod.game.SAFE_DIST + 5000); tick(a)
+assert not a.game.space.safe and leds.values[1] == (0, 0, 0), "off outside the safe zone"
+a.game.to_station(4000); tick(a); assert leds.values[1] == green, "and green again inside it"
+tick(a, fresh=["A"]); assert a.paused and leds.values[1] == (0, 0, 0), "off while paused"
+tick(a, fresh=["A"]); assert leds.values[1] == green
 # another station, another colour, in the tunnel's mouth too
 other = [i for i in range(256) if a.galaxy.system(i).government != gov][0]
 a.cmdr.system = other
@@ -132,7 +143,7 @@ for _ in range(200):
 want = tuple(int(v * 255) for v in cockpit.station_colour(a.galaxy.system(other).government))
 assert last == want or leds.values[1] == want, (last, want)
 os.remove(save)
-print("launch: LEDs pulse in the station's colour, then fade: ok")
+print("launch: LEDs pulse in the station's colour, then fade to green in the safe zone: ok")
 
 # ---- USE_LEDS off ----------------------------------------------------------
 bs.install()
