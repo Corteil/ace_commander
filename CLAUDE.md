@@ -43,6 +43,10 @@ it installs to `/apps/ace_commander/` on the badge.
 - **On Brian's Raspberry Pi the badge is plugged in and Claude can reach it:** copy files
   with `mpremote connect auto fs cp ... :/apps/ace_commander/`, `mpremote connect auto reset`,
   and log with `python3 tools/badge_log.py SECONDS PORT` (only one program can hold the port).
+  On 2026-11-14 the badge was `/dev/ttyACM1`. To test over the REPL (`mpremote run x.py`),
+  `import system.scheduler` first, or importing the app fails with
+  `ImportError: can't import name eventbus` (the firmware's eventbus and scheduler import
+  each other; at boot the scheduler comes first).
   The rest of this list is the older Windows / cloud-session workflow.
 - Claude cannot reach the badge's serial port from its sandbox, and cannot type into a
   terminal by screen control (terminals are click-only). The loop that works: Claude writes
@@ -230,14 +234,16 @@ by itself is faster than one fill for all of them (3.5 against 7.7 ms). Flight a
   whether the ring and dots read well, the streaks on arriving.
 - Arriving and docking (build 21): whether 3 / 4 / 5 ships is the right fight, and
   `DOCK_TIME`.
-- Docked tabs and the launch tunnel (build 22): the galactic chart's cursor speed
-  (`G_CURSOR_SPEED`), the tunnel's look and length.
-- The launch LEDs (build 23): whether the pulses and colours look right on the real LEDs.
 - Whether `deploy.bat`'s copy step reports failures properly (the log step is known to work).
 
 Confirmed by Brian on 2026-11-13: F is faster and E slower; the LEDs flash on a hit and the
 badge's own pattern comes back on leaving flight; ships switch from cross markers to
 wireframes at a distance that looks fine (`WIRE_MIN`).
+
+Confirmed by Brian on 2026-11-14 (build 25): the DEBUG page shows the build; the launch
+tunnel's look and length; the station colours and the LED pulses on launch; the galactic
+chart, cursor speed included (`G_CURSOR_SPEED`). Build 25 also flew 5 minutes with docking
+and launching and no errors in the log.
 
 ## Controls (Brian's choices)
 
