@@ -116,13 +116,29 @@ LAUNCH_TIME = 2.5       # seconds of launch tunnel (C skips it)
 DEBUG_MENU = True       # show DEBUG, a page of cheats for testing, in the in-flight menu
 PERF_SLOW = 25          # ms over the average that makes a frame count as slow
 
-# where the commander is saved: next to this file
+# the app's folder; the commander is saved there
 try:
-    SAVE_PATH = __file__.rsplit("/", 1)[0] + "/commander.json"
-    if not SAVE_PATH.startswith("/") and ":" not in SAVE_PATH:
-        SAVE_PATH = "/" + SAVE_PATH     # the badge gives a path relative to /
+    APP_DIR = __file__.rsplit("/", 1)[0]
+    if not APP_DIR.startswith("/") and ":" not in APP_DIR:
+        APP_DIR = "/" + APP_DIR         # the badge gives a path relative to /
 except Exception:
-    SAVE_PATH = "/apps/ace_commander/commander.json"
+    APP_DIR = "/apps/ace_commander"
+SAVE_PATH = APP_DIR + "/commander.json"
+_build = None
+
+
+def build():
+    """The build number from metadata.json next to this file (deploy.bat copies
+    it with the code), read once, or "?" if it can't be read."""
+    global _build
+    if _build is None:
+        try:
+            import json
+            with open(APP_DIR + "/metadata.json") as f:
+                _build = str(json.load(f)["version"])
+        except Exception:
+            _build = "?"
+    return _build
 
 LEVEL_NOTE = ("fewer, weaker enemies", "the standard fight", "more, deadlier enemies")
 ANY = ("up", "down", "left", "right")           # joystick, buttons or arrow keys
@@ -1068,7 +1084,7 @@ class AceCommander(app.App):
             return
         if self.fsub == "debug":
             ctx.rgba(0, 0, 0, 0.85).rectangle(-100, 62, 200, 16).fill()
-            text(ctx, "DEBUG", 0, -66, 16, cockpit.RED)
+            text(ctx, "DEBUG - BUILD " + build(), 0, -66, 16, cockpit.RED)
             for i, label in enumerate(self._fitems()):
                 y = -49 + i * 14
                 if i == self.fmenu:

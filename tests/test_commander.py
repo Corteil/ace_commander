@@ -238,6 +238,10 @@ def debug(a, line):
 
 tick(d, fresh=["A"])
 assert texts(d)[-1] != "" and "DEBUG" in texts(d)
+debug(d, "INVINCIBLE"); debug(d, "INVINCIBLE")
+import json as _json
+_ver = _json.load(open(os.path.join(os.path.dirname(mod.__file__), "metadata.json")))["version"]
+assert "DEBUG - BUILD %s" % _ver in texts(d), "the DEBUG page shows the build"
 debug(d, "INVINCIBLE")
 tx = texts(d)
 assert "INVINCIBLE: ON" in tx and "+10 KILLS" in tx and g.god

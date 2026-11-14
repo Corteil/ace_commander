@@ -43,7 +43,8 @@ commander's rank, kills, star system and fuel) and a **Pause menu**, where you s
 steering between JOYSTICK and TILT or quit to the title screen.
 
 The menu also has a **Debug** page of cheats for testing: invincibility, kill all enemies,
-next wave, add an enemy, refill missiles, refill fuel, +10 kills and dock now. Kills made there count towards your
+next wave, add an enemy, refill missiles, refill fuel, +10 kills and dock now. Its title
+shows the build number, read from `metadata.json`. Kills made there count towards your
 commander's rank. Set `DEBUG_MENU = False` in `app.py` to hide it.
 
 With TILT, tilting the badge steers and the joystick still works. D then does two jobs: a
