@@ -253,6 +253,17 @@ rock = put(g, "ASTEROID", "rock", 0, 0, 400)
 for _ in range(30):
     g.step(DT, 0, 0, 0, False, False)
 assert g.shield < 100.0 and g.speed < 30.0, (g.shield, g.speed)
+# bounties: each kill adds its blueprint's bounty (tenths of a credit), rocks too
+g = fresh()
+assert g.bounty == 0
+for name, kind in (("SIDEWINDER", "ship"), ("KRAIT", "ship"), ("ASTEROID", "rock")):
+    o = put(g, name, kind, 0, 0, 3000)
+    g._kill(o)
+assert g.bounty == g.types["SIDEWINDER"].bounty + g.types["KRAIT"].bounty + g.types["ASTEROID"].bounty
+total = g.bounty
+assert total > 0
+g._kill(o); assert g.bounty == total, "not paid twice"
+g.reset(); assert g.bounty == 0
 print("scooping cargo and ramming rocks: ok")
 
 # 6. enemies attack, and the game ends --------------------------------------
@@ -402,7 +413,7 @@ assert g.space.station.bp.name == "DODO"
 
 # turning moves the planet, sun and station together, and keeps their shape
 g = fresh(3)
-g.enter(6000, "CORIOLIS", "arrive", 1)
+g.enter(6000, "CORIOLIS", "arrive", 3)     # no ambush: this is only about turning
 sp = g.space; st = sp.station
 before = geometry(sp)
 assert abs(before[2] - game.ARRIVE_DIST) < 1 and not sp.safe
@@ -456,9 +467,9 @@ while not sp.safe:
     n += 1
     assert n < 2000
 g.step(DT, 0, 0, 1.0, False, False)
-assert not g.jumping and sp.d_station > game.SAFE_DIST - slow * game.JUMP_K * 3, "stops at the safe zone"
+assert not g.jumping and sp.d_station > sp.safe_r - slow * game.JUMP_K * 3, "stops at the safe zone"
 print("jump drive: about %.0f s of jumping to the safe zone, at full speed %.0f s" % (
-    n * DT, (game.ARRIVE_DIST - game.SAFE_DIST) / (game.PLAYER_MAX * game.SPEED_K)))
+    n * DT, (game.ARRIVE_DIST - sp.safe_r) / (game.PLAYER_MAX * game.SPEED_K)))
 # then on to the station, which docks you
 while not g.docked:
     g.step(DT, 0, 0, 1.0, False, False)
@@ -467,53 +478,128 @@ while not g.docked:
 assert sp.d_station < game.DOCK_DIST and not g.jumping
 print("flying straight from arriving to docked: %.0f s" % (n * DT))
 
-# encounters: the ships that meet you on arriving, then a group now and then,
-# and none in the safe zone
-g = fresh(5)
-g.set_level(2)
-g.god = True
-g.enter(6000, "CORIOLIS", "arrive")
-assert g.pending == g.max_hostile == 5 and g.spawn_t >= 5.0
+# waves are for combat practice only
+g = fresh(10)
+assert g.msg == "WAVE 1" and g.msg_t > 0
+g.enter(6000, "CORIOLIS", "launch", 3)
+assert g.msg_t <= 0, "no WAVE 1 in a star system"
+g.missiles = 0
+for _ in range(20):
+    g._kill(put(g, "SIDEWINDER", "ship", 0, 0, 3000))
+assert g.wave == 1 and g.missiles == 0 and not g.msg.startswith("WAVE"), (g.wave, g.msg)
+g = fresh(10); g.missiles = 0
+for _ in range(3):
+    g._kill(put(g, "SIDEWINDER", "ship", 0, 0, 3000))
+assert g.wave == 2 and g.msg == "WAVE 2" and g.missiles == 1, "practice still has waves"
+
+# the safe zone is two planet radii round the station, as in Elite
+for km in (3000, 6000):
+    g = fresh(5)
+    g.enter(km, "CORIOLIS", "arrive", 4)
+    assert g.space.safe_r == game.SAFE_K * km * game.PLANET_SCALE
+    g.to_station(g.space.safe_r - 100); assert g.space.safe
+    g.to_station(g.space.safe_r + 100); assert not g.space.safe
+
+# arriving: an ambush only in an anarchy or a feudal system
+for gov, ambush in ((0, True), (1, True), (2, False), (7, False), (None, False)):
+    g = fresh(5)
+    g.set_level(2)
+    g.enter(6000, "CORIOLIS", "arrive", gov)
+    if ambush:
+        assert g.pending == g.max_hostile == 5 == len(g.group) and g.spawn_t >= 5.0
+        assert all(n in game.PIRATES for n in g.group)
+    else:
+        assert g.pending == 0 and not g.group, gov
+g = fresh(5); g.set_level(2); g.god = True
+g.enter(6000, "CORIOLIS", "arrive", 0)
+names = list(g.group)
 g.speed = 0.0
-seen = 0
+seen = []
 for _ in range(1000):
     g.step(DT, 0, 0, 0, False, False)
-    seen = max(seen, sum(1 for o in g.objs if o.kind == "ship"))
+    for o in g.objs + g.new:
+        if o.kind == "ship" and o not in seen:
+            seen.append(o)
     if g.pending == 0:
         break
-assert g.pending == 0 and seen == 5, seen
-for o in list(g.objs):
-    if o.kind == "ship":
-        g._kill(o)
-g.step(DT, 0, 0, 0, False, False)
-assert g.encounter_t > 0
-gaps = []
-t = 0.0
-quiet = True
-for _ in range(int(200 / DT)):
-    g.step(DT, 0, 0, 0, False, False)
-    t += DT
-    ships = [o for o in g.objs if o.kind == "ship"]
-    if ships and quiet:
-        gaps.append(t)
-        t = 0.0
+assert [o.bp.name for o in seen] == names, "the ambush is the pirates picked"
+
+# the roll: certain in an anarchy, rarer the safer the system
+def odds(gov, n=4000):
+    g = fresh(6)
+    g.enter(6000, "CORIOLIS", "arrive", gov)
+    hits = 0
+    for _ in range(n):
+        g.group = []; g.pending = 0; g.skip = 0
+        g._roll()
+        hits += bool(g.group)
+    return hits / n
+o = [odds(gov) for gov in range(8)]
+assert o[0] == 1.0
+for gov in range(1, 8):
+    want = game.PIRATE_ROLL * (8 - gov) / 8
+    assert abs(o[gov] - want) < 0.03, (gov, o[gov], want)
+assert all(o[i] > o[i + 1] for i in range(7)), o
+print("encounter odds by government: " + " ".join("%.2f" % x for x in o))
+# what comes: a lone bounty hunter, or a pack of 1 to 4 pirates (no more than the
+# level allows), small ships more often; then the next rolls are skipped
+g = fresh(7)
+g.enter(6000, "CORIOLIS", "arrive", 0)
+packs = {}
+hunters = 0
+kinds = {}
+for level in (0, 2):
+    g.set_level(level)
+    for _ in range(3000):
+        g.group = []; g.skip = 0
+        g._roll()
+        if len(g.group) == 1 and g.group[0] in game.HUNTERS and g.skip == 1:
+            hunters += 1
+        else:
+            assert all(n in game.PIRATES for n in g.group)
+            assert 1 <= len(g.group) <= min(game.PACK_MOST, g.max_hostile)
+            assert g.skip == len(g.group) - 1
+            packs[len(g.group)] = packs.get(len(g.group), 0) + 1
+            for n in g.group:
+                kinds[n] = kinds.get(n, 0) + 1
+assert sorted(packs) == [1, 2, 3, 4] and 0.3 < hunters / 6000 < 0.48, (packs, hunters)
+assert kinds["SIDEWINDER"] > 2 * kinds["COBRA MK III P"], kinds
+g.set_level(2); g.group = []; g.skip = 2
+g._roll(); g._roll()
+assert not g.group and g.skip == 0, "skipped"
+g._roll(); assert g.group
+
+# over time: far more pirates in an anarchy than in a corporate state, a roll
+# every ENCOUNTER_EVERY seconds once the last ones have gone; none in the safe zone
+def pirates_in(gov, secs=600):
+    g = fresh(8); g.god = True
+    g.enter(6000, "CORIOLIS", "launch", gov)
+    g.to_station(g.space.safe_r + 5000)
+    g.speed = 0.0
+    n = 0
+    first = None
+    for i in range(int(secs / DT)):
         g.step(DT, 0, 0, 0, False, False)
-        for _ in range(200):
-            g.step(DT, 0, 0, 0, False, False)
         for o in list(g.objs):
             if o.kind == "ship":
+                n += 1
+                if first is None:
+                    first = i * DT
                 g._kill(o)
         g.objs[:] = [o for o in g.objs if o.kind != "missile"]
-assert len(gaps) >= 3, gaps
-assert all(5 < x < game.ENCOUNTER[1] + 15 for x in gaps), gaps
-print("encounters %d s apart: ok" % (sum(gaps) / len(gaps)))
-g.to_station(game.SAFE_DIST - 2000)
+    return n, first
+anarchy, first = pirates_in(0)
+corp, _ = pirates_in(7)
+assert anarchy > 3 * max(corp, 1), (anarchy, corp)
+assert game.ENCOUNTER_EVERY - 1 < first < game.ENCOUNTER_EVERY + 1, first
+print("pirates in 10 minutes: anarchy %d, corporate state %d" % (anarchy, corp))
+g = fresh(9)
+g.enter(6000, "CORIOLIS", "launch", 0)
 assert g.space.safe
-g.objs[:] = []
-g.pending = 3; g.encounter_t = 0.0; g.rock_t = 0.0
+g.group = ["SIDEWINDER"] * 3; g.pending = 3; g.encounter_t = 0.0; g.rock_t = 0.0
 for _ in range(int(60 / DT)):
     g.step(DT, 0, 0, 0, False, False)
-assert not g.objs and g.pending == 0, "nothing turns up in the safe zone"
+assert not any(o.kind == "ship" for o in g.objs) and g.pending == 0, "nothing turns up in the safe zone"
 
 # docking: close enough to the station; not once destroyed
 g = fresh(6)

@@ -46,7 +46,7 @@ SUN_DIST = 16.0            # the sun's distance from the planet, in planet radii
 SUN_SIZE = 2.0             # the sun's radius, in planet radii
 ARRIVE_DIST = 120000.0     # a jump arrives this far from the station: two minutes at full speed
 LAUNCH_DIST = 700.0        # a launch leaves you this far out of the station's slot
-SAFE_DIST = 25000.0        # this close to the station no more ships or rocks turn up
+SAFE_K = 2.0               # the safe zone round the station: this many planet radii, as in Elite
 DOCK_DIST = 500.0          # docking C (automatic): this close to the station's centre and you are docked
 # Docking A (authentic) and B (assisted): touching the station docks you only
 # through the slot; anything else is a crash that hurts and bounces you off.
@@ -65,7 +65,21 @@ STATION_HIT = 15.0         # a crash does this much damage, plus 1.5 for each un
 BOUNCE = 300.0             # and leaves you this much further out than where you touched
 STATION_SPIN = 0.25        # radians per second, about the station's nose
 JUMP_K = 8                 # the jump drive moves you this many times faster
-ENCOUNTER = (25.0, 45.0)   # seconds between groups of ships, outside the safe zone
+# Who turns up in a star system, as in the original (read from the main game
+# loop, parts 3 and 4): every ENCOUNTER_EVERY seconds outside the safe zone,
+# once the last ships have gone, a roll. In an anarchy it always succeeds;
+# elsewhere with chance PIRATE_ROLL, and then only if a number 0 to 7 is at
+# least the government, so safer systems see fewer. Then either a lone bounty
+# hunter or a pack of 1 to 4 pirates (no more than the level allows at once),
+# small ships more likely; and the next rolls are skipped, one per extra ship.
+ENCOUNTER_EVERY = 20.0
+PIRATE_ROLL = 120 / 256.0
+HUNTER_CHANCE = 100 / 256.0
+PIRATES = ("SIDEWINDER", "MAMBA", "KRAIT", "ADDER", "GECKO", "COBRA MK I", "WORM",
+           "COBRA MK III P")
+HUNTERS = ("COBRA MK III P", "ASP MK II", "PYTHON P", "FER DE LANCE")
+PACK_MOST = 4
+AMBUSH_GOV = 2             # arriving from hyperspace in an anarchy or feudal system: an ambush
 DODO_TECH = 10             # systems with this tech level or more have a Dodo station
 
 # The ships parked in a station's docking bay depend on the system: pirate
@@ -297,7 +311,8 @@ class Space:
         self.station = Obj(station_bp, "station", 0.0, 0.0, 0.0) if station_bp else None
         self.gov = gov          # the system's government (0 to 7), for the station's colour
         self.d_station = 1e9    # distance to the station
-        self.safe = False       # within SAFE_DIST of the station
+        self.safe_r = radius * SAFE_K   # the safe zone round the station
+        self.safe = False       # within it
 
 
 class Game:
@@ -350,6 +365,7 @@ class Game:
         self.beam = 0.0        # > 0 while the player's laser is drawn
         self.missiles = MAX_MISSILES if self.missile_bp else 0
         self.kills = 0
+        self.bounty = 0        # bounties earned this flight, in tenths of a credit
         self.score = 0
         self.cargo = 0
         self.wave = 1
@@ -372,7 +388,9 @@ class Game:
         self.jumping = False   # the jump drive is on
         self.fwd = 0           # how far everything slid towards you last step (whole units)
         self.pending = 0       # ships of the current encounter still to turn up
-        self.encounter_t = 0.0  # time until the next encounter
+        self.group = []        # their types (names), in the order they come
+        self.encounter_t = 0.0  # time until the next roll for an encounter
+        self.skip = 0          # rolls still to skip after the last encounter
         self.docked = False    # set on reaching the station; whoever is watching takes over
         self.tractor = False   # docking B: the station is drawing you in
         self.bump_t = 0.0      # > 0 just after hitting the station (no second hit meanwhile)
@@ -415,6 +433,7 @@ class Game:
         self.space = None       # left behind too; whoever started the jump sets the new one
         self.jumping = False
         self.pending = 0
+        self.group = []
         self.spawn_t = _rnd(5.0, 8.0)   # a quiet moment on arriving
         self.rock_t = _rnd(6, 12)
         self.msg_t = 0.0
@@ -427,7 +446,8 @@ class Game:
         government, for its colour. how is "launch": just out of the
         station's slot, which faces the planet, so the planet is ahead; or
         "arrive": out of hyperspace, ARRIVE_DIST from the station, with the
-        planet beyond it and as many ships as can attack at once on the way."""
+        planet beyond it, and in an anarchy or a feudal system as many
+        pirates as can attack at once waiting (gov None: no ambush)."""
         bp = self.types.get(station) or self.types.get("CORIOLIS")
         r = max(4000.0, radius_km * PLANET_SCALE)
         sp = Space(bp, r, gov)
@@ -435,6 +455,7 @@ class Game:
             sx, sy, sz = 0.0, 0.0, -LAUNCH_DIST
             ux, uy, uz = 0.0, 0.0, 1.0      # from the station to the planet
             self.pending = 0
+            self.group = []
         else:
             dx, dy, dz = _unit(_rnd(-0.25, 0.25), _rnd(-0.15, 0.15), 1.0)
             sx, sy, sz = dx * ARRIVE_DIST, dy * ARRIVE_DIST, dz * ARRIVE_DIST
@@ -442,7 +463,11 @@ class Game:
             # station isn't lost against it
             side = _rnd(0.3, 0.6) * random.choice((-1, 1))
             ux, uy, uz = _unit(dx + side, dy + _rnd(-0.3, 0.3), dz)
-            self.pending = self.max_hostile
+            # an ambush on arriving, but only where the government is weak
+            self.pending = 0
+            self.group = []
+            if gov is not None and gov < AMBUSH_GOV:
+                self._new_group([self._pirate() for _ in range(self.max_hostile)])
             self.spawn_t = _rnd(5.0, 8.0)
         k = STATION_ORBIT * r
         sp.px, sp.py, sp.pz = sx + ux * k, sy + uy * k, sz + uz * k
@@ -460,7 +485,10 @@ class Game:
             st.x, st.y, st.z = sx, sy, sz
             _look(st.m, ux, uy, uz)         # the slot is on the nose
         self.space = sp
-        self.encounter_t = _rnd(*ENCOUNTER)
+        self.encounter_t = ENCOUNTER_EVERY
+        self.skip = 0
+        if self.msg == "WAVE 1":    # waves are for combat practice only
+            self.msg_t = 0.0
         self._measure()
 
     def to_station(self, dist=4000.0, slot=True):
@@ -498,7 +526,7 @@ class Game:
             sp.d_station = 1e9
         else:
             sp.d_station = math.sqrt(st.x * st.x + st.y * st.y + st.z * st.z)
-        sp.safe = sp.d_station < SAFE_DIST
+        sp.safe = sp.d_station < sp.safe_r
 
     def _near(self):
         """True if a ship or missile is within radar range. In comparisons
@@ -1042,6 +1070,7 @@ class Game:
         o.dead = True
         bp = o.bp
         self._boom(o.x, o.y, o.z, 8 + 2 * min(bp.explosions, 6))
+        self.bounty += bp.bounty    # tenths of a credit; rocks have small ones too
         if o.kind == "ship":
             self.kills += 1
             self.wave_kills += 1
@@ -1055,7 +1084,7 @@ class Game:
                     c.speed = _rnd(1, 4)
                     c.spin = _rnd(-2, 2)
                     self.new.append(c)
-            if self.wave_kills >= 2 + self.wave:
+            if self.space is None and self.wave_kills >= 2 + self.wave:     # practice only
                 self.wave += 1
                 self.wave_kills = 0
                 if self.missile_bp and self.missiles < MAX_MISSILES:
@@ -1128,21 +1157,53 @@ class Game:
             self.spawn_t -= dt
             if self.spawn_t <= 0 and count < MAX_OBJECTS:
                 self.spawn_t = _rnd(0.8, 2.0)
-                if self._spawn_ship() is None:
+                name = self.group.pop(0) if self.group else None
+                if self._spawn_ship(self.types.get(name)) is None:
                     self.pending = 0
+                    self.group = []
                 else:
                     self.pending -= 1
         elif hostile == 0:
             self.encounter_t -= dt
             if self.encounter_t <= 0:
-                self.encounter_t = _rnd(*ENCOUNTER)
-                self.pending = random.randint(1, self.max_hostile)
-                self.spawn_t = 0.0
+                self.encounter_t = ENCOUNTER_EVERY
+                self._roll()
         self.rock_t -= dt
         if self.rock_t <= 0:
             self.rock_t = _rnd(9, 18)
             if count < MAX_OBJECTS - 3:
                 self._spawn_rocks()
+
+    def _roll(self):
+        """Every ENCOUNTER_EVERY seconds: maybe pirates or a bounty hunter,
+        more likely the more dangerous the government (see ENCOUNTER_EVERY)."""
+        if self.skip > 0:
+            self.skip -= 1
+            return
+        gov = self.space.gov
+        if gov is None:
+            gov = 3
+        if gov != 0:
+            if random.random() >= PIRATE_ROLL or random.randint(0, 7) < gov:
+                return
+        if random.random() < HUNTER_CHANCE:
+            self.skip = 1
+            self._new_group([random.choice(HUNTERS)])
+        else:
+            n = min(random.randint(1, PACK_MOST), self.max_hostile)
+            self.skip = n - 1
+            self._new_group([self._pirate() for _ in range(n)])
+
+    @staticmethod
+    def _pirate():
+        """A pirate ship's name: smaller ones more often (two random bytes
+        ANDed together, as in the original)."""
+        return PIRATES[random.randint(0, 255) & random.randint(0, 255) & 7]
+
+    def _new_group(self, names):
+        self.group = list(names)
+        self.pending = len(names)
+        self.spawn_t = 0.0
 
     def _pick_type(self):
         top = min(len(TIERS) - 1, self.wave // 2)
@@ -1156,8 +1217,10 @@ class Game:
             return random.choice(self.fallback)
         return None
 
-    def _spawn_ship(self):
-        bp = self._pick_type()
+    def _spawn_ship(self, bp=None):
+        """A ship of type bp (or picked by wave) somewhere round you."""
+        if bp is None:
+            bp = self._pick_type()
         if bp is None:
             return None
         if random.random() < 0.7:   # usually somewhere ahead

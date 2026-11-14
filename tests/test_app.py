@@ -386,6 +386,19 @@ for t in (cor, dodo):
         hh = max(abs(v[1]) for v in o.bp.verts) / cockpit.SHIP_SCALE
         assert abs(o.ty - hh + floor) < 1e-9
 assert "BOA" not in [o.bp.name for o in cor.parked] and "BOA" in [o.bp.name for o in dodo.parked]
+# the bay has lit windows on both side walls, seen at the end of docking
+def frames(n_windows, f, inward=True):
+    keep = cockpit.BAY_WINDOWS
+    cockpit.BAY_WINDOWS = n_windows
+    c = CountCtx()
+    cockpit.draw_tunnel(c, f, 0.0, cockpit.GREEN, inward, cockpit.Tunnel(5))
+    cockpit.BAY_WINDOWS = keep
+    return c.calls.get("stroke", 0), c.calls.get("fill", 0)
+with3, without = frames(3, 1.0), frames(0, 1.0)
+assert with3[0] - without[0] == 3 * 2, "three window frames a side, at the end of docking"
+assert with3[1] == without[1], "only the frames: nothing filled"
+assert frames(3, 0.0) == frames(0, 0.0), "not seen from outside the mouth"
+assert frames(3, 0.05, False)[0] > frames(0, 0.05, False)[0], "seen as you launch from the bay"
 # the station hides the planet behind it: its outline is filled black first
 class Rec:
     def __init__(self): self.pts = []; self.filled = 0

@@ -288,6 +288,14 @@ SLOT_ROOM = 0.95        # how much of the slot a ship may fill
 # the bay), in tunnel units
 PARK_SPOTS = ((-1.6, 1.3), (1.6, 1.3), (-1.6, 2.7), (1.6, 2.7))
 PARKED_RGB = (0.75, 0.75, 0.75)
+# lit windows along both side walls of the bay, high up, overlooking the ships:
+# how many a side, how high on the wall (fractions of its half height) and
+# how long each is (tunnel units), and the colour of their frames (only the
+# frames are drawn)
+BAY_WINDOWS = 3
+WINDOW_Y = (0.3, 0.7)
+WINDOW_LEN = 0.7
+WINDOW_FRAME = (1.0, 1.0, 1.0)
 
 # the gaps between rings, from the mouth inwards, before they are scaled to
 # add up to TUNNEL_RINGS - 1 (so a tunnel is always the same length)
@@ -561,6 +569,7 @@ def draw_tunnel(ctx, f, t, rgb=GREEN, inward=False, tun=None):
             z = tun.depth[j] + DOCK_START - s
             zs[j] = z if z >= 0.4 else None
         _draw_rings(ctx, tun, zs, rgb, True)
+        _draw_windows(ctx, tun, DOCK_START - s, zs[TUNNEL_RINGS - 2])
         _draw_parked(ctx, tun, DOCK_START - s, zs[TUNNEL_RINGS - 2])
         return
     s = (TUNNEL_RINGS + 1) * f * f      # slow at first, then faster
@@ -576,7 +585,53 @@ def draw_tunnel(ctx, f, t, rgb=GREEN, inward=False, tun=None):
         z = last - tun.depth[j] + 0.6 - s
         zs[j] = z if z >= 0.4 and j < last else None    # the doors are behind you
     _draw_rings(ctx, tun, zs, rgb, False)
+    _draw_windows(ctx, tun, None, None, last + 0.6 - s)
     _draw_parked(ctx, tun, None, None, last + 0.6 - s)
+
+
+def _draw_windows(ctx, tun, ahead, gate, back=None):
+    """Lit windows along the bay's side walls (see BAY_WINDOWS). Distances
+    and gate as for _draw_parked."""
+    if BAY_WINDOWS <= 0:
+        return
+    last = TUNNEL_RINGS - 1
+    start = last - BAY_DEPTH
+    step = (BAY_DEPTH - 0.4) / BAY_WINDOWS
+    wall = BAY_SCALE                        # the side walls, in tunnel units
+    half = BAY_SCALE / tun.aspect           # the bay's half height
+    ylo = WINDOW_Y[0] * half
+    yhi = WINDOW_Y[1] * half
+    f = TUNNEL_FOCAL
+    for k in range(BAY_WINDOWS):
+        d1 = start + 0.3 + k * step
+        d2 = d1 + WINDOW_LEN
+        if back is None:
+            z1 = d1 + ahead
+            z2 = d2 + ahead
+        else:
+            z1 = back - d1
+            z2 = back - d2
+        if z1 > z2:
+            z1, z2 = z2, z1
+        if z2 < 0.3:
+            continue                        # behind you
+        if z1 < 0.3:
+            z1 = 0.3                        # cut off where it passes you
+        if gate is not None:                # in the tunnel still: seen through the opening?
+            zc = (z1 + z2) / 2
+            if wall / zc > 1.0 / gate or yhi / zc > 1.0 / tun.aspect / gate:
+                continue
+        for side in (-1, 1):
+            x1 = int(side * f * wall / z1)
+            x2 = int(side * f * wall / z2)
+            pts = ((x1, int(-f * yhi / z1)), (x2, int(-f * yhi / z2)),
+                   (x2, int(-f * ylo / z2)), (x1, int(-f * ylo / z1)))
+            ctx.rgb(*WINDOW_FRAME)
+            ctx.begin_path()
+            ctx.move_to(*pts[3])
+            for p in pts:
+                ctx.line_to(*p)
+            ctx.stroke()
 
 
 def _draw_parked(ctx, tun, ahead, gate, back=None):
@@ -864,15 +919,17 @@ def draw_hud(ctx, g, ms=None, ring=True):
                 ctx.rectangle(bx - 2, by - h - 2, 5, 5).fill()
         _compass(ctx, sp)
 
-    # wave (yellow) and score (white), as one centred row of digits
-    wave = str(g.wave)
-    score = str(g.score)
-    width = (len(wave) + len(score)) * 10 - 6 + 9
-    x = -width / 2.0
-    ctx.rgb(*YELLOW)
-    x += number(ctx, g.wave, x, -102, _BIG, -1) + 9
-    ctx.rgb(*WHITE)
-    number(ctx, g.score, x, -102, _BIG, -1)
+    # combat practice: wave (yellow) and score (white), as one centred row of
+    # digits; a commander's flight has neither
+    if sp is None:
+        wave = str(g.wave)
+        score = str(g.score)
+        width = (len(wave) + len(score)) * 10 - 6 + 9
+        x = -width / 2.0
+        ctx.rgb(*YELLOW)
+        x += number(ctx, g.wave, x, -102, _BIG, -1) + 9
+        ctx.rgb(*WHITE)
+        number(ctx, g.score, x, -102, _BIG, -1)
     if ms is not None:      # frame time in ms, small, just above
         ctx.rgb(*GREY)
         number(ctx, ms, 0, -114, _SMALL)

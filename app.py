@@ -111,7 +111,8 @@ TILT_ROLL_SIGN = 1.0
 TILT_SWAP_AXES = False  # True if the badge's x axis should pitch, y roll
 
 INVERT_PITCH = False    # False: joystick up raises the nose. True: up dives.
-SHOW_FRAME_TIME = True  # small frame time (ms) at the top of the flight screen
+SHOW_FRAME_TIME = True  # small frame time (ms) at the top of the flight screen, to start with
+DEBUG_ROWS = 7          # DEBUG page lines shown at once, the chosen one in the middle
 USE_LEDS = True         # flash the badge's LEDs red when hit (else a ring on screen)
 FAST_FRAMES = True      # on the title screen, in flight and in the viewer, don't wait
                         # 50 ms between frames
@@ -269,6 +270,7 @@ class AceCommander(app.App):
         self.career = False     # the current game counts towards the commander
         self.docked = True      # the commander is at a station, not out in a flight
         self.banked = 0         # this game's kills already given to the commander
+        self.banked_cash = 0    # and its bounties (tenths of a credit)
         self.saved_over = False
         self.fmenu = 0          # which in-flight menu line is highlighted
         self.fsub = None        # None, "status", "chart", "pause" or "debug": the menu page
@@ -282,6 +284,7 @@ class AceCommander(app.App):
         self.dock_t = 0.0       # how far into the docking tunnel
         self.dock_hold = 0.0    # how long the view of the bay stays at the end of it
         self.held_t = {}        # how long each market button has been held (see _repeat)
+        self.show_ms = SHOW_FRAME_TIME  # the frame time counter (a DEBUG switch)
         self.tunnel = None      # this station's tunnel (cockpit.Tunnel), for launching and docking
         self.d_t = None         # how long D has been down, when steering by tilt
         self.viewer = None
@@ -580,10 +583,12 @@ class AceCommander(app.App):
         if g is None:
             self.game = g = game.Game(SHIPS, level)
             self.banked = 0
+            self.banked_cash = 0
         elif g.over or career != self.career or g.level != level:
             g.set_level(level)
             g.reset()
             self.banked = 0
+            self.banked_cash = 0
         else:
             fresh = False
         self.career = career
@@ -790,10 +795,20 @@ class AceCommander(app.App):
         g.say(self.galaxy.system(c.system).name, 3.0)
 
     def _bank(self):
-        """Give the commander the kills made since the last call."""
+        """Give the commander the kills and bounties made since the last call.
+        A bounty shows the new cash, as in the original; a new rank shows instead."""
         g = self.game
-        if g is not None and self.career and self.cmdr is not None and g.kills > self.banked:
-            rank = self.cmdr.add_kills(g.kills - self.banked)
+        if g is None or not self.career or self.cmdr is None:
+            return
+        c = self.cmdr
+        paid = g.bounty - self.banked_cash
+        if paid > 0:
+            c.cash += paid
+            self.banked_cash = g.bounty
+            if not g.over and g.jump_t <= 0:    # the hyperspace countdown matters more
+                g.say(c.cash_text(), 1.5)
+        if g.kills > self.banked:
+            rank = c.add_kills(g.kills - self.banked)
             self.banked = g.kills
             if rank and not g.over:
                 g.say("RANK: " + rank, 3.0)
@@ -885,6 +900,7 @@ class AceCommander(app.App):
                 g.reset()
                 self.jump_to = None
                 self.banked = 0
+                self.banked_cash = 0
                 self.saved_over = False
                 self.zero = None
             elif cancel:
@@ -983,17 +999,23 @@ class AceCommander(app.App):
             items.append("QUIT TO TITLE")
             return items
         if self.fsub == "debug":
-            return ["INVINCIBLE: " + ("ON" if self.game.god else "OFF"),
-                    "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
-                    "REFILL MISSILES", "REFILL FUEL", "+10 KILLS", "RELEASE CANISTER",
-                    "TO THE STATION", "DOCK NOW"]
+            items = ["INVINCIBLE: " + ("ON" if self.game.god else "OFF"),
+                     "FRAME TIME: " + ("ON" if self.show_ms else "OFF"),
+                     "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
+                     "REFILL MISSILES", "REFILL FUEL", "+10 KILLS", "RELEASE CANISTER",
+                     "TO THE STATION", "DOCK NOW"]
+            if self.career:
+                items.remove("NEXT WAVE")       # waves are for combat practice
+            return items
         return self._fitems_top()
 
     def _debug(self, item):
         """Do one of the DEBUG page's cheats. Kills made this way count like
         any others, so with a commander they raise the rank."""
         g = self.game
-        if item.startswith("INVINCIBLE"):
+        if item.startswith("FRAME TIME"):
+            self.show_ms = not self.show_ms
+        elif item.startswith("INVINCIBLE"):
             g.god = not g.god
             if g.god:
                 g.shield = g.hull = 100.0
@@ -1152,7 +1174,7 @@ class AceCommander(app.App):
             t0 = _us()
             cockpit.draw_world(ctx, self.game)
             t1 = _us()
-            cockpit.draw_hud(ctx, self.game, self.ms if SHOW_FRAME_TIME else None,
+            cockpit.draw_hud(ctx, self.game, self.ms if self.show_ms else None,
                              not self.leds_on)
             if self.paused:
                 self._draw_fmenu(ctx)
@@ -1221,18 +1243,24 @@ class AceCommander(app.App):
                     self.galaxy.system(c.system).name, c.fuel // 10, c.fuel % 10),
                     0, 23, 12, cockpit.CYAN)
             from . import market
-            text(ctx, "hold %d/%dt   this flight: %d kills" % (
-                market.hold_used(c.cargo), c.hold, self.game.kills), 0, 38, 11, cockpit.GREY)
+            text(ctx, "hold %d/%dt   %s" % (market.hold_used(c.cargo), c.hold, c.cash_text()),
+                 0, 38, 11, cockpit.GREY)
             text(ctx, "C or F: back", 0, 53, 11, cockpit.GREY)
             return
         if self.fsub == "debug":
             ctx.rgba(0, 0, 0, 0.85).rectangle(-100, 62, 200, 18).fill()
             text(ctx, "DEBUG - BUILD " + build(), 0, -66, 16, cockpit.RED)
-            for i, label in enumerate(self._fitems()):
-                y = -52 + i * 12
-                if i == self.fmenu:
-                    ctx.rgb(*cockpit.DIM).rectangle(-96, y - 6, 192, 12).fill()
-                text(ctx, label, 0, y, 12, cockpit.GREEN if i == self.fmenu else cockpit.GREY)
+            # the chosen line in the middle, the list going round above and below it
+            items = self._fitems()
+            n = len(items)
+            rows = min(DEBUG_ROWS, n)
+            for k in range(rows):
+                off = k - rows // 2
+                i = (self.fmenu + off) % n
+                y = off * 16
+                if off == 0:
+                    ctx.rgb(*cockpit.DIM).rectangle(-100, y - 8, 200, 16).fill()
+                text(ctx, items[i], 0, y, 14, cockpit.GREEN if off == 0 else cockpit.GREY)
             text(ctx, "C: do it   F: back", 0, 70, 11, cockpit.GREY)
             return
         pause = self.fsub == "pause"

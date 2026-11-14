@@ -177,8 +177,10 @@ assert texts(a) == ["< CONTINUE >"]
 # practice doesn't touch the commander, and each kind of game starts fresh
 choose(a, "COMBAT PRACTICE")
 assert not a.career and a.game.level == 1 and a.game.kills == 0
+practice_cash = a.cmdr.cash
 kill(a.game, 3); tick(a)
-assert a.cmdr.kills == 6
+assert a.cmdr.kills == 6 and a.cmdr.cash == practice_cash, "no kills or bounties for the commander"
+assert a.game.bounty == 3 * a.game.types["SIDEWINDER"].bounty and not a.game.msg.endswith(" Cr")
 tick(a, fresh=["A"]); assert "STATUS" not in texts(a)
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
 assert a.mode == "menu" and commander.load(SAVE).kills == 6
@@ -187,6 +189,22 @@ assert a.mode == "docked" and a.cmdr.kills == 6, "practice kills aren't banked b
 launch(a)
 assert a.career and a.game.level == 0 and a.game.kills == 0
 
+# a commander's flight has no waves: no message, no wave and score on the HUD,
+# no NEXT WAVE cheat
+g = a.game
+assert not (g.msg.startswith("WAVE") and g.msg_t > 0)
+c_ = CountCtx(); a.draw(c_)
+assert not any(t[0].startswith("WAVE") for t in c_.texts)
+from ace_commander import cockpit as cockpit_mod
+digits = []
+real_number = cockpit_mod.number
+cockpit_mod.number = lambda ctx, v, *r, **k: (digits.append(v), real_number(ctx, v, *r, **k))[1]
+show = a.show_ms; a.show_ms = False   # its own digits
+a.draw(CountCtx())
+cockpit_mod.number = real_number; a.show_ms = show
+assert digits == [], "no wave or score on a commander's HUD"
+tick(a, fresh=["A"]); a.fsub = "debug"; assert "NEXT WAVE" not in a._fitems(); a.fsub = None
+tick(a, fresh=["A"])
 # scooped canisters go into the commander's hold
 g = a.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
 assert g.scoop is not None and sum(a.cmdr.cargo) == 0
@@ -216,16 +234,39 @@ assert "C: back to the station" in texts(a)
 tick(a, fresh=["C"]); assert a.mode == "docked" and a.cmdr.kills == 8
 launch(a); assert not g.over and g.kills == 0
 kill(g); tick(a); assert a.cmdr.kills == 9
+# bounties are paid into the commander's cash as you go, and the cash is shown
+cash = a.cmdr.cash
+kills_before = a.cmdr.kills
+side = g.types["SIDEWINDER"].bounty
+rock = g.types["ASTEROID"].bounty
+assert side > 0 and rock > 0
+kill(g); tick(a)                        # a Sidewinder
+assert a.cmdr.cash == cash + side and g.msg == a.cmdr.cash_text(), (a.cmdr.cash, g.msg)
+g._kill(game.Obj(g.types["ASTEROID"], "rock", 0.0, 0.0, 3000.0)); tick(a)
+assert a.cmdr.cash == cash + side + rock, "rocks have small bounties too"
+tick(a); assert a.cmdr.cash == cash + side + rock, "paid once"
+fpick(a, "STATUS"); assert any(t.endswith(a.cmdr.cash_text()) and t.startswith("hold") for t in texts(a))
+tick(a, fresh=["C"]); tick(a, fresh=["A"])
+need = a.cmdr.next_rank()[1]
+kill(g, need); tick(a)
+assert g.msg.startswith("RANK: ") and a.cmdr.cash == cash + rock + side * (1 + need), "a new rank shows instead"
+assert commander.load(SAVE).cash < a.cmdr.cash
+fpick(a, "PAUSE MENU"); tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"])
+assert a.mode == "menu" and commander.load(SAVE).cash == a.cmdr.cash, "and saved with the commander"
+choose(a, "CONTINUE"); assert a.mode == "flight"
+flight_kills = g.kills
+total_kills = a.cmdr.kills
+assert total_kills == kills_before + 1 + need
 
 # a flight left part-way for the title screen carries on
 fpick(a, "PAUSE MENU"); tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"]); assert a.mode == "menu"
-choose(a, "CONTINUE"); assert a.mode == "flight" and g.kills == 1 and not a.docked
+choose(a, "CONTINUE"); assert a.mode == "flight" and g.kills == flight_kills and not a.docked
 
 # a new app instance (the badge restarted) finds the commander
 fpick(a, "PAUSE MENU")
 tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"]); assert a.mode == "menu"
 b = ace_commander.AceCommander()
-assert b.cmdr.kills == 9 and b.cmdr.level == 0 and b.choices()[0] == "CONTINUE"
+assert b.cmdr.kills == total_kills and b.cmdr.level == 0 and b.choices()[0] == "CONTINUE"
 choose(b, "NEW COMMANDER")
 assert any("replaces your saved commander" in t for t in texts(b))
 tick(b, fresh=["JOYRIGHT"]); tick(b, fresh=["C"])
@@ -271,7 +312,20 @@ _ver = _json.load(open(os.path.join(os.path.dirname(mod.__file__), "metadata.jso
 assert "DEBUG - BUILD %s" % _ver in texts(d), "the DEBUG page shows the build"
 debug(d, "INVINCIBLE")
 tx = texts(d)
-assert "INVINCIBLE: ON" in tx and "+10 KILLS" in tx and g.god
+items = d._fitems()
+assert "INVINCIBLE: ON" in tx and g.god
+# seven lines at a time, the chosen one in the middle, going round the end of the list
+assert d.fmenu == 0 and len(items) > mod.DEBUG_ROWS
+shown = [t for t in tx if t in items]
+assert shown == [items[i % len(items)] for i in range(-3, 4)], shown
+assert "DOCK NOW" in shown and items[3] in shown and items[4] not in shown
+tick(d, fresh=["JOYUP"]); assert d.fmenu == len(items) - 1, "up from the top goes round"
+tick(d, fresh=["JOYDOWN"]); assert d.fmenu == 0
+# the frame time counter can be switched off and on
+assert d.show_ms
+debug(d, "FRAME TIME"); assert not d.show_ms and "FRAME TIME: OFF" in texts(d)
+debug(d, "FRAME TIME"); assert d.show_ms
+d.fmenu = 0
 tick(d, fresh=["A"]); assert not d.paused
 g._hurt(5000.0); tick(d)
 assert not g.over and g.hull == 100.0 and g.flash > 0, "hits flash but do no damage"
@@ -283,9 +337,9 @@ assert sum(1 for o in g.objs if o.kind == "ship") == 2
 debug(d, "KILL ALL ENEMIES")
 tick(d, fresh=["A"]); tick(d)
 assert not any(o.kind == "ship" for o in g.objs) and d.cmdr.kills == 12
-g.missiles = 0; w = g.wave
-debug(d, "REFILL MISSILES"); debug(d, "NEXT WAVE")
-assert g.missiles == 4 and g.wave == w + 1
+g.missiles = 0
+debug(d, "REFILL MISSILES")
+assert g.missiles == 4 and "NEXT WAVE" not in d._fitems(), "no waves in a commander's flight"
 debug(d, "INVINCIBLE"); assert not g.god
 tick(d, fresh=["F"]); assert d.fsub is None and d._fitems()[d.fmenu] == "DEBUG", "F goes back"
 tick(d, fresh=["A"])
@@ -349,7 +403,7 @@ for _ in range(200):
         break
 assert e.cmdr.system == 129 and e.cmdr.fuel == 70 - d129, (e.cmdr.system, e.cmdr.fuel)
 assert set("HYPERSPACE %d" % n for n in (5, 4, 3, 2, 1)) <= seen, seen
-assert g.msg == "ZAONCE" and g.pending == g.max_hostile == 4, g.msg
+assert g.msg == "ZAONCE" and g.max_hostile == 4 and g.pending == 0, "a corporate state: no ambush"
 assert g.space is not None and abs(g.space.d_station - game.ARRIVE_DIST) < 1
 assert g.space.gov == e.galaxy.system(129).government
 assert g.warp > 0 and not g.objs and not g.jumped and g.kills == 2
@@ -420,7 +474,7 @@ for _ in range(200):
     if e.cmdr.system == 7:
         break
 assert e.cmdr.system == 7 and e.cmdr.fuel == 70 - d129
-assert g.space is not sp and not g.space.safe and g.pending == g.max_hostile
+assert g.space is not sp and not g.space.safe and g.pending == 0, "Lave, a dictatorship: no ambush"
 kill(g, 3); tick(e)
 g.pending = 0; g.encounter_t = 1e9
 g.objs[:] = [o for o in g.objs if o.kind != "ship"]

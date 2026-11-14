@@ -125,7 +125,7 @@ a.game._hurt(5.0); tick(a); assert leds.values[1] == (255, 0, 0), "a hit still f
 for _ in range(15):
     tick(a)
 assert leds.values[1] == green
-a.game.to_station(mod.game.SAFE_DIST + 5000); tick(a)
+a.game.to_station(a.game.space.safe_r + 5000); tick(a)
 assert not a.game.space.safe and leds.values[1] == (0, 0, 0), "off outside the safe zone"
 a.game.to_station(4000); tick(a); assert leds.values[1] == green, "and green again inside it"
 tick(a, fresh=["A"]); assert a.paused and leds.values[1] == (0, 0, 0), "off while paused"

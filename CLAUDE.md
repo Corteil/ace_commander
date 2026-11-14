@@ -16,7 +16,7 @@ Built from `DESIGN.md`: phase 1 (title screen, saved commander with rank, three 
 button layout) and phase 2 (galaxy, local and galactic charts, system data, hyperspace,
 fuel, docked screens as tabs, launch tunnel), and the start of phase 3 (build 26: planet,
 sun, station, compass, jump drive, automatic docking; build 27: docking by hand; build
-30: the market). Not built yet: cargo canisters and bounties (the rest of phase 3), then
+30: the market; 31: scooped cargo; 32: bounties, which finishes phase 3). Not built yet:
 phases 4 to 6, and the system description sentence.
 
 ## Files
@@ -222,13 +222,13 @@ of a real flight, not from a harness.
    cheap whole numbers `_rotate` uses. `app._enter_space` calls `Game.enter(radius_km,
    station, "launch" / "arrive", government)` on every fresh launch and on arriving.
    Arriving replaces build 21's "clear the ships and you are docked": the first group is
-   `pending = max_hostile`, then `_encounters` sends a group every `ENCOUNTER` seconds,
+   `pending = max_hostile`, then `_encounters` sends a group every `ENCOUNTER` seconds (build 32 replaced both: see below),
    none in the safe zone. Reaching `DOCK_DIST` of the station sets `Game.docked`
    (docking option C); hitting the planet or sun is `_hurt(1e6)`. The jump drive
    (`JUMP_K`) needs speed up held at full speed, no ship or missile within radar range, and
    being outside the safe zone. New DEBUG cheat: TO THE STATION (`Game.to_station`). Build 31
    adds RELEASE CANISTER (`Game.release_canister`: one 700 ahead, drifting in to be
-   scooped); the DEBUG page lines are 12 px apart so all 10 fit.
+   scooped); build 32 made the DEBUG page a looping list (see below).
    The speed test has three circle tests. **Measured over the REPL on the badge (real ctx,
    not yet played by hand):** filled disc r20 1.3 ms, r100 7.2 ms; circle outline r20
    2.6 ms, r80 6.2 ms, and 4 to 5 ms for a big one whose edge crosses the screen. Cockpit
@@ -328,6 +328,39 @@ of a real flight, not from a harness.
    the hold. In the station's safe zone (`Space.safe`) the LEDs are steady green
    (`SAFE_GREEN`, 60 of 255); a hit's red flash and the station colour fading after launch
    come first, and paused they are off.
+   **Build 32: bounties.** `Game._kill` adds the blueprint's `bounty` (tenths of a credit,
+   from the ship data; asteroids and boulders have small ones) to `Game.bounty`, and
+   `app._bank` pays it into `Commander.cash` as it banks kills (`banked_cash`), showing
+   the new cash for 1.5 s as the original does (a new rank shows instead, and nothing
+   overwrites the hyperspace countdown). The original pays only when no other message is
+   showing; this pays always. Combat practice pays nothing. The in-flight status page
+   shows hold and cash. Tests read bounty values from the ship data rather than writing
+   Elite's numbers into the public repo.
+   **Also in build 32, encounters and the safe zone as in Elite** (Brian's request; read
+   from the main game loop, parts 3 and 4, and the space station spawning in the main
+   flight loop). The safe zone is `SAFE_K` (2) planet radii round the station
+   (`Space.safe_r`; Elite's is a box of 2 radii, all its planets one size), replacing the
+   fixed `SAFE_DIST`. Outside it, once the last ships have gone, every `ENCOUNTER_EVERY`
+   (20) s a roll (`Game._roll`): certain in an anarchy, else `PIRATE_ROLL` (47%) and a
+   number 0-7 at least the government, so a corporate state about 6%. Then a lone bounty
+   hunter (`HUNTER_CHANCE`, 39%: `HUNTERS`) or a pack of 1 to `PACK_MOST` (4) `PIRATES`,
+   capped by the level's `max_hostile`, small types more likely (two random bytes ANDed);
+   the next rolls are skipped, one per extra ship (Elite's EV). Differences: Elite rolls
+   whatever is around; this waits for the last group to go, because every ship here is
+   hostile (no traders or police until phase 5). Arriving from hyperspace brings an ambush
+   of `max_hostile` pirates only in an anarchy or feudal system (`AMBUSH_GOV`). Measured
+   in the PC test: 10 minutes outside the safe zone, 23 pirates in an anarchy, 4 in a
+   corporate state.
+   **Waves are for combat practice only** (Brian's request): in a commander's flight no
+   "WAVE" message, no wave and score on the HUD, no free missile per wave, no NEXT WAVE
+   cheat.
+   **DEBUG page and bay windows** (build 32, Brian's requests): the frame time counter is
+   a DEBUG switch, FRAME TIME: ON / OFF (`app.show_ms`, starting from `SHOW_FRAME_TIME`).
+   The DEBUG page shows `DEBUG_ROWS` (7) lines in size 14, the chosen one in the middle and
+   the list going round above and below it. The docking bay has `BAY_WINDOWS` (3) lit
+   windows high on each side wall, white frames only (`cockpit._draw_windows`, `WINDOW_Y`,
+   `WINDOW_LEN`, `WINDOW_FRAME`), drawn behind the parked ships and, from the tunnel,
+   only when seen through the bay's opening. Bay scene on the badge: 17-30 ms a frame.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
@@ -336,7 +369,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 31), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 32), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
@@ -353,7 +386,7 @@ by itself is faster than one fill for all of them (3.5 against 7.7 ms). Flight a
   whether the ring and dots read well, the streaks on arriving.
 - Arriving (build 21, kept in build 26): whether 3 / 4 / 5 ships is the right fight.
 - The star system (build 26): whether the planet, sun, station and compass read well;
-  `ARRIVE_DIST`, `SAFE_DIST`, `JUMP_K`, `ENCOUNTER` and `DOCK_DIST` by feel; the frame
+  `ARRIVE_DIST`, `SAFE_K`, `JUMP_K`, `ENCOUNTER_EVERY` and `DOCK_DIST` by feel; the frame
   rate with the planet in view.
 - Docking by hand (build 27): whether A is possible with the digital joystick (the
   tolerances above), whether B's beam feels right, crash damage and bounce; not yet on
@@ -362,6 +395,8 @@ by itself is faster than one fill for all of them (3.5 against 7.7 ms). Flight a
   the shapes, morphing and spacings look good on the badge.
 - The market (build 30): the layout on the badge, C / D and the repeat speed.
 - Scooping into the hold, combat practice pick-ups and the green safe-zone LEDs (build 31).
+- Bounties (build 32): the cash message on a kill. Encounters by government and the
+  planet-sized safe zone (build 32): whether the danger now feels right.
 - Whether `deploy.bat`'s copy step reports failures properly (the log step is known to work).
 
 Confirmed by Brian on 2026-11-13: F is faster and E slower; the LEDs flash on a hit and the
@@ -396,6 +431,9 @@ Elite, written from scratch, not as a port: no original code is used. The README
 
 ## Pitfalls for an agent working here
 
+- On the Pi the badge sometimes drops off USB for a moment during an mpremote copy
+  (`Input/output error`, then `no device found`); it comes back as the same port. Copy
+  again and check every file's checksum before resetting.
 - After writing files into this folder from a cloud session, **verify by checksum**. Once, a
   write reported success but delivered a stale cached copy of the same staging path. Staging
   each build under a fresh path avoided it.
