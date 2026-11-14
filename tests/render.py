@@ -69,6 +69,10 @@ for _ in range(9):
 d.cmdr.cash = 3; d.trade(True)
 shot(a, "1k_market_scrolled.png")
 d.cmdr.cash = 1000
+d.open("EQUIP SHIP")
+d.cmdr.fuel = 52; d.esel = 1; d.buy_item()
+d.pick_item(1)
+shot(a, "1l_equip.png")
 d.open("GALACTIC CHART")
 shot(a, "1f_galactic.png")
 d.target = 147; d.open("LOCAL CHART")

@@ -16,8 +16,10 @@ Built from `DESIGN.md`: phase 1 (title screen, saved commander with rank, three 
 button layout) and phase 2 (galaxy, local and galactic charts, system data, hyperspace,
 fuel, docked screens as tabs, launch tunnel), and the start of phase 3 (build 26: planet,
 sun, station, compass, jump drive, automatic docking; build 27: docking by hand; build
-30: the market; 31: scooped cargo; 32: bounties, which finishes phase 3). Not built yet:
-phases 4 to 6, and the system description sentence.
+30: the market; 31: scooped cargo; 32: bounties, which finishes phase 3), and the start
+of phase 4 (build 33: the Equip ship screen). Not built yet: the rest of the equipment's
+effects (ECM, escape pod, energy bomb, docking computer, galactic hyperdrive, mining
+laser), phases 5 and 6, and the system description sentence.
 
 ## Files
 
@@ -33,9 +35,10 @@ phases 4 to 6, and the system description sentence.
 - `chart.py` - the local and galactic charts (imported the first time one is opened).
 - `docked.py` - the docked tabs: Status, Market, Local chart, Galactic chart, System data.
 - `market.py` - market prices, stock, buying and selling. Rules only, no badge imports.
+- `equipment.py` - the Equip ship screen's rules: what is on sale, prices, fitting.
 - `ship_data.py`, `game_data.py` - generated, **gitignored** (see Licensing). 31 ships; the
-  galaxy's seeds, name letter pairs, starting place and the market's 17 goods. Both must
-  be copied to the badge.
+  galaxy's seeds, name letter pairs, starting place, the market's 17 goods and the 14
+  equipment prices. Both must be copied to the badge.
 - `tools/import_ships.py`, `tools/import_galaxy.py` - make those two from the Elite source.
 - `tools/badge_log.py`, `deploy.bat` - copy to the badge, restart it, save its serial output
   to `badge_log.txt`.
@@ -361,6 +364,27 @@ of a real flight, not from a harness.
    windows high on each side wall, white frames only (`cockpit._draw_windows`, `WINDOW_Y`,
    `WINDOW_LEN`, `WINDOW_FRAME`), drawn behind the parked ships and, from the tunnel,
    only when seen through the bay's opening. Bay scene on the badge: 17-30 ms a frame.
+   **Build 33 starts phase 4: the Equip ship tab** (third, after Market). `import_galaxy.py`
+   also reads the equipment price list (PRXS: name from each line's comment, price in
+   tenths) into `game_data.EQUIPMENT`. `equipment.py` (read from EQSHP, written afresh):
+   a station sells the first (shown tech level + 2) items, all 14 from tech 10; fuel is
+   2 Cr a light year and fills the tank; missiles up to 4; one of everything else ("ALREADY
+   FITTED"); a new laser refunds the old one's price. The commander keeps `missiles`
+   (a new one starts with 3, as in the original), `laser` and `extras` (names from
+   `equipment.EXTRAS`); save version 4. **Docking no longer refuels for free** (unless
+   game_data.py has no equipment). Each fresh career flight is fitted from the commander
+   (`app._fit`): missiles (fired ones are gone: `_bank` copies them back), laser
+   (`Game.set_laser`, `game.LASERS`: beam twice the rate and hotter, military 1.5x the
+   damage too, mining = pulse until mining exists), the energy unit (`ENERGY_UNIT`, twice
+   the recharge) and fuel scoops: in a career flight a canister is scooped only with
+   scoops and passing below you (`o.y < 0`), as in the original, else it is hit; combat
+   practice always scoops. Shown but not sold yet ("soon", `equipment.SOON`): ECM, escape
+   pod, energy bomb, docking computer, galactic hyperdrive, mining laser. Joystick picks,
+   C buys. The tab draws in about 109 ms on the badge.
+   **DEBUG additions** (Brian's requests): +1000 CR (career), and SHIP CONFIG, a page that
+   changes the ship at once, in the flight and for the commander: laser (C cycles), missiles
+   (0-4), energy unit; in a career also cargo bay (20 / 35 t) and fuel scoops. Add each
+   new item there as its effect is built.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
@@ -369,7 +393,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 32), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 33), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
@@ -395,6 +419,7 @@ by itself is faster than one fill for all of them (3.5 against 7.7 ms). Flight a
   the shapes, morphing and spacings look good on the badge.
 - The market (build 30): the layout on the badge, C / D and the repeat speed.
 - Scooping into the hold, combat practice pick-ups and the green safe-zone LEDs (build 31).
+- The Equip ship tab and the lasers, energy unit and fuel scoops in flight (build 33).
 - Bounties (build 32): the cash message on a kill. Encounters by government and the
   planet-sized safe zone (build 32): whether the danger now feels right.
 - Whether `deploy.bat`'s copy step reports failures properly (the log step is known to work).
@@ -413,7 +438,7 @@ and launching and no errors in the log.
 Joystick steers by default. C or joystick press fires, D missile, B energy bomb (not built
 yet, says so), F/E speed up/down, A in-flight menu (status, and a pause menu with steering
 and quit). Docked, on the market: joystick up / down picks a good, C buys, D sells (held
-buttons repeat). In tilt steering a tap on D re-zeroes and a hold fires the missile. Hostile ships red on the radar. Hit flash on the LEDs, not a ring
+buttons repeat); on Equip ship: joystick picks an item, C buys. In tilt steering a tap on D re-zeroes and a hold fires the missile. Hostile ships red on the radar. Hit flash on the LEDs, not a ring
 on screen. Enemy lasers run from the ship's gun to the bottom of the screen (the cockpit).
 
 ## Licensing

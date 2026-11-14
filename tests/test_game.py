@@ -228,13 +228,40 @@ assert c.dead and g.shield == 100.0, "it drifts in by itself and is scooped"
 g.objs[:] = [game.Obj(g.types["ASTEROID"], "rock", 0.0, 0.0, 9000.0)
              for _ in range(game.MAX_OBJECTS)]
 assert g.release_canister() is None, "not past MAX_OBJECTS"
+# in combat practice a canister recharges the shields, and often holds a missile
+random.seed(4)
+msgs = set()
+g = fresh(); g.missiles = 0
+for k in range(20):
+    g.shield = 30.0
+    put(g, "CANISTER", "can", 0, 0, 200)
+    for _ in range(60):
+        g.step(DT, 0, 0, 0, False, False)
+        if not any(o.kind == "can" for o in g.objs):
+            break
+    assert g.shield == 100.0, "shields recharged"
+    msgs.add(g.msg)
+assert g.missiles == game.MAX_MISSILES, "missiles, up to a full rack"
+assert msgs == {"MISSILE + SHIELDS", "SHIELDS RECHARGED"}, msgs
+# the RELEASE CANISTER cheat: one just ahead that drifts in and is scooped
+g = fresh(); g.shield = 40.0
+c = g.release_canister()
+assert c is not None and c in g.new and c.kind == "can"
+for _ in range(int(10 / DT)):
+    g.step(DT, 0, 0, 0, False, False)
+    if c.dead:
+        break
+assert c.dead and g.shield == 100.0, "it drifts in by itself and is scooped"
+g.objs[:] = [game.Obj(g.types["ASTEROID"], "rock", 0.0, 0.0, 9000.0)
+             for _ in range(game.MAX_OBJECTS)]
+assert g.release_canister() is None, "not past MAX_OBJECTS"
 # with somewhere to put it (a commander's hold): one of the first 8 goods
 got = []
 g = fresh()
 g.scoop = lambda i: (got.append(i), "GOOD %d" % i)[1]
 g.speed = 10.0
 for k in range(40):
-    put(g, "CANISTER", "can", 0, 0, 200)
+    put(g, "CANISTER", "can", 0, -20, 200)
     for _ in range(60):
         g.step(DT, 0, 0, 0, False, False)
         if not any(o.kind == "can" for o in g.objs):
@@ -242,7 +269,7 @@ for k in range(40):
 assert len(got) == 40 and g.cargo == 40 and g.msg == "GOOD %d" % got[-1]
 assert set(got) == set(range(game.SCOOP_GOODS)), set(got)
 g.scoop = lambda i: None        # the hold is full: the canister is lost
-put(g, "CANISTER", "can", 0, 0, 200)
+put(g, "CANISTER", "can", 0, -20, 200)
 for _ in range(60):
     g.step(DT, 0, 0, 0, False, False)
 assert g.cargo == 40 and g.msg == "HOLD FULL" and g.shield == 100.0
@@ -477,6 +504,34 @@ while not g.docked:
     assert n < 4000
 assert sp.d_station < game.DOCK_DIST and not g.jumping
 print("flying straight from arriving to docked: %.0f s" % (n * DT))
+
+# lasers: the beam fires twice as fast and heats faster, the military hits harder
+def firing(kind, secs=1.5):
+    g = fresh(11)
+    g.set_laser(kind)
+    target = put(g, "ANACONDA", "ship", 0, 0, 2000)
+    target.energy = 1e9
+    shots = 0
+    for _ in range(int(secs / DT)):
+        before = g.cool
+        g.step(DT, 0, 0, 0, True, False)
+        if g.cool > before:
+            shots += 1
+    return shots, 1e9 - target.energy, g.heat
+pulse, beam, mil = firing("pulse"), firing("beam"), firing("military")
+assert beam[0] >= 1.6 * pulse[0], (pulse, beam)
+assert beam[2] > pulse[2], "the beam laser heats faster"
+assert abs(mil[1] / mil[0] - 1.5 * pulse[1] / pulse[0]) < 0.01, "military: half as much again a hit"
+g = fresh(); g.set_laser("no such laser"); assert g.laser == "pulse"
+# the energy unit doubles the recharge
+def recharged(unit):
+    g = fresh(12)
+    g.energy_unit = unit
+    g.shield = 10.0; g.since_hit = 9.0
+    for _ in range(int(2 / DT)):
+        g.step(DT, 0, 0, 0, False, False)
+    return g.shield - 10.0
+assert abs(recharged(True) - 2 * recharged(False)) < 0.5
 
 # waves are for combat practice only
 g = fresh(10)

@@ -5,7 +5,8 @@ Phase 1 holds the level, the kill count and the rank that follows from it.
 Phase 2 adds the star system the commander is in and the fuel in the tank.
 Phase 3 adds cash (in tenths of a credit, as the original keeps it), the
 cargo hold, and the market at the station they are at (see market.py), and
-the docking style. Equipment arrives in phase 4.
+the docking style. Phase 4 adds the equipment (see equipment.py): missiles,
+the laser, and a list of the other items fitted.
 """
 import json
 
@@ -29,7 +30,9 @@ RANKS = (
 )
 
 DOCKING = ("A", "B", "C")    # authentic, assisted, automatic
-VERSION = 3
+VERSION = 4
+START_MISSILES = 3  # a new commander's missiles, as in the original
+LASERS = ("pulse", "beam", "military", "mining")
 GOODS = 17          # kinds of cargo (market.py)
 HOLD = 20           # tonnes in a standard cargo hold
 MAX_FUEL = 70       # tenths of a light year: a full tank is 7.0 light years
@@ -57,6 +60,9 @@ class Commander:
         self.cargo = [0] * GOODS
         self.hold = HOLD        # tonnes the hold takes
         self.market = None      # the market where they are (market.new), or None
+        self.missiles = START_MISSILES
+        self.laser = "pulse"    # the front laser (LASERS)
+        self.extras = []        # other items fitted, by name (equipment.EXTRAS)
         self.docking = "B"
         self.system = None      # which star system the commander is in (None: the start)
         self.fuel = MAX_FUEL    # tenths of a light year
@@ -101,13 +107,21 @@ class Commander:
         return {"version": VERSION, "level": self.level, "kills": self.kills,
                 "credits": self.credits, "docking": self.docking,
                 "system": self.system, "fuel": self.fuel, "cargo": self.cargo,
-                "market": self.market}
+                "market": self.market, "hold": self.hold, "missiles": self.missiles,
+                "laser": self.laser, "extras": self.extras}
 
     @classmethod
     def from_dict(cls, d):
         c = cls(d.get("level", 1))
         c.kills = max(0, int(d.get("kills", 0)))
         c.cash = max(0, int(round(float(d.get("credits", 100.0)) * 10)))
+        c.hold = max(HOLD, min(35, int(d.get("hold", HOLD))))
+        c.missiles = max(0, min(4, int(d.get("missiles", START_MISSILES))))
+        if d.get("laser") in LASERS:
+            c.laser = d["laser"]
+        extras = d.get("extras")
+        if isinstance(extras, list):
+            c.extras = [x for x in extras if isinstance(x, str)]
         cargo = d.get("cargo")
         if isinstance(cargo, list) and len(cargo) == GOODS:
             c.cargo = [max(0, int(n)) for n in cargo]

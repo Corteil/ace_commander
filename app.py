@@ -72,6 +72,7 @@ try:    # the galaxy's starting numbers, made by tools/import_galaxy.py
 except Exception:
     game_data = None
 GOODS = getattr(game_data, "GOODS", None)   # the market's goods, if game_data.py has them
+EQUIP = getattr(game_data, "EQUIPMENT", None)   # and the equipment
 SAFE_GREEN = 60         # the LEDs are this green (0-255) in the safe zone round a station
 REPEAT_WAIT = 0.45      # seconds a market button is held before it starts repeating
 REPEAT_EVERY = 0.09     # then once every this many seconds
@@ -598,6 +599,7 @@ class AceCommander(app.App):
             self._place()
             if fresh or g.space is None:
                 self._enter_space("launch")
+                self._fit(g)
         self.jump_to = None
         g.jump_t = 0.0
         self.saved_over = False
@@ -639,7 +641,8 @@ class AceCommander(app.App):
         self._place()
         self.career = True
         c = self.cmdr
-        c.fuel = commander.MAX_FUEL
+        if not EQUIP:           # nowhere to buy fuel: it's free, as before the equipment
+            c.fuel = commander.MAX_FUEL
         if GOODS and self.galaxy is not None and (c.market is None
                                                   or c.market["system"] != c.system):
             from . import market
@@ -650,7 +653,7 @@ class AceCommander(app.App):
             self.game.docked = False
         if self.target == c.system:
             self.target = None
-        self.dock = docked.Docked(c, self.galaxy, self.target, GOODS)
+        self.dock = docked.Docked(c, self.galaxy, self.target, GOODS, EQUIP)
         self.docked = True
         self.jump_to = None
         self.paused = False
@@ -695,6 +698,13 @@ class AceCommander(app.App):
             d.go(d.tab - 1)
         elif hit("j_right" if new else "right"):
             d.go(d.tab + 1)
+        elif d.name() == "EQUIP SHIP":
+            if self._repeat("j_up" if new else "up", dt):
+                d.pick_item(-1)
+            elif self._repeat("j_down" if new else "down", dt):
+                d.pick_item(1)
+            elif hit("C" if new else "confirm"):
+                d.buy_item()
         elif d.name() == "MARKET":
             # the joystick picks a good; C buys and D sells; all repeat when held
             if self._repeat("j_up" if new else "up", dt):
@@ -726,6 +736,16 @@ class AceCommander(app.App):
             return True
         self.held_t[name] = t
         return False
+
+    def _fit(self, g):
+        """A fresh career flight: the commander's ship as equipped."""
+        c = self.cmdr
+        if c is None:
+            return
+        g.missiles = c.missiles if g.missile_bp else 0
+        g.set_laser(c.laser)
+        g.energy_unit = "energy" in c.extras
+        g.fuel_scoops = "scoops" in c.extras
 
     def _scoop(self, i):
         """A canister scooped in flight: good i into the hold (see Game.scoop)."""
@@ -801,6 +821,7 @@ class AceCommander(app.App):
         if g is None or not self.career or self.cmdr is None:
             return
         c = self.cmdr
+        c.missiles = g.missiles             # the ones fired are gone
         paid = g.bounty - self.banked_cash
         if paid > 0:
             c.cash += paid
@@ -1002,12 +1023,60 @@ class AceCommander(app.App):
             items = ["INVINCIBLE: " + ("ON" if self.game.god else "OFF"),
                      "FRAME TIME: " + ("ON" if self.show_ms else "OFF"),
                      "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
-                     "REFILL MISSILES", "REFILL FUEL", "+10 KILLS", "RELEASE CANISTER",
-                     "TO THE STATION", "DOCK NOW"]
+                     "REFILL MISSILES", "REFILL FUEL", "+10 KILLS", "+1000 CR",
+                     "SHIP CONFIG", "RELEASE CANISTER", "TO THE STATION", "DOCK NOW"]
             if self.career:
                 items.remove("NEXT WAVE")       # waves are for combat practice
+            else:
+                items.remove("+1000 CR")        # no commander, no cash
             return items
+        if self.fsub == "ship":
+            return self._ship_items()
         return self._fitems_top()
+
+    def _ship_items(self):
+        """The SHIP CONFIG page (a DEBUG page): the ship's equipment, changed
+        straight away in this flight and, with a commander, for good."""
+        g = self.game
+        onoff = lambda b: "ON" if b else "OFF"
+        items = ["LASER: " + g.laser.upper(), "MISSILES: %d" % g.missiles,
+                 "ENERGY UNIT: " + onoff(g.energy_unit)]
+        if self.career and self.cmdr is not None:
+            c = self.cmdr
+            items += ["CARGO BAY: %dT" % c.hold, "FUEL SCOOPS: " + onoff(g.fuel_scoops)]
+        return items
+
+    def _ship_config(self, item):
+        """Change one thing on the SHIP CONFIG page (C goes to the next setting)."""
+        g = self.game
+        c = self.cmdr if self.career else None
+        if item.startswith("LASER"):
+            kinds = list(game.LASERS)
+            g.set_laser(kinds[(kinds.index(g.laser) + 1) % len(kinds)])
+            if c is not None:
+                c.laser = g.laser
+        elif item.startswith("MISSILES"):
+            if g.missile_bp:
+                g.missiles = (g.missiles + 1) % (game.MAX_MISSILES + 1)
+                if c is not None:
+                    c.missiles = g.missiles
+        elif item.startswith("ENERGY UNIT"):
+            g.energy_unit = not g.energy_unit
+            if c is not None:
+                self._extra(c, "energy", g.energy_unit)
+        elif item.startswith("CARGO BAY") and c is not None:
+            from . import equipment
+            c.hold = commander.HOLD if c.hold >= equipment.BIG_HOLD else equipment.BIG_HOLD
+        elif item.startswith("FUEL SCOOPS") and c is not None:
+            g.fuel_scoops = not g.fuel_scoops
+            self._extra(c, "scoops", g.fuel_scoops)
+
+    @staticmethod
+    def _extra(c, name, on):
+        if on and name not in c.extras:
+            c.extras.append(name)
+        elif not on and name in c.extras:
+            c.extras.remove(name)
 
     def _debug(self, item):
         """Do one of the DEBUG page's cheats. Kills made this way count like
@@ -1038,6 +1107,14 @@ class AceCommander(app.App):
                 self.cmdr.fuel = commander.MAX_FUEL
         elif item == "+10 KILLS":
             g.kills += 10
+        elif item == "+1000 CR":
+            if self.career and self.cmdr is not None:
+                self.cmdr.cash += 10000
+                g.say(self.cmdr.cash_text())
+        elif item == "SHIP CONFIG":
+            self.fsub = "ship"
+            self.fmenu = 0
+            return
         elif item == "RELEASE CANISTER":
             if g.release_canister() is None:
                 g.say("TOO MANY OBJECTS")
@@ -1075,10 +1152,16 @@ class AceCommander(app.App):
         elif cancel:
             if self.fsub is None:
                 self._resume()
+            elif self.fsub == "ship":       # back to the DEBUG page
+                self.fsub = "debug"
+                self.fmenu = self._fitems().index("SHIP CONFIG")
             else:
                 self.fmenu = self._fitems_top().index(
                     "DEBUG" if self.fsub == "debug" else "PAUSE MENU")
                 self.fsub = None
+        elif self.fsub == "ship":
+            if confirm:
+                self._ship_config(items[self.fmenu])
         elif self.fsub == "pause":
             left = hit("j_left" if new else "left")
             side = left or hit("j_right" if new else "right")
@@ -1247,9 +1330,10 @@ class AceCommander(app.App):
                  0, 38, 11, cockpit.GREY)
             text(ctx, "C or F: back", 0, 53, 11, cockpit.GREY)
             return
-        if self.fsub == "debug":
+        if self.fsub == "debug" or self.fsub == "ship":
             ctx.rgba(0, 0, 0, 0.85).rectangle(-100, 62, 200, 18).fill()
-            text(ctx, "DEBUG - BUILD " + build(), 0, -66, 16, cockpit.RED)
+            text(ctx, "DEBUG - BUILD " + build() if self.fsub == "debug" else "SHIP CONFIG",
+                 0, -66, 16, cockpit.RED)
             # the chosen line in the middle, the list going round above and below it
             items = self._fitems()
             n = len(items)

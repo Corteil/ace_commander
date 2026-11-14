@@ -1,19 +1,21 @@
-"""The docked screens, as tabs: Status, Market, Local chart, Galactic chart
-and System data. A row of small squares at the top shows which is open.
+"""The docked screens, as tabs: Status, Market, Equip ship, Local chart,
+Galactic chart and System data. A row of small squares at the top shows
+which is open.
 
 On the market the joystick picks a good, C buys one and D sells one (hold
-either to keep going). On the two charts C makes the selected system the
-hyperspace target; once launched, the in-flight menu offers a jump to it.
-The equipment screen joins these tabs in phase 4.
+either to keep going). On Equip ship the joystick picks an item and C buys
+it. On the two charts C makes the selected system the hyperspace target;
+once launched, the in-flight menu offers a jump to it.
 """
-from . import chart, cockpit, commander, market
+from . import chart, cockpit, commander, equipment, market
 
-TABS = ("STATUS", "MARKET", "LOCAL CHART", "GALACTIC CHART", "SYSTEM DATA")
+TABS = ("STATUS", "MARKET", "EQUIP SHIP", "LOCAL CHART", "GALACTIC CHART", "SYSTEM DATA")
 ROWS = 6            # goods shown at once on the market
 SAY_TIME = 1.5      # seconds a market message stays
 PRICE_X = 24        # where the market's columns end
 STOCK_X = 52
 HOLD_X = 88
+EPRICE_X = 52       # Equip ship's price column
 
 
 def _ly(d):
@@ -21,20 +23,26 @@ def _ly(d):
 
 
 class Docked:
-    def __init__(self, cmdr, gal, target=None, goods=None):
+    def __init__(self, cmdr, gal, target=None, goods=None, equip=None):
         self.cmdr = cmdr
         self.gal = gal          # None without game_data.py: then only Status
+        self.equip = equip
         if gal is None:
             self.tabs = TABS[:1]
-        elif goods and cmdr.market is not None:
-            self.tabs = TABS
-        else:                   # an older game_data.py, without the goods
-            self.tabs = tuple(t for t in TABS if t != "MARKET")
+        else:                   # an older game_data.py may not have goods or equipment
+            self.tabs = tuple(t for t in TABS
+                              if not (t == "MARKET" and not (goods and cmdr.market is not None))
+                              and not (t == "EQUIP SHIP" and not equip))
         self.market = None
         if "MARKET" in self.tabs:
             self.market = market.Market(goods, gal.system(cmdr.system).economy, cmdr)
         self.sel = 0            # the good picked on the market
         self.top = 0            # the first good shown
+        self.esel = 0           # the item picked on Equip ship
+        self.etop = 0
+        self.for_sale = 0       # how many items this station sells
+        if "EQUIP SHIP" in self.tabs:
+            self.for_sale = equipment.on_sale(gal.system(cmdr.system).tech)
         self.msg = None         # why the last trade didn't happen
         self.msg_t = 0.0
         self.tab = 0
@@ -84,6 +92,22 @@ class Docked:
         elif self.sel >= self.top + ROWS:
             self.top = self.sel - ROWS + 1
 
+    def pick_item(self, step):
+        """Move Equip ship's highlight up (-1) or down (1), scrolling the list."""
+        n = self.for_sale
+        self.esel = (self.esel + step) % n
+        if self.esel < self.etop:
+            self.etop = self.esel
+        elif self.esel >= self.etop + ROWS:
+            self.etop = self.esel - ROWS + 1
+
+    def buy_item(self):
+        """Buy the highlighted item. Returns True if it happened."""
+        why = equipment.buy(self.equip, self.esel, self.cmdr)
+        self.msg = why
+        self.msg_t = SAY_TIME if why else 0.0
+        return why is None
+
     def trade(self, buy):
         """Buy (or sell) one of the highlighted good. Returns True if it happened."""
         m = self.market
@@ -107,6 +131,8 @@ class Docked:
             self._draw_data(ctx)
         elif self.name() == "MARKET":
             self._draw_market(ctx)
+        elif self.name() == "EQUIP SHIP":
+            self._draw_equip(ctx)
         else:
             self._draw_status(ctx)
         if len(self.tabs) > 1:      # which tab is open
@@ -208,4 +234,40 @@ class Docked:
             text(ctx, self.msg, 0, 75, 12, cockpit.RED)
         else:
             text(ctx, "C: buy   D: sell", 0, 75, 11, cockpit.GREY)
+        text(ctx, "< > screens   F: status", 0, 91, 11, cockpit.GREY)
+
+    def _draw_equip(self, ctx):
+        """What this station sells, ROWS at a time: name, price, what you have."""
+        text = cockpit.text
+        e = self.equip
+        c = self.cmdr
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        text(ctx, "EQUIP SHIP  " + self.here.name, 0, -100, 11, cockpit.GREY)
+        for label, x in (("price", EPRICE_X), ("have", HOLD_X)):
+            text(ctx, label, x, -74, 10, cockpit.GREY, 1)
+        if self.etop > 0:
+            ctx.rgb(*cockpit.DIM).rectangle(-3, -69, 6, 2).fill()
+        for row in range(min(ROWS, self.for_sale)):
+            i = self.etop + row
+            y = -58 + row * 18
+            if i == self.esel:
+                ctx.rgb(*cockpit.DIM).rectangle(-102, y - 8, 204, 16).fill()
+            soon = i in equipment.SOON
+            col = cockpit.GREY if soon else (cockpit.GREEN if i == self.esel else cockpit.WHITE)
+            text(ctx, equipment.name(e, i), -96, y, 11, col, -1)
+            if soon:
+                text(ctx, "soon", EPRICE_X, y, 11, cockpit.GREY, 1)
+            else:
+                p = equipment.price(e, i, c)
+                text(ctx, "%d.%d" % (p // 10, p % 10), EPRICE_X, y, 11, cockpit.YELLOW, 1)
+            h = equipment.have(i, c)
+            if h:
+                text(ctx, h, HOLD_X, y, 11, cockpit.GREEN, 1)
+        if self.etop + ROWS < self.for_sale:
+            ctx.rgb(*cockpit.DIM).rectangle(-3, 44, 6, 2).fill()
+        text(ctx, c.cash_text(), 0, 58, 12, cockpit.CYAN)
+        if self.msg:
+            text(ctx, self.msg, 0, 75, 12, cockpit.RED)
+        else:
+            text(ctx, "C: buy", 0, 75, 11, cockpit.GREY)
         text(ctx, "< > screens   F: status", 0, 91, 11, cockpit.GREY)

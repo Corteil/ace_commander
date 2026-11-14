@@ -18,10 +18,18 @@ PITCH_RATE = 1.0       # radians per second at full stick
 ROLL_RATE = 1.7
 
 LASER_RANGE = 7000.0
-LASER_DAMAGE = 12.0
-LASER_PERIOD = 0.18    # seconds between shots
-LASER_HEAT = 0.05      # heat added per shot (1.0 = overheated)
 LASER_COOL = 0.16      # heat lost per second
+# the front laser, by type: (seconds between shots, damage a hit, heat a shot
+# (1.0 = overheated)). The beam laser fires twice as fast and heats faster;
+# the military laser hits harder too (Elite's power 23 against the pulse
+# laser's 15). The mining laser is the pulse laser's until mining exists.
+LASERS = {
+    "pulse": (0.18, 12.0, 0.05),
+    "beam": (0.09, 12.0, 0.04),
+    "military": (0.09, 18.0, 0.045),
+    "mining": (0.18, 12.0, 0.05),
+}
+ENERGY_UNIT = 2.0      # an energy unit makes the shields and hull recharge this much faster
 AIM_ASSIST = 0.05      # a shot hits anything within this slope of the crosshair
 
 MISSILE_DAMAGE = 150.0
@@ -320,6 +328,9 @@ class Game:
         self.set_level(level)
         self.god = False    # a cheat: hits flash but do no damage
         self.docking = "C"  # how docking works: see set_docking
+        self.set_laser("pulse")
+        self.energy_unit = False    # recharge ENERGY_UNIT times faster
+        self.fuel_scoops = True     # without them a canister is hit, not scooped
         # what a scooped canister goes into: a function given the good's number
         # that returns its name, or None if there is no room; None in practice
         self.scoop = None
@@ -341,6 +352,11 @@ class Game:
         """"A" authentic, "B" assisted or "C" automatic (commander.DOCKING)."""
         self.docking = style if style in ("A", "B", "C") else "C"
         self.tractor = False
+
+    def set_laser(self, kind):
+        """The front laser: a key of LASERS."""
+        self.laser = kind if kind in LASERS else "pulse"
+        self.laser_period, self.laser_damage, self.laser_heat = LASERS[self.laser]
 
     def set_level(self, level):
         """0 easiest to 2 hardest. Takes effect straight away."""
@@ -937,7 +953,10 @@ class Game:
             d2 = o.x * o.x + o.y * o.y + o.z * o.z
             if d2 >= r * r:
                 continue
-            if o.kind == "can":
+            # a canister is scooped, but only with fuel scoops and from below
+            # (it passes under the ship), as in the original; otherwise it is
+            # hit like anything else
+            if o.kind == "can" and (self.fuel_scoops and o.y < 0 or self.scoop is None):
                 o.dead = True
                 if self.scoop is None:      # practice: a pick-up instead of cargo
                     self.cargo += 1
@@ -1012,9 +1031,9 @@ class Game:
                 self.locked = True
 
         if fire and not self.hot and self.cool <= 0:
-            self.cool = LASER_PERIOD
+            self.cool = self.laser_period
             self.beam = 0.07
-            self.heat += LASER_HEAT
+            self.heat += self.laser_heat
             if self.heat >= 1.0:
                 self.heat = 1.0
                 self.hot = True
@@ -1032,7 +1051,7 @@ class Game:
                     best = o
                     best_z = o.z
             if best is not None:
-                best.energy -= LASER_DAMAGE
+                best.energy -= self.laser_damage
                 best.hit = 0.12
                 if best.energy <= 0:
                     self._kill(best)
@@ -1118,10 +1137,11 @@ class Game:
     def _regen(self, dt):
         self.since_hit += dt
         if self.since_hit > 3.0:
+            k = ENERGY_UNIT * dt if self.energy_unit else dt
             if self.shield < 100.0:
-                self.shield = min(100.0, self.shield + 4.0 * dt)
+                self.shield = min(100.0, self.shield + 4.0 * k)
             if self.hull < 100.0:
-                self.hull = min(100.0, self.hull + 0.8 * dt)
+                self.hull = min(100.0, self.hull + 0.8 * k)
 
     # ---- what turns up ----------------------------------------------------
 
