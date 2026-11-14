@@ -73,10 +73,11 @@ class Docked:
         c = self.cmdr
         s = self.here
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "DOCKED", 0, -100, 11, cockpit.station_colour(c.system))
+        col = cockpit.station_colour(s.government if s is not None else None)
+        text(ctx, "DOCKED", 0, -100, 11, col)
         if s is not None:
             text(ctx, s.name, 0, -80, 22, cockpit.WHITE)
-            text(ctx, s.government_name(), 0, -59, 11, cockpit.GREY)
+            text(ctx, s.government_name(), 0, -59, 11, col)
             text(ctx, "%s, tech %d" % (s.economy_name(), s.tech), 0, -45, 11, cockpit.GREY)
         else:
             text(ctx, "COMMANDER", 0, -70, 20, cockpit.WHITE)
@@ -116,8 +117,9 @@ class Docked:
             text(ctx, "%s away%s" % (_ly(d), "" if 0 < d <= c.fuel else ", too far"),
                  0, -60, 11, cockpit.GREEN if 0 < d <= c.fuel else cockpit.RED)
         ctx.rgb(*cockpit.DIM).rectangle(-90, -50, 180, 1).fill()
-        y = -36
-        for line in (s.government_name(), s.economy_name(), "Tech level %d" % s.tech,
+        text(ctx, s.government_name(), 0, -36, 12, cockpit.station_colour(s.government))
+        y = -20
+        for line in (s.economy_name(), "Tech level %d" % s.tech,
                      "Population %d.%d billion" % (s.population // 10, s.population % 10),
                      "Productivity %d M Cr" % s.productivity,
                      "Radius %d km" % s.radius):

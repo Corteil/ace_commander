@@ -77,9 +77,11 @@ target and shows its data; C on your own system clears the target. A launches fr
 screen, and F goes back to Status, then to the title screen.
 
 Launching flies you out along the station's hexagonal tunnel (about 2.5 seconds; C skips
-it). Each station has its own colour, shown on "DOCKED" and on the tunnel's last ring. The
-badge's LEDs pulse in that colour as each ring goes by, flash full as you leave the tunnel,
-then fade.
+it). A station's colour shows what kind of government runs the system: orange for an
+anarchy, yellow feudal, magenta multi-government, pink dictatorship, violet communist,
+blue confederacy, cyan democracy and green corporate state. It is on "DOCKED", the
+government's name and the tunnel's last ring, and the badge's LEDs pulse in it as each ring
+goes by, flash full as you leave the tunnel, then fade.
 
 ## Hyperspace
 

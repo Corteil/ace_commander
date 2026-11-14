@@ -367,11 +367,18 @@ class AceCommander(app.App):
         else:
             self._leds(0)
 
+    def _government(self):
+        """The government of the commander's system (0 to 7), or None."""
+        c = self.cmdr
+        if c is None or c.system is None or self.galaxy is None:
+            return None
+        return self.galaxy.system(c.system).government
+
     def _leds_station(self, k):
         """The LEDs in this station's colour, k (0 to 1) of full brightness,
         in 16 steps so they are written only when the step changes."""
         k = int(k * 15 + 0.5)
-        rgb = cockpit.station_colour(self.cmdr.system if self.cmdr is not None else None)
+        rgb = cockpit.station_colour(self._government())
         self._leds_rgb(int(rgb[0] * 255) * k // 15, int(rgb[1] * 255) * k // 15,
                        int(rgb[2] * 255) * k // 15)
 
@@ -1006,7 +1013,7 @@ class AceCommander(app.App):
             self.dock.draw(ctx)
         elif self.mode == "launch":
             cockpit.draw_tunnel(ctx, min(1.0, self.launch_t / LAUNCH_TIME), self.launch_t,
-                                cockpit.station_colour(self.cmdr.system))
+                                cockpit.station_colour(self._government()))
         else:
             self._draw_menu(ctx)
         ctx.restore()

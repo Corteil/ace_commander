@@ -85,8 +85,11 @@ mod.SAVE_PATH = save
 a.game.over = True; tick(a, fresh=["CANCEL"])
 bs.choose(a, "NEW COMMANDER"); tick(a, fresh=["C"])
 assert a.mode == "docked"
-col = cockpit.station_colour(a.cmdr.system)
-assert col != cockpit.RED and len(set(cockpit.station_colour(i) for i in range(256))) == 8
+gov = a.galaxy.system(a.cmdr.system).government
+col = cockpit.station_colour(gov)
+assert col != cockpit.RED and cockpit.WHITE not in cockpit.STATION_COLOURS
+assert len(set(cockpit.station_colour(i) for i in range(8))) == 8, "one colour per government"
+assert cockpit.station_colour(None) == cockpit.GREEN
 assert a.dock.here.name == "LAVE"
 c = CountCtx(); a.draw(c)
 assert any(t[0] == "DOCKED" for t in c.texts)
@@ -117,7 +120,7 @@ assert fade[0] == full and fade[-1] == (0, 0, 0)
 assert all(sum(fade[i + 1]) <= sum(fade[i]) for i in range(len(fade) - 1)), fade
 a.game._hurt(5.0); tick(a); assert leds.values[1] == (255, 0, 0)
 # another station, another colour, in the tunnel's mouth too
-other = [i for i in range(256) if cockpit.station_colour(i) != col][0]
+other = [i for i in range(256) if a.galaxy.system(i).government != gov][0]
 a.cmdr.system = other
 a.game.over = True; tick(a, fresh=["C"]); assert a.mode == "docked"
 tick(a, fresh=["A"]); assert a.mode == "launch"
@@ -126,7 +129,7 @@ for _ in range(200):
         break
     last = leds.values[1]
     tick(a, ms=20)
-want = tuple(int(v * 255) for v in cockpit.station_colour(other))
+want = tuple(int(v * 255) for v in cockpit.station_colour(a.galaxy.system(other).government))
 assert last == want or leds.values[1] == want, (last, want)
 os.remove(save)
 print("launch: LEDs pulse in the station's colour, then fade: ok")

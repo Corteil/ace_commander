@@ -202,18 +202,29 @@ TUNNEL_RINGS = 12
 TUNNEL_FOCAL = 62.0     # pixels across a ring of radius 1 at distance 1
 TUNNEL_SPIN = 0.5       # radians per second: the station turns as you leave
 _HEX = tuple((math.cos(k * TAU / 6), math.sin(k * TAU / 6)) for k in range(6))
-# each station has its own colour, for the tunnel's mouth and the badge's LEDs
-# as you launch. No red (the LEDs flash red when you are hit) and no white (the
+# A station's colour says what kind of government runs the system, warm for
+# the dangerous ones and cool for the safe ones, in the order of
+# galaxy.GOVERNMENTS. It is used for the tunnel's mouth and the badge's LEDs as
+# you launch. No red (the LEDs flash red when you are hit) and no white (the
 # tunnel is white).
-STATION_COLOURS = (GREEN, CYAN, YELLOW, MAGENTA, ORANGE, (0.4, 0.55, 1), (1, 0.5, 0.75),
-                   (0.65, 0.4, 1))
+STATION_COLOURS = (
+    ORANGE,             # Anarchy
+    YELLOW,             # Feudal
+    MAGENTA,            # Multi-government
+    (1, 0.5, 0.75),     # Dictatorship: pink
+    (0.65, 0.4, 1),     # Communist: violet
+    (0.4, 0.55, 1),     # Confederacy: blue
+    CYAN,               # Democracy
+    GREEN,              # Corporate State
+)
 
 
-def station_colour(system):
-    """The colour of the station at this system (an index, or None)."""
-    if system is None:
+def station_colour(government):
+    """The colour of a station in a system with this government (0 to 7), or
+    green if it isn't known."""
+    if government is None:
         return GREEN
-    return STATION_COLOURS[((system * 40503) & 0xFFFF) >> 13]     # mixed, 0 to 7
+    return STATION_COLOURS[government & 7]
 
 
 def tunnel_glow(f):
