@@ -589,4 +589,26 @@ fly(g, 1)
 assert g.docked
 print("docking by hand, A and B: ok")
 print("star system: planet, sun, station, safe zone, docking, crashing: ok")
+
+# ships parked in the docking bay suit the system
+random.seed(11)
+names = set(game.PARK_PIRATES + game.PARK_TRADERS + game.PARK_POLICE
+            + game.PARK_LOW_TECH + game.PARK_HIGH_TECH)
+assert names <= set(g.types), names - set(g.types)
+def drawn(gov, tech, n=400):
+    out = []
+    for _ in range(n):
+        p = game.parked_ships(gov, tech)
+        assert 1 <= len(p) <= game.PARK_MOST
+        out.extend(p)
+    return out
+anarchy = drawn(0, 7)
+assert "VIPER" not in anarchy and any(x in game.PARK_PIRATES for x in anarchy), "no police in an anarchy"
+corp = drawn(7, 7)
+assert not any(x in game.PARK_PIRATES for x in corp) and corp.count("VIPER") > len(corp) // 5
+assert not any(x in game.PARK_LOW_TECH + game.PARK_HIGH_TECH for x in drawn(3, 7))
+assert any(x in game.PARK_LOW_TECH for x in drawn(3, 2)), "shuttles where the tech is low"
+assert any(x in game.PARK_HIGH_TECH for x in drawn(3, 12)), "the newest ships where it is high"
+assert drawn(None, None, 20)
+print("parked ships suit the system: ok")
 print("ALL GAME TESTS PASSED")

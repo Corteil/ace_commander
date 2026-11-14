@@ -262,20 +262,33 @@ of a real flight, not from a harness.
    `DOCK_END` ahead. The LEDs (`cockpit.dock_glow`) rise as the mouth nears, flash going
    through it, pulse for each ring; then `_dock()` as before. DOCK NOW and GAME OVER + C
    skip the scene. Measured on the badge (real ctx, REPL): 14-19 ms a frame to draw.
-   **Build 29: every station's tunnel is different** (Brian's requests). `cockpit.Tunnel(system,
-   station)`: the mouth is the station's slot, a level letterbox (`SLOT_ASPECT`: Coriolis
-   3:1, Dodo 2:1, from their slot vertices); halfway in it is the station's own shape
-   (`TUNNEL_SHAPES`, picked from the system's number: hexagon (straight through), square,
-   triangle or round); the bay doors are always a hexagon. Every shape is 12 (x, y) points
-   in the same order round the centre, so a ring between two is an eased blend. The gaps
-   follow one of `TUNNEL_SPACINGS` (even, widening, narrowing, pairs, threes, scaled so the
-   tunnel is always `TUNNEL_RINGS - 1` long). Launch and docking at one station use the same
-   tunnel (`app._pick_tunnel`). The LED pulses follow the real ring spacing (`_pulse`).
-   Star and cross middle shapes were tried and removed at Brian's request.
-   `tools/tunnel_sheet.py` draws six stations side by side into `tests/shots/tunnels.png`.
-   Measured on the badge (REPL, real ctx):
-   making a tunnel 10 ms; drawing 17-26 ms docking, 10-29 ms launching (the old hexagon
-   launch was 3-55 ms).
+   **Build 29: every station's tunnel is different** (Brian's requests, after trying
+   several looks). `cockpit.Tunnel(system, station)`: every ring is the station's slot, a
+   level letterbox that doesn't turn (`SLOT_ASPECT`: Coriolis 3:1, Dodo 2:1, from their
+   slot vertices), so the tunnel is four corners with straight long edges. The gaps between
+   rings follow one of `TUNNEL_SPACINGS` (even, widening, narrowing, pairs, threes, picked
+   from the system's number). At the end the tunnel opens into the docking bay: the same
+   shape `BAY_SCALE` (3) times bigger and `BAY_DEPTH` deep, its doors on the far wall
+   filled dimly in the station's colour; docking stops at the way into the bay (`DOCK_END`).
+   **Ships are parked in the bay**, a fresh random set on each launch and docking
+   (`app._pick_tunnel`): `game.parked_ships(gov, tech)` draws 1 to 4 names from pools that
+   suit the system (pirate craft where the government is weak, traders, police Vipers where
+   it is strong, shuttles below tech 5, Asp / Fer de Lance from tech 10), and
+   `Tunnel.park` keeps only ships that fit through the slot at `SHIP_SCALE` (150 ship units
+   to a tunnel unit; e.g. the Boa is too tall for a Coriolis but fits a Dodo), one to each
+   of `PARK_SPOTS`, resting on the floor, facing in or out a little askew. Until you are in
+   the bay only ships seen through its opening are drawn. Launch and docking at one
+   station use the same tunnel; the LED pulses follow the real spacing (`_pulse`). Tried
+   and dropped at Brian's request: morphing between shapes, hexagon doors, a spinning
+   tunnel. At the end of docking the bay stays in view for a random `DOCK_HOLD` (1-2 s).
+   `tools/tunnel_sheet.py` draws six stations side by side into
+   `tests/shots/tunnels.png`. Measured on the badge (REPL, real ctx): making a tunnel and
+   parking 4 ships about 4 ms; drawing 16-25 ms a frame with 4 parked.
+   **The station hides the planet behind it** (Brian's request): in `_draw_space`, when
+   the station is nearer than the planet's centre and its screen size overlaps the
+   planet's outline, `draw_ship(..., solid=True)` fills the station's outline black
+   (`_fill_hull`, the convex hull of its projected vertices) before its edges. Costs about
+   2 ms on the badge, only while they overlap. Ships don't hide the planet (not asked).
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).

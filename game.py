@@ -68,6 +68,18 @@ JUMP_K = 8                 # the jump drive moves you this many times faster
 ENCOUNTER = (25.0, 45.0)   # seconds between groups of ships, outside the safe zone
 DODO_TECH = 10             # systems with this tech level or more have a Dodo station
 
+# The ships parked in a station's docking bay depend on the system: pirate
+# craft where the government is weak, traders and police where it is strong,
+# shuttles where the tech level is low, the newest ships where it is high.
+# Only ships small enough for the bay.
+PARK_PIRATES = ("SIDEWINDER", "MAMBA", "KRAIT", "WORM", "GECKO", "COBRA MK I")
+PARK_TRADERS = ("COBRA MK III", "BOA", "ADDER", "MORAY")
+PARK_POLICE = ("VIPER",)
+PARK_LOW_TECH = ("SHUTTLE", "TRANSPORTER")      # below PARK_LOW tech level
+PARK_HIGH_TECH = ("ASP MK II", "FER DE LANCE")  # at DODO_TECH or more
+PARK_LOW = 5
+PARK_MOST = 4
+
 # enemy ships by difficulty; later waves draw from further down the list
 TIERS = (
     ("SIDEWINDER", "GECKO", "COBRA MK I", "WORM"),
@@ -88,6 +100,26 @@ LEVELS = (
     (4, 1.0, 1.0),
     (5, 1.3, 1.3),
 )
+
+
+def parked_ships(gov, tech, rnd=random):
+    """Names of 1 to PARK_MOST ships parked in the docking bay of a system
+    with this government (0 anarchy to 7 corporate state) and tech level,
+    drawn at random from the kinds that system would have. gov None: a mix."""
+    if gov is None:
+        gov = 3
+    # how many of each kind go in the hat: pirates fade out and police come
+    # in as the government gets safer
+    pool = []
+    for names, n in ((PARK_PIRATES, max(0, 4 - gov)), (PARK_TRADERS, 2 + gov // 2),
+                     (PARK_POLICE, max(0, gov - 2) * 2)):
+        for name in names:
+            pool.extend([name] * n)
+    if tech is not None and tech < PARK_LOW:
+        pool.extend(PARK_LOW_TECH * 4)
+    if tech is not None and tech >= DODO_TECH:
+        pool.extend(PARK_HIGH_TECH * 3)
+    return [pool[rnd.randrange(len(pool))] for _ in range(rnd.randint(1, PARK_MOST))]
 
 
 def _rnd(a, b):

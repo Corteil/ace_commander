@@ -43,6 +43,7 @@ constants below.
 """
 import asyncio
 import gc
+import random
 import time
 
 import app
@@ -114,6 +115,7 @@ PERF_LOG = 60           # print a PERF line to the console every this many fligh
                         # frames (0 = never)
 LAUNCH_TIME = 2.5       # seconds of launch tunnel (C skips it)
 DOCK_TIME = 3.0         # seconds of flying in through the station's tunnel on docking (C skips it)
+DOCK_HOLD = (1.0, 2.0)  # then the view of the bay stays this long, chosen at random
 DOCK_NAMES = {"A": "AUTHENTIC", "B": "ASSISTED", "C": "AUTOMATIC"}
 DEBUG_MENU = True       # show DEBUG, a page of cheats for testing, in the in-flight menu
 PERF_SLOW = 25          # ms over the average that makes a frame count as slow
@@ -274,6 +276,7 @@ class AceCommander(app.App):
         self.target = None      # the system picked for the next hyperspace jump
         self.launch_t = 0.0     # how far into the launch tunnel
         self.dock_t = 0.0       # how far into the docking tunnel
+        self.dock_hold = 0.0    # how long the view of the bay stays at the end of it
         self.tunnel = None      # this station's tunnel (cockpit.Tunnel), for launching and docking
         self.d_t = None         # how long D has been down, when steering by tilt
         self.viewer = None
@@ -510,7 +513,7 @@ class AceCommander(app.App):
         elif self.mode == "docking":
             self.dock_t += dt
             self._leds_station(cockpit.dock_glow(min(1.0, self.dock_t / DOCK_TIME), self.tunnel))
-            if confirm or self.dock_t >= DOCK_TIME:
+            if confirm or self.dock_t >= DOCK_TIME + self.dock_hold:
                 self._leds_release()
                 self._dock()
         elif self.mode == "viewer":
@@ -676,7 +679,8 @@ class AceCommander(app.App):
             self._launch()
 
     def _pick_tunnel(self):
-        """Each station's tunnel has its own shapes and spacing, from its system."""
+        """This station's tunnel: its slot's shape and its own ring spacing, from its
+        system, with ships parked in the bay that suit the system."""
         c = self.cmdr
         seed = 0
         station = "CORIOLIS"
@@ -685,6 +689,18 @@ class AceCommander(app.App):
             if self.galaxy is not None and self.galaxy.system(seed).tech >= game.DODO_TECH:
                 station = "DODO"
         self.tunnel = cockpit.Tunnel(seed, station)
+        # ships parked in the bay, the kinds this system would have
+        gov = tech = None
+        if c is not None and c.system is not None and self.galaxy is not None:
+            s = self.galaxy.system(seed)
+            gov, tech = s.government, s.tech
+        if self.game is not None:
+            types = self.game.types
+        else:
+            types = {e[0]: game.Blueprint(e) for e in SHIPS} if SHIPS else {}
+        if types:
+            self.tunnel.park([types[n] for n in game.parked_ships(gov, tech) if n in types],
+                             random)
 
     def _launch(self):
         self._pick_tunnel()
@@ -888,6 +904,7 @@ class AceCommander(app.App):
                 g.docked = False
                 self._bank()
                 self.dock_t = 0.0
+                self.dock_hold = random.uniform(*DOCK_HOLD)
                 self._pick_tunnel()
                 self.mode = "docking"
         return True

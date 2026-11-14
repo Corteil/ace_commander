@@ -103,9 +103,11 @@ _OK = [False] * 48  # False if the vertex is behind the viewer
 _VIS = [False] * 24  # which faces of the ship being drawn can be seen
 
 
-def draw_ship(ctx, o, rgb=None):
-    """Draw one object, in its kind's colour or rgb. Returns True if any of it
-    was on screen."""
+def draw_ship(ctx, o, rgb=None, wire_min=WIRE_MIN, solid=False):
+    """Draw one object, in its kind's colour or rgb, as a wireframe if it looks
+    at least wire_min pixels across. With solid, its outline is filled black
+    first, hiding whatever was drawn behind it. Returns True if any of it was
+    on screen."""
     z = int(o.z)
     if z < INEAR:
         return False
@@ -121,7 +123,7 @@ def draw_ship(ctx, o, rgb=None):
     if pr < 3:          # too far away to make out: a dot
         ctx.rectangle(sx - 1, sy - 1, 2, 2).fill()
         return True
-    if pr < WIRE_MIN:   # middle distance: a small marker, much cheaper than lines
+    if pr < wire_min:   # middle distance: a small marker, much cheaper than lines
         ctx.rectangle(sx - pr, sy - 1, 2 * pr, 1.5).fill()
         h = pr // 2
         ctx.rectangle(sx - 1, sy - h, 1.5, 2 * h).fill()
@@ -162,6 +164,9 @@ def draw_ship(ctx, o, rgb=None):
                   + ((nx * m2 + ny * m5 + nz * m8) >> 8) * z < 0)
         i += 1
 
+    if solid:
+        _fill_hull(ctx, len(bp.verts))
+    ctx.rgb(*(RED if o.hit > 0 else rgb or COLOUR[o.kind]))
     ctx.begin_path()
     for a, b, f1, f2 in bp.edges:
         if (vis[f1] or vis[f2]) and ok[a] and ok[b]:
@@ -169,6 +174,40 @@ def draw_ship(ctx, o, rgb=None):
             ctx.line_to(px[b], py[b])
     ctx.stroke()
     return True
+
+
+def _fill_hull(ctx, n):
+    """Fill black the outline round the first n projected vertices (the
+    smallest convex shape holding them all), if none is behind the viewer."""
+    px = _PX
+    py = _PY
+    pts = []
+    for i in range(n):
+        if not _OK[i]:
+            return
+        pts.append((px[i], py[i]))
+    pts.sort()
+    # Andrew's monotone chain: the lower then the upper half of the outline
+    hull = []
+    for half in (pts, pts[::-1]):
+        start = len(hull)
+        for p in half:
+            while len(hull) >= start + 2:
+                ax, ay = hull[-2]
+                bx, by = hull[-1]
+                if (bx - ax) * (p[1] - ay) - (by - ay) * (p[0] - ax) > 0:
+                    break
+                hull.pop()
+            hull.append(p)
+        hull.pop()
+    if len(hull) < 3:
+        return
+    ctx.rgb(0, 0, 0)
+    ctx.begin_path()
+    ctx.move_to(*hull[-1])
+    for p in hull:
+        ctx.line_to(*p)
+    ctx.fill()
 
 
 def _enemy_beam(ctx, o):
@@ -229,52 +268,25 @@ def station_colour(government):
 
 # ---- the station's tunnel, for launching and docking --------------------
 #
-# Each station has its own tunnel (Tunnel): the rings change shape from the
-# mouth, which is the station's slot (a flat letterbox, level), through the
-# station's own shape halfway in, to a hexagon at the bay doors; and the gaps
-# between them follow a pattern. Every shape is the same 12 points in the
-# same order round the centre, so a ring between two shapes is a blend.
+# Each station has its own tunnel (Tunnel): every ring is the shape of the
+# station's slot (a flat letterbox, level as you come in), and the gaps
+# between the rings follow a pattern of the station's own. At the end it
+# opens into a bigger docking bay of the same shape, with the doors at the back.
 TUNNEL_RINGS = 12
 TUNNEL_FOCAL = 62.0     # pixels across a ring of radius 1 at distance 1
-TUNNEL_SPIN = 0.5       # radians per second: the station turns as you go through
-_CORNERS = 12
-
-
-def _ngon(n):
-    """A regular n-sided shape (n divides 12, a corner at 0 degrees), as 12
-    points at 30 degree steps."""
-    side = TAU / n
-    out = []
-    for k in range(_CORNERS):
-        a = k * TAU / _CORNERS
-        r = math.cos(side / 2) / math.cos(a % side - side / 2)
-        out.append((r * math.cos(a), r * math.sin(a)))
-    return tuple(out)
-
-
-def _slot(aspect):
-    """A station's slot: a rectangle aspect times as wide as it is tall, as 12
-    points, three to each quarter (the middle of the side, half way up it,
-    the corner), in the same order as _ngon's."""
-    w = 1.0
-    h = 1.0 / aspect
-    out = []
-    for sx, sy, flip in ((1, 1, False), (-1, 1, True), (-1, -1, False), (1, -1, True)):
-        q = ((w, 0.0), (w, h * 0.5), (w, h)) if not flip else ((0.0, h), (w, h), (w, h * 0.5))
-        out.extend((x * sx, y * sy) for x, y in q)
-    return tuple(out)
-
-
-HEXAGON = _ngon(6)
-# the shape halfway along, which is what makes one station's tunnel unlike
-# another's (the hexagon means straight from the slot to the doors)
-TUNNEL_SHAPES = (
-    ("HEXAGON", HEXAGON),
-    ("SQUARE", _ngon(4)),
-    ("TRIANGLE", _ngon(3)),
-    ("ROUND", _ngon(12)),
-)
 SLOT_ASPECT = {"CORIOLIS": 3.0, "DODO": 2.0}    # from their slots' vertices: 20 x 60 and 32 x 64
+# the tunnel opens into the docking bay: the same shape, this much bigger and
+# this deep, whatever the spacing; its far wall is the bay doors
+BAY_SCALE = 3.0
+BAY_DEPTH = 3.6
+# ships parked in the bay: ship units to a tunnel unit (a slot is 2 units
+# wide), and only ships that would fit through the slot
+SHIP_SCALE = 150.0
+SLOT_ROOM = 0.95        # how much of the slot a ship may fill
+# where they park: either side of the way in, two rows deep (x, depth into
+# the bay), in tunnel units
+PARK_SPOTS = ((-1.6, 1.3), (1.6, 1.3), (-1.6, 2.7), (1.6, 2.7))
+PARKED_RGB = (0.75, 0.75, 0.75)
 
 # the gaps between rings, from the mouth inwards, before they are scaled to
 # add up to TUNNEL_RINGS - 1 (so a tunnel is always the same length)
@@ -287,40 +299,77 @@ TUNNEL_SPACINGS = (
 )
 
 
-def _blend(pa, pb, t):
-    t = t * t * (3 - 2 * t)     # eased: the change is quickest in the middle
-    return [(xa + (xb - xa) * t, ya + (yb - ya) * t) for (xa, ya), (xb, yb) in zip(pa, pb)]
-
-
 class Tunnel:
-    """One station's tunnel. Ring 0 is the mouth, the last ring the bay
-    doors. depth[j] is ring j's distance in from the mouth (0 to
-    TUNNEL_RINGS - 1); pts[j] its corners as whole numbers, 16ths of a pixel
-    at distance 1. seed (the system's number) picks the middle shape and the
-    spacing; station (its ship name) the slot's shape."""
+    """One station's tunnel. Ring 0 is the mouth; the last ring before the
+    bay is where the tunnel opens into it, and the last ring of all is the
+    bay doors, BAY_SCALE times the slot's size. depth[j] is ring j's distance in from the mouth (0 to
+    TUNNEL_RINGS - 1); pts the slot's four corners, the same for every ring,
+    as whole numbers, 16ths of a pixel at distance 1. seed (the system's
+    number) picks the spacing; station (its ship name) the slot's shape."""
 
     def __init__(self, seed=0, station="CORIOLIS"):
         seed = int(seed) & 0xFF
-        mid = seed % len(TUNNEL_SHAPES)
         sp = (seed // 4 + seed // 17) % len(TUNNEL_SPACINGS)
-        self.names = ("SLOT", TUNNEL_SHAPES[mid][0], "HEXAGON", TUNNEL_SPACINGS[sp][0])
-        slot = _slot(SLOT_ASPECT.get(station, 3.0))
-        middle = TUNNEL_SHAPES[mid][1]
-        gaps = TUNNEL_SPACINGS[sp][1]
-        k = (TUNNEL_RINGS - 1) / sum(gaps)
+        self.names = ("SLOT", TUNNEL_SPACINGS[sp][0])
         last = TUNNEL_RINGS - 1
+        gaps = TUNNEL_SPACINGS[sp][1][:last - 1]    # between the rings; then the bay
+        k = (last - BAY_DEPTH) / sum(gaps)
         self.depth = []
-        self.pts = []
         d = 0.0
-        scale = TUNNEL_FOCAL * 16
-        for j in range(TUNNEL_RINGS):
+        for j in range(last):
             if j:
                 d += gaps[j - 1] * k
-            self.depth.append(d if j < last else float(last))
-            t = 2.0 * j / last
-            ring = _blend(slot, middle, t) if t <= 1.0 else _blend(middle, HEXAGON, t - 1.0)
-            self.pts.append([(int(x * scale), int(y * scale)) for x, y in ring])
-        self.mouth_in = 1.0 / SLOT_ASPECT.get(station, 3.0)   # the slot's half height, for the stars beyond
+            self.depth.append(d)
+        self.depth[last - 1] = last - BAY_DEPTH
+        self.depth.append(float(last))              # the doors, at the back of the bay
+        aspect = SLOT_ASPECT.get(station, 3.0)
+        w = int(TUNNEL_FOCAL * 16)
+        h = int(TUNNEL_FOCAL * 16 / aspect)
+        self.pts = ((w, h), (-w, h), (-w, -h), (w, -h))
+        self.mouth_in = 1.0 / aspect    # the slot's half height, for the stars beyond
+        self.aspect = aspect
+        self.parked = []                # ships in the bay (_Parked): see park
+
+    def fits(self, bp):
+        """True if this ship would fit through the slot, level."""
+        hw = max([abs(v[0]) for v in bp.verts] or [0])
+        hh = max([abs(v[1]) for v in bp.verts] or [0])
+        room = SHIP_SCALE * SLOT_ROOM
+        return hw <= room and hh <= room / self.aspect
+
+    def park(self, bps, rnd):
+        """Park these ships (blueprints) in the bay, the ones that fit the
+        slot, one to a spot, each facing in or out, a little askew."""
+        spots = list(PARK_SPOTS)
+        self.parked = []
+        floor = BAY_SCALE / self.aspect
+        for bp in bps:
+            if not spots or not self.fits(bp):
+                continue
+            x, d = spots.pop(rnd.randrange(len(spots)))
+            hh = max([abs(v[1]) for v in bp.verts] or [0])
+            a = rnd.uniform(-0.3, 0.3) + (math.pi if rnd.random() < 0.5 else 0.0)
+            self.parked.append(_Parked(bp, x, -floor + hh / SHIP_SCALE,
+                                       TUNNEL_RINGS - 1 - BAY_DEPTH + d, a))
+
+
+class _Parked:
+    """A ship parked in the bay: tunnel units across (x), up (y) and its
+    depth in from the mouth; turned by a about the vertical. Has what
+    draw_ship needs."""
+    kind = "ship"
+    hit = 0.0
+
+    def __init__(self, bp, x, y, depth, a):
+        self.bp = bp
+        self.tx = x
+        self.ty = y
+        self.depth = depth
+        c = math.cos(a)
+        sn = math.sin(a)
+        # side, roof, nose: level, the nose a round from straight ahead
+        self.m = [c, 0.0, -sn, 0.0, 1.0, 0.0, sn, 0.0, c]
+        self.x = self.y = self.z = 0.0
 
 
 _TUNNEL0 = None
@@ -336,18 +385,16 @@ def _tunnel(tun):
 
 
 # where each corner of each ring lands on the screen, while drawing
-_SX = [0] * (TUNNEL_RINGS * _CORNERS)
-_SY = [0] * (TUNNEL_RINGS * _CORNERS)
+_SX = [0] * (TUNNEL_RINGS * 4)
+_SY = [0] * (TUNNEL_RINGS * 4)
 
 
-def _draw_rings(ctx, tun, zs, t, rgb, doors):
-    """Draw the rings at distances zs[j] (None if not drawn), the mouth and
-    (if doors) the filled bay doors in the station's colour, and the long
-    edges joining every other corner."""
+def _draw_rings(ctx, tun, zs, rgb, doors):
+    """Draw the rings at distances zs[j] (None if not drawn): the mouth in
+    the station's colour, the tunnel's rings and its four long edges, the
+    wall where it opens into the bay, and (if doors) the bay's edges and its
+    doors, filled dimly, in the station's colour."""
     ctx.line_width = 1.5
-    a = t * TUNNEL_SPIN
-    ca = int(math.cos(a) * 1024)
-    sa = int(math.sin(a) * 1024)
     sx = _SX
     sy = _SY
     last = TUNNEL_RINGS - 1
@@ -358,38 +405,62 @@ def _draw_rings(ctx, tun, zs, t, rgb, doors):
             continue
         shown.append(j)
         kk = int(1024 / z)
-        base = j * _CORNERS
-        for i, (x, y) in enumerate(tun.pts[j]):
-            sx[base + i] = ((x * ca - y * sa) >> 10) * kk >> 14
-            sy[base + i] = ((x * sa + y * ca) >> 10) * kk >> 14
+        if j == last:
+            kk = int(kk * BAY_SCALE)
+        base = j * 4
+        for i in range(4):
+            x, y = tun.pts[i]       # the tunnel doesn't turn: each ring is a scale of these
+            sx[base + i] = x * kk >> 14
+            sy[base + i] = y * kk >> 14
     # far to near, so the doors are filled before anything is drawn over them
     shown.sort(key=lambda j: -zs[j])
     for j in shown:
         z = zs[j]
         b = 1.0 if z < 2 else 2.0 / z      # dimmer further in
-        base = j * _CORNERS
-        if j == last and doors:
+        base = j * 4
+        if j == last:
             ctx.rgb(rgb[0] * 0.25, rgb[1] * 0.25, rgb[2] * 0.25)
             _ring_path(ctx, base)
             ctx.fill()
-        if j == 0 or (j == last and doors):
+        if j == 0 or j == last:
             ctx.rgb(rgb[0] * b, rgb[1] * b, rgb[2] * b)
         else:
             ctx.rgb(b, b, b)
         _ring_path(ctx, base)
         ctx.stroke()
-    if len(shown) > 1:
+    tube = [j for j in shown if j < last]
+    if len(tube) > 1:       # the rings are all the same shape, so these are straight
+        near = tube[-1] * 4
+        far = tube[0] * 4
         ctx.rgb(*GREY)
         ctx.begin_path()
-        for i in range(0, _CORNERS, 2):
-            first = True
-            for j in shown:
-                p = j * _CORNERS + i
-                if first:
-                    ctx.move_to(sx[p], sy[p])
-                    first = False
-                else:
-                    ctx.line_to(sx[p], sy[p])
+        for i in range(4):
+            ctx.move_to(sx[near + i], sy[near + i])
+            ctx.line_to(sx[far + i], sy[far + i])
+        ctx.stroke()
+    # the bay: its front wall (round the tunnel's end) and its four edges back
+    # to the doors, from the nearest point still in front of you
+    zo = zs[last - 1] if zs[last - 1] is not None else (0.4 if zs[last] is not None else None)
+    if zo is None:
+        return
+    ko = int(1024 * BAY_SCALE / zo)
+    ox = [x * ko >> 14 for x, y in tun.pts]
+    oy = [y * ko >> 14 for x, y in tun.pts]
+    b = 1.0 if zo < 2 else 2.0 / zo
+    ctx.rgb(b, b, b)
+    if zs[last - 1] is not None:
+        ctx.begin_path()
+        ctx.move_to(ox[3], oy[3])
+        for i in range(4):
+            ctx.line_to(ox[i], oy[i])
+        ctx.stroke()
+    if zs[last] is not None:
+        d = last * 4
+        ctx.rgb(*GREY)
+        ctx.begin_path()
+        for i in range(4):
+            ctx.move_to(ox[i], oy[i])
+            ctx.line_to(sx[d + i], sy[d + i])
         ctx.stroke()
 
 
@@ -397,9 +468,8 @@ def _ring_path(ctx, base):
     sx = _SX
     sy = _SY
     ctx.begin_path()
-    p = base + _CORNERS - 1
-    ctx.move_to(sx[p], sy[p])
-    for p in range(base, base + _CORNERS):
+    ctx.move_to(sx[base + 3], sy[base + 3])
+    for p in range(base, base + 4):
         ctx.line_to(sx[p], sy[p])
 
 
@@ -436,7 +506,7 @@ def tunnel_glow(f, tun=None):
 # Docking is the launch the other way round: in through the mouth, the rings
 # coming at you more and more slowly, to a stop at the bay doors at the back.
 DOCK_START = 3.0        # the mouth starts this far ahead
-DOCK_END = 2.2          # and you stop with the doors this far ahead
+DOCK_END = BAY_DEPTH + 0.2     # and you stop with the doors this far ahead: at the way into the bay
 
 
 def _dock_depth(f):
@@ -476,8 +546,8 @@ _ZS = [None] * TUNNEL_RINGS
 
 def draw_tunnel(ctx, f, t, rgb=GREEN, inward=False, tun=None):
     """The launch: flying out along the station's tunnel (tun, a Tunnel). f
-    goes from 0 at the start to 1 at the mouth; t is the time in seconds,
-    for the spin; rgb is the station's colour, for the mouth. With inward,
+    goes from 0 at the start to 1 at the mouth; t is the time in seconds
+    (unused: the tunnel doesn't turn); rgb is the station's colour, for the mouth. With inward,
     docking instead: f goes from 0 outside the mouth to 1 stopped at the
     doors."""
     tun = _tunnel(tun)
@@ -489,7 +559,8 @@ def draw_tunnel(ctx, f, t, rgb=GREEN, inward=False, tun=None):
         for j in range(TUNNEL_RINGS):
             z = tun.depth[j] + DOCK_START - s
             zs[j] = z if z >= 0.4 else None
-        _draw_rings(ctx, tun, zs, t, rgb, True)
+        _draw_rings(ctx, tun, zs, rgb, True)
+        _draw_parked(ctx, tun, DOCK_START - s, zs[TUNNEL_RINGS - 2])
         return
     s = (TUNNEL_RINGS + 1) * f * f      # slow at first, then faster
     # space, through the mouth: as far out as the circle inside it
@@ -503,7 +574,30 @@ def draw_tunnel(ctx, f, t, rgb=GREEN, inward=False, tun=None):
     for j in range(TUNNEL_RINGS):
         z = last - tun.depth[j] + 0.6 - s
         zs[j] = z if z >= 0.4 and j < last else None    # the doors are behind you
-    _draw_rings(ctx, tun, zs, t, rgb, False)
+    _draw_rings(ctx, tun, zs, rgb, False)
+    _draw_parked(ctx, tun, None, None, last + 0.6 - s)
+
+
+def _draw_parked(ctx, tun, ahead, gate, back=None):
+    """The ships parked in the bay. A ship at depth d is d + ahead away
+    (docking), or back - d (launching, looking out). gate is how far
+    ahead the tunnel opens into the bay, or None once you are in it: until
+    then only ships seen through the opening are drawn."""
+    zk = FOCAL / TUNNEL_FOCAL * SHIP_SCALE      # tunnel distance to world units
+    for o in tun.parked:
+        z = o.depth + ahead if back is None else back - o.depth
+        if z < 0.2:
+            continue
+        o.x = o.tx * SHIP_SCALE
+        o.y = o.ty * SHIP_SCALE
+        o.z = z * zk
+        if gate is not None:    # in the tunnel still: is it in sight through the opening?
+            sx = TUNNEL_FOCAL * o.tx / z
+            sy = TUNNEL_FOCAL * o.ty / z
+            if (abs(sx) > TUNNEL_FOCAL / gate
+                    or abs(sy) > TUNNEL_FOCAL / tun.aspect / gate):
+                continue
+        draw_ship(ctx, o, PARKED_RGB, 3)    # never a marker: these are close
 
 
 def draw(ctx, g, ms=None, ring=True):
@@ -647,8 +741,20 @@ def _draw_space(ctx, sp):
             if dx * dx + dy * dy < d * d:   # in front of the sun: hide it
                 ctx.rgb(0, 0, 0).arc(x, y, r, 0, TAU, 0).fill()
         ctx.rgb(*PLANET).arc(x, y, r, 0, TAU, 0).stroke()
-    if sp.station is not None:
-        draw_ship(ctx, sp.station, station_colour(sp.gov))
+    st = sp.station
+    if st is not None:
+        # in front of the planet and over its outline: the station hides it
+        solid = False
+        if (planet is not None and st.z > NEAR
+                and st.x * st.x + st.y * st.y + st.z * st.z
+                < sp.px * sp.px + sp.py * sp.py + sp.pz * sp.pz):
+            k = FOCAL / st.z
+            dx = st.x * k - planet[0]
+            dy = -st.y * k - planet[1]
+            pr = st.bp.size * k
+            d = math.sqrt(dx * dx + dy * dy)
+            solid = abs(d - planet[2]) < pr
+        draw_ship(ctx, st, station_colour(sp.gov), WIRE_MIN, solid)
 
 
 # the compass, right of the radar: a ring with a dot that points to the planet,

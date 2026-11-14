@@ -406,6 +406,7 @@ for _ in range(400):
     if e.mode == "docked":
         break
 assert "docking" in seen, "flying in shows the docking tunnel first"
+assert 1.0 <= e.dock_hold <= 2.0, "the view of the bay stays 1 to 2 s"
 assert e.mode == "docked" and e.docked, "flying into the station docks you"
 assert e.cmdr.fuel == 70 and e.cmdr.kills == 2 + 3
 saved = commander.load(SAVE)
