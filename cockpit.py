@@ -83,9 +83,10 @@ def number(ctx, value, x, y, font=_BIG, align=0):
     return width
 
 
-def text(ctx, s, x, y, size, rgb):
+def text(ctx, s, x, y, size, rgb, align=0):
+    """Text centred on (x, y), or with align -1 starting at x, 1 ending at x."""
     ctx.font_size = size
-    ctx.text_align = ctx.CENTER
+    ctx.text_align = ctx.CENTER if align == 0 else (ctx.LEFT if align < 0 else ctx.RIGHT)
     ctx.text_baseline = ctx.MIDDLE
     ctx.rgb(*rgb).move_to(x, y).text(s)
 

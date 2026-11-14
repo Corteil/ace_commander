@@ -1,13 +1,19 @@
-"""The docked screens, as tabs: Status, Local chart, Galactic chart and
-System data. A row of small squares at the top shows which is open.
+"""The docked screens, as tabs: Status, Market, Local chart, Galactic chart
+and System data. A row of small squares at the top shows which is open.
 
-On the two charts C makes the selected system the hyperspace target; once
-launched, the in-flight menu offers a jump to it. The market and the
-equipment screen join these tabs in later phases.
+On the market the joystick picks a good, C buys one and D sells one (hold
+either to keep going). On the two charts C makes the selected system the
+hyperspace target; once launched, the in-flight menu offers a jump to it.
+The equipment screen joins these tabs in phase 4.
 """
-from . import chart, cockpit, commander
+from . import chart, cockpit, commander, market
 
-TABS = ("STATUS", "LOCAL CHART", "GALACTIC CHART", "SYSTEM DATA")
+TABS = ("STATUS", "MARKET", "LOCAL CHART", "GALACTIC CHART", "SYSTEM DATA")
+ROWS = 6            # goods shown at once on the market
+SAY_TIME = 1.5      # seconds a market message stays
+PRICE_X = 24        # where the market's columns end
+STOCK_X = 52
+HOLD_X = 88
 
 
 def _ly(d):
@@ -15,10 +21,22 @@ def _ly(d):
 
 
 class Docked:
-    def __init__(self, cmdr, gal, target=None):
+    def __init__(self, cmdr, gal, target=None, goods=None):
         self.cmdr = cmdr
         self.gal = gal          # None without game_data.py: then only Status
-        self.tabs = TABS if gal is not None else TABS[:1]
+        if gal is None:
+            self.tabs = TABS[:1]
+        elif goods and cmdr.market is not None:
+            self.tabs = TABS
+        else:                   # an older game_data.py, without the goods
+            self.tabs = tuple(t for t in TABS if t != "MARKET")
+        self.market = None
+        if "MARKET" in self.tabs:
+            self.market = market.Market(goods, gal.system(cmdr.system).economy, cmdr)
+        self.sel = 0            # the good picked on the market
+        self.top = 0            # the first good shown
+        self.msg = None         # why the last trade didn't happen
+        self.msg_t = 0.0
         self.tab = 0
         self.target = target if gal is not None else None   # a system index, or None
         self.here = gal.system(cmdr.system) if gal is not None else None
@@ -27,6 +45,10 @@ class Docked:
 
     def name(self):
         return self.tabs[self.tab]
+
+    def open(self, name):
+        """Open the tab with this name."""
+        self.go(self.tabs.index(name))
 
     def go(self, tab):
         """Open tab number tab (it wraps round)."""
@@ -49,7 +71,32 @@ class Docked:
         if i is None:
             return
         self.target = None if i == self.cmdr.system else i
-        self.go(TABS.index("SYSTEM DATA"))
+        self.open("SYSTEM DATA")
+
+    # ---- the market ---------------------------------------------------------
+
+    def pick_good(self, step):
+        """Move the market's highlight up (-1) or down (1), scrolling the list."""
+        n = len(self.market.goods)
+        self.sel = (self.sel + step) % n
+        if self.sel < self.top:
+            self.top = self.sel
+        elif self.sel >= self.top + ROWS:
+            self.top = self.sel - ROWS + 1
+
+    def trade(self, buy):
+        """Buy (or sell) one of the highlighted good. Returns True if it happened."""
+        m = self.market
+        why = m.buy(self.sel) if buy else m.sell(self.sel)
+        self.msg = why
+        self.msg_t = SAY_TIME if why else 0.0
+        return why is None
+
+    def tick(self, dt):
+        if self.msg_t > 0:
+            self.msg_t -= dt
+            if self.msg_t <= 0:
+                self.msg = None
 
     # ---- drawing ------------------------------------------------------------
 
@@ -58,6 +105,8 @@ class Docked:
             self.view.draw(ctx)
         elif self.data is not None:
             self._draw_data(ctx)
+        elif self.name() == "MARKET":
+            self._draw_market(ctx)
         else:
             self._draw_status(ctx)
         if len(self.tabs) > 1:      # which tab is open
@@ -88,8 +137,7 @@ class Docked:
         nxt = c.next_rank()
         if nxt:
             text(ctx, "%d more for %s" % (nxt[1], nxt[0]), 0, 13, 12, cockpit.YELLOW)
-        text(ctx, "fuel %s   %d.%d Cr" % (
-            _ly(c.fuel), int(c.credits), int(c.credits * 10) % 10), 0, 30, 12, cockpit.CYAN)
+        text(ctx, "fuel %s   %s" % (_ly(c.fuel), c.cash_text()), 0, 30, 12, cockpit.CYAN)
         if self.target is not None:
             t = self.gal.system(self.target)
             d = self.gal.distance(c.system, self.target)
@@ -126,3 +174,38 @@ class Docked:
             text(ctx, line, 0, y, 12, cockpit.YELLOW)
             y += 16
         text(ctx, "< > screens   F: status", 0, 68, 11, cockpit.GREY)
+
+    def _draw_market(self, ctx):
+        """The goods, ROWS at a time: name, price, stock and what is in the hold."""
+        text = cockpit.text
+        m = self.market
+        c = self.cmdr
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        text(ctx, "MARKET  " + self.here.name, 0, -100, 11, cockpit.GREY)
+        for label, x in (("price", PRICE_X), ("qty", STOCK_X), ("hold", HOLD_X)):
+            text(ctx, label, x, -74, 10, cockpit.GREY, 1)
+        if self.top > 0:                            # more above
+            ctx.rgb(*cockpit.DIM).rectangle(-3, -69, 6, 2).fill()
+        for row in range(ROWS):
+            i = self.top + row
+            y = -58 + row * 18
+            if i == self.sel:
+                ctx.rgb(*cockpit.DIM).rectangle(-102, y - 8, 204, 16).fill()
+            col = cockpit.GREEN if i == self.sel else cockpit.WHITE
+            unit = m.unit(i)
+            p = m.prices[i]
+            text(ctx, m.name(i), -96, y, 11, col, -1)
+            text(ctx, "%d.%d" % (p // 10, p % 10), PRICE_X, y, 11, cockpit.YELLOW, 1)
+            text(ctx, "%d%s" % (m.stock[i], unit) if m.stock[i] else "-", STOCK_X, y, 11,
+                 cockpit.CYAN, 1)
+            if c.cargo[i]:
+                text(ctx, "%d%s" % (c.cargo[i], unit), HOLD_X, y, 11, cockpit.GREEN, 1)
+        if self.top + ROWS < len(m.goods):          # more below
+            ctx.rgb(*cockpit.DIM).rectangle(-3, 44, 6, 2).fill()
+        text(ctx, "%s   hold %d/%dt" % (c.cash_text(), market.hold_used(c.cargo), c.hold),
+             0, 58, 12, cockpit.CYAN)
+        if self.msg:
+            text(ctx, self.msg, 0, 75, 12, cockpit.RED)
+        else:
+            text(ctx, "C: buy   D: sell", 0, 75, 11, cockpit.GREY)
+        text(ctx, "< > screens   F: status", 0, 91, 11, cockpit.GREY)

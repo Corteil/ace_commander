@@ -59,11 +59,21 @@ tick(a, fresh=["CONFIRM"])
 a.cmdr.add_kills(140)
 shot(a, "1e_docked.png")
 d = a.dock
-d.go(2)
+d.open("MARKET")
+for i in (0, 0, 0, 7, 7):
+    d.sel = i; d.trade(True)
+d.pick_good(1)
+shot(a, "1j_market.png")
+for _ in range(9):
+    d.pick_good(1)
+d.cmdr.cash = 3; d.trade(True)
+shot(a, "1k_market_scrolled.png")
+d.cmdr.cash = 1000
+d.open("GALACTIC CHART")
 shot(a, "1f_galactic.png")
-d.target = 147; d.go(1)
+d.target = 147; d.open("LOCAL CHART")
 shot(a, "1g_local_docked.png")
-d.go(3)
+d.open("SYSTEM DATA")
 shot(a, "1h_system_data.png")
 d.go(0); a.target = 147
 shot(a, "1i_docked_target.png")

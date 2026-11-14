@@ -71,6 +71,9 @@ try:    # the galaxy's starting numbers, made by tools/import_galaxy.py
     from . import game_data
 except Exception:
     game_data = None
+GOODS = getattr(game_data, "GOODS", None)   # the market's goods, if game_data.py has them
+REPEAT_WAIT = 0.45      # seconds a market button is held before it starts repeating
+REPEAT_EVERY = 0.09     # then once every this many seconds
 
 try:    # the joystick's directions and buttons A-F, told apart from each other
     from events.joystick import JOYSTICK_BUTTON_TYPES as JOY
@@ -277,6 +280,7 @@ class AceCommander(app.App):
         self.launch_t = 0.0     # how far into the launch tunnel
         self.dock_t = 0.0       # how far into the docking tunnel
         self.dock_hold = 0.0    # how long the view of the bay stays at the end of it
+        self.held_t = {}        # how long each market button has been held (see _repeat)
         self.tunnel = None      # this station's tunnel (cockpit.Tunnel), for launching and docking
         self.d_t = None         # how long D has been down, when steering by tilt
         self.viewer = None
@@ -627,12 +631,17 @@ class AceCommander(app.App):
         self.career = True
         c = self.cmdr
         c.fuel = commander.MAX_FUEL
+        if GOODS and self.galaxy is not None and (c.market is None
+                                                  or c.market["system"] != c.system):
+            from . import market
+            c.market = market.new(GOODS, c.system, self.galaxy.system(c.system).economy,
+                                  random.randint(0, 255))
         c.save(SAVE_PATH)
         if self.game is not None:
             self.game.docked = False
         if self.target == c.system:
             self.target = None
-        self.dock = docked.Docked(c, self.galaxy, self.target)
+        self.dock = docked.Docked(c, self.galaxy, self.target, GOODS)
         self.docked = True
         self.jump_to = None
         self.paused = False
@@ -648,10 +657,12 @@ class AceCommander(app.App):
         d = self.dock
         hit = self.pad.hit
         new = FB is not None
+        d.tick(dt)
         if cancel:
             if d.tab:
                 d.go(0)
             else:
+                self._save_docked()
                 self.mode = "menu"
             return
         if new and hit(BTN_MENU):
@@ -675,8 +686,42 @@ class AceCommander(app.App):
             d.go(d.tab - 1)
         elif hit("j_right" if new else "right"):
             d.go(d.tab + 1)
+        elif d.name() == "MARKET":
+            # the joystick picks a good; C buys and D sells; all repeat when held
+            if self._repeat("j_up" if new else "up", dt):
+                d.pick_good(-1)
+            elif self._repeat("j_down" if new else "down", dt):
+                d.pick_good(1)
+            elif self._repeat("C" if new else "confirm", dt):
+                d.trade(True)
+            elif new and self._repeat(BTN_MISSILE, dt):
+                d.trade(False)
         elif confirm and d.name() == "STATUS":
             self._launch()
+
+    def _repeat(self, name, dt):
+        """True when button name is pressed, and again and again while it is
+        held: after REPEAT_WAIT, every REPEAT_EVERY seconds."""
+        pad = self.pad
+        if pad.hit(name):
+            self.held_t[name] = 0.0
+            return True
+        if name not in self.held_t:
+            return False
+        if not pad.held(name):
+            del self.held_t[name]
+            return False
+        t = self.held_t[name] + dt
+        if t >= REPEAT_WAIT:
+            self.held_t[name] = t - REPEAT_EVERY
+            return True
+        self.held_t[name] = t
+        return False
+
+    def _save_docked(self):
+        """Save what was bought and sold while docked."""
+        if self.cmdr is not None:
+            self.cmdr.save(SAVE_PATH)
 
     def _pick_tunnel(self):
         """This station's tunnel: its slot's shape and its own ring spacing, from its
@@ -703,6 +748,7 @@ class AceCommander(app.App):
                              random)
 
     def _launch(self):
+        self._save_docked()
         self._pick_tunnel()
         self.launch_t = 0.0
         self.dock = None
@@ -728,6 +774,7 @@ class AceCommander(app.App):
             return
         c.system = to[0]
         c.fuel = max(0, c.fuel - to[1])
+        c.market = None         # a new system: its market is worked out on docking
         self.target = None
         self._save()
         self._enter_space("arrive")

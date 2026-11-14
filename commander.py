@@ -3,9 +3,9 @@ tests on a PC.
 
 Phase 1 holds the level, the kill count and the rank that follows from it.
 Phase 2 adds the star system the commander is in and the fuel in the tank.
-Credits, cargo and equipment arrive with the later phases; the fields
-that already have a decided starting value (credits, docking style) are saved
-now so old saves stay readable.
+Phase 3 adds cash (in tenths of a credit, as the original keeps it), the
+cargo hold, and the market at the station they are at (see market.py), and
+the docking style. Equipment arrives in phase 4.
 """
 import json
 
@@ -29,7 +29,9 @@ RANKS = (
 )
 
 DOCKING = ("A", "B", "C")    # authentic, assisted, automatic
-VERSION = 2
+VERSION = 3
+GOODS = 17          # kinds of cargo (market.py)
+HOLD = 20           # tonnes in a standard cargo hold
 MAX_FUEL = 70       # tenths of a light year: a full tank is 7.0 light years
 
 
@@ -51,11 +53,22 @@ class Commander:
     def __init__(self, level=1):
         self.level = max(0, min(len(LEVELS) - 1, int(level)))
         self.kills = 0
-        self.credits = 100.0
+        self.cash = 1000        # tenths of a credit
+        self.cargo = [0] * GOODS
+        self.hold = HOLD        # tonnes the hold takes
+        self.market = None      # the market where they are (market.new), or None
         self.docking = "B"
         self.system = None      # which star system the commander is in (None: the start)
         self.fuel = MAX_FUEL    # tenths of a light year
         self._needs = thresholds(self.level)
+
+    @property
+    def credits(self):
+        return self.cash / 10.0
+
+    def cash_text(self):
+        """Cash as the original shows it: 1234.5 Cr."""
+        return "%d.%d Cr" % (self.cash // 10, self.cash % 10)
 
     def rank_index(self):
         i = 0
@@ -87,13 +100,23 @@ class Commander:
     def to_dict(self):
         return {"version": VERSION, "level": self.level, "kills": self.kills,
                 "credits": self.credits, "docking": self.docking,
-                "system": self.system, "fuel": self.fuel}
+                "system": self.system, "fuel": self.fuel, "cargo": self.cargo,
+                "market": self.market}
 
     @classmethod
     def from_dict(cls, d):
         c = cls(d.get("level", 1))
         c.kills = max(0, int(d.get("kills", 0)))
-        c.credits = float(d.get("credits", 100.0))
+        c.cash = max(0, int(round(float(d.get("credits", 100.0)) * 10)))
+        cargo = d.get("cargo")
+        if isinstance(cargo, list) and len(cargo) == GOODS:
+            c.cargo = [max(0, int(n)) for n in cargo]
+        m = d.get("market")
+        if (isinstance(m, dict) and isinstance(m.get("system"), int)
+                and isinstance(m.get("r"), int) and isinstance(m.get("stock"), list)
+                and len(m["stock"]) == GOODS):
+            c.market = {"system": m["system"], "r": m["r"] & 0xFF,
+                        "stock": [max(0, int(n)) for n in m["stock"]]}
         if d.get("docking") in DOCKING:
             c.docking = d["docking"]
         s = d.get("system")

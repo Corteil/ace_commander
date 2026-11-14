@@ -212,6 +212,7 @@ class CountCtx:
     """Checks every call is a known one with finite numbers, and counts them."""
     CENTER = "center"
     LEFT = "left"
+    RIGHT = "right"
     MIDDLE = "middle"
 
     def __init__(self):
@@ -250,6 +251,7 @@ class PilCtx:
     """Draws to a PIL image, to look at a frame. scale 3 = 720 x 720."""
     CENTER = "center"
     LEFT = "left"
+    RIGHT = "right"
     MIDDLE = "middle"
 
     def __init__(self, scale=3):
@@ -344,7 +346,8 @@ class PilCtx:
         except OSError:
             font = ImageFont.load_default()
         x, y = self._p(*self.cur)
-        self.d.text((x, y), s, fill=self.col, font=font, anchor="mm")
+        anchor = {"left": "lm", "right": "rm"}.get(self.text_align, "mm")
+        self.d.text((x, y), s, fill=self.col, font=font, anchor=anchor)
         self.path = []
         return self
 

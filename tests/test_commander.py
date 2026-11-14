@@ -334,6 +334,7 @@ assert g.space.gov == e.galaxy.system(129).government
 assert g.warp > 0 and not g.objs and not g.jumped and g.kills == 2
 saved = commander.load(SAVE)
 assert (saved.system, saved.fuel, saved.kills) == (129, 70 - d129, 2), "arriving saves"
+assert e.cmdr.market is None and saved.market is None, "a new system: its market comes on docking"
 texts(e)        # the streaks draw
 for _ in range(60):
     tick(e)
@@ -426,8 +427,57 @@ print("launching, arriving, flying to the station, docking, refuelling: ok")
 
 # ---- the docked tabs, targets, and the jump line in the in-flight menu ----
 d = e.dock
-assert d.tabs == ("STATUS", "LOCAL CHART", "GALACTIC CHART", "SYSTEM DATA") and d.tab == 0
-assert any("< > screens" in t for t in texts(e))
+assert d.tabs == ("STATUS", "MARKET", "LOCAL CHART", "GALACTIC CHART", "SYSTEM DATA")
+assert d.tab == 0 and any("< > screens" in t for t in texts(e))
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "MARKET"
+# ---- the market (Lave: rich agricultural, so food is cheap and computers dear)
+m = d.market; c = e.cmdr
+assert c.market["system"] == c.system == 7 and len(m.prices) == 17
+tx = texts(e)
+assert "MARKET  LAVE" in tx and "FOOD" in tx and "price" in tx and "C: buy   D: sell" in tx, tx
+assert 36 <= m.prices[0] <= 40 and 896 <= m.prices[7] <= 908, (m.prices[0], m.prices[7])
+assert m.stock[16] == 0, "never any alien items"
+cash0, food0 = c.cash, m.stock[0]
+tick(e, fresh=["C"])
+assert c.cargo[0] == 1 and c.cash == cash0 - m.prices[0] and m.stock[0] == food0 - 1, "C buys one"
+assert any(t.startswith("1t") for t in texts(e)) and any("hold 1/20t" in t for t in texts(e))
+tick(e, fresh=["D"])
+assert c.cargo[0] == 0 and c.cash == cash0 and m.stock[0] == food0, "D sells one at the same price"
+tick(e, fresh=["D"]); assert d.msg == "NONE TO SELL" and "NONE TO SELL" in texts(e)
+for _ in range(int(1.6 / 0.04)):
+    tick(e)
+assert d.msg is None, "the message goes"
+# holding C keeps buying, until the hold is full or the stock runs out
+c.cash = 100000
+for _ in range(60):
+    tick(e, held=["C"])
+tick(e)
+assert c.cargo[0] == min(20, food0) and (d.msg in ("HOLD FULL", "NONE LEFT") or c.cargo[0] < 20), (c.cargo[0], d.msg)
+if c.cargo[0] == 20:
+    tick(e, fresh=["C"]); assert d.msg == "HOLD FULL"
+# gold is by the kilo and doesn't use the hold
+for _ in range(5):
+    tick(e, fresh=["JOYDOWN"])
+assert d.sel == 5 and d.top == 0
+for _ in range(8):
+    tick(e, fresh=["JOYDOWN"])
+assert d.sel == 13 and d.top == 8 and m.unit(13) == "kg", "the list scrolls"
+if m.stock[13]:
+    tick(e, fresh=["C"]); assert c.cargo[13] == 1
+c.cash = 5
+tick(e, fresh=["JOYUP"]); tick(e, fresh=["C"])
+assert d.msg in ("NOT ENOUGH CASH", "NONE LEFT")
+# trades are saved: on leaving for the title, and on launching
+bought = list(c.cargo)
+c.cash = 1234
+tick(e, fresh=["F"]); assert d.name() == "STATUS" and "fuel 7.0 LY   123.4 Cr" in texts(e)
+tick(e, fresh=["F"]); assert e.mode == "menu"
+saved = commander.load(SAVE)
+assert saved.cargo == bought and saved.cash == 1234 and saved.market == c.market, "saved on leaving"
+choose(e, "CONTINUE"); assert e.mode == "docked"
+d = e.dock
+assert d.market.stock == saved.market["stock"] and e.cmdr.cargo == bought, "the same market again"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "MARKET"
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART" and d.view.verb == "TARGET"
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART", "the joystick moves the cursor here"
 tick(e, fresh=["B"]); assert d.name() == "GALACTIC CHART" and len(d.view.dots) == 256
@@ -441,7 +491,7 @@ tick(e, fresh=["JOYRIGHT"]); assert d.name() == "STATUS", "tabs wrap round"
 tick(e, fresh=["E"]); assert d.name() == "SYSTEM DATA"
 tick(e, fresh=["F"]); assert d.name() == "STATUS" and e.mode == "docked", "F goes back to Status"
 # pick Diso (147) on the galactic chart by steering to it
-d.go(2)
+d.open("GALACTIC CHART")
 tx_, ty_ = [(dot[0], dot[1]) for dot in d.view.dots if dot[2] == 147][0]
 for _ in range(400):
     v = d.view
@@ -461,9 +511,9 @@ dd = gal.distance(7, 147)
 tx = texts(e)
 assert "Democracy" in tx and ("%d.%d LY away" % (dd // 10, dd % 10)) in tx, tx
 d.go(0); assert any(t.startswith("target: DISO") for t in texts(e))
-d.go(1); assert d.view.sel[2] == 147, "the chart opens on the target"
+d.open("LOCAL CHART"); assert d.view.sel[2] == 147, "the chart opens on the target"
 # a far system can be looked up, but not jumped to
-d.go(2)
+d.open("GALACTIC CHART")
 far = max(d.view.dots, key=lambda dot: dot[3])
 d.view.cx, d.view.cy = float(far[0]), float(far[1]); d.view._select()
 assert any("TOO FAR  C: DATA" in t for t in texts(e))
