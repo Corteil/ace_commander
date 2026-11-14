@@ -151,6 +151,20 @@ g.to_station(2500.0)
 for _ in range(6):
     g._space(0.3)
 shot(a, "4k_station.png")
+# docking by hand: the slot level (what docking A asks for), close in
+g.to_station(700.0)
+st = g.space.station
+game._roll(st.m, math.pi / 2 - math.atan2(st.m[3], st.m[4]))
+g._measure()
+shot(a, "4m_slot_level.png")
+# the docking tunnel: outside the mouth, going through it, stopped at the doors
+saved_mode = a.mode
+a.mode = "docking"
+for name, f in (("4n_dock_mouth.png", 0.05), ("4o_dock_through.png", 0.3),
+                ("4p_dock_doors.png", 1.0)):
+    a.dock_t = f * mod.DOCK_TIME
+    shot(a, name)
+a.mode = saved_mode
 g.space = launched
 g.speed = 0.0
 for _ in range(int(math.pi / 0.04)):     # turn round to look back at the station

@@ -113,6 +113,8 @@ FAST_FRAMES = True      # on the title screen, in flight and in the viewer, don'
 PERF_LOG = 60           # print a PERF line to the console every this many flight
                         # frames (0 = never)
 LAUNCH_TIME = 2.5       # seconds of launch tunnel (C skips it)
+DOCK_TIME = 3.0         # seconds of flying in through the station's tunnel on docking (C skips it)
+DOCK_NAMES = {"A": "AUTHENTIC", "B": "ASSISTED", "C": "AUTOMATIC"}
 DEBUG_MENU = True       # show DEBUG, a page of cheats for testing, in the in-flight menu
 PERF_SLOW = 25          # ms over the average that makes a frame count as slow
 
@@ -271,6 +273,7 @@ class AceCommander(app.App):
         self.dock = None        # the docked screens (docked.Docked), while docked
         self.target = None      # the system picked for the next hyperspace jump
         self.launch_t = 0.0     # how far into the launch tunnel
+        self.dock_t = 0.0       # how far into the docking tunnel
         self.d_t = None         # how long D has been down, when steering by tilt
         self.viewer = None
         self.paused = False
@@ -315,7 +318,7 @@ class AceCommander(app.App):
             self.update(_diff(now, last))
             last = now
             if self.fast and (self.mode == "flight" or self.mode == "viewer"
-                              or self.mode == "launch"
+                              or self.mode == "launch" or self.mode == "docking"
                               or (self.mode == "menu" and self.title is not None)):
                 try:
                     scheduler.render_needed.set()
@@ -502,6 +505,12 @@ class AceCommander(app.App):
                     self.game.over = True   # every launch is a new flight
                 self.docked = False
                 self._start_flight(True)
+        elif self.mode == "docking":
+            self.dock_t += dt
+            self._leds_station(cockpit.dock_glow(min(1.0, self.dock_t / DOCK_TIME)))
+            if confirm or self.dock_t >= DOCK_TIME:
+                self._leds_release()
+                self._dock()
         elif self.mode == "viewer":
             self._update_viewer(dt, cancel, confirm)
         elif self.mode == "bench":
@@ -600,6 +609,7 @@ class AceCommander(app.App):
         c = self.cmdr
         if self.galaxy is None or c is None or c.system is None:
             return
+        self.game.set_docking(c.docking)
         s = self.galaxy.system(c.system)
         self.game.enter(s.radius, "DODO" if s.tech >= game.DODO_TECH else "CORIOLIS", how,
                         s.government)
@@ -860,8 +870,11 @@ class AceCommander(app.App):
             self._arrive()
         if self.career:
             self._bank()
-            if g.docked:
-                self._dock()
+            if g.docked:        # flown in: the tunnel, then the docked screens
+                g.docked = False
+                self._bank()
+                self.dock_t = 0.0
+                self.mode = "docking"
         return True
 
     # ---- in-flight menu ---------------------------------------------------
@@ -874,7 +887,11 @@ class AceCommander(app.App):
                 steer = "STEER: " + ("TILT" if self.use_tilt else stick)
             else:
                 steer = "STEER: %s (no tilt sensor)" % stick
-            return [steer, "QUIT TO TITLE"]
+            items = [steer]
+            if self.career and self.cmdr is not None:
+                items.append("DOCKING: " + DOCK_NAMES[self.cmdr.docking])
+            items.append("QUIT TO TITLE")
+            return items
         if self.fsub == "debug":
             return ["INVINCIBLE: " + ("ON" if self.game.god else "OFF"),
                     "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
@@ -948,11 +965,20 @@ class AceCommander(app.App):
                     "DEBUG" if self.fsub == "debug" else "PAUSE MENU")
                 self.fsub = None
         elif self.fsub == "pause":
-            side = hit("j_left" if new else "left") or hit("j_right" if new else "right")
+            left = hit("j_left" if new else "left")
+            side = left or hit("j_right" if new else "right")
+            item = items[self.fmenu]
             if self.fmenu == 0:
                 if (confirm or side) and self.tilt_ok:
                     self.use_tilt = not self.use_tilt
                     self.zero = None
+            elif item.startswith("DOCKING"):
+                if confirm or side:     # C and right go A, B, C, A; left goes back
+                    c = self.cmdr
+                    i = commander.DOCKING.index(c.docking) + (-1 if left else 1)
+                    c.docking = commander.DOCKING[i % len(commander.DOCKING)]
+                    self.game.set_docking(c.docking)
+                    c.save(SAVE_PATH)
             elif confirm:
                 self._to_title()
         elif self.fsub == "debug":
@@ -1050,6 +1076,9 @@ class AceCommander(app.App):
         elif self.mode == "launch":
             cockpit.draw_tunnel(ctx, min(1.0, self.launch_t / LAUNCH_TIME), self.launch_t,
                                 cockpit.station_colour(self._government()))
+        elif self.mode == "docking":
+            cockpit.draw_tunnel(ctx, min(1.0, self.dock_t / DOCK_TIME), self.dock_t,
+                                cockpit.station_colour(self._government()), True)
         else:
             self._draw_menu(ctx)
         ctx.restore()

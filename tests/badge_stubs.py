@@ -314,6 +314,10 @@ class PilCtx:
         elif self.shape and self.shape[0] == "arc":
             _, x, y, r = self.shape
             self.d.ellipse([self._p(x - r, y - r), self._p(x + r, y + r)], fill=self.col)
+        else:           # a path of lines: filled as polygons
+            for pts in self.path:
+                if len(pts) > 2:
+                    self.d.polygon(pts, fill=self.col)
         self.shape = None
         self.path = []
         return self

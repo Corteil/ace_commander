@@ -202,6 +202,56 @@ _STREAKS = tuple(
     for i in range(18))
 
 
+def _hexagon(ctx, corners, k):
+    ctx.begin_path()
+    x, y = corners[5]
+    ctx.move_to(int(x * k), int(y * k))
+    for x, y in corners:
+        ctx.line_to(int(x * k), int(y * k))
+
+
+def _draw_dock(ctx, f, t, rgb):
+    """Docking: see draw_tunnel. Ring 0 is the mouth, in the station's
+    colour; the last ring is the bay doors, filled dimly."""
+    ctx.line_width = 1.5
+    s = _dock_depth(f)
+    a = t * TUNNEL_SPIN
+    ca = math.cos(a)
+    sa = math.sin(a)
+    corners = [(TUNNEL_FOCAL * (x * ca - y * sa), TUNNEL_FOCAL * (x * sa + y * ca))
+               for x, y in _HEX]
+    last = TUNNEL_RINGS - 1
+    near = far = None
+    # far to near, so the doors are filled before the rings are drawn over them
+    for i in range(last, -1, -1):
+        z = i + DOCK_START - s
+        if z < 0.4:
+            continue
+        k = 1.0 / z
+        if far is None:
+            far = k
+        near = k
+        b = 1.0 if z < 2 else 2.0 / z      # dimmer further in
+        if i == last:                       # the doors
+            ctx.rgb(rgb[0] * 0.25, rgb[1] * 0.25, rgb[2] * 0.25)
+            _hexagon(ctx, corners, k)
+            ctx.fill()
+            ctx.rgb(rgb[0] * b, rgb[1] * b, rgb[2] * b)
+        elif i == 0:                        # the mouth
+            ctx.rgb(rgb[0] * b, rgb[1] * b, rgb[2] * b)
+        else:
+            ctx.rgb(b, b, b)
+        _hexagon(ctx, corners, k)
+        ctx.stroke()
+    if near is not None and far != near:    # the tunnel's six long edges
+        ctx.rgb(*GREY)
+        ctx.begin_path()
+        for x, y in corners:
+            ctx.move_to(int(x * near), int(y * near))
+            ctx.line_to(int(x * far), int(y * far))
+        ctx.stroke()
+
+
 # the launch tunnel: hexagonal rings one unit apart, the way out of the station
 TUNNEL_RINGS = 12
 TUNNEL_FOCAL = 62.0     # pixels across a ring of radius 1 at distance 1
@@ -245,6 +295,34 @@ def tunnel_glow(f):
     return 0.5 * (1 - p) * (1 - p)
 
 
+# Docking is the launch the other way round: in through the mouth, the rings
+# coming at you more and more slowly, to a stop at the bay doors at the back.
+DOCK_START = 3.0        # the mouth starts this far ahead (rings are one unit apart)
+DOCK_END = 2.2          # and you stop with the doors this far ahead
+
+
+def _dock_depth(f):
+    """How far into the tunnel you are at point f (0 to 1) of docking:
+    quick through the mouth, slowing to a stop."""
+    g = 1.0 - f
+    return (DOCK_START + TUNNEL_RINGS - 1 - DOCK_END) * (1.0 - g * g)
+
+
+def dock_glow(f):
+    """How bright the LEDs are at point f (0 to 1) of docking: rising as the
+    mouth comes up, a flash going through it, then a pulse for each ring."""
+    p = _dock_depth(f) - (DOCK_START - 0.4)     # ring i goes past when this reaches i
+    if p < 0:
+        return 0.4 * (1.0 + p / (DOCK_START - 0.4))
+    n = int(p)
+    if n >= TUNNEL_RINGS - 1:
+        return 0.0
+    p -= n
+    if n == 0:
+        return 1.0 - 0.6 * p
+    return 0.5 * (1 - p) * (1 - p)
+
+
 # stars seen through the mouth of the tunnel: (x, y, distance from the centre)
 def _scatter(n):
     out = []
@@ -261,11 +339,15 @@ def _scatter(n):
 _STARS = _scatter(40)
 
 
-def draw_tunnel(ctx, f, t, rgb=GREEN):
+def draw_tunnel(ctx, f, t, rgb=GREEN, inward=False):
     """The launch: flying out along a tunnel of hexagons. f goes from 0 at the
     start to 1 at the mouth; t is the time in seconds, for the spin; rgb is
-    the station's colour, for the mouth."""
+    the station's colour, for the mouth. With inward, docking instead: f
+    goes from 0 outside the mouth to 1 stopped at the doors."""
     ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+    if inward:
+        _draw_dock(ctx, f, t, rgb)
+        return
     ctx.line_width = 1.5
     s = (TUNNEL_RINGS + 1) * f * f      # slow at first, then faster
     a = t * TUNNEL_SPIN

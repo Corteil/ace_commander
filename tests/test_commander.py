@@ -162,6 +162,12 @@ assert any("more for ABOVE AVERAGE" in t for t in tx)
 assert any(t.startswith("LAVE") and "fuel 7.0 LY" in t for t in tx), tx
 tick(a, fresh=["C"]); assert a.fsub is None and a.paused
 fpick(a, "PAUSE MENU"); assert a.fsub == "pause"
+assert a._fitems()[1] == "DOCKING: ASSISTED" and a.game.docking == "B", a._fitems()
+tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+assert a._fitems()[1] == "DOCKING: AUTOMATIC" and a.game.docking == "C"
+assert commander.load(SAVE).docking == "C", "the choice is saved straight away"
+tick(a, fresh=["JOYRIGHT"]); assert a.cmdr.docking == "A" and a.game.docking == "A"
+tick(a, fresh=["JOYLEFT"]); tick(a, fresh=["JOYLEFT"]); assert a.cmdr.docking == "B"
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
 assert a.mode == "menu" and commander.load(SAVE).kills == 6, "quitting to the title saves"
 assert a.choices()[0] == "CONTINUE" and a.menu == 0
@@ -191,12 +197,12 @@ launch(a); assert not g.over and g.kills == 0
 kill(g); tick(a); assert a.cmdr.kills == 9
 
 # a flight left part-way for the title screen carries on
-fpick(a, "PAUSE MENU"); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); assert a.mode == "menu"
+fpick(a, "PAUSE MENU"); tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"]); assert a.mode == "menu"
 choose(a, "CONTINUE"); assert a.mode == "flight" and g.kills == 1 and not a.docked
 
 # a new app instance (the badge restarted) finds the commander
 fpick(a, "PAUSE MENU")
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); assert a.mode == "menu"
+tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"]); assert a.mode == "menu"
 b = ace_commander.AceCommander()
 assert b.cmdr.kills == 9 and b.cmdr.level == 0 and b.choices()[0] == "CONTINUE"
 choose(b, "NEW COMMANDER")
@@ -391,11 +397,15 @@ g.pending = 0; g.encounter_t = 1e9
 g.objs[:] = [o for o in g.objs if o.kind != "ship"]
 debug(e, "TO THE STATION")
 assert g.space.station.z == 4000.0 and g.space.safe
+e.cmdr.docking = "C"; g.set_docking("C")    # at full speed only automatic docking works
 tick(e, fresh=["A"])
+seen = set()
 for _ in range(400):
     tick(e, held=["F"])        # F: speed up
+    seen.add(e.mode)
     if e.mode == "docked":
         break
+assert "docking" in seen, "flying in shows the docking tunnel first"
 assert e.mode == "docked" and e.docked, "flying into the station docks you"
 assert e.cmdr.fuel == 70 and e.cmdr.kills == 2 + 3
 saved = commander.load(SAVE)
@@ -460,7 +470,7 @@ tick(e, fresh=["C"]); assert e.target == far[2] and d.name() == "SYSTEM DATA"
 assert any("too far" in t for t in texts(e))
 launch(e)
 assert not any(s.startswith("JUMP") for s in e._fitems_top()), "no jump line out of range"
-fpick(e, "PAUSE MENU"); tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["C"])
+fpick(e, "PAUSE MENU"); tick(e, fresh=["JOYUP"]); tick(e, fresh=["C"])
 choose(e, "CONTINUE"); assert e.mode == "flight"   # back in the same flight
 e.target = 147
 assert e._fitems_top()[1] == "JUMP: DISO", e._fitems_top()

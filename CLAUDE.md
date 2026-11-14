@@ -3,7 +3,7 @@
 Notes for picking this project up in a new session. Last updated at the end of the first
 working session, 2026-11-12 (build 13); updated 2026-11-13 (build 16: renamed, on a Pi, design
 phase 1 built) and again that night (build 22: DEBUG page, missile lock, phase 2), and
-2026-11-14 (build 26: phase 3 started, the star system).
+2026-11-14 (build 26: phase 3 started, the star system; build 27: docking by hand).
 
 ## What this is
 
@@ -15,8 +15,8 @@ C or `@micropython.viper` is welcome only if measurements show it would help.
 Built from `DESIGN.md`: phase 1 (title screen, saved commander with rank, three levels, new
 button layout) and phase 2 (galaxy, local and galactic charts, system data, hyperspace,
 fuel, docked screens as tabs, launch tunnel), and the start of phase 3 (build 26: planet,
-sun, station, compass, jump drive, automatic docking). Not built yet: docking by hand,
-trading (the rest of phase 3, then phases 4 to 6), and the system description sentence.
+sun, station, compass, jump drive, automatic docking; build 27: docking by hand). Not
+built yet: trading (the rest of phase 3, then phases 4 to 6), and the system description sentence.
 
 ## Files
 
@@ -237,6 +237,31 @@ of a real flight, not from a harness.
    Brian asked for them and confirmed they look good (2026-11-14). A real flight in a
    system that day: 36-38 ms a frame with no ships (draw 12.5-14), 38-47 ms with 1-4, one
    or two collections per 60 frames as before, no errors.
+   **Build 27: docking by hand** (2026-11-14). `Game.docking` ("A" / "B" / "C", from
+   `Commander.docking` via `Game.set_docking` in `app._enter_space`; `Game()` defaults to C
+   so old tests keep working). The pause page has DOCKING: AUTHENTIC / ASSISTED / AUTOMATIC
+   (C or right goes on, left back; saved straight away). `Game._approach` runs within
+   `CAPTURE_DIST` for A and B: you touch the station at `bp.front + PLAYER_R` from its
+   centre (`Blueprint.front` is the slot face: 160 Coriolis, 196 Dodo). A docks if you are
+   in front of the slot (`SLOT_CONE_A`, 22 deg), flying into it (`HEAD_A`, 26 deg), the slot
+   level on screen (`LEVEL_A`, |station roof . screen x| >= cos 30 deg, either way up; the
+   station spins at `STATION_SPIN` so you roll with it) and at `DOCK_SPEED` (20) or less. B:
+   in the cone (`SLOT_CONE_B`), heading in (`HEAD_B`) and slow, the tractor beam takes over
+   ("TRACTOR BEAM"): the station turns its slot to you (`PULL_TURN`) and closes at `PULL`;
+   speeding up past `DOCK_SPEED` loses it ("TOO FAST"). Anything else is a crash
+   ("STATION HIT" / "TOO FAST"): `STATION_HIT` + 1.5 x speed damage, speed 0, bounced
+   `BOUNCE` out (`Game._shift` moves the whole system), 1 s before another hit counts.
+   TO THE STATION now also turns the slot to face you (`to_station(dist, slot=True)`).
+   Tested on the PC only (tests/test_game.py "docking by hand"; shot 4m_slot_level.png
+   shows the slot as a level letterbox when A's roll rule is met).
+   **Build 28: the docking scene** (Brian's request after trying build 27, which he said
+   ran fine). Flying in (any style) sets app mode `docking` for `DOCK_TIME` (3 s, C skips):
+   the launch tunnel the other way round (`cockpit.draw_tunnel(..., inward=True)`,
+   `_draw_dock`): the mouth in the station's colour starts `DOCK_START` ahead, the rings
+   come at you more and more slowly, and you stop with the bay doors (a dim filled hexagon)
+   `DOCK_END` ahead. The LEDs (`cockpit.dock_glow`) rise as the mouth nears, flash going
+   through it, pulse for each ring; then `_dock()` as before. DOCK NOW and GAME OVER + C
+   skip the scene. Measured on the badge (real ctx, REPL): 14-19 ms a frame to draw.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
@@ -245,7 +270,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 26), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 28), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
@@ -264,6 +289,10 @@ by itself is faster than one fill for all of them (3.5 against 7.7 ms). Flight a
 - The star system (build 26): whether the planet, sun, station and compass read well;
   `ARRIVE_DIST`, `SAFE_DIST`, `JUMP_K`, `ENCOUNTER` and `DOCK_DIST` by feel; the frame
   rate with the planet in view.
+- Docking by hand (build 27): whether A is possible with the digital joystick (the
+  tolerances above), whether B's beam feels right, crash damage and bounce; not yet on
+  the badge (deployed and checked over the REPL; Brian's first test run was fine).
+- The docking scene (build 28): its look, its length (`DOCK_TIME`) and the LEDs.
 - Whether `deploy.bat`'s copy step reports failures properly (the log step is known to work).
 
 Confirmed by Brian on 2026-11-13: F is faster and E slower; the LEDs flash on a hit and the

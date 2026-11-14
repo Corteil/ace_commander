@@ -47,7 +47,22 @@ SUN_SIZE = 2.0             # the sun's radius, in planet radii
 ARRIVE_DIST = 120000.0     # a jump arrives this far from the station: two minutes at full speed
 LAUNCH_DIST = 700.0        # a launch leaves you this far out of the station's slot
 SAFE_DIST = 25000.0        # this close to the station no more ships or rocks turn up
-DOCK_DIST = 500.0          # this close to the station's centre and you are docked
+DOCK_DIST = 500.0          # docking C (automatic): this close to the station's centre and you are docked
+# Docking A (authentic) and B (assisted): touching the station docks you only
+# through the slot; anything else is a crash that hurts and bounces you off.
+# Angles are given as their cosines.
+PLAYER_R = 40.0            # your ship's size: you touch the station this far from its front face
+DOCK_SPEED = 20.0          # faster than this (Elite speed units, top speed 40) and it's a crash
+SLOT_CONE_A = 0.927        # A: you must be in front of the slot, within 22 degrees of its axis
+HEAD_A = 0.9               # A: and flying into it, within 26 degrees
+LEVEL_A = 0.866            # A: with the slot level on the screen, within 30 degrees (either way up)
+SLOT_CONE_B = 0.82         # B: within 35 degrees of the slot's axis
+HEAD_B = 0.7               # B: flying towards it within 45 degrees; the roll doesn't matter
+CAPTURE_DIST = 1500.0      # B: this close, in the cone, heading in and slow enough, the station takes you
+PULL = 250.0               # B: how fast the station's tractor beam draws you in, world units a second
+PULL_TURN = 0.8            # B: how fast it turns its slot to face you, radians a second
+STATION_HIT = 15.0         # a crash does this much damage, plus 1.5 for each unit of speed
+BOUNCE = 300.0             # and leaves you this much further out than where you touched
 STATION_SPIN = 0.25        # radians per second, about the station's nose
 JUMP_K = 8                 # the jump drive moves you this many times faster
 ENCOUNTER = (25.0, 45.0)   # seconds between groups of ships, outside the safe zone
@@ -159,6 +174,9 @@ class Blueprint:
                 size2 = d
         self.size = math.sqrt(size2)   # distance of the furthest vertex
         self.isize = int(self.size + 0.5)
+        # its furthest vertex along the nose: for a station, how far the slot
+        # face is from its centre (160 for the Coriolis, 196 for the Dodo)
+        self.front = float(max([v[2] for v in self.verts] or [0]))
         if stats:
             (self.canisters, area, self.gun, self.explosions, self.bounty,
              self.vis, self.energy, self.speed, self.laser, self.missiles) = stats
@@ -251,6 +269,7 @@ class Game:
     def __init__(self, ships, level=1):
         self.set_level(level)
         self.god = False    # a cheat: hits flash but do no damage
+        self.docking = "C"  # how docking works: see set_docking
         self.types = {}
         for entry in ships:
             bp = Blueprint(entry)
@@ -264,6 +283,11 @@ class Game:
         self.fallback = [bp for bp in self.types.values()
                          if bp.laser and bp.speed and bp.name not in tiered]
         self.reset()
+
+    def set_docking(self, style):
+        """"A" authentic, "B" assisted or "C" automatic (commander.DOCKING)."""
+        self.docking = style if style in ("A", "B", "C") else "C"
+        self.tractor = False
 
     def set_level(self, level):
         """0 easiest to 2 hardest. Takes effect straight away."""
@@ -312,6 +336,8 @@ class Game:
         self.pending = 0       # ships of the current encounter still to turn up
         self.encounter_t = 0.0  # time until the next encounter
         self.docked = False    # set on reaching the station; whoever is watching takes over
+        self.tractor = False   # docking B: the station is drawing you in
+        self.bump_t = 0.0      # > 0 just after hitting the station (no second hit meanwhile)
         self.again = "C: fly again"     # what C does on the GAME OVER screen
 
     def say(self, msg, t=2.0):
@@ -399,13 +425,23 @@ class Game:
         self.encounter_t = _rnd(*ENCOUNTER)
         self._measure()
 
-    def to_station(self, dist=4000.0):
-        """A cheat: move the star system so the station is dist ahead."""
+    def to_station(self, dist=4000.0, slot=True):
+        """A cheat: move the star system so the station is dist ahead, with
+        its slot facing you unless slot is False."""
         sp = self.space
         if sp is None or sp.station is None:
             return
         st = sp.station
-        dx, dy, dz = -st.x, -st.y, dist - st.z
+        self._shift(-st.x, -st.y, dist - st.z)
+        if slot:
+            _look(st.m, 0.0, 0.0, -1.0)
+        self.tractor = False
+        self._measure()
+
+    def _shift(self, dx, dy, dz):
+        """Move the planet, sun and station together (you never move)."""
+        sp = self.space
+        st = sp.station
         st.x += dx
         st.y += dy
         st.z += dz
@@ -415,7 +451,6 @@ class Game:
         sp.sx += dx
         sp.sy += dy
         sp.sz += dz
-        self._measure()
 
     def _measure(self):
         """How far the station is, and so whether this is the safe zone."""
@@ -449,15 +484,77 @@ class Game:
         self._measure()
         if self.over:
             return
-        if st is not None and sp.d_station < DOCK_DIST:
-            self.docked = True
-            self.jumping = False
-            return
+        if self.bump_t > 0:
+            self.bump_t -= dt
+        if st is not None:
+            if self.docking == "C":
+                if sp.d_station < DOCK_DIST:
+                    self._docked()
+                    return
+            elif sp.d_station < CAPTURE_DIST:
+                if self._approach(sp, st, dt):
+                    return
         if not self.god:
             for x, y, z, r in ((sp.px, sp.py, sp.pz, sp.pr), (sp.sx, sp.sy, sp.sz, sp.sr)):
                 if x * x + y * y + z * z < r * r:
                     self._hurt(1e6)
                     return
+
+    def _docked(self):
+        self.docked = True
+        self.jumping = False
+        self.tractor = False
+
+    def _approach(self, sp, st, dt):
+        """Docking A or B near the station: the tractor beam (B), and what
+        touching the station does. Returns True if you docked."""
+        d = sp.d_station
+        m = st.m
+        # where you are and which way you face, in the station's own terms
+        # (x along its side, y its roof, z its nose, which the slot is on)
+        lz = -(st.x * m[6] + st.y * m[7] + st.z * m[8])
+        cone = lz / d if d > 1.0 else 1.0     # 1: straight out of the slot
+        head = -m[8]                          # 1: flying straight into the slot
+        slow = self.speed <= DOCK_SPEED
+        if self.docking == "B":
+            if self.tractor:
+                if not slow or d > CAPTURE_DIST * 1.2:
+                    self.tractor = False
+                    self.say("TRACTOR LOST" if slow else "TOO FAST")
+            elif slow and cone >= SLOT_CONE_B and head >= HEAD_B:
+                self.tractor = True
+                self.say("TRACTOR BEAM")
+            if self.tractor and d > 1.0:
+                # the slot swings round to face you and the station closes in
+                ux, uy, uz = -st.x / d, -st.y / d, -st.z / d
+                _turn(m, ux, uy, uz, PULL_TURN * dt)
+                k = PULL * dt
+                self._shift(ux * k, uy * k, uz * k)
+                self._measure()
+                d = sp.d_station
+        front = st.bp.front
+        if d >= front + PLAYER_R or self.bump_t > 0:
+            return False
+        if self.docking == "A":
+            ok = cone >= SLOT_CONE_A and head >= HEAD_A and abs(m[3]) >= LEVEL_A
+        else:
+            ok = cone >= SLOT_CONE_B and (self.tractor or head >= HEAD_B)
+        if ok and slow:
+            self._docked()
+            return True
+        # a crash: it hurts, and you bounce off
+        self.say("TOO FAST" if ok else "STATION HIT")
+        self._hurt(STATION_HIT + self.speed * 1.5)
+        self.speed = 0.0
+        self.tractor = False
+        self.bump_t = 1.0
+        if d > 1.0:
+            k = (front + PLAYER_R + BOUNCE) / d - 1.0
+            self._shift(st.x * k, st.y * k, st.z * k)
+        else:
+            self._shift(0.0, 0.0, front + PLAYER_R + BOUNCE)
+        self._measure()
+        return False
 
     # ---- one step of the simulation ---------------------------------------
 

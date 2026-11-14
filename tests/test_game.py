@@ -504,5 +504,89 @@ for _ in range(50):
     g.step(DT, 0, 0, 1.0, False, False)
 assert any(o.kind == "ship" for o in g.objs) and not g.jumping
 g.reset(); assert g.space is None and g.pending == 0
+
+# docking by hand: A (authentic) and B (assisted)
+def at_station(style, dist, speed, level=True, seed=9):
+    g = fresh(seed)
+    g.set_docking(style)
+    g.enter(6000, "CORIOLIS", "launch")
+    g.to_station(dist)
+    st = g.space.station
+    if level:       # the slot's long side across the screen
+        game._roll(st.m, math.pi / 2 - math.atan2(st.m[3], st.m[4]))
+    g.speed = float(speed)
+    return g, st
+
+def fly(g, secs, roll=0.0):
+    for _ in range(int(secs / DT)):
+        g.step(DT, 0, roll, 0, False, False)
+        if g.docked or g.flash > 0:
+            return
+
+g, st = at_station("A", 600, 10)
+assert abs(st.m[3]) > 0.99
+fly(g, 3)
+assert g.docked and g.shield == 100, "A: level, slow and straight in docks"
+# the station turns as you come in: at 0.25 rad/s, 1 s is 14 degrees, so a slow
+# approach from far out has to roll with it
+g, st = at_station("A", 1200, 8)
+fly(g, 8)
+assert not g.docked and g.flash > 0 and g.shield < 100, "A: not matching the spin is a crash"
+assert g.speed == 0 and g.space.d_station > st.bp.front + game.PLAYER_R, "bounced clear"
+g, st = at_station("A", 1200, 8)
+fly(g, 8, roll=game.STATION_SPIN / game.ROLL_RATE)
+assert g.docked, "A: rolling with the station docks"
+assert g.docked, "A: rolling with the station docks"
+g, st = at_station("A", 600, 10, level=False)
+fly(g, 3)
+assert not g.docked and g.flash > 0, "A: the slot on end is a crash"
+g, st = at_station("A", 600, 30)
+fly(g, 3)
+assert not g.docked and g.msg == "TOO FAST" and g.shield < 100
+# off the slot's axis: hitting the side of the station
+g, st = at_station("A", 600, 10)
+g._shift(0.0, 250.0, 0.0)       # the station above you, so you hit its underside
+st.z -= 300
+fly(g, 4)
+assert not g.docked, "A: off to one side is a crash"
+
+# B: no roll matching, and the tractor beam takes over once in the cone
+g, st = at_station("B", 1200, 10, level=False)
+fly(g, 0.2)
+assert g.tractor and g.msg == "TRACTOR BEAM"
+fly(g, 10)
+assert g.docked and g.shield == 100 and not g.tractor, "B: slot on end, slow, docks"
+g, st = at_station("B", 1200, 10, level=False)
+g.speed = 0.0
+fly(g, 15)
+assert g.docked, "B: the beam pulls you in even when stopped"
+g, st = at_station("B", 1200, 30)
+fly(g, 3)
+assert not g.tractor and not g.docked and g.flash > 0, "B: too fast, no beam, a crash"
+g, st = at_station("B", 1200, 10)
+game._look(st.m, 1.0, 0.0, 0.0)  # slot facing sideways: you're outside the cone
+fly(g, 6)
+assert not g.tractor and not g.docked and g.flash > 0, "B: hitting the side is a crash"
+# the beam lets go if you speed up
+g, st = at_station("B", 1400, 10)
+fly(g, 0.2)
+assert g.tractor
+for _ in range(int(1 / DT)):
+    g.step(DT, 0, 0, 1.0, False, False)
+assert not g.tractor and not g.docked and g.msg == "TOO FAST"
+# a crash at full speed leaves you hurt but alive; the invincible bounce too
+g, st = at_station("A", 900, 40, level=False)
+fly(g, 2)
+assert not g.over and g.hull == 100 and g.shield < 100
+g, st = at_station("A", 900, 40, level=False)
+g.god = True
+fly(g, 2)
+assert g.flash > 0 and g.shield == 100 and g.space.d_station > 300
+# C still docks at DOCK_DIST whatever the angle
+g, st = at_station("C", game.DOCK_DIST + 100, 10, level=False)
+game._look(st.m, 1.0, 0.0, 0.0)
+fly(g, 1)
+assert g.docked
+print("docking by hand, A and B: ok")
 print("star system: planet, sun, station, safe zone, docking, crashing: ok")
 print("ALL GAME TESTS PASSED")
