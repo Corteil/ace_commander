@@ -51,7 +51,7 @@ MAX_OBJECTS = 14
 PLANET_SCALE = 4.0         # world units per km of the planet's radius (galaxy.System.radius)
 STATION_ORBIT = 3.0        # the station's distance from the planet's centre, in planet radii
 SUN_DIST = 16.0            # the sun's distance from the planet, in planet radii
-SUN_SIZE = 2.0             # the sun's radius, in planet radii
+SUN_SIZE = 1.0             # the sun's radius, in planet radii: the same, as in Elite
 ARRIVE_DIST = 120000.0     # a jump arrives this far from the station: two minutes at full speed
 LAUNCH_DIST = 700.0        # a launch leaves you this far out of the station's slot
 SAFE_K = 2.0               # the safe zone round the station: this many planet radii, as in Elite
@@ -89,6 +89,16 @@ HUNTERS = ("COBRA MK III P", "ASP MK II", "PYTHON P", "FER DE LANCE")
 PACK_MOST = 4
 AMBUSH_GOV = 2             # arriving from hyperspace in an anarchy or feudal system: an ambush
 DODO_TECH = 10             # systems with this tech level or more have a Dodo station
+# Near the sun the cabin heats up, and with fuel scoops you can skim fuel from
+# it, as in the original (main flight loop, part 15): the cabin temperature is
+# 285 - SUN_HEAT * (distance / sun radius)^2, never below COOL_CABIN (deep
+# space), so it starts to rise within about 2.7 sun radii. At SCOOP_TEMP or
+# more (within about 1.3 radii) the scoops take in speed / 8 tenths of a light
+# year every SUN_CHECK seconds. Flying into the sun is the end, as before.
+COOL_CABIN = 30
+SUN_HEAT = 36.0
+SCOOP_TEMP = 224
+SUN_CHECK = 1.0
 
 # The ships parked in a station's docking bay depend on the system: pirate
 # craft where the government is weak, traders and police where it is strong,
@@ -318,6 +328,8 @@ class Space:
         self.sr = radius * SUN_SIZE
         self.station = Obj(station_bp, "station", 0.0, 0.0, 0.0) if station_bp else None
         self.gov = gov          # the system's government (0 to 7), for the station's colour
+        self.sun = 2            # which colour the sun is (cockpit.SUN_COLOURS): yellow
+        self.planet = 0         # and the planet (cockpit.PLANET_COLOURS): blue
         self.d_station = 1e9    # distance to the station
         self.safe_r = radius * SAFE_K   # the safe zone round the station
         self.safe = False       # within it
@@ -331,6 +343,10 @@ class Game:
         self.set_laser("pulse")
         self.energy_unit = False    # recharge ENERGY_UNIT times faster
         self.fuel_scoops = True     # without them a canister is hit, not scooped
+        # what skimmed fuel goes into: a function given tenths of a light year
+        # that returns how many fitted in the tank; None: nowhere (practice)
+        self.refuel = None
+        self.fuel = None    # the commander's fuel (tenths of a LY), for the HUD; None: none
         # what a scooped canister goes into: a function given the good's number
         # that returns its name, or None if there is no room; None in practice
         self.scoop = None
@@ -408,6 +424,9 @@ class Game:
         self.encounter_t = 0.0  # time until the next roll for an encounter
         self.skip = 0          # rolls still to skip after the last encounter
         self.docked = False    # set on reaching the station; whoever is watching takes over
+        self.cabin = COOL_CABIN  # the cabin temperature, 30 in deep space to 255
+        self.scooping = False  # skimming fuel from the sun just now
+        self.sun_t = SUN_CHECK  # time to the next fuel scoop
         self.tractor = False   # docking B: the station is drawing you in
         self.bump_t = 0.0      # > 0 just after hitting the station (no second hit meanwhile)
         self.again = "C: fly again"     # what C does on the GAME OVER screen
@@ -456,7 +475,7 @@ class Game:
 
     # ---- the star system --------------------------------------------------
 
-    def enter(self, radius_km, station, how, gov=None):
+    def enter(self, radius_km, station, how, gov=None, sun=2, planet=0):
         """Put the player in a star system. radius_km is the planet's radius
         (galaxy.System.radius), station the station's ship name, gov the
         government, for its colour. how is "launch": just out of the
@@ -467,6 +486,8 @@ class Game:
         bp = self.types.get(station) or self.types.get("CORIOLIS")
         r = max(4000.0, radius_km * PLANET_SCALE)
         sp = Space(bp, r, gov)
+        sp.sun = sun
+        sp.planet = planet
         if how == "launch":
             sx, sy, sz = 0.0, 0.0, -LAUNCH_DIST
             ux, uy, uz = 0.0, 0.0, 1.0      # from the station to the planet
@@ -518,6 +539,17 @@ class Game:
         if slot:
             _look(st.m, 0.0, 0.0, -1.0)
         self.tractor = False
+        self._measure()
+
+    def to_sun(self, k=1.15, ahead=0.0):
+        """A cheat: move the star system so the sun's centre is k sun radii
+        to your right and ahead sun radii in front: with ahead 0 you are
+        flying past it at that distance; with ahead > 0 flying on takes you
+        down to k sun radii and out again."""
+        sp = self.space
+        if sp is None or sp.station is None:
+            return
+        self._shift(sp.sr * k - sp.sx, -sp.sy, sp.sr * ahead - sp.sz)
         self._measure()
 
     def _shift(self, dx, dy, dz):
@@ -576,11 +608,33 @@ class Game:
             elif sp.d_station < CAPTURE_DIST:
                 if self._approach(sp, st, dt):
                     return
+        self._sun(sp, dt)
         if not self.god:
             for x, y, z, r in ((sp.px, sp.py, sp.pz, sp.pr), (sp.sx, sp.sy, sp.sz, sp.sr)):
                 if x * x + y * y + z * z < r * r:
                     self._hurt(1e6)
                     return
+
+    def _sun(self, sp, dt):
+        """The cabin temperature near the sun, and skimming fuel from it."""
+        k = (sp.sx * sp.sx + sp.sy * sp.sy + sp.sz * sp.sz) / (sp.sr * sp.sr)
+        t = 285.0 - SUN_HEAT * k
+        self.cabin = int(t) if t > COOL_CABIN else COOL_CABIN
+        if self.cabin > 255:
+            self.cabin = 255
+        if self.cabin < SCOOP_TEMP:
+            self.scooping = False       # out of the band: stops at once
+        self.sun_t -= dt
+        if self.sun_t > 0:
+            return
+        self.sun_t = SUN_CHECK
+        self.scooping = False
+        if (self.cabin >= SCOOP_TEMP and self.fuel_scoops and self.refuel is not None
+                and not self.over):
+            n = int(self.speed) // 8
+            if n > 0 and self.refuel(n) > 0:
+                self.scooping = True
+                self.say("FUEL SCOOPS ON", 1.2)
 
     def _docked(self):
         self.docked = True
@@ -672,6 +726,7 @@ class Game:
         # the jump drive: speed up held at full speed, with no ships about
         self.jumping = (sp is not None and not self.over and throttle > 0
                         and self.speed >= PLAYER_MAX and not sp.safe and self.jump_t <= 0
+                        and self.cabin <= COOL_CABIN    # not near the sun
                         and not self._near())
         if self.jumping:
             fwd *= JUMP_K

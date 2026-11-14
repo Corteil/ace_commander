@@ -127,12 +127,22 @@ for _ in range(15):
 assert leds.values[1] == green
 a.game.to_station(a.game.space.safe_r + 5000); tick(a)
 assert not a.game.space.safe and leds.values[1] == (0, 0, 0), "off outside the safe zone"
+a.game.to_sun(); tick(a)
+v = leds.values[1]
+assert v[0] > 150 and v[2] == 0 and v[1] < v[0] // 3, ("near the sun: hot red", v)
+a.game.fuel_scoops = True; a.game.speed = 40.0; a.cmdr.fuel = 10
+seen = set()
+for _ in range(60):
+    tick(a, held=["F"])
+    if a.game.scooping:
+        seen.add(leds.values[1])
+assert seen and all(c[2] == 0 and c[1] == c[0] * 3 // 4 for c in seen) and len(seen) == 2, seen
 a.game.to_station(4000); tick(a); assert leds.values[1] == green, "and green again inside it"
 tick(a, fresh=["A"]); assert a.paused and leds.values[1] == (0, 0, 0), "off while paused"
 tick(a, fresh=["A"]); assert leds.values[1] == green
 # another station, another colour, in the tunnel's mouth too
 other = [i for i in range(256) if a.galaxy.system(i).government != gov][0]
-a.cmdr.system = other
+a.cmdr.system = a.cmdr.docked_at = other
 a.game.over = True; tick(a, fresh=["C"]); assert a.mode == "docked"
 tick(a, fresh=["A"]); assert a.mode == "launch"
 for _ in range(200):

@@ -396,6 +396,13 @@ class AceCommander(app.App):
         elif self.glow > 0:     # just launched: the station's colour fades away
             self._leds_station(self.glow)
             self.glow -= self.dt * 2.0
+        elif g.space is not None and g.scooping:    # skimming fuel: yellow pulses
+            k = 255 if int(g.time * 4) % 2 else 90
+            self._leds_rgb(k, k * 3 // 4, 0)
+        elif g.space is not None and g.cabin > game.COOL_CABIN:   # near the sun: orange to red
+            l = ((g.cabin - game.COOL_CABIN) * 15 // (255 - game.COOL_CABIN)) / 15.0   # 16 steps
+            r = int(255 * l)
+            self._leds_rgb(r, int(r * 0.45 * (1.0 - l)), 0)
         elif g.space is not None and g.space.safe:  # near the station: no ships come here
             self._leds_rgb(0, SAFE_GREEN, 0)
         else:
@@ -595,6 +602,7 @@ class AceCommander(app.App):
         self.career = career
         g.again = "C: back to the station" if career else "C: fly again"
         g.scoop = self._scoop if career and self.cmdr is not None else None
+        g.refuel = self._refuel if career and self.cmdr is not None else None
         if career:
             self._place()
             if fresh or g.space is None:
@@ -632,15 +640,18 @@ class AceCommander(app.App):
         self.game.set_docking(c.docking)
         s = self.galaxy.system(c.system)
         self.game.enter(s.radius, "DODO" if s.tech >= game.DODO_TECH else "CORIOLIS", how,
-                        s.government)
+                        s.government, (c.system * 37 + 11) % 5,     # the sun's colour
+                        (c.system * 53 + 29) % 7)                   # and the planet's
 
     def _dock(self):
-        """Show the commander docked at their star system. Docking fills the
-        tank (for nothing, until there is money to be made) and saves."""
+        """Show the commander docked at their star system, remember it as where
+        they start again if destroyed, and save. Fuel is bought on Equip ship
+        (it is free only if game_data.py has no equipment)."""
         self._bank()            # before career is set: practice kills don't count
         self._place()
         self.career = True
         c = self.cmdr
+        c.docked_at = c.system  # where to start again if destroyed
         if not EQUIP:           # nowhere to buy fuel: it's free, as before the equipment
             c.fuel = commander.MAX_FUEL
         if GOODS and self.galaxy is not None and (c.market is None
@@ -747,6 +758,15 @@ class AceCommander(app.App):
         g.energy_unit = "energy" in c.extras
         g.fuel_scoops = "scoops" in c.extras
 
+    def _refuel(self, n):
+        """Fuel skimmed from the sun: n tenths of a light year into the tank.
+        Returns how many fitted (see Game.refuel)."""
+        c = self.cmdr
+        n = min(n, commander.MAX_FUEL - c.fuel)
+        c.fuel += n
+        self.game.fuel = c.fuel
+        return n
+
     def _scoop(self, i):
         """A canister scooped in flight: good i into the hold (see Game.scoop)."""
         from . import market
@@ -822,6 +842,7 @@ class AceCommander(app.App):
             return
         c = self.cmdr
         c.missiles = g.missiles             # the ones fired are gone
+        g.fuel = c.fuel                     # for the HUD
         paid = g.bounty - self.banked_cash
         if paid > 0:
             c.cash += paid
@@ -913,7 +934,12 @@ class AceCommander(app.App):
             if not self.saved_over:
                 self.saved_over = True
                 if self.career and self.cmdr is not None:
-                    self.cmdr.cargo = [0] * commander.GOODS     # lost with the ship
+                    c = self.cmdr
+                    c.cargo = [0] * commander.GOODS     # lost with the ship
+                    # you start again at the last station you docked at
+                    if c.docked_at is not None and c.docked_at != c.system:
+                        c.system = c.docked_at
+                        self.target = None
                 self._save()
             if confirm and self.career:
                 self._dock()
@@ -1023,12 +1049,14 @@ class AceCommander(app.App):
             items = ["INVINCIBLE: " + ("ON" if self.game.god else "OFF"),
                      "FRAME TIME: " + ("ON" if self.show_ms else "OFF"),
                      "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
-                     "REFILL MISSILES", "REFILL FUEL", "+10 KILLS", "+1000 CR",
-                     "SHIP CONFIG", "RELEASE CANISTER", "TO THE STATION", "DOCK NOW"]
+                     "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4", "+10 KILLS", "+1000 CR",
+                     "SHIP CONFIG", "RELEASE CANISTER", "TO THE STATION", "TO THE SUN",
+                     "DOCK NOW"]
             if self.career:
                 items.remove("NEXT WAVE")       # waves are for combat practice
             else:
-                items.remove("+1000 CR")        # no commander, no cash
+                items.remove("+1000 CR")        # no commander, no cash or fuel
+                items.remove("FUEL TO 1/4")
             return items
         if self.fsub == "ship":
             return self._ship_items()
@@ -1107,6 +1135,11 @@ class AceCommander(app.App):
                 self.cmdr.fuel = commander.MAX_FUEL
         elif item == "+10 KILLS":
             g.kills += 10
+        elif item == "FUEL TO 1/4":
+            if self.career and self.cmdr is not None:
+                self.cmdr.fuel = commander.MAX_FUEL // 4
+                c = self.cmdr
+                g.say("FUEL %d.%d LY" % (c.fuel // 10, c.fuel % 10))
         elif item == "+1000 CR":
             if self.career and self.cmdr is not None:
                 self.cmdr.cash += 10000
@@ -1118,6 +1151,8 @@ class AceCommander(app.App):
         elif item == "RELEASE CANISTER":
             if g.release_canister() is None:
                 g.say("TOO MANY OBJECTS")
+        elif item == "TO THE SUN":
+            g.to_sun(1.15, 1.6)     # flying on takes you down through the scooping band
         elif item == "TO THE STATION":
             g.to_station()
         elif item == "DOCK NOW":

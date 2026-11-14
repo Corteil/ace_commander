@@ -385,6 +385,41 @@ of a real flight, not from a harness.
    changes the ship at once, in the flight and for the commander: laser (C cycles), missiles
    (0-4), energy unit; in a career also cargo bay (20 / 35 t) and fuel scoops. Add each
    new item there as its effect is built.
+   **Starting again after being destroyed** (Brian's request): `Commander.docked_at` is
+   the last system docked at (set in `app._dock`, saved). On game over in a career the
+   commander is moved back there before the game-over save, so C ("back to the station")
+   or a later CONTINUE starts at the last station docked at, not a system jumped to and
+   never docked in. Fuel used since stays used; cargo is lost as before. Old saves have
+   no `docked_at` until they next dock (until then: the current system, as before).
+   **Build 34: sun skimming** (Brian's request; main flight loop part 15). `Game._sun`:
+   cabin temperature = 285 - `SUN_HEAT` x (distance / sun radius)^2, at least 30; at
+   `SCOOP_TEMP` (224) or more with fuel scoops, every `SUN_CHECK` s `Game.refuel`
+   (`app._refuel`) takes speed // 8 tenths of a LY ("FUEL SCOOPS ON"). CT and AL gauges
+   at the top of the HUD only near the sun (`cockpit._sun_gauges`), with a FU fuel bar
+   under them (`Game.fuel`, copied from the commander; red below a quarter); LEDs orange to red
+   with heat (16 steps), yellow pulses while scooping. The jump drive is off near the
+   sun. DEBUG: TO THE SUN (`Game.to_sun`) and FUEL TO 1/4 (career: 1.7 LY). Hyperspace has no distance limit, as in
+   Elite (only not docked or mid-countdown). Then (Brian: the gauges seemed stuck, as
+   the sun was twice the planet's size and crossing its heat took a minute): the sun is
+   now the planet's size (`SUN_SIZE` 1.0, as in Elite, whose planet and sun share one
+   radius); AL is full where the cabin starts to warm and empty at the surface, worked
+   out from `SUN_HEAT` so it fits every sun (`cockpit.SUN_GAUGE_ALT`); CT is green when
+   cool, through yellow and orange to red at the scooping band (`ct_colour`,
+   `CT_COLOURS`); TO THE SUN starts at the edge of the heat heading in (`to_sun(1.15,
+   1.6)`: about 18 s at full speed to the band). CT is Elite's cabin temperature, a raw
+   0-255 value with no units (30 deep space, 255 fatal in the original).
+   Then (Brian): a planet behind the sun was drawn as a black disc over it, because the
+   "planet in front of the sun" fill never checked which was nearer; `_draw_space` now
+   draws whichever is nearer last (the sun hides a planet behind it). Each system's sun
+   has one of `cockpit.SUN_COLOURS` (red, orange, yellow, white, blue-white), from the
+   system's number (`Space.sun`, `Game.enter(..., sun)`). Messages and the sun gauges
+   have a dark band behind them so they read against the sun.
+   Each system's planet is a filled disc with a brighter outline, in one of
+   `cockpit.PLANET_COLOURS` (ocean blue, green, desert, red, grey, purple, teal; `Space.planet`,
+   `Game.enter(..., planet)`), so a planet in front of the sun hides it in its own colour.
+   The stardust is now drawn after the planet and sun (it is close to you). Measured on
+   the badge: draw_world 13 ms with a small planet, 19 ms in the launch view, 25 ms with
+   a planet of radius about 200 px.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
@@ -393,7 +428,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 33), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 34), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

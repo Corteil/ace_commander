@@ -58,6 +58,9 @@ assert "ecm" not in c.extras and c.laser == "military"
 # saved and loaded
 d = commander.Commander.from_dict(c.to_dict())
 assert (d.missiles, d.laser, d.hold, sorted(d.extras)) == (4, "military", 35, ["energy", "scoops"])
+d2 = commander.Commander(); d2.docked_at = 129
+assert commander.Commander.from_dict(d2.to_dict()).docked_at == 129
+assert commander.Commander.from_dict({"docked_at": 999}).docked_at is None
 old = commander.Commander.from_dict({"level": 1, "credits": 50.0})
 assert (old.missiles, old.laser, old.hold, old.extras) == (3, "pulse", 20, []), "older saves"
 bad = commander.Commander.from_dict({"missiles": 99, "laser": "death ray", "hold": 1000, "extras": [1, "x"]})

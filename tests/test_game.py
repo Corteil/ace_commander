@@ -533,6 +533,36 @@ def recharged(unit):
     return g.shield - 10.0
 assert abs(recharged(True) - 2 * recharged(False)) < 0.5
 
+# the sun: the cabin heats up near it, and fuel scoops skim fuel from it
+g = fresh(13)
+g.enter(6000, "CORIOLIS", "launch", 3)
+g.step(DT, 0, 0, 0, False, False)
+assert g.cabin == game.COOL_CABIN and not g.scooping, "cool far from the sun"
+for k, lo, hi in ((3.0, 30, 30), (2.0, 135, 145), (1.15, 230, 240)):
+    g.to_sun(k); g.step(DT, 0, 0, 0, False, False)
+    assert lo <= g.cabin <= hi, (k, g.cabin)
+got = []
+def tank(n):
+    got.append(n)
+    return n
+g.refuel = tank
+g.speed = 40.0; g.to_sun(1.15); g.sun_t = 0.0
+for _ in range(int(3.5 / DT)):
+    g.step(DT, 0, 0, 0, False, False)
+assert g.cabin >= game.SCOOP_TEMP and len(got) == 4 and set(got) == {5}, got
+assert g.msg == "FUEL SCOOPS ON" and g.scooping, "speed 40: half a light year a second"
+got[:] = []; g.speed = 7.0; g.sun_t = 0.0; g.step(DT, 0, 0, 0, False, False)
+assert not got and not g.scooping, "too slow to scoop anything"
+g.speed = 40.0; g.fuel_scoops = False; g.sun_t = 0.0; g.step(DT, 0, 0, 0, False, False)
+assert not got and not g.scooping, "no scoops, no fuel"
+g.fuel_scoops = True; g.refuel = lambda n: 0; g.msg_t = 0.0; g.sun_t = 0.0
+g.step(DT, 0, 0, 0, False, False)
+assert not g.scooping and g.msg_t <= 0, "a full tank takes nothing"
+g.refuel = tank; g.to_sun(1.6); g.sun_t = 0.0; g.step(DT, 0, 0, 0, False, False)
+assert g.cabin < game.SCOOP_TEMP and not got, "not close enough"
+g.to_sun(0.9); g.step(DT, 0, 0, 0, False, False)
+assert g.over, "into the sun is the end"
+
 # waves are for combat practice only
 g = fresh(10)
 assert g.msg == "WAVE 1" and g.msg_t > 0

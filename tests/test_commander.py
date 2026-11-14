@@ -356,6 +356,8 @@ assert not any(o.kind == "ship" for o in g.objs) and d.cmdr.kills == 12
 g.missiles = 0
 debug(d, "REFILL MISSILES")
 assert g.missiles == 4 and "NEXT WAVE" not in d._fitems(), "no waves in a commander's flight"
+# FUEL TO 1/4 empties the tank to a quarter (1.7 LY), for trying sun skimming
+debug(d, "FUEL TO 1/4"); assert d.cmdr.fuel == 17 and g.msg == "FUEL 1.7 LY"
 # +1000 CR adds to the commander's cash
 cash = d.cmdr.cash
 debug(d, "+1000 CR"); assert d.cmdr.cash == cash + 10000 and d.paused
@@ -377,6 +379,34 @@ ship("CARGO BAY"); assert d.cmdr.hold == 20
 ship("FUEL SCOOPS"); assert g.fuel_scoops and "scoops" in d.cmdr.extras
 ship("FUEL SCOOPS"); assert not g.fuel_scoops and "scoops" not in d.cmdr.extras
 tick(d, fresh=["F"]); assert d.fsub == "debug" and d._fitems()[d.fmenu] == "SHIP CONFIG", "F goes back"
+# TO THE SUN: at the edge of the heat, heading in; flying on, the cabin heats
+# up to the scooping band and out again, and with fuel scoops the tank fills;
+# the cabin temperature, altitude and fuel gauges show
+d.cmdr.fuel = 20; g.fuel_scoops = True; d.cmdr.extras.append("scoops")
+g.speed = 40.0
+debug(d, "TO THE SUN"); tick(d, fresh=["A"])
+temps = []
+for _ in range(int(40 / 0.04)):
+    tick(d, held=["F"])
+    temps.append(g.cabin)
+    if g.cabin >= game.SCOOP_TEMP and d.cmdr.fuel > 25:
+        break
+assert temps[0] > game.COOL_CABIN and temps[0] < game.SCOOP_TEMP, temps[0]
+assert g.cabin >= game.SCOOP_TEMP and d.cmdr.fuel > 25, (g.cabin, d.cmdr.fuel)
+assert all(b >= a for a, b in zip(temps, temps[1:])), "heating up all the way in"
+print("TO THE SUN: %.0f s to the scooping band" % (len(temps) * 0.04))
+tx = texts(d)
+assert "CT" in tx and "AL" in tx and "FU" in tx and g.fuel == d.cmdr.fuel
+fuel = d.cmdr.fuel
+d.cmdr.fuel = 69
+for _ in range(int(2.5 / 0.04)):
+    tick(d, held=["F"])
+assert d.cmdr.fuel == 70, "up to a full tank"
+g.fuel_scoops = False; d.cmdr.extras.remove("scoops")
+debug(d, "TO THE STATION"); tick(d, fresh=["A"]); tick(d)
+tx = texts(d)
+assert g.cabin == game.COOL_CABIN and "CT" not in tx and "FU" not in tx, "the gauges go away from the sun"
+tick(d, fresh=["A"])
 debug(d, "REFILL MISSILES")
 debug(d, "INVINCIBLE"); assert not g.god
 tick(d, fresh=["F"]); assert d.fsub is None and d._fitems()[d.fmenu] == "DEBUG", "F goes back"
@@ -478,11 +508,22 @@ tick(e, fresh=["A"])
 fpick(e, "LOCAL CHART")
 e.chart.cx, e.chart.cy = [(float(px), float(py)) for px, py, i, d in e.chart.dots if i == 7][0]
 e.chart._select(); tick(e, fresh=["C"]); assert g.jump_t > 0
+# destroyed at Zaonce, never having docked there: you start again at Lave,
+# the last station you docked at, with the fuel for the jump still spent
+assert e.cmdr.docked_at == 7
+fuel = e.cmdr.fuel
 g._hurt(5000.0); tick(e); tick(e)
-assert g.over and g.jump_t == 0 and e.cmdr.system == 129
+assert g.over and g.jump_t == 0 and e.cmdr.system == 7 and e.cmdr.fuel == fuel
+assert commander.load(SAVE).system == 7, "saved there too"
 assert g.again == "C: back to the station"
-tick(e, fresh=["C"]); assert e.mode == "docked" and e.cmdr.fuel == 70, "docking fills the tank"
-assert "ZAONCE" in texts(e)
+tick(e, fresh=["C"]); assert e.mode == "docked" and "LAVE" in texts(e)
+# docked at Zaonce, destroyed there: you start again at Zaonce
+e.cmdr.system = 129; e._dock()
+assert e.cmdr.docked_at == 129 and "ZAONCE" in texts(e)
+launch(e); e.game._hurt(5000.0); tick(e); tick(e)
+assert e.game.over and e.cmdr.system == 129
+tick(e, fresh=["C"]); assert e.mode == "docked" and "ZAONCE" in texts(e)
+e.cmdr.fuel = 70
 
 # launching puts you outside the station, facing the planet; arriving is far
 # off, and flying up to the station docks you
@@ -492,10 +533,49 @@ sp = g.space
 assert sp is not None and sp.station.z == -game.LAUNCH_DIST and sp.pz > 0 and sp.safe
 assert g.kills == 0 and g.pending == 0
 c = CountCtx(); e.draw(c)
-assert c.calls.get("arc", 0) == 1 and not c.texts[1:], "the planet ahead, as one circle"
+assert c.calls.get("arc", 0) == 2 and not c.texts[1:], "the planet ahead: a disc and its outline"
 g.space.sx, g.space.sy, g.space.sz = 0.0, 0.0, 400000.0      # put the sun behind the planet
 c = CountCtx(); e.draw(c)
-assert c.calls.get("arc", 0) == 3, "sun, the planet filled black in front of it, its outline"
+assert c.calls.get("arc", 0) == 3, "the sun, then the planet's disc over it and its outline"
+# a planet behind the sun is hidden by it: no black disc over the sun
+class ArcLog(CountCtx):
+    def __init__(self):
+        CountCtx.__init__(self); object.__setattr__(self, "log", [])
+    def rgb(self, *a):
+        self.log.append(("rgb", a)); return CountCtx.__getattr__(self, "rgb")(*a)
+    def arc(self, *a):
+        self.log.append(("arc",)); return CountCtx.__getattr__(self, "arc")(*a)
+sp_ = g.space
+keep = (sp_.sx, sp_.sy, sp_.sz, sp_.px, sp_.py, sp_.pz)
+sp_.px, sp_.py, sp_.pz = 0.0, 0.0, 900000.0             # the planet far behind...
+sp_.sx, sp_.sy, sp_.sz = 0.0, 0.0, 300000.0             # ...the sun
+lg = ArcLog(); e.draw(lg)
+colours = [x[1] for x in lg.log if x[0] == "rgb"]
+from ace_commander import cockpit as ck
+fill, edge = ck.PLANET_COLOURS[g.space.planet % len(ck.PLANET_COLOURS)]
+k = colours.index(fill)
+assert lg.calls.get("arc", 0) == 3 and colours[k + 1] == edge, colours[:8]
+assert colours[k + 2] == ck.SUN_COLOURS[g.space.sun % len(ck.SUN_COLOURS)], "the sun last, over it"
+from ace_commander import cockpit as ck
+
+sp_.sx, sp_.sy, sp_.sz, sp_.px, sp_.py, sp_.pz = keep
+# each system's sun has its colour
+keep_space, keep_sys = e.game.space, e.cmdr.system
+cols = set()
+for i in range(40):
+    e.cmdr.system = i; e._enter_space("launch"); cols.add(e.game.space.sun)
+assert cols == set(range(len(ck.SUN_COLOURS))), cols
+pcols = set()
+for i in range(60):
+    e.cmdr.system = i; e._enter_space("launch"); pcols.add(e.game.space.planet)
+assert pcols == set(range(len(ck.PLANET_COLOURS))), pcols
+e.cmdr.system = 7; e._enter_space("launch")
+a1 = e.game.space.sun; e._enter_space("arrive"); assert e.game.space.sun == a1, "the same each visit"
+e.game.space, e.cmdr.system = keep_space, keep_sys
+g = e.game; g.spawn_t = g.rock_t = 1e9; g.pending = 0; g.group = []
+# messages have a dark band behind them, to read against the sun
+g.say("FUEL SCOOPS ON"); c = CountCtx(); e.draw(c)
+assert "FUEL SCOOPS ON" in [t[0] for t in c.texts] and c.calls.get("rgba", 0) >= 1
 g.space.sz = -400000.0
 g.jumping = True; g.fwd = 400
 c = CountCtx(); e.draw(c)

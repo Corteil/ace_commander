@@ -38,7 +38,26 @@ GREY = (0.7, 0.7, 0.75)
 COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": MAGENTA, "pmissile": CYAN,
           "station": WHITE}
 PLANET = (0.35, 0.6, 1)
+# each system's planet is one of these, picked from its number (Space.planet):
+# (the disc's colour, its outline's)
+PLANET_COLOURS = (
+    ((0.12, 0.25, 0.55), (0.35, 0.6, 1)),       # ocean blue
+    ((0.12, 0.4, 0.18), (0.4, 0.9, 0.45)),      # green
+    ((0.5, 0.38, 0.2), (0.95, 0.75, 0.45)),     # desert
+    ((0.5, 0.18, 0.12), (1, 0.45, 0.3)),        # red
+    ((0.32, 0.32, 0.36), (0.75, 0.75, 0.8)),    # grey
+    ((0.32, 0.16, 0.45), (0.75, 0.5, 1)),       # purple
+    ((0.1, 0.38, 0.4), (0.4, 0.9, 0.9)),        # teal
+)
 SUN = (1, 0.8, 0.25)
+# each system's sun is one of these, picked from its number (Space.sun)
+SUN_COLOURS = (
+    (1, 0.35, 0.2),     # red
+    (1, 0.6, 0.2),      # orange
+    (1, 0.8, 0.25),     # yellow
+    (1, 0.95, 0.8),     # white
+    (0.7, 0.85, 1),     # blue-white
+)
 
 # seven-segment digits: which of the segments a-g are lit for 0-9
 _SEGS = ("abcdef", "bc", "abged", "abgcd", "fgbc", "afgcd", "afgedc", "abc", "abcdefg", "abcdfg")
@@ -667,8 +686,26 @@ def draw_world(ctx, g):
     ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
     ctx.line_width = 1.5
 
-    # stardust, so speed and turning can be seen; with the jump drive on, each
-    # speck is a streak back to where it was two steps ago
+    if g.warp > 0:      # just out of hyperspace: streaks rushing out from the centre
+        k = 256 - int(g.warp * 256 / _WARP_T)       # 0 at the start to 256 at the end
+        if k < 0:
+            k = 0
+        ctx.rgb(*CYAN)
+        ctx.begin_path()
+        for dx, dy, r0 in _STREAKS:
+            a = r0 + (k * 40 >> 8)
+            b = a + 12 + (k * 110 >> 8)
+            ctx.move_to(dx * a >> 8, dy * a >> 8)
+            ctx.line_to(dx * b >> 8, dy * b >> 8)
+        ctx.stroke()
+
+    sp = g.space
+    if sp is not None:
+        _draw_space(ctx, sp)
+
+    # stardust, so speed and turning can be seen (close to you, so drawn over the
+    # planet and sun); with the jump drive on, each speck is a streak back to
+    # where it was two steps ago
     if g.jumping:
         ctx.rgb(*WHITE)
         tail = 2 * g.fwd
@@ -691,22 +728,6 @@ def draw_world(ctx, g):
             if z > INEAR:
                 ctx.rectangle(int(p[0]) * IFOCAL // z, -(int(p[1]) * IFOCAL // z), 1.5, 1.5).fill()
 
-    if g.warp > 0:      # just out of hyperspace: streaks rushing out from the centre
-        k = 256 - int(g.warp * 256 / _WARP_T)       # 0 at the start to 256 at the end
-        if k < 0:
-            k = 0
-        ctx.rgb(*CYAN)
-        ctx.begin_path()
-        for dx, dy, r0 in _STREAKS:
-            a = r0 + (k * 40 >> 8)
-            b = a + 12 + (k * 110 >> 8)
-            ctx.move_to(dx * a >> 8, dy * a >> 8)
-            ctx.line_to(dx * b >> 8, dy * b >> 8)
-        ctx.stroke()
-
-    sp = g.space
-    if sp is not None:
-        _draw_space(ctx, sp)
 
     for o in g.objs:
         draw_ship(ctx, o)
@@ -777,26 +798,46 @@ def _covers(c):
 MAX_ARC = 2000      # pixels: circles bigger than this that don't cover the screen are left out
 
 
+def _sun(ctx, sp, sun):
+    if sun is None:
+        return
+    ctx.rgb(*SUN_COLOURS[sp.sun % len(SUN_COLOURS)])
+    if _covers(sun):
+        ctx.rectangle(-120, -120, 240, 240).fill()
+    elif sun[2] < MAX_ARC:
+        ctx.arc(sun[0], sun[1], sun[2], 0, TAU, 0).fill()
+
+
+def _planet(ctx, sp, planet):
+    """The planet: a disc in its colour with a brighter outline."""
+    if planet is None:
+        return
+    fill, edge = PLANET_COLOURS[sp.planet % len(PLANET_COLOURS)]
+    ctx.rgb(*fill)
+    if _covers(planet):
+        ctx.rectangle(-120, -120, 240, 240).fill()
+        return
+    if planet[2] >= MAX_ARC:
+        return
+    x, y, r = planet
+    ctx.arc(x, y, r, 0, TAU, 0).fill()
+    ctx.rgb(*edge).arc(x, y, r, 0, TAU, 0).stroke()
+
+
 def _draw_space(ctx, sp):
     """The sun (filled), the planet (an outline, filled black if it is in
     front of the sun) and the station, in its government's colour."""
     sun = _sphere(sp.sx, sp.sy, sp.sz, sp.sr)
-    if sun is not None:
-        ctx.rgb(*SUN)
-        if _covers(sun):
-            ctx.rectangle(-120, -120, 240, 240).fill()
-        elif sun[2] < MAX_ARC:
-            ctx.arc(sun[0], sun[1], sun[2], 0, TAU, 0).fill()
     planet = _sphere(sp.px, sp.py, sp.pz, sp.pr)
-    if planet is not None and not _covers(planet) and planet[2] < MAX_ARC:
-        x, y, r = planet
-        if sun is not None:
-            dx = x - sun[0]
-            dy = y - sun[1]
-            d = r + sun[2]
-            if dx * dx + dy * dy < d * d:   # in front of the sun: hide it
-                ctx.rgb(0, 0, 0).arc(x, y, r, 0, TAU, 0).fill()
-        ctx.rgb(*PLANET).arc(x, y, r, 0, TAU, 0).stroke()
+    # whichever is nearer is drawn last, over the other
+    sun_near = (sp.sx * sp.sx + sp.sy * sp.sy + sp.sz * sp.sz
+                < sp.px * sp.px + sp.py * sp.py + sp.pz * sp.pz)
+    if sun_near:
+        _planet(ctx, sp, planet)
+        _sun(ctx, sp, sun)
+    else:
+        _sun(ctx, sp, sun)
+        _planet(ctx, sp, planet)
     st = sp.station
     if st is not None:
         # in front of the planet and over its outline: the station hides it
@@ -823,6 +864,60 @@ _COMPASS = tuple(
      COMPASS_Y + COMPASS_R * math.sin(i * TAU / 16) - 0.75)
     for i in range(16)
 )
+
+
+COOL_CABIN = 30         # the same as game.COOL_CABIN
+SCOOP_TEMP = 224        # the same as game.SCOOP_TEMP
+SUN_HEAT = 36.0         # the same as game.SUN_HEAT
+# the altitude gauge is full where the cabin starts to warm, empty at the
+# sun's surface: in sun radii above it, so it fits every sun's size
+SUN_GAUGE_ALT = math.sqrt((285 - COOL_CABIN) / SUN_HEAT) - 1.0
+# the cabin temperature gauge's colour, from cool to too hot: green while it
+# is safe, through yellow and orange to red near the surface
+CT_COLOURS = ((0.0, (0.2, 1.0, 0.3)), (0.45, (1.0, 0.9, 0.1)), (0.7, (1.0, 0.55, 0.1)),
+              (0.86, (1.0, 0.15, 0.1)))
+MAX_FUEL = 70           # a full tank, tenths of a light year (commander.MAX_FUEL)
+
+
+def ct_colour(cabin):
+    """The cabin temperature gauge's colour (see CT_COLOURS), blended."""
+    f = (cabin - COOL_CABIN) / (255.0 - COOL_CABIN)
+    last = CT_COLOURS[0]
+    for at, rgb in CT_COLOURS:
+        if f <= at:
+            if at == last[0]:
+                return rgb
+            k = (f - last[0]) / (at - last[0])
+            a = last[1]
+            return (a[0] + (rgb[0] - a[0]) * k, a[1] + (rgb[1] - a[1]) * k,
+                    a[2] + (rgb[2] - a[2]) * k)
+        last = (at, rgb)
+    return last[1]
+
+
+def _sun_gauges(ctx, g, sp):
+    """Near the sun: cabin temperature (CT) and altitude above the sun (AL),
+    two bars across the top of the screen, and the fuel (FU) under them. CT
+    goes from green through yellow and orange to red near the surface; AL is
+    full where the cabin starts to warm and empty at the sun's surface; FU is
+    red below a quarter of a tank."""
+    ctx.rgba(0, 0, 0, 0.6).rectangle(-74, -99, 148, 19).fill()    # readable against the sun
+    text(ctx, "CT", -66, -92, 9, GREY)
+    text(ctx, "AL", 66, -92, 9, GREY)
+    ctx.rgb(*DIM).rectangle(-58, -94, 50, 4).fill()
+    ctx.rgb(*DIM).rectangle(8, -94, 50, 4).fill()
+    t = (g.cabin - COOL_CABIN) * 50 // (255 - COOL_CABIN)
+    ctx.rgb(*ct_colour(g.cabin))
+    ctx.rectangle(-58, -94, t, 4).fill()
+    d = math.sqrt(sp.sx * sp.sx + sp.sy * sp.sy + sp.sz * sp.sz) - sp.sr
+    a = int(50 * d / (SUN_GAUGE_ALT * sp.sr))
+    a = 0 if a < 0 else 50 if a > 50 else a
+    ctx.rgb(*CYAN).rectangle(8, -94, a, 4).fill()
+    if g.fuel is not None:      # the fuel, under them: watch it fill as you skim
+        text(ctx, "FU", -66, -83, 9, GREY)
+        ctx.rgb(*DIM).rectangle(-58, -85, 116, 4).fill()
+        f = g.fuel * 116 // MAX_FUEL
+        ctx.rgb(*(RED if g.fuel < MAX_FUEL // 4 else GREEN)).rectangle(-58, -85, f, 4).fill()
 
 
 def _compass(ctx, sp):
@@ -918,6 +1013,8 @@ def draw_hud(ctx, g, ms=None, ring=True):
                     ctx.rectangle(bx, by, 1, -h).fill()
                 ctx.rectangle(bx - 2, by - h - 2, 5, 5).fill()
         _compass(ctx, sp)
+        if g.cabin > COOL_CABIN:
+            _sun_gauges(ctx, g, sp)
 
     # combat practice: wave (yellow) and score (white), as one centred row of
     # digits; a commander's flight has neither
@@ -941,6 +1038,8 @@ def draw_hud(ctx, g, ms=None, ring=True):
         text(ctx, g.again, 0, 30, 12, GREY)
         text(ctx, "F: title screen", 0, 46, 12, GREY)
     elif g.msg_t > 0:
+        # a dark band behind it, so it can be read against the sun
+        ctx.rgba(0, 0, 0, 0.6).rectangle(-78, -75, 156, 18).fill()
         text(ctx, g.msg, 0, -66, 14, YELLOW)
 
     if ring and g.flash > 0:     # just been hit

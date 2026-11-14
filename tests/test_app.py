@@ -399,6 +399,14 @@ assert with3[0] - without[0] == 3 * 2, "three window frames a side, at the end o
 assert with3[1] == without[1], "only the frames: nothing filled"
 assert frames(3, 0.0) == frames(0, 0.0), "not seen from outside the mouth"
 assert frames(3, 0.05, False)[0] > frames(0, 0.05, False)[0], "seen as you launch from the bay"
+# the cabin temperature gauge: green when cool, red in the scooping band,
+# yellow and orange between; the altitude gauge fits the sun's size
+G = cockpit.ct_colour(30); Rd = cockpit.ct_colour(cockpit.SCOOP_TEMP)
+assert G[1] > 0.9 and G[0] < 0.3 and Rd[0] > 0.9 and Rd[1] < 0.2, (G, Rd)
+mid = [cockpit.ct_colour(t) for t in range(30, 256, 5)]
+assert all(b[1] <= a[1] + 1e-9 for a, b in zip(mid, mid[1:])), "less and less green"
+assert any(abs(c[0] - 1) < 0.01 and abs(c[1] - 0.9) < 0.05 for c in mid), "yellow on the way"
+assert abs(cockpit.SUN_GAUGE_ALT - ((285 - 30) / cockpit.SUN_HEAT) ** 0.5 + 1) < 1e-9
 # the station hides the planet behind it: its outline is filled black first
 class Rec:
     def __init__(self): self.pts = []; self.filled = 0
