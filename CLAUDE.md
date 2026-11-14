@@ -59,8 +59,11 @@ it installs to `/apps/ace_commander/` on the badge.
 `python tests/run_all.py` from the repo folder (needs `ship_data.py`). `tests/render.py`
 draws real frames to `tests/shots/*.png` with Pillow, which is how layout was checked.
 `tests/badge_stubs.py` copies the firmware's button matching rules, so joystick-versus-button
-logic is tested for real. Also compile with the real compiler:
-`pip install mpy-cross` then `python -m mpy_cross -o /tmp/x.mpy app.py`.
+logic is tested for real. Also compile with the badge's own compiler, which the firmware
+build in `~/Code/tildagon-firmware-builds` leaves behind (v1.28.0, the badge's version; runs
+on the Pi without Docker):
+`~/Code/tildagon-firmware-builds/work/2026-v2.2.1-rc1-mirror/badge-2024-software/micropython/mpy-cross/build/mpy-cross -march=xtensawin -o /tmp/x.mpy app.py`
+for each `.py` file. Don't use `pip install mpy-cross`: it is a newer MicroPython (v1.29).
 
 Nothing here proves behaviour on the badge. Say so when reporting.
 
