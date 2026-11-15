@@ -39,7 +39,7 @@ GREY = (0.7, 0.7, 0.75)
 # your laser's beam, by type (game.LASERS); the LEDs flash the same colour on
 # each shot. Enemy lasers are ORANGE, which none of these is.
 LASER_COLOURS = {
-    "pulse": RED,
+    "pulse": MAGENTA,
     "beam": (0.25, 0.5, 1),
     "military": GREEN,
     "mining": YELLOW,

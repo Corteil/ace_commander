@@ -754,7 +754,7 @@ of a real flight, not from a harness.
    (replacing build 22's "JUMP: name", shown only with a target in range): "HYPERSPACE:
    DISO" with a target in range starts the countdown; plain "HYPERSPACE" opens the local
    chart to pick one. Hidden during a countdown.
-   Then (Brian): each laser has its own beam colour (`cockpit.LASER_COLOURS`: pulse red,
+   Then (Brian): each laser has its own beam colour (`cockpit.LASER_COLOURS`: pulse magenta,
    beam blue, military green, mining yellow; enemy beams stay ORANGE), and the ring LEDs
    flash that colour while `Game.beam` is set after each shot (`_leds_flight`, below the
    bomb, ECM and hit flashes, above the launch glow, scooping, sun and safe zone).
