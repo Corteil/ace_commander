@@ -20,9 +20,10 @@ import app
 STEPS = ("ship_data", "game_data", "commander", "galaxy", "market", "equipment", "game",
          "cockpit", "chart", "title", "viewer", "bench", "docked", "ace")
 OPTIONAL = ("ship_data", "game_data")   # made from your own copy of Elite: may be missing
-GREEN = (0.3, 1, 0.4)
+GREEN = (0.3, 1, 0.4)      # the title screen's menu line
 GREY = (0.6, 0.6, 0.6)
 DIM = (0.15, 0.3, 0.18)
+_letters = None             # letters.py, the name in block letters: loaded first
 
 
 class AceCommander(app.App):
@@ -33,7 +34,12 @@ class AceCommander(app.App):
         self.error = None       # why loading failed, if it did
 
     async def run(self, render_update):
+        global _letters
         pkg = __name__.rsplit(".", 1)[0]
+        try:        # tiny: the name as the title screen draws it, from the first frame
+            _letters = __import__(pkg + ".letters", None, None, ["draw_name"])
+        except Exception:
+            pass
         for name in STEPS:
             await render_update()           # show how far it has got
             try:
@@ -54,18 +60,23 @@ class AceCommander(app.App):
             return
         ctx.save()
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        _text(ctx, "ACE", 0, -38, 30, GREEN)
-        _text(ctx, "COMMANDER", 0, -10, 22, GREEN)
-        n = len(STEPS)
-        ctx.rgb(*DIM).rectangle(-70, 18, 140, 8).fill()
-        ctx.rgb(*GREEN).rectangle(-70, 18, 140 * self.done // n, 8).fill()
-        if self.error:
-            _text(ctx, "LOAD FAILED", 0, 44, 14, (1, 0.3, 0.2))
-            _text(ctx, self.error[:28], 0, 62, 10, GREY)
+        # the name where the title screen has it, in its colours, so the
+        # hand-over to the title screen doesn't jump
+        if _letters is not None:
+            _letters.draw_name(ctx)
         else:
-            _text(ctx, "LOADING", 0, 44, 13, GREY)
+            _text(ctx, "ACE", 0, -96, 28, (1, 0.85, 0.2))
+            _text(ctx, "COMMANDER", 0, -69, 16, (1, 1, 1))
+        n = len(STEPS)
+        ctx.rgb(*DIM).rectangle(-70, 4, 140, 8).fill()
+        ctx.rgb(*GREEN).rectangle(-70, 4, 140 * self.done // n, 8).fill()
+        if self.error:
+            _text(ctx, "LOAD FAILED", 0, 60, 14, (1, 0.3, 0.2))
+            _text(ctx, self.error[:28], 0, 84, 10, GREY)
+        else:
             if self.done < n:
-                _text(ctx, STEPS[self.done], 0, 62, 10, GREY)
+                _text(ctx, STEPS[self.done], 0, 28, 10, GREY)
+            _text(ctx, "LOADING", 0, 84, 13, GREEN)     # where the menu line will be
         ctx.restore()
 
 
