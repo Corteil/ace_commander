@@ -681,8 +681,88 @@ def draw(ctx, g, ms=None, ring=True):
     draw_hud(ctx, g, ms, ring)
 
 
+# While the docking computer flies, the view is from behind and above your own
+# ship (Brian's idea): the camera sits CHASE_BACK behind you and CHASE_UP above.
+CHASE_BACK = 760
+CHASE_UP = 130
+_me = None      # your ship, for that view: [Obj, the Game whose blueprint it is]
+
+
+def _chase_shift(g, dy, dz):
+    """Move everything drawn by (0, dy, dz): into the chase camera's view and
+    back out again (only while drawing; the rules never see it)."""
+    for o in g.objs:
+        o.y += dy
+        o.z += dz
+    idy = int(dy)
+    idz = int(dz)
+    for p in g.dust:
+        p[1] += idy
+        p[2] += idz
+    for boom in g.booms:
+        for p in boom.parts:
+            p[1] += idy
+            p[2] += idz
+    sp = g.space
+    if sp is not None:
+        sp.py += dy
+        sp.pz += dz
+        sp.sy += dy
+        sp.sz += dz
+        if sp.station is not None:
+            sp.station.y += dy
+            sp.station.z += dz
+
+
+class _Me:
+    """Your own ship, as draw_ship wants it: straight ahead of the chase
+    camera, facing the way you fly."""
+
+    def __init__(self, bp):
+        self.bp = bp
+        self.kind = "ship"
+        self.x = 0.0
+        self.y = -float(CHASE_UP)
+        self.z = float(CHASE_BACK)
+        self.m = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+        self.hit = 0.0
+
+
+def _my_ship(g):
+    global _me
+    if _me is None or _me[1] is not g:
+        bp = g.types.get("COBRA MK III")
+        if bp is None:
+            return None
+        _me = [_Me(bp), g, 0.0, 0.0]
+    # bank and pitch with the docking computer's stick, eased, so you can see it fly
+    p, r = getattr(g, "auto_stick", (0.0, 0.0))
+    _me[2] += (r * 0.5 - _me[2]) * 0.2
+    _me[3] += (p * 0.25 - _me[3]) * 0.2
+    b, a = _me[2], _me[3]
+    cb, sb, ca, sa = math.cos(b), math.sin(b), math.cos(a), math.sin(a)
+    # side, roof, nose: rolled by b (right wing down), then nose up by a
+    _me[0].m = [cb, -sb, 0.0, sb * ca, cb * ca, sa, -sb * sa, -cb * sa, ca]
+    return _me[0]
+
+
 def draw_world(ctx, g):
-    """Space, ships, explosions and laser beams."""
+    """Space, ships, explosions and laser beams; from behind your ship while
+    the docking computer flies."""
+    if getattr(g, "autodock", False):
+        me = _my_ship(g)
+        if me is not None:
+            _chase_shift(g, -CHASE_UP, CHASE_BACK)
+            try:
+                _draw_world(ctx, g)
+                draw_ship(ctx, me, CYAN, 0, True)
+            finally:
+                _chase_shift(g, CHASE_UP, -CHASE_BACK)
+            return
+    _draw_world(ctx, g)
+
+
+def _draw_world(ctx, g):
     ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
     ctx.line_width = 1.5
 
@@ -955,12 +1035,13 @@ def _vbar(ctx, x, frac, rgb):
 def draw_hud(ctx, g, ms=None, ring=True):
     """Crosshair, gauges, radar and numbers. ring: flash a red ring when hit
     (for badges where the LEDs can't be used for that)."""
-    # crosshair
-    ctx.rgb(*GREEN)
-    ctx.rectangle(6, -0.75, 8, 1.5).fill()
-    ctx.rectangle(-14, -0.75, 8, 1.5).fill()
-    ctx.rectangle(-0.75, 6, 1.5, 8).fill()
-    ctx.rectangle(-0.75, -14, 1.5, 8).fill()
+    # crosshair (not in the docking computer's view from behind your ship)
+    if not getattr(g, "autodock", False):
+        ctx.rgb(*GREEN)
+        ctx.rectangle(6, -0.75, 8, 1.5).fill()
+        ctx.rectangle(-14, -0.75, 8, 1.5).fill()
+        ctx.rectangle(-0.75, 6, 1.5, 8).fill()
+        ctx.rectangle(-0.75, -14, 1.5, 8).fill()
 
     # gauges: speed and laser heat on the left, shield and energy on the right
     _vbar(ctx, -112, g.speed / 40.0, CYAN if g.jumping else GREEN)

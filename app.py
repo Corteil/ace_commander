@@ -676,6 +676,9 @@ class AceCommander(app.App):
         self._write()
         if self.game is not None:
             self.game.docked = False
+            self.game.autodock = False      # the docking computer starts afresh next time
+            self.game.auto_phase = 0
+            self.game.auto_level = False
         if self.target == c.system:
             self.target = None
         self.dock = docked.Docked(c, self.galaxy, self.target, GOODS, EQUIP)
@@ -1093,7 +1096,7 @@ class AceCommander(app.App):
         if hit("k_M"):
             missile = True
         fire = held("confirm") or held("k_F") or held("k_SPACE")
-        if g.autodock and (throttle or abs(roll) > 0.3 or abs(jy) > 0.3 or fire or missile):
+        if g.autodock and self._took_controls(new):
             g.stop_autodock()       # taking the controls switches the docking computer off
         pitch = jy if INVERT_PITCH else -jy
         t0 = _us()
@@ -1109,6 +1112,21 @@ class AceCommander(app.App):
                 g.docked = False
                 self._fly_in()
         return True
+
+    def _took_controls(self, new):
+        """A fresh press of a flight control (not one still held from choosing
+        DOCKING COMPUTER in the menu, and not tilting the badge): the
+        docking computer hands back control."""
+        hit = self.pad.hit
+        for name in (STICK if new else ANY):
+            if hit(name):
+                return True
+        if new and (hit(BTN_SPEED_UP) or hit(BTN_SPEED_DOWN) or hit(BTN_MISSILE)):
+            return True
+        for name in ("confirm", "k_E", "k_Q", "k_F", "k_SPACE", "k_M"):
+            if hit(name):
+                return True
+        return False
 
     def _fly_in(self):
         """The docking scene: in through the station's tunnel, a while in the

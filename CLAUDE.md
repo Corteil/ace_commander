@@ -473,6 +473,14 @@ of a real flight, not from a harness.
    23.5 s game time, 3.1 ms a step. DEBUG has LEVEL (EASY / NORMAL / HARD, C goes round):
    the enemies at once and, in a career, the commander's level and rank thresholds, written
    into the save (`_write_setting`) so a death doesn't undo it.
+   **Build 38 (Brian, 2026-11-15):** the docking computer said OFF as soon as it was chosen,
+   because the C that chose it was still held on the next frames and counted as firing.
+   Now only a fresh press of a flight control (`app._took_controls`: joystick, C, D, E, F,
+   keys; never tilt) hands back control. Its state (`autodock`, `auto_phase`,
+   `auto_level`) is cleared on docking (`app._dock`, so DOCK NOW too), on a hyperspace jump
+   and on entering a system. While it flies, the view is from behind and above your ship
+   (`cockpit.draw_world`: everything is shifted by `CHASE_UP` / `CHASE_BACK` for the draw and
+   back, and a Cobra Mk III is drawn in cyan, banking with `Game.auto_stick`); no crosshair.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -483,7 +491,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 37), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 38), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

@@ -293,5 +293,38 @@ assert c.system == e.galaxy.nearest(*galaxy.GAL_ARRIVE) and c.fuel == fuel
 assert c.docked_at is None and commander.load(SAVE).galaxy == 0, "saved only on docking"
 tick(e, fresh=["A"]); assert "GALACTIC JUMP" not in e._fitems(); tick(e, fresh=["A"])
 print("app: galactic hyperdrive to galaxy 2: ok")
-os.remove(SAVE)
+
+# ---- build 38: held buttons, a fresh start each time, the chase view -------
+from ace_commander import cockpit
+e = ace_commander.AceCommander()
+choose(e, "CONTINUE") if e.cmdr is not None else None
+if e.cmdr is None:
+    choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
+c = e.cmdr
+if "docking" not in c.extras:
+    c.extras.append("docking")
+launch(e); g = e.game; g.spawn_t = g.rock_t = g.encounter_t = 1e9
+# C still held for a few frames after choosing DOCKING COMPUTER: it stays on
+tick(e, fresh=["A"]); e.fmenu = e._fitems().index("DOCKING COMPUTER")
+for _ in range(6):          # the press that chooses it, then held on
+    tick(e, held=["C"])
+assert g.autodock, "a held C from the menu doesn't switch it off"
+tick(e); tick(e, fresh=["C"]); assert not g.autodock, "a fresh press does"
+fpick(e, "DOCKING COMPUTER"); assert g.autodock
+# the chase view: your ship drawn, and everything put back where it was
+before = [(o.x, o.y, o.z) for o in g.objs] + [(g.space.station.y, g.space.station.z, g.space.py)]
+dust = [list(p) for p in g.dust]
+cx = CountCtx(); e.draw(cx)
+after = [(o.x, o.y, o.z) for o in g.objs] + [(g.space.station.y, g.space.station.z, g.space.py)]
+assert before == after and dust == g.dust, "drawing leaves the game as it was"
+# docking (or DOCK NOW) clears it; so does a jump
+e._dock()
+assert not g.autodock and g.auto_phase == 0
+launch(e); g = e.game; g.spawn_t = g.rock_t = g.encounter_t = 1e9
+assert g.computer and not g.autodock
+tick(e, fresh=["A"]); assert "DOCKING COMPUTER" in e._fitems(); tick(e, fresh=["A"])
+g.autodock = True; g.jump_t = 0.01; g.step(DT, 0, 0, 0, False, False)
+assert g.jumped and not g.autodock, "a jump switches it off"
+os.path.exists(SAVE) and os.remove(SAVE)
+print("build 38: held buttons, cleared on docking and jumping, chase view: ok")
 print("ALL EQUIPMENT EFFECT TESTS PASSED")

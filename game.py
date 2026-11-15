@@ -457,6 +457,7 @@ class Game:
         self.auto_phase = 0    # where it has got to: see start_autodock
         self.auto_far = False  # it is far from where it is heading: the jump drive's speed
         self.auto_level = False  # it is matching the slot's roll
+        self.auto_stick = (0.0, 0.0)    # its last pitch and roll
 
     def say(self, msg, t=2.0):
         self.msg = msg
@@ -483,6 +484,7 @@ class Game:
             return
         # the jump: everything here is left behind
         self.jump_t = 0.0
+        self.autodock = False   # a new system: the docking computer is off
         self.objs = []
         self.new = []
         self.booms = []
@@ -549,6 +551,9 @@ class Game:
             st.x, st.y, st.z = sx, sy, sz
             _look(st.m, ux, uy, uz)         # the slot is on the nose
         self.space = sp
+        self.autodock = False
+        self.auto_phase = 0
+        self.auto_level = False
         self.encounter_t = ENCOUNTER_EVERY
         self.skip = 0
         if self.msg == "WAVE 1":    # waves are for combat practice only
@@ -813,6 +818,7 @@ class Game:
                 self.auto_level = True
             want = DOCK_SPEED * 0.7
         throttle = max(-1.0, min(1.0, (want - self.speed) * 0.5))
+        self.auto_stick = (pitch, roll)     # for the view from behind your ship
         return pitch, roll, throttle
 
     def _ecm(self):
