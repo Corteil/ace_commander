@@ -62,8 +62,10 @@ for _ in range(2000):
     g._tick(0, 0)
     n += sum(1 for o in g.new if o.role == "trader")
 assert 70 < n < 210, n
-# in the safe zone nothing turns up but the station's shuttles
+# in the safe zone nothing turns up but the station's shuttles (out of the
+# slot, so not with you lined up in front of it)
 g = system(); assert g.space.safe
+g.to_station(3000.0, False); game._look(g.space.station.m, 0.0, 0.0, 1.0)
 seen = []
 for _ in range(int(240 / DT)):
     g.step(DT, 0, 0, 0, False, False)
@@ -217,6 +219,64 @@ g.add_trader(); g.add_police(False); g.objs.extend(g.new); g.new = []
 assert sum(1 for o in g.objs if o.kind == "ship" and o.state in ("attack", "break")) == 0
 cx = CountCtx(); cockpit.draw_hud(cx, g)
 print("police and hunters: contraband, 40 or more, killing a Viper makes a fugitive: ok")
+
+# ---- keeping out of your way (build 47) -----------------------------------------
+g = system()        # launch: just out of the slot, lined up in front of it
+assert not g._slot_clear(), "nothing comes out at you"
+g.to_station(3000.0, False)
+game._look(g.space.station.m, 0.0, 0.0, 1.0)    # slot facing away: you're behind it
+assert g._slot_clear()
+game._look(g.space.station.m, 0.0, 0.0, -1.0)   # facing you, 3 km out
+assert not g._slot_clear()
+g.to_station(game.SLOT_CLEAR + 2000.0, False); game._look(g.space.station.m, 0.0, 0.0, -1.0)
+assert g._slot_clear(), "far enough out"
+g.to_station(3000.0, False); game._look(g.space.station.m, 0.0, 0.0, 1.0)
+g.computer = True; g.start_autodock(); assert not g._slot_clear(), "not while the computer flies"
+# the station holds its shuttles while the docking computer brings you in
+real = game.SHUTTLE_CHANCE; game.SHUTTLE_CHANCE = 1.0
+try:
+    for seed in range(6):
+        g = system(seed=seed); g.computer = True
+        g.to_station(5000.0, False)
+        game._look(g.space.station.m, *game._unit(random.uniform(-1, 1), random.uniform(-1, 1),
+                                                   random.uniform(-1, 1)))
+        hull = g.hull; shield = g.shield
+        assert g.start_autodock() is None
+        for _ in range(int(60 / DT)):
+            g.step(DT, 0, 0, 0, False, False)
+            assert not any(o.bp.name in game.SHUTTLES for o in g.objs + g.new), "none launched"
+            if g.docked:
+                break
+        assert g.docked and g.shield == shield and g.hull == hull, seed
+finally:
+    game.SHUTTLE_CHANCE = real
+# one already on its way out turns aside rather than fly into you
+hits = 0
+for seed in range(8):
+    g = system(seed=seed); g.computer = True
+    st = g.space.station
+    g.to_station(5000.0, False); game._look(st.m, 0.0, 0.0, -1.0)   # slot facing you
+    sh = g.add_shuttle(); g.objs.extend(g.new); g.new = []
+    sh.dest = "planet"
+    shield = g.shield
+    g.start_autodock()
+    for _ in range(int(60 / DT)):
+        g.step(DT, 0, 0, 0, False, False)
+        if g.docked:
+            break
+    hits += g.shield < shield
+assert hits == 0, hits
+# a trader heading straight at you turns away
+g = system()
+t = g.add_trader(); g.objs.extend(g.new); g.new = []
+t.x, t.y, t.z = 0.0, 0.0, 2500.0; game._look(t.m, 0.0, 0.0, -1.0); t.speed = t.bp.speed
+t.dest = "planet"
+closest = 1e9
+for _ in range(int(10 / DT)):
+    g.step(DT, 0, 0, 0, False, False)
+    closest = min(closest, math.sqrt(t.x * t.x + t.y * t.y + t.z * t.z))
+assert g.hull == 100.0 and g.shield == 100.0 and closest > 300, closest
+print("out of your way: no launches when lined up or docking by computer, ships turn aside: ok")
 
 # ---- pirates ------------------------------------------------------------------
 # a pirate that follows you into the safe zone loses its nerve

@@ -154,6 +154,16 @@ POLICE = "VIPER"
 # (PREY_RANGE at most); a trader they destroy spills its cargo and counts for
 # nobody. (Not in the original, where pirates only ever go for you.)
 PREY_RANGE = 6000.0
+# Keeping out of your way (not in the original, Brian asked): a friendly station
+# launches no shuttles while the docking computer flies or you are within
+# SLOT_CLEAR in front of its slot (inside SLOT_CLEAR_CONE of its axis), and a
+# ship that isn't attacking you turns aside when it is in your path or comes
+# within AVOID_DIST heading your way.
+SLOT_CLEAR = 6000.0
+SLOT_CLEAR_CONE = 0.7
+AVOID_DIST = 1200.0
+AVOID_AHEAD = 3000.0    # and one in your path this far ahead (within AVOID_SIDE of it) gets out of it
+AVOID_SIDE = 300.0
 
 # The ships parked in a station's docking bay depend on the system: pirate
 # craft where the government is weak, traders and police where it is strong,
@@ -1258,6 +1268,16 @@ class Game:
                 if ((o.role == "police" or o.role == "hunter") and self.legal >= HUNT_LEGAL
                         and not self.over):
                     o.state = "attack"      # there's a price on your head (TN1)
+                elif (0 < o.z < AVOID_AHEAD and o.x * o.x + o.y * o.y < (bp.radius + AVOID_SIDE) ** 2
+                      or d < AVOID_DIST and m[6] * tx + m[7] * ty + m[8] * tz > 0):
+                    # in your path, or coming your way: sideways out of it (not
+                    # straight away from you, which is back down your path)
+                    lx, ly = o.x, o.y
+                    r = math.sqrt(lx * lx + ly * ly)
+                    if r < 1.0:
+                        lx, ly, r = m[0], m[1], math.sqrt(m[0] * m[0] + m[1] * m[1]) or 1.0
+                    _turn(m, lx / r, ly / r, 0.0, turn * 2.5)
+                    want = bp.speed
             else:   # flee
                 _turn(m, -tx, -ty, -tz, turn)
             o.speed += (want - o.speed) * min(1.0, 2.0 * dt)
@@ -1668,14 +1688,27 @@ class Game:
         self.station_t = 1.0
         if len(self.objs) + len(self.new) >= MAX_OBJECTS:
             return
-        if sp.hostile:
+        if sp.hostile:      # these are coming for you: they don't wait for a clear slot
             if self._count("police") < STATION_COPS and random.random() < STATION_COP_CHANCE:
                 self.add_police(True, True)
-        elif random.random() < SHUTTLE_CHANCE:
+        elif random.random() < SHUTTLE_CHANCE and self._slot_clear():
             for o in self.objs:
                 if o.role == "trader" and o.bp.name in SHUTTLES and not o.dead:
                     return
             self.add_shuttle()
+
+    def _slot_clear(self):
+        """True if a ship can come out of the station's slot without flying
+        into you: the docking computer isn't bringing you in and you aren't
+        lined up in front of the slot (SLOT_CLEAR, SLOT_CLEAR_CONE)."""
+        if self.autodock:
+            return False
+        sp = self.space
+        st = sp.station
+        d = sp.d_station
+        m = st.m
+        lz = -(st.x * m[6] + st.y * m[7] + st.z * m[8])     # how far out in front of the slot
+        return not (0 < lz < SLOT_CLEAR + st.bp.front and lz > d * SLOT_CLEAR_CONE)
 
     def _tick(self, hostile, count):
         """Once every ENCOUNTER_EVERY seconds outside the safe zone: maybe a

@@ -573,6 +573,14 @@ of a real flight, not from a harness.
    (`draw_ship` with `wire_min` 0 never falls back to a dot or marker), and never smaller
    than `CHASE_STATION_MIN` (12 px radius): a far one is drawn as if nearer along the same
    line of sight, then put back (`_draw_space(ctx, sp, wire)`). The cockpit view is as before.
+   **Build 47 (Brian: a ship coming out of the station hit him on the run in):** a friendly
+   station launches no shuttle while the docking computer flies or you are within
+   `SLOT_CLEAR` (6,000) in front of its slot, inside `SLOT_CLEAR_CONE` of its axis
+   (`Game._slot_clear`); a hostile station's police still launch. A ship that isn't
+   attacking you ("trade" / "patrol") dodges sideways out of your line of travel when it is
+   within `AVOID_AHEAD` (3,000) ahead and `AVOID_SIDE` of your path, or within `AVOID_DIST`
+   heading your way (turning straight away put it back down your path). 40 docking-computer
+   runs from random directions with a shuttle already coming out: no hits, all docked.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -583,7 +591,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 46), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 47), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
