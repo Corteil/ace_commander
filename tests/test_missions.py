@@ -354,17 +354,13 @@ assert e.game.navy and e.game.energy_unit and not e.game.plans
 # the pause menu's CONSTRICTOR setting, saved; 2 MIN to start with; shown
 # only while mission 1 is under way
 assert c.quick_con and e.game.con_wait == missions.QUICK_WAIT
-tick(e, fresh=["A"]); e.fsub = "pause"
-assert not any(t.startswith("CONSTRICTOR") for t in e._fitems()), "mission 1 is over"
-done = c.mission
-c.mission = 1
+tick(e, fresh=["A"]); e.fsub = "settings"
 e.fmenu = [i for i, t in enumerate(e._fitems()) if t.startswith("CONSTRICTOR")][0]
 assert e._fitems()[e.fmenu] == "CONSTRICTOR: 2 MIN"
 tick(e, fresh=["C"])
 assert not c.quick_con and e.game.con_wait is None and e._fitems()[e.fmenu] == "CONSTRICTOR: ORIGINAL"
 assert commander.load(SAVE).quick_con is False
 tick(e, fresh=["C"]); assert c.quick_con
-c.mission = done
 assert commander.Commander.from_dict({"level": 1}).quick_con, "old saves: 2 MIN"
 # SHIP CONFIG's NAVY ENERGY UNIT switch
 e.fsub = "ship"

@@ -155,7 +155,7 @@ assert commander.load(SAVE).kills == 0, "not written every kill"
 tick(a, fresh=["A"])
 tx = texts(a)
 assert "STATUS" in tx
-assert a._fitems() == ["RESUME", "LOCAL CHART", "STATUS", "PAUSE MENU", "DEBUG"], a._fitems()
+assert a._fitems() == ["RESUME", "LOCAL CHART", "STATUS", "SETTINGS", "QUIT TO TITLE", "DEBUG"], a._fitems()
 assert texts(a)
 fpick(a, "STATUS"); assert a.fsub == "status"
 tx = texts(a)
@@ -163,14 +163,15 @@ assert "AVERAGE" in tx and any("6 kills" in t and "EASY" in t for t in tx), tx
 assert any("more for ABOVE AVERAGE" in t for t in tx)
 assert any(t.startswith("LAVE") and "fuel 7.0 LY" in t for t in tx), tx
 tick(a, fresh=["C"]); assert a.fsub is None and a.paused
-fpick(a, "PAUSE MENU"); assert a.fsub == "pause"
+fpick(a, "SETTINGS"); assert a.fsub == "settings"
 assert a._fitems()[1] == "DOCKING: ASSISTED" and a.game.docking == "B", a._fitems()
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
 assert a._fitems()[1] == "DOCKING: AUTOMATIC" and a.game.docking == "C"
 assert commander.load(SAVE).docking == "C", "the choice is saved straight away"
 tick(a, fresh=["JOYRIGHT"]); assert a.cmdr.docking == "A" and a.game.docking == "A"
 tick(a, fresh=["JOYLEFT"]); tick(a, fresh=["JOYLEFT"]); assert a.cmdr.docking == "B"
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+assert "QUIT TO TITLE" not in a._fitems(), "settings only"
+tick(a, fresh=["F"]); fpick(a, "QUIT TO TITLE")
 assert a.mode == "menu" and commander.load(SAVE).kills == 0, "quitting to the title mid-flight saves nothing"
 assert a.cmdr.kills == 6, "but the flight carries on with CONTINUE"
 assert a.choices()[0] == "CONTINUE" and a.menu == 0
@@ -184,7 +185,7 @@ kill(a.game, 3); tick(a)
 assert a.cmdr.kills == 6 and a.cmdr.cash == practice_cash, "no kills or bounties for the commander"
 assert a.game.bounty == 3 * a.game.types["SIDEWINDER"].bounty and not a.game.msg.endswith(" Cr")
 tick(a, fresh=["A"]); assert "STATUS" not in texts(a)
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+fpick(a, "QUIT TO TITLE")
 assert a.mode == "menu" and commander.load(SAVE).kills == 0
 choose(a, "CONTINUE")
 assert a.mode == "docked" and a.cmdr.kills == 6, "practice kills aren't banked by docking"
@@ -277,7 +278,7 @@ need = a.cmdr.next_rank()[1]
 kill(g, need); tick(a)
 assert g.msg.startswith("RANK: ") and a.cmdr.cash == cash + rock + side * (1 + need), "a new rank shows instead"
 assert commander.load(SAVE).cash < a.cmdr.cash
-fpick(a, "PAUSE MENU"); tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"])
+fpick(a, "QUIT TO TITLE")
 assert a.mode == "menu" and commander.load(SAVE).cash < a.cmdr.cash, "quitting mid-flight saves nothing"
 choose(a, "CONTINUE"); assert a.mode == "flight"
 flight_kills = g.kills
@@ -285,13 +286,12 @@ total_kills = a.cmdr.kills
 assert total_kills == kills_before + 1 + need
 
 # a flight left part-way for the title screen carries on
-fpick(a, "PAUSE MENU"); tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"]); assert a.mode == "menu"
+fpick(a, "QUIT TO TITLE"); assert a.mode == "menu"
 choose(a, "CONTINUE"); assert a.mode == "flight" and g.kills == flight_kills and not a.docked
 
 # a new app instance (the badge restarted) finds the commander as last saved,
 # docked: the flight since is lost, as in the original
-fpick(a, "PAUSE MENU")
-tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"]); assert a.mode == "menu"
+fpick(a, "QUIT TO TITLE"); assert a.mode == "menu"
 b = ace_commander.AceCommander()
 assert b.cmdr.kills == commander.load(SAVE).kills == 6 < total_kills
 assert b.cmdr.level == 0 and b.choices()[0] == "CONTINUE"
@@ -307,7 +307,7 @@ n = ace_commander.AceCommander()
 choose(n, "CONTINUE"); launch(n)
 kill(n.game, 2); tick(n); assert n.cmdr.kills == 2
 n.game.missiles = 1; n.game.bounty += 5000; tick(n)
-fpick(n, "PAUSE MENU"); tick(n, fresh=["JOYUP"]); tick(n, fresh=["C"]); assert n.mode == "menu"
+fpick(n, "QUIT TO TITLE"); assert n.mode == "menu"
 choose(n, "NEW COMMANDER"); tick(n, fresh=["C"])
 assert n.mode == "docked" and n.cmdr.kills == 0 and n.cmdr.cash == 1000
 assert n.cmdr.missiles == commander.START_MISSILES, (n.cmdr.kills, n.cmdr.cash, n.cmdr.missiles)
@@ -787,7 +787,7 @@ tick(e, fresh=["C"]); assert e.target == far[2] and d.name() == "SYSTEM DATA"
 assert any("too far" in t for t in texts(e))
 launch(e)
 assert not any(s.startswith("JUMP") for s in e._fitems_top()), "no jump line out of range"
-fpick(e, "PAUSE MENU"); tick(e, fresh=["JOYUP"]); tick(e, fresh=["C"])
+fpick(e, "QUIT TO TITLE")
 choose(e, "CONTINUE"); assert e.mode == "flight"   # back in the same flight
 e.target = 147
 assert e._fitems_top()[1] == "JUMP: DISO", e._fitems_top()

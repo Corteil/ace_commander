@@ -138,7 +138,8 @@ tick(a)
 assert g.time == t0, "nothing moves while the menu is open"
 tick(a, held=[])
 tx = texts(a)
-assert "PAUSED" in tx and "RESUME" in tx and "PAUSE MENU" in tx and "STATUS" not in tx
+assert "PAUSED" in tx and "RESUME" in tx and "SETTINGS" in tx and "STATUS" not in tx
+assert "QUIT TO TITLE" in tx
 tick(a, fresh=["C"])
 assert not a.paused, "C on RESUME resumes"
 tick(a, fresh=["A"]); assert a.paused
@@ -147,9 +148,9 @@ tick(a, fresh=["A"]); tick(a, fresh=["F"]); assert not a.paused, "and so does F"
 tick(a, fresh=["A"])
 tick(a, fresh=["D"]); tick(a, fresh=["B"]); assert a.fmenu == 0, "lettered buttons don't move the menu"
 tick(a, fresh=["JOYDOWN"]); assert a.fmenu == 1
-tick(a, fresh=["C"]); assert a.fsub == "pause" and a.fmenu == 0
+tick(a, fresh=["C"]); assert a.fsub == "settings" and a.fmenu == 0
 tx = texts(a)
-assert "PAUSE MENU" in tx and "STEER: JOYSTICK" in tx and "QUIT TO TITLE" in tx
+assert "SETTINGS" in tx and "STEER: JOYSTICK" in tx and "QUIT TO TITLE" not in tx
 tick(a, fresh=["JOYRIGHT"]); assert a.use_tilt, "joystick left/right switches to tilt"
 assert "STEER: TILT" in texts(a)
 tick(a, fresh=["B"]); tick(a, fresh=["E"]); assert a.use_tilt, "B and E don't switch it"
@@ -192,7 +193,7 @@ Imu.reading = [0.0, 0.0, G]
 tick(a, fresh=["D"]); assert a.zero == (0.0, 0.0)
 tick(a, fresh=["A"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
 tick(a, fresh=["JOYLEFT"]); assert not a.use_tilt
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+tick(a, fresh=["F"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
 assert a.mode == "menu" and not a.paused, "QUIT TO TITLE"
 choose(a, "COMBAT PRACTICE"); assert a.mode == "flight" and a.game is g, "the fight carries on"
 print("in-flight menu on A, steering switch, tilt with D tap and hold, quit and carry on: ok")
@@ -312,15 +313,15 @@ s = g.speed
 tick(a, held=["UP"]); assert g.speed > s
 tick(a, fresh=["LEFT"]); assert g.msg == "NO TARGET"
 tick(a, fresh=["CANCEL"]); assert a.paused
-tick(a, fresh=["DOWN"]); tick(a, fresh=["CONFIRM"]); assert a.fsub == "pause"
+tick(a, fresh=["DOWN"]); tick(a, fresh=["CONFIRM"]); assert a.fsub == "settings"
 assert any("TILT" in t[0] for t in frame(a).texts)
 tick(a, fresh=["RIGHT"]); assert not a.use_tilt
 assert any("STICK" in t[0] for t in frame(a).texts)
 tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"]); assert not a.paused, "CANCEL backs out"
 ahead, side = rocks(mod, g)
 tick(a, held=["UP"]); assert ahead.y < 0 and g.speed == 0.0
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["DOWN"]); tick(a, fresh=["CONFIRM"])
-tick(a, fresh=["DOWN"]); tick(a, fresh=["CONFIRM"]); assert a.mode == "menu"
+tick(a, fresh=["CANCEL"]); tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"])
+tick(a, fresh=["CONFIRM"]); assert a.mode == "menu", "QUIT TO TITLE"
 print("older firmware fallback: ok")
 
 # ---- no accelerometer and no keyboard modules -------------------------------

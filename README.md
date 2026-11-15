@@ -41,8 +41,9 @@ Written for the 2026 Spaceagon: use the joystick to steer and the buttons are fo
 
 In the in-flight menu the joystick moves up and down, C selects, F goes back and A
 resumes. It has the **Local chart** (see [Hyperspace](#hyperspace)), **Status** (your
-commander's rank, kills, star system and fuel) and a **Pause menu**, where you switch
-steering between JOYSTICK and TILT or quit to the title screen.
+commander's rank, kills, star system and fuel), **Settings** (steering JOYSTICK or TILT,
+the docking style, and how soon mission 1's Constrictor turns up; joystick left / right or
+C changes one) and **Quit to title**.
 
 The menu also has a **Debug** page of cheats for testing: invincibility, kill all enemies,
 next wave, add an enemy, refill missiles, refill fuel, +10 kills, to the station (moves
@@ -151,7 +152,7 @@ is high enough, docking in the first or second galaxy brings an incoming message
 Her Majesty's Space Navy: a prototype ship, the Constrictor, has been stolen. While you
 hunt it, the stations along its trail tell you where it went (on System data, docked).
 It turns up at Orarra, in the second galaxy, after two minutes outside the
-station's safe zone (or, with CONSTRICTOR: ORIGINAL in the pause menu, as rarely as in
+station's safe zone (or, with CONSTRICTOR: ORIGINAL in the in-flight Settings, as rarely as in
 the original). Only a military laser gets through its shields, and it has an ECM. Destroy it and dock
 for your reward. Later, with more kills, in the third galaxy, the Navy has a second job
 for you, and the Thargoids will not like it. The texts are read from your own copy of

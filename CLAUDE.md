@@ -696,10 +696,13 @@ of a real flight, not from a harness.
    Constrictor sits at the top of mission 1's column and goes once scrolled near the top.
    Then (Brian): the Constrictor turns up after `missions.QUICK_WAIT` (120 s) outside
    Orarra's safe zone while you hunt it (`Game.con_wait`, `con_t`, reset on entering a
-   system; one at a time; the original's roll still applies too). Pause menu, only while
-   mission 1 is under way: CONSTRICTOR: 2 MIN / ORIGINAL (`Commander.quick_con`, saved,
+   system; one at a time; the original's roll still applies too). Settings page:
+   CONSTRICTOR: 2 MIN / ORIGINAL (`Commander.quick_con`, saved,
    default 2 MIN; ORIGINAL leaves only the roll). SHIP CONFIG (DEBUG) has NAVY ENERGY
    UNIT: ON / OFF, which takes the place of the usual unit (and ENERGY UNIT the reverse).
+   Then (Brian): the in-flight PAUSE MENU is now SETTINGS (`fsub` "settings"): STEER,
+   and with a commander DOCKING and CONSTRICTOR (always shown). QUIT TO TITLE moved to the
+   top in-flight menu, after SETTINGS.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -753,7 +756,7 @@ and launching and no errors in the log.
 ## Controls (Brian's choices)
 
 Joystick steers by default. C or joystick press fires, D missile, B energy bomb (not built
-yet, says so), F/E speed up/down, A in-flight menu (status, and a pause menu with steering
+yet, says so), F/E speed up/down, A in-flight menu (status, settings with steering
 and quit). Docked, on the market: joystick up / down picks a good, C buys, D sells (held
 buttons repeat); on Equip ship: joystick picks an item, C buys. In tilt steering a tap on D re-zeroes and a hold fires the missile. Hostile ships red on the radar. Hit flash on the LEDs, not a ring
 on screen. Enemy lasers run from the ship's gun to the bottom of the screen (the cockpit).

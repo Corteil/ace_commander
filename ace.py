@@ -295,7 +295,7 @@ class AceCommander(app.App):
         self.banked_cash = 0    # and its bounties (tenths of a credit)
         self.saved_over = False
         self.fmenu = 0          # which in-flight menu line is highlighted
-        self.fsub = None        # None, "status", "chart", "pause" or "debug": the menu page
+        self.fsub = None        # None, "status", "chart", "settings" or "debug": the menu page
         self.galaxy = None      # made the first time a commander flies
         self.galaxy_n = 0       # which of the 8 galaxies self.galaxy is
         self.eject_t = 0.0      # time since the escape pod was launched
@@ -1273,7 +1273,7 @@ class AceCommander(app.App):
 
     def _fitems(self):
         """The lines on the current page of the in-flight menu."""
-        if self.fsub == "pause":
+        if self.fsub == "settings":
             stick = "JOYSTICK" if FB is not None else "STICK"
             if self.tilt_ok:
                 steer = "STEER: " + ("TILT" if self.use_tilt else stick)
@@ -1282,9 +1282,7 @@ class AceCommander(app.App):
             items = [steer]
             if self.career and self.cmdr is not None:
                 items.append("DOCKING: " + DOCK_NAMES[self.cmdr.docking])
-                if missions.hunting(self.cmdr.mission):     # only matters while you hunt it
-                    items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
-            items.append("QUIT TO TITLE")
+                items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
             return items
         if self.fsub == "debug":
             items = ["INVINCIBLE: " + ("ON" if self.game.god else "OFF"),
@@ -1568,12 +1566,12 @@ class AceCommander(app.App):
                 self.fmenu = self._fitems().index("SHIP CONFIG")
             else:
                 self.fmenu = self._fitems_top().index(
-                    "DEBUG" if self.fsub == "debug" else "PAUSE MENU")
+                    "DEBUG" if self.fsub == "debug" else "SETTINGS")
                 self.fsub = None
         elif self.fsub == "ship":
             if confirm:
                 self._ship_config(items[self.fmenu])
-        elif self.fsub == "pause":
+        elif self.fsub == "settings":
             left = hit("j_left" if new else "left")
             side = left or hit("j_right" if new else "right")
             item = items[self.fmenu]
@@ -1594,8 +1592,6 @@ class AceCommander(app.App):
                     c.docking = commander.DOCKING[i % len(commander.DOCKING)]
                     self.game.set_docking(c.docking)
                     self._write_setting("docking", c.docking)
-            elif confirm:
-                self._to_title()
         elif self.fsub == "debug":
             if confirm:
                 self._debug(items[self.fmenu])
@@ -1633,8 +1629,10 @@ class AceCommander(app.App):
             elif item == "DEBUG":
                 self.fsub = "debug"
                 self.fmenu = 0
+            elif item == "QUIT TO TITLE":
+                self._to_title()
             else:
-                self.fsub = "pause"
+                self.fsub = "settings"
                 self.fmenu = 0
 
     def _update_chart(self, new, cancel, confirm):
@@ -1693,7 +1691,8 @@ class AceCommander(app.App):
                     and g.jump_t <= 0 and self.galaxy is not None):
                 items.append("GALACTIC JUMP")
             items.append("STATUS")
-        items.append("PAUSE MENU")
+        items.append("SETTINGS")
+        items.append("QUIT TO TITLE")
         if DEBUG_MENU:
             items.append("DEBUG")
         return items
@@ -1812,8 +1811,8 @@ class AceCommander(app.App):
                 text(ctx, items[i], 0, y, 14, cockpit.GREEN if off == 0 else cockpit.GREY)
             text(ctx, "C: do it   F: back", 0, 70, 11, cockpit.GREY)
             return
-        pause = self.fsub == "pause"
-        text(ctx, "PAUSE MENU" if pause else "PAUSED", 0, -60, 18, cockpit.WHITE)
+        pause = self.fsub == "settings"
+        text(ctx, "SETTINGS" if pause else "PAUSED", 0, -60, 18, cockpit.WHITE)
         items = self._fitems()
         many = len(items) > 6       # equipment adds lines: closer together, no help line
         step = 13 if many else 16

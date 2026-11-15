@@ -54,8 +54,8 @@ print("hit flash on LEDs, fading", seen, ": ok")
 g._hurt(10.0); tick(a); assert leds.values[5] == (255, 0, 0)
 tick(a, fresh=["A"]); tick(a)                       # paused
 assert a.paused and leds.values == RED12(0)
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])  # PAUSE MENU
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])  # QUIT TO TITLE
+tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["JOYDOWN"])
+tick(a, fresh=["CONFIRM"])                              # QUIT TO TITLE
 assert a.mode == "menu" and bus.events == ["PatternDisable", "PatternEnable"]
 tick(a); tick(a)
 assert bus.events == ["PatternDisable", "PatternEnable"]
