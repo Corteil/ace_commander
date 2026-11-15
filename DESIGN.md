@@ -481,3 +481,46 @@ come 3, 4 or 5 at a time and hit 0.7, 1 or 1.3 times as often and as hard.
 
 Two things also need an answer from the badge: whether F and E are the right way round for
 speed, and whether the LEDs flash on a hit and recover afterwards.
+
+## Original mission texts (agreed by Brian, 2026-11-15; for build 57)
+
+For the game without the Elite files. [NAME] is the commander's name (the badge's Name
+setting, or Jameson); [SHIPYARD], [LAST SEEN], [BRIEFING SYSTEM], [BASE] and [NEXT SYSTEM]
+are systems to be picked from our own galaxy (build 56). Names: the Commonwealth Navy,
+Captain Hollis, Captain Varga, Agent Mercer of Navy Intelligence, the Vorn's Nest Worlds.
+
+**Mission 1, briefing** (the Phantom turning above the text):
+Commander [NAME], this is Captain Hollis of the Commonwealth Navy. I'll be brief, as I
+suspect you prefer. / The ship above is the Phantom, a prototype from our yards at
+[SHIPYARD]. Its shield generator is years ahead of anything flying. Four months ago a crew
+we trusted took it and vanished. / It was last reported near [LAST SEEN], heading out. /
+Find it and destroy it. We would rather lose it than see it copied. / A warning: those
+shields shrug off anything but a military laser, and it carries an ECM, so don't count on
+your missiles. / Good hunting, Commander. / MESSAGE ENDS
+
+**Mission 1, reward:** Commander, the Phantom is confirmed destroyed. Well flown. / The Navy
+pays its debts. 5000 credits are already in your account. / Keep your record clean. We may
+need you again sooner than you think. / MESSAGE ENDS
+
+**Mission 2, first message:** Commander [NAME], Captain Varga, Commonwealth Navy. Your name
+came up after the Phantom business. / We have work that suits you. Go to [BRIEFING SYSTEM]
+and dock. You'll be met. / It pays well, if you come back. / MESSAGE ENDS
+
+**Mission 2, briefing:** Commander [NAME]. Agent Mercer, Navy Intelligence. Don't bother
+looking for me afterwards. / For years the Navy has held the Vorn at the edge of known
+space. That is about to change: our fleets are ready to strike at their Nest Worlds. / I've
+got hold of the Nest Worlds' defence plans. The Vorn know something is missing, but not
+what, or who has it. / Any signal I send to our base at [BASE] would be picked up. The
+plans have to go by hand, in a ship nobody would look at twice. Yours. / The plans are now
+in your ship's computer. Get them to [BASE]. / Expect company. / MESSAGE ENDS
+
+**Mission 2, reward:** Commander, the plans are safe, and so are you, which we did not
+expect when the Vorn came after you. / The Navy doesn't forget. Your ship now has a Navy
+Energy Unit: it recharges faster than anything you can buy. / MESSAGE ENDS
+
+**Trail clues** (System data, docked, while hunting the Phantom; about twenty, e.g.):
+"A ship nobody recognised refuelled here and left without paying the docking fee." /
+"The Phantom was seen leaving for [NEXT SYSTEM], Commander." / "Traders say a strange ship
+has been buying military parts in this galaxy." / "It jumped out of the galaxy with a
+galactic hyperdrive. The Navy knows." / "Our police chased a ship with no markings. Their
+lasers did nothing to it."
