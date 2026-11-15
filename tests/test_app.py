@@ -333,7 +333,7 @@ for _ in range(50):
     tick(a, held=["JOYUP", "C", "F"]); frame(a)
 print("no imu / no keyboard modules: ok")
 
-# ---- ship_data.py missing ---------------------------------------------------
+# ---- ship_data.py missing: the game's own ships ---------------------------
 tmp = os.path.join(HERE, "noship")
 shutil.rmtree(tmp, ignore_errors=True)
 shutil.copytree(REPO, os.path.join(tmp, "ace_commander"),
@@ -341,13 +341,30 @@ shutil.copytree(REPO, os.path.join(tmp, "ace_commander"),
 sys.path.insert(0, tmp)
 sys.path.remove(PARENT)
 pkg, mod = load()
+assert "noship" in pkg.__file__ and mod.ORIGINAL_SHIPS and len(mod.SHIPS) == 31
+a = pkg.AceCommander()
+c = frame(a); fits(c)
+assert a.title.name == "KESTREL", "the title screen shows the ships' own names"
+choose(a, "COMBAT PRACTICE")
+g = a.game
+assert g.types["COBRA MK III"].title == "KESTREL"
+for _ in range(200):
+    tick(a, held=["JOYUP", "C"]); frame(a)
+print("ship_data.py missing: the game's own ships: ok")
+
+# ---- and original_ships.py missing too ----------------------------------------
+shutil.rmtree(tmp, ignore_errors=True)
+shutil.copytree(REPO, os.path.join(tmp, "ace_commander"),
+                ignore=shutil.ignore_patterns("ship_data.py", "original_ships.py", "__pycache__",
+                                              ".git", "tests"))
+pkg, mod = load()
 assert "noship" in pkg.__file__ and mod.SHIPS == ()
 a = pkg.AceCommander()
 c = frame(a); fits(c)
 assert any(t[0] == "ship_data.py" for t in c.texts)
 tick(a, fresh=["C"]); assert a.mode == "menu"
 tick(a, fresh=["F"]); assert App.minimised == 1
-print("ship_data.py missing: ok")
+print("no ships at all: ok")
 
 # the station tunnels: every ring is the slot, level; spacings differ
 cockpit = sys.modules["ace_commander.cockpit"]

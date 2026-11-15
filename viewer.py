@@ -31,7 +31,9 @@ class Viewer:
         self._load()
 
     def _load(self):
-        name, verts, edges, normals = self.ships[self.idx][:4]
+        e = self.ships[self.idx]
+        name, verts, edges, normals = e[:4]
+        name = e[5] if len(e) > 5 else name     # the name shown
         r = max(math.sqrt(x * x + y * y + z * z) for x, y, z in verts) or 1.0
         s = FIT_RADIUS / r
         self.name = name

@@ -128,10 +128,10 @@ def text(ctx, s, x, y, size, rgb, align=0):
 # whole pixels.
 IFOCAL = int(FOCAL)
 INEAR = int(NEAR)
-_PX = [0] * 48      # screen x of each vertex of the ship being drawn
-_PY = [0] * 48      # screen y
-_OK = [False] * 48  # False if the vertex is behind the viewer
-_VIS = [False] * 24  # which faces of the ship being drawn can be seen
+_PX = [0] * 96      # screen x of each vertex of the ship being drawn
+_PY = [0] * 96      # screen y
+_OK = [False] * 96  # False if the vertex is behind the viewer
+_VIS = [False] * 64  # which faces of the ship being drawn can be seen
 
 
 def draw_ship(ctx, o, rgb=None, wire_min=WIRE_MIN, solid=False):

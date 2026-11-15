@@ -333,10 +333,11 @@ def _roll(m, a):
 
 
 class Blueprint:
-    """One ship type from ship_data.py."""
+    """One ship type from ship_data.py (or original_ships.py)."""
 
     def __init__(self, entry):
-        self.name = entry[0]
+        self.name = entry[0]    # the role the game knows it by
+        self.title = entry[5] if len(entry) > 5 else entry[0]   # the name shown
         self.verts = entry[1]
         self.edges = entry[2]
         self.normals = entry[3]

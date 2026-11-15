@@ -50,6 +50,11 @@ description sentence (build 52) and the disc version's two missions (build 54).
   special system sentences. Rules only.
 - `missions.py` - the disc version's two missions (Constrictor, Thargoid plans). Rules only.
 - `briefing.py` - INCOMING MESSAGE and the mission texts, a screen at a time, on docking.
+- `original_ships.py` - **the game's own ships** (build 55), committed: 31 original
+  designs, one for each role the game knows by Elite's names, with their own names
+  (entry[5], `Blueprint.title`). Made by `tools/make_original_ships.py` with
+  `tools/shipmaker.py` (convex hulls from corner points, explicit faces, lines on faces).
+  Used when `ship_data.py` is missing, or with Options > SHIPS: OWN.
 - `ship_data.py`, `game_data.py` - generated, **gitignored** (see Licensing). 31 ships; the
   galaxy's seeds, name letter pairs, starting place, the market's 17 goods and the 14
   equipment prices. Both must be copied to the badge.
@@ -764,6 +769,27 @@ of a real flight, not from a harness.
    the pulse laser.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
+   **Build 55: publishing prep begins, the game's own ships** (Brian: a full game with
+   our own content, our own names, Claude designs the ships). `original_ships.py` (31
+   roles: KESTREL in the Cobra Mk III's role, WARDEN police, GNAT, HORNET, STINGER, MULE,
+   SKINK, KITE, GRUB, HARRIER, LANCET, BULWARK, BARGE, LEVIATHAN, EEL, PHANTOM (mission
+   1), VORN MOTHERSHIP and DRONE (aliens), SHUTTLE, HAULER, DRUM STATION (low tech, 3:1
+   slot) and HALO STATION (high tech: a six-sided ring on three flat spokes round a hub,
+   2:1 docking slot in the hub's front), rocks, canister, plate, missile, pod). Sizes near
+   the originals' (the game's balance and the bay slots depend on them); stats our own
+   (none within 3 values of Elite's, checked against ship_data.py); hit areas capped at
+   9800. `ace.py` imports `ship_data` and falls back to `original_ships`
+   (`ORIGINAL_SHIPS`, `HAVE_ELITE_SHIPS`); Options (title and docked, not in flight) has
+   SHIPS: ELITE / OWN when ship_data.py is there, read from options.json at the next start
+   (`_want_own_ships`). The viewer and title screen show the titles. The draw limits went
+   from 48 vertices / 24 faces to 96 / 64 (`cockpit._PX`, `_VIS`). On the badge (real
+   ctx): Halo 5.8-6.7 ms against Elite's Dodo 3.1-3.9; Drum 2.3-2.7 (Coriolis 2.4-4.8);
+   Kestrel 2.6 (Cobra 2.8). The ring's faces point out from each segment's own middle
+   (not the ring's radius, which flipped them). Stations still collide as the old ones
+   did (by distance from the centre), so you can fly through the Halo's ring unharmed.
+   Tests: `tests/test_original_ships.py`; `test_app.py` runs a copy without ship_data.py.
+   Next in publishing prep: our own galaxy, goods and equipment (56), our own words and
+   mission texts (57), then the README, DEBUG off, level names and the app store (58).
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).

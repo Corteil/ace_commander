@@ -236,6 +236,15 @@ b.omenu = 2; tick(b, fresh=["C"])
 assert not b.cmdr.quick_con
 from ace_commander import commander as cm
 d = cm.load(save); assert d.docking == "A" and d.quick_con is False
+# SHIPS: ELITE / OWN, with ship_data.py there: kept for the next start
+import json as _json
+items = b._settings(True)
+assert "SHIPS: ELITE" in items and mod.HAVE_ELITE_SHIPS and not mod.ORIGINAL_SHIPS
+b.omenu = items.index("SHIPS: ELITE"); tick(b, fresh=["C"])
+assert "SHIPS: OWN (RESTART)" in b._settings(True)
+assert _json.load(open(mod.options_path()))["own_ships"] is True
+tick(b, fresh=["C"]); assert "SHIPS: ELITE" in b._settings(True)
+assert _json.load(open(mod.options_path()))["own_ships"] is False
 # Options > DEBUG away from a flight: only the cheats that work there, in groups
 assert b._settings(True)[-1] == "DEBUG"
 b.omenu = len(b._settings(True)) - 1; tick(b, fresh=["C"])
