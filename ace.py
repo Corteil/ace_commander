@@ -1983,12 +1983,12 @@ class AceCommander(app.App):
                 self._resume()
             elif item == "STATUS":
                 self.fsub = "status"
-            elif item == "LOCAL CHART":
+            elif item == "LOCAL CHART" or item == "HYPERSPACE":   # no target: pick one
                 from . import chart
                 self.chart = chart.Chart(self.galaxy, self.cmdr.system, self.cmdr.fuel,
                                          self.target, at=self.witch)
                 self.fsub = "chart"
-            elif item.startswith("JUMP"):
+            elif item.startswith("HYPERSPACE: "):
                 to = self._jump_ok()
                 if to is not None:
                     self.jump_to = to
@@ -2058,9 +2058,12 @@ class AceCommander(app.App):
     def _fitems_top(self):
         items = ["RESUME"]
         if self.career:
-            to = self._jump_ok()
-            if to is not None and self.game is not None and self.game.jump_t <= 0:
-                items.append("JUMP: " + self.galaxy.system(to[0]).name)
+            # always there, unless a countdown is on: with a target in range it
+            # jumps, without one it opens the local chart to pick one
+            if self.galaxy is not None and self.game is not None and self.game.jump_t <= 0:
+                to = self._jump_ok()
+                items.append("HYPERSPACE: " + self.galaxy.system(to[0]).name if to is not None
+                             else "HYPERSPACE")
             if self.galaxy is not None:
                 items.append("LOCAL CHART")
             g = self.game

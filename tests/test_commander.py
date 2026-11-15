@@ -159,7 +159,8 @@ assert commander.load(SAVE).kills == 0, "not written every kill"
 tick(a, fresh=["A"])
 tx = texts(a)
 assert "STATUS" in tx
-assert a._fitems() == ["RESUME", "LOCAL CHART", "STATUS", "SETTINGS", "QUIT TO TITLE", "DEBUG"], a._fitems()
+assert a._fitems() == ["RESUME", "HYPERSPACE", "LOCAL CHART", "STATUS", "SETTINGS", "QUIT TO TITLE",
+                       "DEBUG"], a._fitems()
 assert texts(a)
 fpick(a, "STATUS"); assert a.fsub == "status"
 tx = texts(a)
@@ -832,16 +833,19 @@ assert any(t.endswith("TOO FAR") for t in texts(e))
 tick(e, fresh=["C"]); assert e.target == far[2] and d.name() == "SYSTEM DATA"
 assert any("too far" in t for t in texts(e))
 launch(e)
-assert not any(s.startswith("JUMP") for s in e._fitems_top()), "no jump line out of range"
+assert "HYPERSPACE" in e._fitems_top(), "out of range: a plain HYPERSPACE line"
+assert not any(s.startswith("HYPERSPACE: ") for s in e._fitems_top())
+fpick(e, "HYPERSPACE"); assert e.fsub == "chart", "which opens the local chart"
+tick(e, fresh=["F"]); tick(e, fresh=["A"])
 fpick(e, "QUIT TO TITLE")
 choose(e, "CONTINUE"); assert e.mode == "flight"   # back in the same flight
 e.target = 147
-assert e._fitems_top()[1] == "JUMP: DISO", e._fitems_top()
+assert e._fitems_top()[1] == "HYPERSPACE: DISO", e._fitems_top()
 assert texts(e) is not None
 g = e.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
-fpick(e, "JUMP: DISO")
+fpick(e, "HYPERSPACE: DISO")
 assert not e.paused and g.jump_t > 0 and e.jump_to == (147, dd)
-assert not any(s.startswith("JUMP") for s in e._fitems_top()), "not twice"
+assert not any(s.startswith("HYPERSPACE") for s in e._fitems_top()), "not during the countdown"
 for _ in range(200):
     tick(e)
     if e.cmdr.system == 147:

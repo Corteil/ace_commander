@@ -99,11 +99,11 @@ goes by, flash full as you leave the tunnel, then fade.
 
 ## Hyperspace
 
-A commander starts at Lave with a full tank, which is 7 light years of fuel. If you picked
-a target while docked and it is in range, the in-flight menu (A) has **Jump: name** just
-below Resume, which starts the jump straight away. Otherwise:
+A commander starts at Lave with a full tank, which is 7 light years of fuel. The in-flight menu (A)
+always has **Hyperspace** just below Resume. If you picked a target while docked and it is
+in range, it reads **Hyperspace: name** and starts the jump straight away. Otherwise:
 
-1. Press A and choose **Local chart**. The green cross in the middle is where you are, the
+1. Press A and choose **Hyperspace** (or **Local chart**). The green cross in the middle is where you are, the
    ring is how far your fuel reaches, and each dot is a star system (white if you can reach
    it, grey if not).
 2. Move the yellow cursor with the joystick. The system nearest the cursor gets a box, with
