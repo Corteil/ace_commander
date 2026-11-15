@@ -501,6 +501,31 @@ of a real flight, not from a harness.
    for it to be optional for now: shown only when DEBUG's REPAIR SHOP is ON
    (`app.repair_shop`, not saved, applies from the next docking). Ship types are written
    up as a future phase 6 extra in `DESIGN.md`, not built.
+   **Build 42 starts phase 5: traders, police and legal status** (2026-11-15; Brian had
+   play-tested every build to 41 and was happy). `Game.legal` 0-255 (the original's FIST;
+   `legal_name`: CLEAN 0, OFFENDER 1-49, FUGITIVE 50+), saved as `Commander.legal`, copied
+   game to commander in `app._bank`, set from it in `_fit`. Launching with illegal goods
+   (`ILLEGAL`: slaves and narcotics 2 a tonne, firearms 1) raises it to at least their
+   weight (`Game.illegal_cargo`). The first hit on a trader adds `HIT_TRADER` (16), killing
+   one `KILL_TRADER` (16) more; firing on the police or the station (`_hit_station`: a shot
+   that hits nothing else with the station in the crosshair) makes you a fugitive
+   (`_crime`, `_provoke`). Each jump halves it (`app._arrive`); the escape pod clears it;
+   dying without one goes back to the saved value. Ships have `Obj.role` ("pirate",
+   "trader", "police") and two new states, "trade" and "patrol", that leave you alone;
+   only "attack" / "break" count as hostile for encounters. `Game._traffic` (called from
+   `_encounters` before the safe-zone check, so in the safe zone too): every
+   `TRADER_EVERY` (12 s), with fewer than 2 traders, one of `TRADERS` (Cobra Mk III,
+   Python, Boa, Anaconda, Moray) turns up with chance 0.45 (0.8 in the safe zone) facing the
+   station; it steers there and docks (vanishes) on reaching it; fired on, it attacks if
+   it has a laser, else flees; no bounty. Every `POLICE_EVERY` (6 s) in the safe zone,
+   with fewer than 3 police: a Viper hunting you always if a fugitive, with chance
+   legal / 64 if an offender, else now and then a patrol (`PATROL_CHANCE`); they launch
+   out of the slot when the station is within 8,400, else arrive like other ships; a patrol
+   turns on a fugitive. Radar: pirates and attackers red, police blue (`POLICE_BLUE`),
+   traders white. Status pages show the legal status. DEBUG: ADD A TRADER, ADD POLICE,
+   LEGAL (CLEAN / OFFENDER / FUGITIVE), career only. Tests: `tests/test_traffic.py`. On the
+   badge: 6.7 ms a step with three police and a trader. Not built yet from phase 5: pirates
+   attacking traders, Thargoids, and legal status changing the market or bounties.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -511,7 +536,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 41), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 42), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

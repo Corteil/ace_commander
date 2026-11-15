@@ -34,6 +34,7 @@ RED = (1, 0.25, 0.2)
 ORANGE = (1, 0.55, 0.1)
 CYAN = (0.3, 0.9, 1)
 MAGENTA = (1, 0.3, 1)
+POLICE_BLUE = (0.35, 0.5, 1)
 GREY = (0.7, 0.7, 0.75)
 COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": MAGENTA, "pmissile": CYAN,
           "station": WHITE}
@@ -1150,7 +1151,15 @@ def draw_hud(ctx, g, ms=None, ring=True):
             h = 22
         elif h < -6:
             h = -6
-        ctx.rgb(*(RED if o.kind == "ship" else COLOUR[o.kind]))   # hostile ships in red
+        if o.kind == "ship":    # hostile ships red, the police blue, traders white
+            if o.role == "pirate" or o.state == "attack" or o.state == "break":
+                ctx.rgb(*RED)
+            elif o.role == "police":
+                ctx.rgb(*POLICE_BLUE)
+            else:
+                ctx.rgb(*WHITE)
+        else:
+            ctx.rgb(*COLOUR[o.kind])
         if h >= 0:
             ctx.rectangle(bx, by - h, 1, h).fill()
         else:
