@@ -419,7 +419,7 @@ Constrictor and the Thargoid plans, as the disc original; see `missions.py`).
   your ship (`cockpit.SHIP_COLOURS`, 10 Cr a coat, saved as `Commander.colour`). The colour
   shows in the launch and docking tunnels and the docking computer's view. It could later
   also mend damage, if damage comes to last between flights.
-- **Ship types (future):** buy a different ship instead of the Cobra Mk III. Not in BBC
+- **Ship types (next, Brian asked 2026-11-15: "able to change ship being flown"):** buy a different ship instead of the Cobra Mk III. Not in BBC
   Elite, so the rules are ours to make: each type would bring its own top speed, turn rate,
   hold size, missile pylons, laser mounts, shields and price, taken from the ship data
   (`ship_data.py` already has speed, energy, laser power and missiles for all 31). It would

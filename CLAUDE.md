@@ -912,6 +912,13 @@ of a real flight, not from a harness.
    main. The store lists it within about 15 minutes at apps.badge.emfcamp.org; problems
    at apps.badge.emfcamp.org/errors/. A new version: bump `version` in tildagon.toml
    and metadata.json, merge to main, make a release.
+   **For the next build (Brian, 2026-11-15, after the v59 release):**
+   - Remove the title screen's SPEED TEST (`bench.py`, its title-menu choice, the loader
+     step, the README line and `tests/test_bench.py`).
+   - Be able to change the ship you fly: the "Ship types" phase 6 extra in DESIGN.md (buy
+     another hull; its speed, turn rate, hold, pylons, lasers, shields and price; the
+     tunnel/chase-view model, `Game` constants, `commander.HOLD`, `Commander.ship`). Ask
+     Brian how ships are bought and what carries over before building.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
