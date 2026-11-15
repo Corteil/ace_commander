@@ -51,10 +51,17 @@ assert c.cash == cash - E[eq.BEAM][1] + E[eq.MILITARY][1]
 assert eq.have(eq.BEAM, c) == "fitted" and eq.have(eq.PULSE, c) == ""
 c.cash = E[eq.MILITARY][1] - E[eq.BEAM][1]        # just enough with the refund
 assert eq.buy(E, eq.MILITARY, c) is None and c.cash == 0
-# not yet: shown but not sold
-for i in eq.SOON:
-    assert eq.buy(E, i, c) == "COMING SOON"
-assert "ecm" not in c.extras and c.laser == "military"
+# everything is on sale now; each extra goes on the list once
+assert eq.SOON == ()
+for i, name in ((eq.ECM, "ecm"), (eq.POD, "pod"), (eq.BOMB, "bomb"), (eq.DOCKING, "docking"),
+                (eq.HYPERDRIVE, "hyperdrive")):
+    c.cash = 10 ** 6
+    assert eq.buy(E, i, c) is None and name in c.extras and eq.have(i, c) == "fitted"
+    assert eq.buy(E, i, c) == "ALREADY FITTED"
+for x in ("ecm", "pod", "bomb", "docking", "hyperdrive"):
+    c.extras.remove(x)
+c.cash = 0
+assert c.laser == "military"
 # saved and loaded
 d = commander.Commander.from_dict(c.to_dict())
 assert (d.missiles, d.laser, d.hold, sorted(d.extras)) == (4, "military", 35, ["energy", "scoops"])

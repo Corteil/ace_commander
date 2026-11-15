@@ -17,7 +17,7 @@ Flight (2026 Spaceagon)
     Joystick      pitch and roll
     C, or press the joystick    fire lasers (hold)
     D             fire a missile at the boxed target
-    B             energy bomb (not in the game yet)
+    B             energy bomb, once fitted (it is used up)
     F / E         speed up / slow down
     A             in-flight menu, which pauses the game
 With tilt steering (chosen in the in-flight menu) tilting the badge steers and
@@ -123,6 +123,7 @@ PERF_LOG = 60           # print a PERF line to the console every this many fligh
 LAUNCH_TIME = 2.5       # seconds of launch tunnel (C skips it)
 DOCK_TIME = 3.0         # seconds of flying in through the station's tunnel on docking (C skips it)
 DOCK_HOLD = (1.0, 2.0)  # then the view of the bay stays this long, chosen at random
+EJECT_TIME = 3.0        # seconds of "ESCAPE POD LAUNCHED" before waking up docked (C skips it)
 DOCK_NAMES = {"A": "AUTHENTIC", "B": "ASSISTED", "C": "AUTOMATIC"}
 DEBUG_MENU = True       # show DEBUG, a page of cheats for testing, in the in-flight menu
 PERF_SLOW = 25          # ms over the average that makes a frame count as slow
@@ -279,6 +280,8 @@ class AceCommander(app.App):
         self.fmenu = 0          # which in-flight menu line is highlighted
         self.fsub = None        # None, "status", "chart", "pause" or "debug": the menu page
         self.galaxy = None      # made the first time a commander flies
+        self.galaxy_n = 0       # which of the 8 galaxies self.galaxy is
+        self.eject_t = 0.0      # time since the escape pod was launched
         self.chart = None       # the local chart, while it is open
         self.jump_to = None     # (system, distance) the hyperspace countdown is for
         self.dt = 0.0           # seconds since the last update
@@ -390,6 +393,10 @@ class AceCommander(app.App):
             self._leds(0)
         elif g.over:
             self._leds(48)
+        elif g.bomb_t > 0:      # the energy bomb: a white flash
+            self._leds(255)
+        elif g.ecm_t > 0:       # the ECM: a violet flash
+            self._leds_rgb(160, 0, 255)
         elif g.flash > 0.18:    # full, then fading over the 0.3 s after a hit
             self._leds(255)
         elif g.flash > 0.09:
@@ -626,10 +633,13 @@ class AceCommander(app.App):
         starting system. Without game_data.py there is no galaxy."""
         if game_data is None:
             return
-        if self.galaxy is None:
-            from . import galaxy
-            self.galaxy = galaxy.Galaxy(game_data.SEEDS, game_data.PAIRS)
         c = self.cmdr
+        if self.galaxy is None or self.galaxy_n != c.galaxy:
+            from . import galaxy
+            self.galaxy = None      # free the old one first
+            self.galaxy = galaxy.Galaxy(galaxy.seeds_for(game_data.SEEDS, c.galaxy),
+                                        game_data.PAIRS)
+            self.galaxy_n = c.galaxy
         if c.system is None:
             c.system = self.galaxy.find(*game_data.START_XY) or 0
             c.fuel = min(commander.MAX_FUEL, game_data.START_FUEL)
@@ -761,6 +771,10 @@ class AceCommander(app.App):
         g.set_laser(c.laser)
         g.energy_unit = "energy" in c.extras
         g.fuel_scoops = "scoops" in c.extras
+        g.ecm = "ecm" in c.extras
+        g.pod = "pod" in c.extras
+        g.bombs = 1 if "bomb" in c.extras else 0
+        g.computer = "docking" in c.extras
 
     def _refuel(self, n):
         """Fuel skimmed from the sun: n tenths of a light year into the tank.
@@ -804,7 +818,7 @@ class AceCommander(app.App):
         lost. The commander goes back to how they were when last saved (docked
         at a station), and this flight's kills, bounties and used missiles are
         written off so that nothing more is banked from it. (With an escape
-        pod, once it exists, only the cargo will be lost.)"""
+        pod only the cargo is lost: see _update_flight.)"""
         if self.saved is not None:
             self.cmdr = commander.Commander.from_dict(json.loads(self.saved))
         else:                   # never saved: lose the cargo at least
@@ -868,6 +882,14 @@ class AceCommander(app.App):
         c = self.cmdr
         if to is None or not self.career or c is None or self.galaxy is None:
             return
+        if to[0] == "galaxy":   # the galactic hyperdrive: the next galaxy, no fuel used
+            from . import galaxy
+            c.galaxy = (c.galaxy + 1) % 8
+            self._extra(c, "hyperdrive", False)     # used up
+            self._place()
+            c.system = self.galaxy.nearest(*galaxy.GAL_ARRIVE)
+            c.docked_at = None  # nowhere docked in this galaxy yet
+            to = (c.system, 0)
         c.system = to[0]
         c.fuel = max(0, c.fuel - to[1])
         c.market = None         # a new system: its market is worked out on docking
@@ -967,6 +989,35 @@ class AceCommander(app.App):
         if hit("k_P"):
             menu = True
 
+        if g.over and g.ejected:
+            # the escape pod: the ship and its cargo are lost, the pod is used
+            # up, and you wake up docked at this system's station with a full
+            # tank, as in the original
+            if not self.saved_over:
+                self.saved_over = True
+                self.eject_t = 0.0
+                c = self.cmdr
+                if self.career and c is not None:
+                    c.cargo = [0] * commander.GOODS
+                    self._extra(c, "pod", False)
+                    c.fuel = commander.MAX_FUEL
+                    self.jump_to = None
+                # nothing else since the last save is lost; docking saves it
+            self.eject_t += dt
+            if self.career and (confirm or self.eject_t >= EJECT_TIME):
+                g.ejected = False
+                self._dock()
+            elif not self.career and confirm:   # practice has no station: fly again
+                g.reset()
+                self.banked = 0
+                self.banked_cash = 0
+                self.saved_over = False
+                self.zero = None
+            elif cancel:
+                self._to_title()
+            else:
+                g.step(dt, 0.0, 0.0, 0.0, False, False)
+            return False
         if g.over:
             if not self.saved_over:
                 self.saved_over = True
@@ -1020,8 +1071,8 @@ class AceCommander(app.App):
                     else:
                         self.zero = None
                         self.d_t = None
-            if hit(BTN_BOMB):
-                g.say("NO ENERGY BOMB")
+            if hit(BTN_BOMB) and g.energy_bomb() and self.career and self.cmdr is not None:
+                self._extra(self.cmdr, "bomb", False)     # used up
             roll, jy = self._steer(tilt, STICK, True)
         elif tilt:              # older firmware: the d-pad is free for speed and missiles
             if held("up"):
@@ -1042,6 +1093,8 @@ class AceCommander(app.App):
         if hit("k_M"):
             missile = True
         fire = held("confirm") or held("k_F") or held("k_SPACE")
+        if g.autodock and (throttle or abs(roll) > 0.3 or abs(jy) > 0.3 or fire or missile):
+            g.stop_autodock()       # taking the controls switches the docking computer off
         pitch = jy if INVERT_PITCH else -jy
         t0 = _us()
         g.step(dt, pitch, roll, max(-1.0, min(1.0, throttle)), fire, missile)
@@ -1103,6 +1156,10 @@ class AceCommander(app.App):
         if self.career and self.cmdr is not None:
             c = self.cmdr
             items += ["CARGO BAY: %dT" % c.hold, "FUEL SCOOPS: " + onoff(g.fuel_scoops)]
+        items += ["ECM: " + onoff(g.ecm), "ESCAPE POD: " + onoff(g.pod),
+                  "ENERGY BOMB: " + onoff(g.bombs), "DOCK COMPUTER: " + onoff(g.computer)]
+        if self.career and self.cmdr is not None:
+            items.append("GAL. HYPERDRIVE: " + onoff("hyperdrive" in self.cmdr.extras))
         return items
 
     def _ship_config(self, item):
@@ -1129,6 +1186,26 @@ class AceCommander(app.App):
         elif item.startswith("FUEL SCOOPS") and c is not None:
             g.fuel_scoops = not g.fuel_scoops
             self._extra(c, "scoops", g.fuel_scoops)
+        elif item.startswith("ECM"):
+            g.ecm = not g.ecm
+            if c is not None:
+                self._extra(c, "ecm", g.ecm)
+        elif item.startswith("ESCAPE POD"):
+            g.pod = not g.pod
+            if c is not None:
+                self._extra(c, "pod", g.pod)
+        elif item.startswith("ENERGY BOMB"):
+            g.bombs = 0 if g.bombs else 1
+            if c is not None:
+                self._extra(c, "bomb", bool(g.bombs))
+        elif item.startswith("DOCK COMPUTER"):
+            g.computer = not g.computer
+            if not g.computer:
+                g.stop_autodock()
+            if c is not None:
+                self._extra(c, "docking", g.computer)
+        elif item.startswith("GAL. HYPERDRIVE") and c is not None:
+            self._extra(c, "hyperdrive", "hyperdrive" not in c.extras)
 
     @staticmethod
     def _extra(c, name, on):
@@ -1265,6 +1342,20 @@ class AceCommander(app.App):
                     self.jump_to = to
                     self.game.start_jump()
                 self._resume()
+            elif item == "DOCKING COMPUTER":
+                why = self.game.start_autodock()
+                if why:
+                    self.game.say(why)
+                self._resume()
+            elif item == "DOCK COMPUTER OFF":
+                self.game.stop_autodock()
+                self._resume()
+            elif item == "GALACTIC JUMP":
+                self.jump_to = ("galaxy", 0)
+                self.game.stop_autodock()
+                self.game.start_jump()
+                self.game.say("GALACTIC HYPERSPACE", 1.5)
+                self._resume()
             elif item == "DEBUG":
                 self.fsub = "debug"
                 self.fmenu = 0
@@ -1301,6 +1392,16 @@ class AceCommander(app.App):
                 items.append("JUMP: " + self.galaxy.system(to[0]).name)
             if self.galaxy is not None:
                 items.append("LOCAL CHART")
+            g = self.game
+            c = self.cmdr
+            if g is not None and g.computer:
+                if g.autodock:
+                    items.append("DOCK COMPUTER OFF")
+                elif g.space is not None and g.space.safe:
+                    items.append("DOCKING COMPUTER")
+            if (c is not None and "hyperdrive" in c.extras and g is not None
+                    and g.jump_t <= 0 and self.galaxy is not None):
+                items.append("GALACTIC JUMP")
             items.append("STATUS")
         items.append("PAUSE MENU")
         if DEBUG_MENU:
@@ -1416,18 +1517,22 @@ class AceCommander(app.App):
         pause = self.fsub == "pause"
         text(ctx, "PAUSE MENU" if pause else "PAUSED", 0, -60, 18, cockpit.WHITE)
         items = self._fitems()
+        many = len(items) > 6       # equipment adds lines: closer together, no help line
+        step = 13 if many else 16
+        top = -44 if many else -40
         for i, label in enumerate(items):
-            y = -40 + i * 16
+            y = top + i * step
             if i == self.fmenu:
-                ctx.rgb(*cockpit.DIM).rectangle(-96, y - 8, 192, 16).fill()
-            text(ctx, label, 0, y, 13, cockpit.GREEN if i == self.fmenu else cockpit.GREY)
+                ctx.rgb(*cockpit.DIM).rectangle(-96, y - step / 2, 192, step).fill()
+            text(ctx, label, 0, y, 12 if many else 13,
+                 cockpit.GREEN if i == self.fmenu else cockpit.GREY)
         if pause:
             # where the time goes: whole frame, game rules, and my drawing calls
             text(ctx, "frame %d  rules %d" % (self.ms, self.t_step), 0, 20, 11, cockpit.GREY)
             text(ctx, "world %d  hud %d  objs %d" % (
                 self.t_world, self.t_hud, len(self.game.objs)), 0, 34, 11, cockpit.GREY)
             text(ctx, "C: change   F: back", 0, 52, 11, cockpit.GREY)
-        else:
+        elif not many:
             text(ctx, "C: choose   A: resume", 0, 54, 11, cockpit.GREY)
 
 

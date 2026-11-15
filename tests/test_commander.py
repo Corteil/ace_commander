@@ -726,9 +726,10 @@ tick(e, fresh=["C"]); assert d.msg == "MISSILES FULL" and c.missiles == 4
 tick(e, fresh=["JOYDOWN"]); cash = c.cash
 tick(e, fresh=["C"]); assert c.hold == 35 and c.cash == cash - eq[2][1]
 tick(e, fresh=["C"]); assert d.msg == "ALREADY FITTED" and c.cash == cash - eq[2][1]
-# the ECM isn't for sale yet
-tick(e, fresh=["JOYDOWN"]); assert d.esel == 3 and "soon" in texts(e)
-tick(e, fresh=["C"]); assert d.msg == "COMING SOON" and "ecm" not in c.extras
+# the ECM is for sale now
+tick(e, fresh=["JOYDOWN"]); assert d.esel == 3 and "soon" not in texts(e)
+cash = c.cash = 20000
+tick(e, fresh=["C"]); assert "ecm" in c.extras and c.cash == cash - eq[3][1]
 # a beam laser: the pulse laser's price comes back
 tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["JOYDOWN"]); assert d.esel == 5
 c.cash = cash = 20000

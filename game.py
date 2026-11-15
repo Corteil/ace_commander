@@ -22,14 +22,27 @@ LASER_COOL = 0.16      # heat lost per second
 # the front laser, by type: (seconds between shots, damage a hit, heat a shot
 # (1.0 = overheated)). The beam laser fires twice as fast and heats faster;
 # the military laser hits harder too (Elite's power 23 against the pulse
-# laser's 15). The mining laser is the pulse laser's until mining exists.
+# laser's 15). The mining laser fires like the pulse laser, a little harder, and
+# breaks rocks into splinters you can scoop (see Game._kill).
 LASERS = {
     "pulse": (0.18, 12.0, 0.05),
     "beam": (0.09, 12.0, 0.04),
     "military": (0.09, 18.0, 0.045),
-    "mining": (0.18, 12.0, 0.05),
+    "mining": (0.18, 15.0, 0.05),
 }
 ENERGY_UNIT = 2.0      # an energy unit makes the shields and hull recharge this much faster
+# The rest of the equipment (phase 4). The ECM fires by itself when an enemy
+# missile comes within ECM_RANGE, destroys every enemy missile about, and
+# costs ECM_COST of the shields. The energy bomb, once, destroys every ship,
+# missile and rock within BOMB_RANGE. The escape pod saves you (see
+# Game.ejected). The docking computer flies you in from the safe zone (see
+# Game._autopilot).
+ECM_RANGE = 2500.0
+ECM_COST = 10.0
+BOMB_RANGE = 10000.0
+MINERALS = 12           # the good a splinter holds (market.py's list: food is 0)
+AUTO_FAST = 8000.0      # the docking computer uses the jump drive's speed further out than this
+AUTO_SLOW = 3000.0      # and slows to docking speed closer in than this
 AIM_ASSIST = 0.05      # a shot hits anything within this slope of the crosshair
 
 MISSILE_DAMAGE = 150.0
@@ -278,6 +291,7 @@ class Obj:
         self.spin = 0.0
         self.aim = None     # [dx, dy, dz] heading used while breaking away
         self.target = None  # what a player missile is chasing
+        self.good = None    # a splinter: the good it holds (a canister: None, any of several)
         self.missiles = bp.missiles
         self.beam = 0.0     # > 0 while this ship's laser is drawn
         self.hit = 0.0      # > 0 while flashing from a hit
@@ -343,6 +357,10 @@ class Game:
         self.set_laser("pulse")
         self.energy_unit = False    # recharge ENERGY_UNIT times faster
         self.fuel_scoops = True     # without them a canister is hit, not scooped
+        self.ecm = False            # fires by itself at incoming missiles
+        self.pod = False            # an escape pod: being destroyed isn't the end
+        self.bombs = 0              # energy bombs (one at most, used once)
+        self.computer = False       # a docking computer
         # what skimmed fuel goes into: a function given tenths of a light year
         # that returns how many fitted in the tank; None: nowhere (practice)
         self.refuel = None
@@ -430,6 +448,10 @@ class Game:
         self.tractor = False   # docking B: the station is drawing you in
         self.bump_t = 0.0      # > 0 just after hitting the station (no second hit meanwhile)
         self.again = "C: fly again"     # what C does on the GAME OVER screen
+        self.ejected = False   # destroyed, but the escape pod got away: whoever is watching docks you
+        self.ecm_t = 0.0       # > 0 just after the ECM fired
+        self.bomb_t = 0.0      # > 0 just after the energy bomb went off
+        self.autodock = False  # the docking computer is flying
 
     def say(self, msg, t=2.0):
         self.msg = msg
@@ -601,7 +623,11 @@ class Game:
         if self.bump_t > 0:
             self.bump_t -= dt
         if st is not None:
-            if self.docking == "C":
+            if self.autodock:
+                if sp.d_station < st.bp.front + PLAYER_R + 300.0:
+                    self._docked()
+                    return
+            elif self.docking == "C":
                 if sp.d_station < DOCK_DIST:
                     self._docked()
                     return
@@ -638,6 +664,7 @@ class Game:
 
     def _docked(self):
         self.docked = True
+        self.autodock = False
         self.jumping = False
         self.tractor = False
 
@@ -692,6 +719,85 @@ class Game:
         self._measure()
         return False
 
+    # ---- the docking computer, ECM and energy bomb ------------------------
+
+    def start_autodock(self):
+        """Switch the docking computer on. Returns None, or why not."""
+        sp = self.space
+        if not self.computer:
+            return "NO DOCKING COMPUTER"
+        if sp is None or sp.station is None or not sp.safe or self.over:
+            return "STATION TOO FAR"
+        self.autodock = True
+        self.jump_t = 0.0
+        self.tractor = False
+        self.say("DOCKING COMPUTER ON")
+        return None
+
+    def stop_autodock(self):
+        if self.autodock:
+            self.autodock = False
+            self.say("DOCKING COMPUTER OFF")
+
+    def _autopilot(self):
+        """The docking computer's stick and throttle: roll the station up
+        (or down) over the crosshair, pitch onto it, and fly in, fast while
+        far off and slowly near. Returns (pitch, roll, throttle)."""
+        st = self.space.station
+        x, y, z = st.x, st.y, st.z
+        if y >= 0:
+            phi = math.atan2(x, y)      # 0: straight above the crosshair
+            up = 1.0
+        else:
+            phi = math.atan2(-x, -y)    # 0: straight below it
+            up = -1.0
+        off = math.atan2(math.sqrt(x * x + y * y), z)   # 0: dead ahead
+        roll = max(-1.0, min(1.0, phi * 3.0)) if off > 0.02 else 0.0
+        k = 1.0 if abs(phi) < 0.4 else 0.3
+        pitch = up * k * max(-1.0, min(1.0, off * 4.0))
+        d = self.space.d_station
+        if off > 0.3:
+            want = DOCK_SPEED * 0.5
+        elif d > AUTO_SLOW:
+            want = PLAYER_MAX
+        else:
+            want = DOCK_SPEED * 0.8
+        throttle = max(-1.0, min(1.0, (want - self.speed) * 0.5))
+        return pitch, roll, throttle
+
+    def _ecm(self):
+        """The ECM: every enemy missile about is destroyed."""
+        n = 0
+        for o in self.objs:
+            if o.kind == "missile" and not o.dead:
+                o.dead = True
+                self._boom(o.x, o.y, o.z, 8)
+                n += 1
+        if n:
+            self.ecm_t = 0.5
+            self.shield = max(0.0, self.shield - ECM_COST)
+            self.say("ECM")
+
+    def energy_bomb(self):
+        """Set off the energy bomb, if there is one: every ship, missile and
+        rock within BOMB_RANGE is destroyed. Returns True if it went off."""
+        if self.bombs <= 0 or self.over:
+            if not self.over:
+                self.say("NO ENERGY BOMB")
+            return False
+        self.bombs -= 1
+        self.bomb_t = 0.4
+        r = BOMB_RANGE
+        for o in self.objs:
+            if (not o.dead and o.kind in ("ship", "missile", "pmissile", "rock")
+                    and -r < o.x < r and -r < o.y < r and -r < o.z < r):
+                if o.kind == "pmissile":
+                    o.dead = True
+                else:
+                    self._kill(o)
+        self.say("ENERGY BOMB")
+        return True
+
     # ---- one step of the simulation ---------------------------------------
 
     def step(self, dt, pitch, roll, throttle, fire, missile):
@@ -708,6 +814,16 @@ class Game:
             self.beam -= dt
         if self.warp > 0:
             self.warp -= dt
+        if self.ecm_t > 0:
+            self.ecm_t -= dt
+        if self.bomb_t > 0:
+            self.bomb_t -= dt
+        if self.autodock:
+            if self.over or self.space is None or not self.space.safe:
+                self.autodock = False
+            else:
+                pitch, roll, throttle = self._autopilot()
+                fire = missile = False
         if self.over:
             self.jump_t = 0.0
             pitch = roll = 0.0
@@ -728,7 +844,8 @@ class Game:
                         and self.speed >= PLAYER_MAX and not sp.safe and self.jump_t <= 0
                         and self.cabin <= COOL_CABIN    # not near the sun
                         and not self._near())
-        if self.jumping:
+        if self.jumping or (self.autodock and self.speed >= PLAYER_MAX
+                            and sp.d_station > AUTO_FAST):
             fwd *= JUMP_K
         self.fwd = int(fwd)
         self._rotate(pitch * PITCH_RATE * dt, roll * ROLL_RATE * dt, fwd)
@@ -933,6 +1050,9 @@ class Game:
             o.speed += (want - o.speed) * min(1.0, 2.0 * dt)
             v = o.speed * SPEED_K * dt / THINK_EVERY    # this frame's share
         elif kind == "missile":
+            if self.ecm and d < ECM_RANGE and not self.over:
+                self._ecm()
+                return
             o.t -= dt
             if o.t <= 0 or (d < 150 and not self.over):
                 if o.t > 0:
@@ -1020,7 +1140,7 @@ class Game:
                     continue
                 # a canister holds one of the first SCOOP_GOODS goods, as in the
                 # original; with no room for it, it is lost
-                name = self.scoop(random.randrange(SCOOP_GOODS))
+                name = self.scoop(random.randrange(SCOOP_GOODS) if o.good is None else o.good)
                 if name:
                     self.cargo += 1
                     self.score += 25
@@ -1109,7 +1229,7 @@ class Game:
                 best.energy -= self.laser_damage
                 best.hit = 0.12
                 if best.energy <= 0:
-                    self._kill(best)
+                    self._kill(best, self.laser == "mining")
 
         if missile and self.missiles > 0:
             t = self.lock
@@ -1138,7 +1258,9 @@ class Game:
         self.new.append(c)
         return c
 
-    def _kill(self, o):
+    def _kill(self, o, mine=False):
+        """o is destroyed. mine: by the mining laser, so a rock breaks into
+        splinters you can scoop for minerals."""
         if o.dead:
             return
         o.dead = True
@@ -1170,6 +1292,27 @@ class Game:
             self.score += 5
         elif o.kind == "rock":
             self.score += 2
+            if mine:
+                self._splinters(o)
+
+    def _splinters(self, rock):
+        """A rock broken up by the mining laser: an asteroid into two or three
+        splinters, a boulder into one or two, each holding minerals."""
+        bp = self.types.get("SPLINTER") or self.can_bp
+        if bp is None:
+            return
+        n = random.randint(2, 3) if rock.bp.name == "ASTEROID" else random.randint(1, 2)
+        for _ in range(n):
+            if len(self.objs) + len(self.new) >= MAX_OBJECTS:
+                return
+            c = Obj(bp, "can", rock.x + _rnd(-60, 60), rock.y + _rnd(-60, 60),
+                    rock.z + _rnd(-60, 60))
+            dx, dy, dz = _unit(_rnd(-1, 1), _rnd(-1, 1), _rnd(-1, 1))
+            _look(c.m, dx, dy, dz)
+            c.speed = _rnd(1, 3)
+            c.spin = _rnd(-2, 2)
+            c.good = MINERALS
+            self.new.append(c)
 
     def _hurt(self, damage):
         if self.over:
@@ -1184,10 +1327,16 @@ class Game:
         if self.hull <= 0:
             self.hull = 0.0
             self.over = True
+            self.autodock = False
             self.lock = None
             self.locked = False
             self._boom(0.0, 0.0, 150.0, 20)
-            self.say("GAME OVER", 1e9)
+            if self.pod:        # the escape pod gets away; the ship and its cargo are lost
+                self.pod = False
+                self.ejected = True
+                self.say("ESCAPE POD LAUNCHED", 1e9)
+            else:
+                self.say("GAME OVER", 1e9)
 
     def _regen(self, dt):
         self.since_hit += dt

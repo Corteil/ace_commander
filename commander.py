@@ -66,6 +66,7 @@ class Commander:
         self.docked_at = None   # the last system docked at: where they start again if destroyed
         self.docking = "B"
         self.system = None      # which star system the commander is in (None: the start)
+        self.galaxy = 0         # which of the 8 galaxies (0 is the first)
         self.fuel = MAX_FUEL    # tenths of a light year
         self._needs = thresholds(self.level)
 
@@ -109,7 +110,8 @@ class Commander:
                 "credits": self.credits, "docking": self.docking,
                 "system": self.system, "fuel": self.fuel, "cargo": self.cargo,
                 "market": self.market, "hold": self.hold, "missiles": self.missiles,
-                "laser": self.laser, "extras": self.extras, "docked_at": self.docked_at}
+                "laser": self.laser, "extras": self.extras, "docked_at": self.docked_at,
+                "galaxy": self.galaxy}
 
     @classmethod
     def from_dict(cls, d):
@@ -138,6 +140,9 @@ class Commander:
         if isinstance(s, int) and 0 <= s < 256:
             c.system = s
         c.fuel = max(0, min(MAX_FUEL, int(d.get("fuel", MAX_FUEL))))
+        g = d.get("galaxy")
+        if isinstance(g, int) and 0 <= g < 8:
+            c.galaxy = g
         s = d.get("docked_at")
         if isinstance(s, int) and 0 <= s < 256:
             c.docked_at = s

@@ -17,9 +17,9 @@ button layout) and phase 2 (galaxy, local and galactic charts, system data, hype
 fuel, docked screens as tabs, launch tunnel), and the start of phase 3 (build 26: planet,
 sun, station, compass, jump drive, automatic docking; build 27: docking by hand; build
 30: the market; 31: scooped cargo; 32: bounties, which finishes phase 3), and the start
-of phase 4 (build 33: the Equip ship screen). Not built yet: the rest of the equipment's
-effects (ECM, escape pod, energy bomb, docking computer, galactic hyperdrive, mining
-laser), phases 5 and 6, and the system description sentence.
+of phase 4 (build 33: the Equip ship screen; build 36: every item's effect). Not built
+yet: the rest of phase 4 (see `DESIGN.md`), phases 5 and 6, and the system description
+sentence.
 
 ## Files
 
@@ -52,7 +52,10 @@ it installs to `/apps/ace_commander/` on the badge.
 - **On Brian's Raspberry Pi the badge is plugged in and Claude can reach it:** copy files
   with `mpremote connect auto fs cp ... :/apps/ace_commander/`, `mpremote connect auto reset`,
   and log with `python3 tools/badge_log.py SECONDS PORT` (only one program can hold the port).
-  On 2026-11-14 the badge was `/dev/ttyACM1`. To test over the REPL (`mpremote run x.py`),
+  On 2026-11-14 the badge was `/dev/ttyACM1`. Brian has two badges: serial
+  `7c4fad337ac00000` (the usual one) and `64e83372252c0000` (build 34 put on it
+  2026-11-14 over an older build; it keeps its own `commander.json`). Both run
+  MicroPython 1.28; check `/dev/serial/by-id/` to see which is plugged in. To test over the REPL (`mpremote run x.py`),
   `import system.scheduler` first, or importing the app fails with
   `ImportError: can't import name eventbus` (the firmware's eventbus and scheduler import
   each other; at boot the scheduler comes first).
@@ -400,10 +403,10 @@ of a real flight, not from a harness.
    commander left part-way (it set `career` False first). Still possible: quit a flight to
    the title, play combat practice, then CONTINUE docks the commander wherever they were,
    with the flight's progress. `Commander.docked_at` is still saved but no longer used.
-   The escape pod (phase 4, not built) is what should save you from this: per the disc
-   source's ESCAPE routine it loses the cargo, uses up the pod, clears the legal status,
-   gives a full tank and docks you; what it does to credits and other equipment is not
-   checked yet.
+   The escape pod (build 36) saves you from this: per the disc source's ESCAPE routine
+   it loses the cargo, uses up the pod, gives a full tank and docks you, and docking saves
+   the rest of the flight (kills, bounties). Legal status doesn't exist yet; what the
+   original does to credits and other equipment is not checked yet.
    **Build 34: sun skimming** (Brian's request; main flight loop part 15). `Game._sun`:
    cabin temperature = 285 - `SUN_HEAT` x (distance / sun radius)^2, at least 30; at
    `SCOOP_TEMP` (224) or more with fuel scoops, every `SUN_CHECK` s `Game.refuel`
@@ -433,6 +436,32 @@ of a real flight, not from a harness.
    The stardust is now drawn after the planet and sun (it is close to you). Measured on
    the badge: draw_world 13 ms with a small planet, 19 ms in the launch view, 25 ms with
    a planet of radius about 200 px.
+   **Build 36: every item of equipment works** (`equipment.SOON` is empty; 2026-11-15).
+   ECM (`Game.ecm`): an enemy missile within `ECM_RANGE` (2500) makes `_ecm` destroy every
+   enemy missile, costs `ECM_COST` (10) shield, says "ECM" and flashes the LEDs violet.
+   Energy bomb (`Game.bombs`, B in flight): `energy_bomb()` kills every ship, missile and
+   rock within `BOMB_RANGE` (canisters are spared), counts the kills, flashes the screen and
+   LEDs white, and the app takes "bomb" off the commander. Escape pod (`Game.pod`): dying
+   sets `Game.ejected` ("ESCAPE POD" box instead of GAME OVER); the app empties the hold,
+   removes the pod, fills the tank (as in the original) and after `EJECT_TIME` (3 s, C skips)
+   docks you at the system you were in, and that docking saves the flight's kills and
+   bounties (without a pod, `_restore` goes back to the last save as in build 35). An
+   energy bomb or galactic hyperdrive used in a flight that ends in death without a pod
+   comes back with the last save, as everything else does. Docking computer (`Game.computer`):
+   in-flight menu DOCKING COMPUTER while in the safe zone, DOCK COMPUTER OFF while on;
+   `Game._autopilot` rolls the station over the crosshair, pitches onto it, flies at full
+   speed (8x beyond `AUTO_FAST`) and slows in `AUTO_SLOW`, and docks you within the
+   station's front + 340 whatever the docking style; stick, throttle, fire or missile
+   switch it off. 12 to 17 s from anywhere in the safe zone; on the badge 1.9 ms a step.
+   Galactic hyperdrive: in-flight menu GALACTIC JUMP, the usual countdown with
+   `jump_to = ("galaxy", 0)`; `_arrive` adds 1 to `Commander.galaxy` (0-7, saved), uses
+   the drive up, remakes `app.galaxy` from `galaxy.seeds_for` (each seed byte rotated left,
+   as in the original; 62 ms on the badge) and arrives at the system nearest (96, 96)
+   (`GAL_ARRIVE`), no fuel used, `docked_at` cleared. Mining laser: a rock it destroys
+   breaks into SPLINTERs (asteroid 2-3, boulder 1-2; `Game._splinters`), "can" objects with
+   `Obj.good = MINERALS`, which scoop as minerals; its damage is 15 (pulse 12). SHIP CONFIG
+   has a switch for each. The top in-flight menu closes up (13 px lines, no help line) when
+   it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
@@ -441,7 +470,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 34), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 36), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

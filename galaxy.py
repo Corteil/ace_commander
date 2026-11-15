@@ -80,6 +80,25 @@ class System:
         return ECONOMIES[self.economy]
 
 
+def seeds_for(seeds, n):
+    """The starting seeds of galaxy n (0 to 7) from galaxy 0's: as in the
+    original's galactic hyperdrive, each byte of each seed is rotated left
+    once per galaxy."""
+    n &= 7
+    out = []
+    for s in seeds:
+        w = 0
+        for shift in (8, 0):
+            b = (s >> shift) & 0xFF
+            b = ((b << n) | (b >> (8 - n))) & 0xFF
+            w |= b << shift
+        out.append(w)
+    return tuple(out)
+
+
+GAL_ARRIVE = (96, 96)   # a galactic jump arrives at the system nearest here, as in the original
+
+
 class Galaxy:
     def __init__(self, seeds, pairs):
         self.seeds = tuple(seeds)

@@ -1031,7 +1031,16 @@ def draw_hud(ctx, g, ms=None, ring=True):
         ctx.rgb(*GREY)
         number(ctx, ms, 0, -114, _SMALL)
 
-    if g.over:
+    if g.bomb_t > 0:    # the energy bomb: the screen flashes white
+        ctx.rgba(1, 1, 1, min(1.0, g.bomb_t * 2.0)).rectangle(-120, -120, 240, 240).fill()
+    if g.over and g.ejected:
+        ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -42, 200, 100).fill()
+        text(ctx, "ESCAPE POD", 0, -22, 24, YELLOW)
+        text(ctx, "ship and cargo lost", 0, 6, 13, WHITE)
+        text(ctx, "C: to the station" if g.again.endswith("station") else g.again,
+             0, 30, 12, GREY)
+        text(ctx, "F: title screen", 0, 46, 12, GREY)
+    elif g.over:
         ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -42, 200, 100).fill()
         text(ctx, "GAME OVER", 0, -22, 26, RED)
         text(ctx, "SCORE %d   KILLS %d" % (g.score, g.kills), 0, 6, 14, WHITE)

@@ -29,8 +29,8 @@ LASERS = {PULSE: "pulse", BEAM: "beam", MILITARY: "military", MINING: "mining"}
 # the other items, by the name the commander keeps them under
 EXTRAS = {ECM: "ecm", SCOOPS: "scoops", POD: "pod", BOMB: "bomb", ENERGY: "energy",
           DOCKING: "docking", HYPERDRIVE: "hyperdrive"}
-# what the game can't do yet: shown, but not for sale
-SOON = (ECM, POD, BOMB, DOCKING, HYPERDRIVE, MINING)
+# what the game can't do yet: shown, but not for sale (everything works now)
+SOON = ()
 
 
 def on_sale(tech):
