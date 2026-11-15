@@ -81,6 +81,8 @@ SAFE_GREEN = 60         # the LEDs are this green (0-255) in the safe zone round
 LED_ANGLE1 = 70.0      # LED 1 about 20 degrees past 12 o'clock (Brian saw 1, 2, 3 at 0:10, 2:00, 2:50)
 LED_CLOCKWISE = True
 JUMP_FADE = 900.0       # how fast a jump flash fades, 0-255 a second
+HYPER_RGB = (130, 180, 255)     # arriving from hyperspace: blue-white, like the streaks
+DUST_RGB = (255, 255, 255)      # the jump drive's stardust: white
 EDGE_IN = 100           # a streak or speck this far from the middle (pixels) is leaving the screen
 EDGE_OUT = 140
 REPEAT_WAIT = 0.45      # seconds a market button is held before it starts repeating
@@ -405,6 +407,7 @@ class AceCommander(app.App):
         self.leds_on = False             # we have taken over the LEDs
         self.jump_leds = [0.0] * 13      # each ring LED's white jump flash, 0-255 (1 to 12)
         self.jump_lit = False            # the last write was a jump flash
+        self.jump_rgb = DUST_RGB         # their colour at full brightness
         self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
         self.own_ships = ORIGINAL_SHIPS  # DATA: OWN / ELITE, from the next start
         self.omenu = 0                   # the chosen line on the Options page
@@ -517,12 +520,14 @@ class AceCommander(app.App):
             if lit[i] > 0:
                 lit[i] = max(0.0, lit[i] - fade)
         if g.warp > 0:          # the hyperspace streaks (cockpit._STREAKS)
+            self.jump_rgb = HYPER_RGB
             k = 256 - int(g.warp * 256 / cockpit._WARP_T)
             for dx, dy, r0 in cockpit._STREAKS:
                 b = r0 + (k * 40 >> 8) + 12 + (k * 110 >> 8)     # the streak's outer end
                 if EDGE_IN <= b <= EDGE_OUT:
                     lit[self._led_at(dx, dy)] = 255.0
         elif g.jumping:         # stardust streaking past and off the edge
+            self.jump_rgb = DUST_RGB
             f = cockpit.IFOCAL
             for p in g.dust:
                 z = int(p[2])
@@ -538,8 +543,9 @@ class AceCommander(app.App):
                 break
         return any_lit
 
-    def _leds_each(self, values):
-        """Each ring LED white at its own level (values[1] to [12], 0-255)."""
+    def _leds_each(self, values, rgb=DUST_RGB):
+        """Each ring LED in colour rgb at its own level (values[1] to [12],
+        0-255)."""
         if tildagonos is None or not self.use_leds:
             return
         try:
@@ -551,9 +557,10 @@ class AceCommander(app.App):
                     pass
                 self.leds_on = True
             leds = tildagonos.leds
+            r, gr, b = rgb
             for i in range(1, 13):
                 v = int(values[i])
-                leds[i] = (v, v, v)
+                leds[i] = (r * v // 255, gr * v // 255, b * v // 255)
             leds.write()
             self.led_level = None       # the next whole-ring colour is written afresh
         except Exception:
@@ -588,7 +595,7 @@ class AceCommander(app.App):
             r, gr, b = cockpit.LASER_COLOURS.get(g.laser, cockpit.RED)
             self._leds_rgb(int(r * 255), int(gr * 255), int(b * 255))
         elif self._jump_flashes() or self.jump_lit:     # the jump: white where streaks leave
-            self._leds_each(self.jump_leds)
+            self._leds_each(self.jump_leds, self.jump_rgb)
             self.jump_lit = any(v > 0 for v in self.jump_leds[1:])
         elif self.glow > 0:     # just launched: the station's colour fades away
             self._leds_station(self.glow)

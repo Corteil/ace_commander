@@ -92,14 +92,16 @@ for _ in range(int(WT / 0.04)):
     tick(a)
     for i in range(1, 13):
         v = leds.values[i]
-        assert v[0] == v[1] == v[2], "white"
-        if v[0] > 0:
+        assert v[2] >= v[1] >= v[0], "blue-white, like the streaks"
+        if v[2] > 0:
             seen_lit.add(i)
+            if v[2] == 255:
+                assert v == mod.HYPER_RGB, v
     lit_now = [i for i in range(1, 13) if leds.values[i][0] > 0]
 assert len(seen_lit) >= 6, ("streaks leave all round the screen", seen_lit)
 for _ in range(20):
     tick(a)
-assert not any(leds.values[i] == (255, 255, 255) for i in range(1, 13)), "and fade away"
+assert not any(leds.values[i] == mod.HYPER_RGB for i in range(1, 13)), "and fade away"
 # and with the jump drive, where the stardust streaks off the edge
 z = 2000.0
 fx = mod.cockpit.FOCAL

@@ -895,7 +895,8 @@ of a real flight, not from a harness.
    each hyperspace streak (`cockpit._STREAKS`, while `Game.warp`) or, with the jump drive
    on, each stardust speck crosses the screen's edge (`EDGE_IN` to `EDGE_OUT` px from the
    middle), white, fading at `JUMP_FADE`; per-LED writes (`_leds_each`), below the bomb,
-   ECM, hit and laser flashes. `_led_at` maps a screen direction to LED 1-12 with
+   ECM, hit and laser flashes; hyperspace flashes are blue-white (`HYPER_RGB`, Brian: more
+   blue), the jump drive's white (`DUST_RGB`). `_led_at` maps a screen direction to LED 1-12 with
    `LED_ANGLE1` (LED 1's angle, anticlockwise from 3 o'clock) and `LED_CLOCKWISE`: the
    firmware doesn't say where the LEDs are. Checked on the badge (LEDs 1, 2, 3 lit red,
    green, blue; Brian saw them at 0:10, 2:00 and 2:50 on a clock face): clockwise, and a
