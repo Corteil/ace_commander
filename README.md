@@ -29,7 +29,8 @@ The game shows a loading screen for a few seconds while it starts.
 A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves the app.
 
 - **New commander** / **Continue**: the game. Pick a level (EASY, NORMAL or HARD) for a new
-  commander: it sets how many kills each rank takes and how tough the enemies are. Your
+  commander: it sets how many kills each rank takes, how many enemies attack at once, and
+  how many hits they take. Your
   commander is saved each time you dock, and only then. Being destroyed takes you back to
   your last save, unless you have an escape pod.
 - **Combat practice**: endless waves of ships, with nothing kept.
@@ -43,7 +44,7 @@ A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves 
 | Input | Action |
 |---|---|
 | Joystick | pitch and roll |
-| C, or press the joystick (hold) | lasers |
+| C, or press the joystick (hold) | lasers (pulse and mining fire shots; beam and military a steady beam) |
 | D | fire a missile at the boxed target (it locks after two seconds in the sights) |
 | B | energy bomb, if fitted |
 | F / E | speed up / slow down |

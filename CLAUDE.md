@@ -879,6 +879,17 @@ of a real flight, not from a harness.
    `pages`) and `DEBUG_MENU` is on for good ("debug": true in options.json, read by
    `_debug_wanted`). A route from the start: Daenor, (a stop such as Idei), Reares,
    Arorzu, Kasaxipa, Elkasoso. Not in the README on purpose.
+   Then (Brian): lasers hit with Elite's power (`game.LASERS`: pulse 15, beam 15, military
+   23, mining 50; were 12 / 12 / 18 / 15); the beam and military lasers are continuous
+   (`CONTINUOUS`: the beam drawn and the LEDs lit while fire is held, a hit every 0.09 s,
+   until overheated); the level scales every ship's energy (`LEVELS`' fourth value,
+   `energy_k`: EASY 0.75, NORMAL 1, HARD 1.25, applied once as a ship joins `objs`,
+   `Obj.max_energy` / `leveled`; the Thargon launch and flee thresholds use max_energy).
+   At NORMAL the hits to kill match Elite's (a Gnat 5 pulse / 4 military / 2 mining hits,
+   the Phantom 44 military).
+   Brian chose to keep mission 2's Vorn as the original: no ambush on arrival, only the
+   in-flight encounter ticks (PLANS_THARGOID) while carrying the plans. Not on the badge
+   yet (he said no for now).
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
