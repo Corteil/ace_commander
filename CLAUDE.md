@@ -754,6 +754,14 @@ of a real flight, not from a harness.
    (replacing build 22's "JUMP: name", shown only with a target in range): "HYPERSPACE:
    DISO" with a target in range starts the countdown; plain "HYPERSPACE" opens the local
    chart to pick one. Hidden during a countdown.
+   Then (Brian): each laser has its own beam colour (`cockpit.LASER_COLOURS`: pulse magenta,
+   beam blue, military green, mining yellow; enemy beams stay ORANGE), and the ring LEDs
+   flash that colour while `Game.beam` is set after each shot (`_leds_flight`, below the
+   bomb, ECM and hit flashes, above the launch glow, scooping, sun and safe zone).
+   Then (Brian): the energy bomb flashes the LEDs white as intended (it used `_leds`,
+   which is red only, so it looked like a hit); enemy missiles are ORANGE like enemy
+   lasers (all enemy fire), your missiles `LIGHT_PURPLE` (was cyan), so magenta is only
+   the pulse laser.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
