@@ -11,5 +11,6 @@ options.json
 
 # made by the tests
 tests/noship/
+tests/noelite/
 tests/shots/
 game_data.py

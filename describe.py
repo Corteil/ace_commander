@@ -170,9 +170,76 @@ class _Writer:
         self.ship = False
 
 
+class _Grammar:
+    """The game's own descriptions (original_data.DESCRIBE): each <word> is
+    one of its choices, picked by a small random-number generator seeded
+    from the system (whole numbers only, cheap on the badge)."""
+
+    def __init__(self, rules, name, s1, s2, pairs):
+        self.rules = rules
+        self.name = name[:1].upper() + name[1:].lower()
+        self.pairs = pairs
+        self.x = ((s1 ^ (s2 << 3)) & 0xFFFF) or 0xACE1
+
+    def rnd(self):
+        """The next number, 0 to 65535 (a 16-bit xorshift)."""
+        x = self.x
+        x ^= (x << 7) & 0xFFFF
+        x ^= x >> 9
+        x ^= (x << 8) & 0xFFFF
+        self.x = x
+        return x
+
+    def adjective(self):
+        stem = self.name
+        if stem and stem[-1] in VOWELS:
+            stem = stem[:-1]
+        return stem + "ian"
+
+    def made_up(self):
+        n = 1 + self.rnd() % 3
+        s = ""
+        for _ in range(n):
+            i = 2 + 2 * (self.rnd() % 31)
+            s += self.pairs[i:i + 2].replace("?", "")
+        return s[:1] + s[1:].lower()
+
+    def expand(self, word, depth=0):
+        choices = self.rules.get(word)
+        if not choices or depth > 8:
+            return ""
+        t = choices[self.rnd() % len(choices)]
+        out = []
+        i = 0
+        while i < len(t):
+            c = t[i]
+            if c == "<":
+                j = t.index(">", i)
+                out.append(self.expand(t[i + 1:j], depth + 1))
+                i = j + 1
+            elif c == "%" and i + 1 < len(t):
+                k = t[i + 1]
+                out.append(self.name if k == "N" else self.adjective() if k == "I"
+                           else self.made_up() if k == "R" else "")
+                i += 2
+            else:
+                out.append(c)
+                i += 1
+        return "".join(out)
+
+
 def describe(game_data, system, seeds):
     """The description sentence for a galaxy.System, given its three seeds
     (s0, s1, s2), or None without the tables in game_data."""
+    rules = getattr(game_data, "DESCRIBE", None)
+    if rules:
+        g = _Grammar(rules, system.name, seeds[1], seeds[2], game_data.PAIRS)
+        words = g.expand("start").split(" ")
+        for i in range(len(words) - 1):     # "a ancient" -> "an ancient"
+            if words[i] in ("a", "A") and words[i + 1][:1].lower() in "aeiou":
+                words[i] += "n"
+        s = " ".join(words)
+        return s[:1].upper() + s[1:]
     tokens = getattr(game_data, "DESC_TOKENS", None)
     if not tokens:
         return None
@@ -183,7 +250,13 @@ def describe(game_data, system, seeds):
 
 
 def special(game_data, n, name):
-    """Special system sentence n (RUTOK) for a system called name."""
+    """Special system sentence n (RUTOK, or the game's own SPECIAL) for a
+    system called name."""
+    own = getattr(game_data, "SPECIAL", None)
+    if own:
+        if not 0 < n <= len(own):
+            return None
+        return own[n - 1][3].replace("%N", name[:1] + name[1:].lower())
     rutok = getattr(game_data, "DESC_RUTOK", None)
     if not rutok or n >= len(rutok):
         return None
@@ -200,6 +273,11 @@ def mission_pages(game_data, n, cmdr, galaxy):
     """Mission text n (an extended token, see missions.py) as a list of
     screens: (text with paragraphs split by newlines, shows the ship).
     cmdr: the commander's name; galaxy: 0 for the first."""
+    own = getattr(game_data, "MISSION_TEXTS", None)
+    if own:
+        trail = getattr(game_data, "TRAIL", {})
+        return [(t.replace("[NAME]", cmdr).replace("[TRAIL]", trail.get(galaxy, trail.get(1, ""))),
+                 ship) for t, ship in own.get(n, ())]
     tokens = getattr(game_data, "DESC_TOKENS", None)
     if not tokens or n not in tokens:
         return []

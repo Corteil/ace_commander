@@ -839,6 +839,21 @@ of a real flight, not from a harness.
    without it load anywhere). Brian's usual badge: his Elite commander (380 kills, both
    missions done) was moved from commander.json to commander_elite.json (backup on the Pi
    in ~/Code/ace_commander_save_backups/).
+   **Build 57: the game's own words** (`original_data.py`). System data sentences from
+   our own grammar (`DESCRIBE`: `<word>` choices, %N name, %I adjective, %R made-up name;
+   `describe._Grammar`, a 16-bit xorshift seeded from the system's s1 and s2, "a" made
+   "an" before a vowel); every system in all eight galaxies has one that fits the page,
+   over 240 different per galaxy. The agreed mission texts (`MISSION_TEXTS` by
+   missions.py's numbers, [NAME] and [TRAIL] filled in by `describe.mission_pages`;
+   `TRAIL` by galaxy: Rotuvaga in the first, "jumped to this galaxy" in the second).
+   Trail clues (`SPECIAL`: galaxy, system, always, words; read by
+   `missions.special_sentence` and `describe.special`): Tuelve, Rotuvaga, Kalimii in
+   galaxy 1; Linaqu, Gaorsaka, Pamivaes, Soilliro, Reorrove, Litudade, Tudekai, Elnada
+   along the route in galaxy 2; three always-on sentences. `_mission_news` runs with
+   MISSION_TEXTS as well as Elite's DESC_TOKENS. With DATA: OWN the whole game now runs
+   without Elite's files. Tests: `tests/test_original_data.py` plays both missions in a
+   copy of the app without ship_data.py and game_data.py. Not yet on the badge (Brian
+   asked to be asked first).
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).

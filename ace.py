@@ -816,7 +816,8 @@ class AceCommander(app.App):
         save, and show the message before the docked screens."""
         c = self.cmdr
         gal = self.galaxy
-        if gal is None or not getattr(game_data, "DESC_TOKENS", None):
+        if gal is None or not (getattr(game_data, "DESC_TOKENS", None)
+                               or getattr(game_data, "MISSION_TEXTS", None)):
             return
         n = missions.on_docking(c, gal.xs[c.system], gal.ys[c.system])
         if n is None:

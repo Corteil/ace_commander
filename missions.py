@@ -174,6 +174,12 @@ def special_sentence(game_data, tp, galaxy, index):
     """The system's special sentence (PDESC, RUTOK) when you are docked
     there, or None for the usual one: a few always, the rest only while
     mission 1 is under way."""
+    own = getattr(game_data, "SPECIAL", None)
+    if own:
+        for n, (gal, system, always, _) in enumerate(own):
+            if system == index and gal == galaxy:
+                return n + 1 if always or tp & 1 else None
+        return None
     ru = getattr(game_data, "DESC_RU", None)
     if not ru:
         return None
