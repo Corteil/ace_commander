@@ -17,10 +17,19 @@ Shapes are added as parts:
     normal pointing away from the point inside (for shapes that aren't
     convex, such as a ring)
   - line(a, b, face): a line drawn on a face (a docking slot, engines)
+
+A shape that isn't convex can be split into convex parts (part() before
+each): the game then draws the parts back to front, a part nearer than the
+middle blacking out its outline first so that it hides what is behind it.
+Blacking out costs the badge about 2 ms a part, so each part says when:
+HIDES_ALWAYS, HIDES_SIDE_ON (only when seen side-on to the nose, as a
+ring's pieces overlap only then) or HIDES_NEVER. The blueprint then has a
+seventh item, the parts: (vertex numbers, edge numbers, when) for each.
 """
 import math
 
 NORMAL_LEN = 64     # the length the face normals are scaled to
+HIDES_NEVER, HIDES_ALWAYS, HIDES_SIDE_ON = 0, 1, 2
 
 
 def _sub(a, b):
@@ -42,6 +51,14 @@ class Ship:
         self.verts = []
         self.faces = []         # (loop of vertex numbers, normal)
         self.lines = []         # (a, b, face)
+        self.part_of = []       # each face's part (None: no parts)
+        self.cur = None         # the part being added to
+        self.hides = []         # each part's HIDES_...
+
+    def part(self, hides=HIDES_ALWAYS):
+        """Start a new convex part: the faces and lines after this belong to it."""
+        self.cur = len(self.hides)
+        self.hides.append(hides)
 
     def vertex(self, p):
         """The number of vertex p, added if it is new."""
@@ -66,6 +83,14 @@ class Ship:
         if _dot(n, _sub(c, inside)) < 0:
             n = (-n[0], -n[1], -n[2])
         self.faces.append((loop, n))
+        self.part_of.append(self.cur)
+        return len(self.faces) - 1
+
+    def panel(self, loop):
+        """A flat piece seen from either side (a zero normal)."""
+        loop = [i if isinstance(i, int) else self.vertex(i) for i in loop]
+        self.faces.append((loop, (0, 0, 0)))
+        self.part_of.append(self.cur)
         return len(self.faces) - 1
 
     def hull(self, points):
@@ -137,4 +162,15 @@ class Ship:
         for _, n in self.faces:
             ln = math.sqrt(_dot(n, n)) or 1.0
             normals.append(tuple(int(round(c * NORMAL_LEN / ln)) for c in n))
-        return (self.key, tuple(self.verts), tuple(edges), tuple(normals), stats, self.title)
+        entry = (self.key, tuple(self.verts), tuple(edges), tuple(normals), stats, self.title)
+        if not self.hides:
+            return entry
+        parts = []
+        for p in range(len(self.hides)):
+            vs = set()
+            for f, (loop, _) in enumerate(self.faces):
+                if self.part_of[f] == p:
+                    vs.update(loop)
+            es = tuple(i for i, e in enumerate(edges) if self.part_of[e[2]] == p)
+            parts.append((tuple(sorted(vs)), es, self.hides[p]))
+        return entry + (tuple(parts),)

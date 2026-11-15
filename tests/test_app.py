@@ -436,10 +436,10 @@ class Rec:
 square = [(-10, -10), (10, -10), (10, 10), (-10, 10), (0, 0), (5, 0), (-10, 0)]
 for i, (x, y) in enumerate(square):
     cockpit._PX[i] = x; cockpit._PY[i] = y; cockpit._OK[i] = True
-r = Rec(); cockpit._fill_hull(r, len(square))
+r = Rec(); cockpit._fill_hull(r, range(len(square)))
 assert r.filled == 1 and set(r.pts) == {(-10, -10), (10, -10), (10, 10), (-10, 10)}, r.pts
 cockpit._OK[2] = False
-r = Rec(); cockpit._fill_hull(r, len(square))
+r = Rec(); cockpit._fill_hull(r, range(len(square)))
 assert r.filled == 0, "not when part of it is behind you"
 print("station tunnels: the slot all the way, every spacing used, parked ships fit: ok")
 print("ALL APP TESTS PASSED")

@@ -27,7 +27,7 @@ need = set(game.PIRATES + game.HUNTERS + game.TRADERS + game.SHUTTLES + game.ROC
 assert need <= set(names), need - set(names)
 titles = [e[5] for e in SHIPS]
 for e in SHIPS:
-    key, verts, edges, normals, stats, title = e
+    key, verts, edges, normals, stats, title = e[:6]
     assert len(verts) <= len(cockpit._PX) and len(normals) <= len(cockpit._VIS), key
     for a, b, f1, f2 in edges:
         assert 0 <= a < len(verts) and 0 <= b < len(verts) and a != b, (key, a, b)
@@ -78,6 +78,19 @@ for e in SHIPS:
         o.m = [ca, sa * sb, -sa * cb, 0.0, cb, sb, sa, -ca * sb, ca * cb]
         o.x, o.y, o.z = 0.0, 0.0, o.bp.size * 3
         cockpit.draw_ship(CountCtx(), o, None, 0, True)
+# the ring station is drawn in convex parts, back to front: the hub always
+# blacks out what is behind it, the ring's pieces only side-on, the spokes never
+halo = game.Blueprint([e for e in SHIPS if e[0] == "DODO"][0])
+assert halo.parts and sorted(p[2] for p in halo.parts) == [0, 0, 0, 1, 2, 2, 2, 2, 2, 2]
+assert sorted(e for p in halo.parts for e in p[1]) == list(range(len(halo.edges))), \
+    "every edge in exactly one part"
+o = O(); o.bp = halo; o.x = o.y = 0.0; o.z = 1500.0
+o.m = [-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0]     # face on, the slot towards you
+c = CountCtx(); cockpit.draw_ship(c, o, None, 0, False)
+face_on = c.calls.get("fill", 0)
+o.m = [0.0, 0.0, 1.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0]      # side on
+c = CountCtx(); cockpit.draw_ship(c, o, None, 0, False)
+assert face_on == 1 and c.calls.get("fill", 0) > face_on, (face_on, c.calls.get("fill", 0))
 print("drawn from all round: ok")
 
 # ---- playing with them --------------------------------------------------------------

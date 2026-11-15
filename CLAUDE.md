@@ -787,6 +787,13 @@ of a real flight, not from a harness.
    Kestrel 2.6 (Cobra 2.8). The ring's faces point out from each segment's own middle
    (not the ring's radius, which flipped them). Stations still collide as the old ones
    did (by distance from the centre), so you can fly through the Halo's ring unharmed.
+   Then (Brian: the Halo didn't hide all its hidden lines; Elite's rule is only right for
+   convex shapes): a blueprint may have convex parts (entry[6], `Blueprint.parts`:
+   vertices, edges and when it hides), drawn back to front by mean depth (`_PZ`); a part
+   nearer than the centre blacks out its outline first (`_fill_hull(ctx, indices)`), the
+   hub always, the ring's six pieces only side-on (|nose . view| < 0.5), the spokes
+   never: each fill costs about 2 ms on the badge. Halo now 9-10 ms averaged over all
+   angles (Elite's Dodo 3-6), about 8.7 face on, as you fly in to dock.
    Tests: `tests/test_original_ships.py`; `test_app.py` runs a copy without ship_data.py.
    Next in publishing prep: our own galaxy, goods and equipment (56), our own words and
    mission texts (57), then the README, DEBUG off, level names and the app store (58).

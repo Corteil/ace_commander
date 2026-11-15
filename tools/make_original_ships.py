@@ -14,7 +14,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from shipmaker import Ship
+from shipmaker import HIDES_NEVER, HIDES_SIDE_ON, Ship
 
 
 def ring_station():
@@ -30,12 +30,14 @@ def ring_station():
         rings.append([s.vertex((rr * c, rr * sn, z))
                       for rr, z in ((r + w, d), (r + w, -d), (r - w, -d), (r - w, d))])
     for k in range(n):
+        s.part(HIDES_SIDE_ON)   # each piece of the ring is convex: drawn on its own
         p, q = rings[k], rings[(k + 1) % n]
         corners = [s.verts[i] for i in p + q]
         mid = tuple(sum(v[j] for v in corners) / 8.0 for j in range(3))   # inside the tube
         for j in range(4):
             s.face([p[j], p[(j + 1) % 4], q[(j + 1) % 4], q[j]], mid)
     # the hub: a hexagonal drum, longer than the ring is deep
+    s.part()
     hr, back, front = 62, -64, 96
     hub = [(hr * math.cos(math.pi / 3 * k), hr * math.sin(math.pi / 3 * k), z)
            for z in (back, front) for k in range(6)]
@@ -50,12 +52,13 @@ def ring_station():
     # seen from either side (a zero normal), 4 lines each
     t, inner, outer = 10, hr * math.cos(math.pi / 6), r - w
     for k in range(3):
+        s.part(HIDES_NEVER)     # too thin to hide anything
         a = math.pi / 6 + 2 * math.pi / 3 * k      # through the middle of a hub side
         c, sn = math.cos(a), math.sin(a)
         ox, oy = -sn * t, c * t                    # across the spoke
         p = [s.vertex((rr * c + u * ox, rr * sn + u * oy, 0))
              for rr, u in ((inner, 1), (outer, 1), (outer, -1), (inner, -1))]
-        s.faces.append((p, (0, 0, 0)))
+        s.panel(p)
     return s.blueprint(_stats(s, 0, 11, 0, 115, 255, 0, 0, 0, gun=0))
 
 
@@ -223,7 +226,7 @@ def plate():
     """A bent strip of hull: one flat piece, seen from either side."""
     s = Ship("PLATE", "ALLOY PLATE")
     p = [s.vertex(v) for v in ((-16, -34, -6), (14, -30, 8), (18, 36, 4), (-12, 30, -8))]
-    s.faces.append((p, (0, 0, 0)))
+    s.panel(p)
     return s.blueprint(_stats(s, 0, 1, 0, 5, 16, 15, 0, 0))
 
 
