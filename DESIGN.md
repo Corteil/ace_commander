@@ -404,7 +404,23 @@ order puts the visible, low-risk work first and the parts that depend on decisio
 | 3. Station and trade | Station, planet, compass, docking, market, cargo, bounties | Fly in and dock yourself, and make money trading |
 | 4. Equipment | The equipment screen and each item's effect | Spend the money on a better ship |
 | 5. A living galaxy | Traders, police, legal status, rank, system danger levels, Thargoids | Play the full Elite loop |
-| 6. Extras | Other seven galaxies, mining, original content so the repo runs without Elite data | Optional |
+| 6. Extras | Other seven galaxies, mining, original content so the repo runs without Elite data, the Repair Shop, ship types | Optional |
+
+**Phase 6 extras asked for by Brian (2026-11-15):**
+
+- **Repair Shop** (started in build 41, behind a DEBUG switch): a docked tab that repaints
+  your ship (`cockpit.SHIP_COLOURS`, 10 Cr a coat, saved as `Commander.colour`). The colour
+  shows in the launch and docking tunnels and the docking computer's view. It could later
+  also mend damage, if damage comes to last between flights.
+- **Ship types (future):** buy a different ship instead of the Cobra Mk III. Not in BBC
+  Elite, so the rules are ours to make: each type would bring its own top speed, turn rate,
+  hold size, missile pylons, laser mounts, shields and price, taken from the ship data
+  (`ship_data.py` already has speed, energy, laser power and missiles for all 31). It would
+  change: the tunnel and chase-view model (`Tunnel.fly`, `cockpit._my_ship`, which must
+  fit the slot: `Tunnel.fits`), `Game` constants that are now fixed (`PLAYER_MAX`,
+  `PITCH_RATE`, `ROLL_RATE`, `MAX_MISSILES`), `commander.HOLD`, and the save
+  (`Commander.ship`). Sold at the Repair Shop, perhaps only at high tech levels, with
+  trade-in of the old ship and its equipment rules to settle (does equipment move across?).
 
 Phase 2 is built (build 22): the galaxy, both charts, system data, hyperspace, fuel,
 arriving docked, the docked screens as tabs, and a hexagon tunnel on launch. The docked

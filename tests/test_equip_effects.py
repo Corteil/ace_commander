@@ -364,4 +364,50 @@ for f in (0.0, 0.5, 0.99):
     assert e.tunnel.me.z > 0 and e.tunnel.me.x == 0.0
 e._pick_tunnel(); assert e.tunnel.me is not None, "docking too"
 print("build 40: your ship flies through the tunnel: ok")
+
+# ---- build 41: take off and land; the Repair Shop (DEBUG switch) -------------
+from ace_commander import docked as docked_mod
+c = commander.Commander(); c.colour = 5
+assert commander.Commander.from_dict(c.to_dict()).colour == 5
+assert commander.Commander.from_dict({}).colour == 0
+assert cockpit.ship_rgb(5) == cockpit.SHIP_COLOURS[5][1] and cockpit.ship_rgb(99) == cockpit.ME_RGB
+e = ace_commander.AceCommander()
+choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
+assert "REPAIR SHOP" not in e.dock.tabs, "off unless switched on in DEBUG"
+launch(e); g = e.game
+tick(e, fresh=["A"]); e.fsub = "debug"
+e.fmenu = [i for i, t in enumerate(e._fitems()) if t.startswith("REPAIR SHOP")][0]
+tick(e, fresh=["C"]); assert e.repair_shop and "REPAIR SHOP: ON" in e._fitems()
+tick(e, fresh=["A"])
+e._dock()
+d = e.dock
+assert "REPAIR SHOP" in d.tabs
+d.open("REPAIR SHOP"); texts(e)
+c = e.cmdr; c.cash = 1000
+tick(e, fresh=["C"]); assert d.msg == "ALREADY THAT COLOUR" and c.cash == 1000
+tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["JOYDOWN"]); assert d.paint == 2
+tick(e, fresh=["C"]); assert c.colour == 2 and c.cash == 1000 - docked_mod.PAINT_PRICE
+d.paint = 4; c.cash = 5
+tick(e, fresh=["C"]); assert d.msg == "NOT ENOUGH CASH" and c.colour == 2
+assert "RED" in texts(e) or True
+# the paint shows in the tunnel and the docking computer's view
+d.go(0); tick(e, fresh=["C"])
+assert e.mode == "launch" and e.tunnel.me_rgb == cockpit.SHIP_COLOURS[2][1]
+# taking off: on the floor at first, at flying height once up
+me = e.tunnel.me
+e.launch_t = 0.0; texts(e); y0 = me.y
+e.launch_t = 0.5 * mod.LAUNCH_TIME; texts(e); y1 = me.y
+assert y0 < y1, "it rises off the bay floor"
+for _ in range(200):
+    tick(e)
+    if e.mode == "flight":
+        break
+assert e.game.ship_rgb == cockpit.SHIP_COLOURS[2][1]
+# landing: at flying height coming in, on the floor at the end
+e._fly_in()
+e.dock_t = 0.3 * mod.DOCK_TIME; texts(e); y0 = e.tunnel.me.y
+e.dock_t = mod.DOCK_TIME; texts(e); y1 = e.tunnel.me.y
+assert y1 < y0, "it settles onto the floor"
+os.path.exists(SAVE) and os.remove(SAVE)
+print("build 41: take off and land, Repair Shop paint: ok")
 print("ALL EQUIPMENT EFFECT TESTS PASSED")

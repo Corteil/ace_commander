@@ -283,6 +283,7 @@ class AceCommander(app.App):
         self.galaxy_n = 0       # which of the 8 galaxies self.galaxy is
         self.eject_t = 0.0      # time since the escape pod was launched
         self.fire_lock = False  # the lasers wait until C is let go (held on from a menu)
+        self.repair_shop = False    # show the Repair Shop tab (a DEBUG switch for now)
         self.chart = None       # the local chart, while it is open
         self.jump_to = None     # (system, distance) the hyperspace countdown is for
         self.dt = 0.0           # seconds since the last update
@@ -683,7 +684,8 @@ class AceCommander(app.App):
             self.game.auto_level = False
         if self.target == c.system:
             self.target = None
-        self.dock = docked.Docked(c, self.galaxy, self.target, GOODS, EQUIP)
+        self.dock = docked.Docked(c, self.galaxy, self.target, GOODS, EQUIP,
+                                  self._ship_bp(), self.repair_shop)
         self.docked = True
         self.jump_to = None
         self.paused = False
@@ -735,6 +737,13 @@ class AceCommander(app.App):
                 d.pick_item(1)
             elif hit("C" if new else "confirm"):
                 d.buy_item()
+        elif d.name() == "REPAIR SHOP":
+            if hit("j_up" if new else "up"):
+                d.pick_paint(-1)
+            elif hit("j_down" if new else "down"):
+                d.pick_paint(1)
+            elif hit("C" if new else "confirm"):
+                d.buy_paint()
         elif d.name() == "MARKET":
             # the joystick picks a good; C buys and D sells; all repeat when held
             if self._repeat("j_up" if new else "up", dt):
@@ -780,6 +789,7 @@ class AceCommander(app.App):
         g.pod = "pod" in c.extras
         g.bombs = 1 if "bomb" in c.extras else 0
         g.computer = "docking" in c.extras
+        g.ship_rgb = cockpit.ship_rgb(c.colour)     # for the view from behind your ship
 
     def _refuel(self, n):
         """Fuel skimmed from the sun: n tenths of a light year into the tank.
@@ -858,7 +868,8 @@ class AceCommander(app.App):
         else:
             types = {e[0]: game.Blueprint(e) for e in SHIPS} if SHIPS else {}
         if types:
-            self.tunnel.fly(types.get("COBRA MK III"))      # your ship, seen from behind
+            self.tunnel.fly(types.get("COBRA MK III"),      # your ship, seen from behind
+                            cockpit.ship_rgb(c.colour if c is not None else 0))
             self.tunnel.park([types[n] for n in game.parked_ships(gov, tech) if n in types],
                              random)
 
@@ -1136,6 +1147,15 @@ class AceCommander(app.App):
                 return True
         return False
 
+    def _ship_bp(self):
+        """Your ship's blueprint (a Cobra Mk III), or None without ship data."""
+        if self.game is not None:
+            return self.game.types.get("COBRA MK III")
+        for e in SHIPS or ():
+            if e[0] == "COBRA MK III":
+                return game.Blueprint(e)
+        return None
+
     def _fly_in(self):
         """The docking scene: in through the station's tunnel, a while in the
         bay, then the docked screens (see update, mode "docking")."""
@@ -1166,7 +1186,8 @@ class AceCommander(app.App):
                      "FRAME TIME: " + ("ON" if self.show_ms else "OFF"),
                      "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
                      "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4", "+10 KILLS", "+1000 CR",
-                     "SHIP CONFIG", "RELEASE CANISTER", "TO THE STATION", "TO THE SUN",
+                     "SHIP CONFIG", "REPAIR SHOP: " + ("ON" if self.repair_shop else "OFF"),
+                     "RELEASE CANISTER", "TO THE STATION", "TO THE SUN",
                      "DOCK NOW"]
             if self.career:
                 items.remove("NEXT WAVE")       # waves are for combat practice
@@ -1250,6 +1271,10 @@ class AceCommander(app.App):
         """Do one of the DEBUG page's cheats. Kills made this way count like
         any others, so with a commander they raise the rank."""
         g = self.game
+        if item.startswith("REPAIR SHOP"):
+            self.repair_shop = not self.repair_shop     # shown from the next docking
+            g.say("REPAIR SHOP " + ("ON" if self.repair_shop else "OFF"))
+            return
         if item.startswith("LEVEL"):
             # the next level, at once: the enemies, and with a commander the ranks too
             level = (g.level + 1) % len(commander.LEVELS)

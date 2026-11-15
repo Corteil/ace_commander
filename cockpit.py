@@ -313,6 +313,27 @@ PARKED_RGB = (0.75, 0.75, 0.75)
 ME_AHEAD = 2.0
 ME_LOW = 0.35
 ME_RGB = (0.3, 0.9, 1)
+# Taking off and landing in the bay: on launch the ship rises off the bay floor
+# over the first ME_LIFT of the scene before flying out (the view closing in
+# on it meanwhile); on docking it settles onto the floor over the last ME_LAND.
+ME_LIFT = 0.3
+ME_LAND = 0.3
+# the colours a ship can be painted at the Repair Shop: (name, rgb)
+SHIP_COLOURS = (
+    ("CYAN", (0.3, 0.9, 1)),
+    ("WHITE", (1, 1, 1)),
+    ("RED", (1, 0.25, 0.2)),
+    ("ORANGE", (1, 0.55, 0.1)),
+    ("YELLOW", (1, 0.9, 0.2)),
+    ("GREEN", (0.3, 1, 0.35)),
+    ("BLUE", (0.35, 0.5, 1)),
+    ("PURPLE", (0.75, 0.4, 1)),
+)
+
+
+def ship_rgb(i):
+    """The colour of paint number i (SHIP_COLOURS), cyan if unknown."""
+    return SHIP_COLOURS[i][1] if isinstance(i, int) and 0 <= i < len(SHIP_COLOURS) else ME_RGB
 # lit windows along both side walls of the bay, high up, overlooking the ships:
 # how many a side, how high on the wall (fractions of its half height) and
 # how long each is (tunnel units), and the colour of their frames (only the
@@ -364,6 +385,7 @@ class Tunnel:
         self.aspect = aspect
         self.parked = []                # ships in the bay (_Parked): see park
         self.me = None                  # your ship, drawn flying through (see _draw_me)
+        self.me_rgb = ME_RGB            # and its paint
 
     def fits(self, bp):
         """True if this ship would fit through the slot, level."""
@@ -372,9 +394,10 @@ class Tunnel:
         room = SHIP_SCALE * SLOT_ROOM
         return hw <= room and hh <= room / self.aspect
 
-    def fly(self, bp):
-        """Show this ship (your own) flying through the tunnel, if it fits."""
+    def fly(self, bp, rgb=ME_RGB):
+        """Show this ship (your own, painted rgb) flying through the tunnel, if it fits."""
         self.me = _MeInTunnel(bp) if bp is not None and self.fits(bp) else None
+        self.me_rgb = rgb
 
     def park(self, bps, rnd):
         """Park these ships (blueprints) in the bay, the ones that fit the
@@ -401,6 +424,7 @@ class _MeInTunnel:
         self.bp = bp
         self.m = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
         self.x = self.y = self.z = 0.0
+        self.hh = max([abs(v[1]) for v in bp.verts] or [0])    # how far down its hull goes
 
 
 class _Parked:
@@ -612,7 +636,8 @@ def draw_tunnel(ctx, f, t, rgb=GREEN, inward=False, tun=None):
         _draw_rings(ctx, tun, zs, rgb, True)
         _draw_windows(ctx, tun, DOCK_START - s, zs[TUNNEL_RINGS - 2])
         _draw_parked(ctx, tun, DOCK_START - s, zs[TUNNEL_RINGS - 2])
-        _draw_me(ctx, tun)
+        k = (f - (1.0 - ME_LAND)) / ME_LAND       # landing: 0 to 1 over the last part
+        _draw_me(ctx, tun, ME_AHEAD, _ease(k))
         return
     s = (TUNNEL_RINGS + 1) * f * f      # slow at first, then faster
     # space, through the mouth: as far out as the circle inside it
@@ -629,22 +654,37 @@ def draw_tunnel(ctx, f, t, rgb=GREEN, inward=False, tun=None):
     _draw_rings(ctx, tun, zs, rgb, False)
     _draw_windows(ctx, tun, None, None, last + 0.6 - s)
     _draw_parked(ctx, tun, None, None, last + 0.6 - s)
-    _draw_me(ctx, tun)
+    # taking off: it rises from the floor where it stands while the view
+    # closes in, then flies out ME_AHEAD in front
+    s_lift = (TUNNEL_RINGS + 1) * ME_LIFT * ME_LIFT
+    _draw_me(ctx, tun, ME_AHEAD + s_lift - min(s, s_lift), 1.0 - _ease(f / ME_LIFT))
 
 
-def _draw_me(ctx, tun):
-    """Your ship, ME_AHEAD in front of the view, level in the slot and flying
+def _ease(k):
+    """0 to 1, smoothly (k is clipped to 0..1)."""
+    if k <= 0:
+        return 0.0
+    if k >= 1:
+        return 1.0
+    return k * k * (3.0 - 2.0 * k)
+
+
+def _draw_me(ctx, tun, ahead, down):
+    """Your ship, ahead tunnel units in front of the view, level and flying
     the way you look: in from the mouth when docking, out to it on launch.
+    down is 0 at its flying height in the slot, 1 standing on the bay floor.
     Filled black inside its outline so the tunnel behind it doesn't show
     through; the rings nearer than it are all bigger than it, so none would
     cross it."""
     o = tun.me
     if o is None:
         return
+    fly = -ME_LOW / tun.aspect
+    floor = -BAY_SCALE / tun.aspect + o.hh / SHIP_SCALE
     o.x = 0.0
-    o.y = -ME_LOW * SHIP_SCALE / tun.aspect
-    o.z = ME_AHEAD * FOCAL / TUNNEL_FOCAL * SHIP_SCALE
-    draw_ship(ctx, o, ME_RGB, 3, True)
+    o.y = (fly + (floor - fly) * down) * SHIP_SCALE
+    o.z = ahead * FOCAL / TUNNEL_FOCAL * SHIP_SCALE
+    draw_ship(ctx, o, tun.me_rgb, 3, True)
 
 
 def _draw_windows(ctx, tun, ahead, gate, back=None):
@@ -794,7 +834,7 @@ def draw_world(ctx, g):
             _chase_shift(g, -CHASE_UP, CHASE_BACK)
             try:
                 _draw_world(ctx, g)
-                draw_ship(ctx, me, CYAN, 0, True)
+                draw_ship(ctx, me, getattr(g, "ship_rgb", CYAN), 0, True)
             finally:
                 _chase_shift(g, CHASE_UP, -CHASE_BACK)
             return

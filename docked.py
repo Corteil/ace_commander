@@ -9,7 +9,10 @@ once launched, the in-flight menu offers a jump to it.
 """
 from . import chart, cockpit, commander, equipment, market
 
-TABS = ("STATUS", "MARKET", "EQUIP SHIP", "LOCAL CHART", "GALACTIC CHART", "SYSTEM DATA")
+TABS = ("STATUS", "MARKET", "EQUIP SHIP", "REPAIR SHOP", "LOCAL CHART", "GALACTIC CHART",
+        "SYSTEM DATA")
+PAINT_PRICE = 100   # tenths of a credit: a new colour at the Repair Shop costs 10.0 Cr
+SPIN = 0.8          # radians a second the Repair Shop's ship turns
 ROWS = 6            # goods shown at once on the market
 SAY_TIME = 1.5      # seconds a market message stays
 PRICE_X = 24        # where the market's columns end
@@ -23,8 +26,14 @@ def _ly(d):
 
 
 class Docked:
-    def __init__(self, cmdr, gal, target=None, goods=None, equip=None):
+    def __init__(self, cmdr, gal, target=None, goods=None, equip=None, ship=None,
+                 repair=False):
+        """ship is your ship's blueprint, for the Repair Shop, which is shown
+        only with repair (a DEBUG switch for now)."""
         self.cmdr = cmdr
+        self.ship = ship
+        self.spin = 0.0         # the Repair Shop's ship, turning
+        self.paint = cmdr.colour if 0 <= cmdr.colour < len(cockpit.SHIP_COLOURS) else 0
         self.gal = gal          # None without game_data.py: then only Status
         self.equip = equip
         if gal is None:
@@ -32,7 +41,8 @@ class Docked:
         else:                   # an older game_data.py may not have goods or equipment
             self.tabs = tuple(t for t in TABS
                               if not (t == "MARKET" and not (goods and cmdr.market is not None))
-                              and not (t == "EQUIP SHIP" and not equip))
+                              and not (t == "EQUIP SHIP" and not equip)
+                              and not (t == "REPAIR SHOP" and not (repair and ship)))
         self.market = None
         if "MARKET" in self.tabs:
             self.market = market.Market(goods, gal.system(cmdr.system).economy, cmdr)
@@ -116,7 +126,29 @@ class Docked:
         self.msg_t = SAY_TIME if why else 0.0
         return why is None
 
+    # ---- the repair shop --------------------------------------------------------
+
+    def pick_paint(self, step):
+        """Move the Repair Shop's choice of colour up (-1) or down (1)."""
+        self.paint = (self.paint + step) % len(cockpit.SHIP_COLOURS)
+
+    def buy_paint(self):
+        """Paint the ship the chosen colour. Returns True if it happened."""
+        c = self.cmdr
+        why = None
+        if self.paint == c.colour:
+            why = "ALREADY THAT COLOUR"
+        elif c.cash < PAINT_PRICE:
+            why = "NOT ENOUGH CASH"
+        else:
+            c.cash -= PAINT_PRICE
+            c.colour = self.paint
+        self.msg = why
+        self.msg_t = SAY_TIME if why else 0.0
+        return why is None
+
     def tick(self, dt):
+        self.spin += SPIN * dt
         if self.msg_t > 0:
             self.msg_t -= dt
             if self.msg_t <= 0:
@@ -133,6 +165,8 @@ class Docked:
             self._draw_market(ctx)
         elif self.name() == "EQUIP SHIP":
             self._draw_equip(ctx)
+        elif self.name() == "REPAIR SHOP":
+            self._draw_repair(ctx)
         else:
             self._draw_status(ctx)
         if len(self.tabs) > 1:      # which tab is open
@@ -236,6 +270,45 @@ class Docked:
             text(ctx, "C: buy   D: sell", 0, 75, 11, cockpit.GREY)
         text(ctx, "< > screens   F: status", 0, 91, 11, cockpit.GREY)
 
+    def _draw_repair(self, ctx):
+        """Your ship turning in the chosen colour, the colours as a row of
+        swatches, and what a new coat costs."""
+        import math
+        text = cockpit.text
+        c = self.cmdr
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        text(ctx, "REPAIR SHOP  " + self.here.name, 0, -100, 11, cockpit.GREY)
+        name, rgb = cockpit.SHIP_COLOURS[self.paint]
+        o = _Show(self.ship)
+        z = 560.0
+        o.z = z
+        o.y = 38.0 * z / cockpit.FOCAL      # 38 pixels above the middle
+        a = self.spin
+        ca, sa = math.cos(a), math.sin(a)
+        t = 0.35                            # tipped towards you, to see the top
+        ct, st = math.cos(t), math.sin(t)
+        # turned about the vertical by a, then tipped by t
+        o.m = [ca, -sa * st, sa * ct, 0.0, ct, st, -sa, -ca * st, ca * ct]
+        cockpit.draw_ship(ctx, o, rgb, 3, True)
+        text(ctx, name, 0, 8, 16, rgb)
+        n = len(cockpit.SHIP_COLOURS)
+        x0 = -(n * 18 - 6) // 2
+        for i in range(n):
+            x = x0 + i * 18
+            if i == self.paint:
+                ctx.rgb(*cockpit.WHITE).rectangle(x - 2, 22, 16, 16).fill()
+            ctx.rgb(*cockpit.SHIP_COLOURS[i][1]).rectangle(x, 24, 12, 12).fill()
+        if self.paint == c.colour:
+            text(ctx, "your colour   " + c.cash_text(), 0, 52, 12, cockpit.CYAN)
+        else:
+            text(ctx, "paint %d.%d Cr   %s" % (PAINT_PRICE // 10, PAINT_PRICE % 10,
+                                             c.cash_text()), 0, 52, 12, cockpit.YELLOW)
+        if self.msg:
+            text(ctx, self.msg, 0, 70, 12, cockpit.RED)
+        else:
+            text(ctx, "up/down: colour   C: paint", 0, 70, 11, cockpit.GREY)
+        text(ctx, "< > screens   F: status", 0, 88, 11, cockpit.GREY)
+
     def _draw_equip(self, ctx):
         """What this station sells, ROWS at a time: name, price, what you have."""
         text = cockpit.text
@@ -271,3 +344,14 @@ class Docked:
         else:
             text(ctx, "C: buy", 0, 75, 11, cockpit.GREY)
         text(ctx, "< > screens   F: status", 0, 91, 11, cockpit.GREY)
+
+
+class _Show:
+    """A ship as draw_ship wants it, for the Repair Shop."""
+    kind = "ship"
+    hit = 0.0
+
+    def __init__(self, bp):
+        self.bp = bp
+        self.x = self.y = self.z = 0.0
+        self.m = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]

@@ -491,6 +491,16 @@ of a real flight, not from a harness.
    and `cockpit._draw_me`, `ME_AHEAD` (2.0) tunnel units ahead of the view, `ME_LOW` below
    the slot's middle, cyan, filled black inside. Docking ends with it in the bay between the
    parked ships. At 1.4 ahead it looked wider than the tunnel further on.
+   **Build 41 (Brian):** take-off and landing in the tunnel scenes: on launch your ship
+   rises off the bay floor (where the parked ships stand) over the first `ME_LIFT` of the
+   scene while the view closes in, then flies out; on docking it settles onto the floor
+   over the last `ME_LAND` (`cockpit._draw_me(ctx, tun, ahead, down)`, `_ease`). A **Repair
+   Shop** docked tab (after Equip ship) repaints your ship: `cockpit.SHIP_COLOURS` (8),
+   `docked.PAINT_PRICE` 10.0 Cr, saved as `Commander.colour`, used in the tunnels
+   (`Tunnel.fly(bp, rgb)`) and the docking computer's view (`Game.ship_rgb`). Brian asked
+   for it to be optional for now: shown only when DEBUG's REPAIR SHOP is ON
+   (`app.repair_shop`, not saved, applies from the next docking). Ship types are written
+   up as a future phase 6 extra in `DESIGN.md`, not built.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -501,7 +511,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 40), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 41), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
