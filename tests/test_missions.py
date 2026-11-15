@@ -364,7 +364,7 @@ assert commander.load(SAVE).quick_con is False
 tick(e, fresh=["C"]); assert c.quick_con
 assert commander.Commander.from_dict({"level": 1}).quick_con, "old saves: 2 MIN"
 # SHIP CONFIG's NAVY ENERGY UNIT switch
-e.fsub = "ship"
+e.fsub = "dgroup"; e.dgroup = "SHIP"
 items = e._fitems()
 assert "NAVY ENERGY UNIT: ON" in items and "ENERGY UNIT: OFF" in items
 e.fmenu = items.index("NAVY ENERGY UNIT: ON"); tick(e, fresh=["C"])

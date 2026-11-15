@@ -159,7 +159,7 @@ assert commander.load(SAVE).kills == 0, "not written every kill"
 tick(a, fresh=["A"])
 tx = texts(a)
 assert "STATUS" in tx
-assert a._fitems() == ["RESUME", "LOCAL CHART", "STATUS", "SETTINGS", "QUIT TO TITLE"], a._fitems()
+assert a._fitems() == ["RESUME", "LOCAL CHART", "STATUS", "SETTINGS", "QUIT TO TITLE", "DEBUG"], a._fitems()
 assert texts(a)
 fpick(a, "STATUS"); assert a.fsub == "status"
 tx = texts(a)
@@ -354,7 +354,7 @@ def debug(a, line):
 tick(d, fresh=["A"])
 assert texts(d)[-1] != "" and "SETTINGS" in texts(d)
 debug(d, "INVINCIBLE"); debug(d, "INVINCIBLE")
-assert "DEBUG: SHIP" in texts(d), "a group's page"
+assert "SHIP CONFIG" in texts(d), "the SHIP group is the ship config page"
 import json as _json
 _ver = _json.load(open(os.path.join(os.path.dirname(mod.__file__), "metadata.json")))["version"]
 tick(d, fresh=["F"])
@@ -401,9 +401,10 @@ debug(d, "FUEL TO 1/4"); assert d.cmdr.fuel == 17 and g.msg == "FUEL 1.7 LY"
 cash = d.cmdr.cash
 debug(d, "+1000 CR"); assert d.cmdr.cash == cash + 10000 and d.paused
 # SHIP CONFIG: change the ship's equipment, in this flight and for the commander
-debug(d, "SHIP CONFIG"); assert d.fsub == "ship" and d.fmenu == 0
+debug(d, "INVINCIBLE"); debug(d, "INVINCIBLE")    # SHIP: its cheats, then SHIP CONFIG
+assert d.fsub == "dgroup" and d.dgroup == "SHIP"
 tx = texts(d)
-assert "SHIP CONFIG" in tx and "LASER: PULSE" in tx and "MISSILES: 4" in tx, tx
+assert "SHIP CONFIG" in tx and "LASER: PULSE" in d._fitems() and "MISSILES: 4" in d._fitems(), tx
 def ship(label):
     d.fmenu = [i for i, t in enumerate(d._fitems()) if t.startswith(label)][0]
     tick(d, fresh=["C"])
@@ -417,7 +418,16 @@ ship("CARGO BAY"); assert d.cmdr.hold == 35 and "CARGO BAY: 35T" in d._fitems()
 ship("CARGO BAY"); assert d.cmdr.hold == 20
 ship("FUEL SCOOPS"); assert g.fuel_scoops and "scoops" in d.cmdr.extras
 ship("FUEL SCOOPS"); assert not g.fuel_scoops and "scoops" not in d.cmdr.extras
-tick(d, fresh=["F"]); assert d.fsub == "dgroup" and d._fitems()[d.fmenu] == "SHIP CONFIG", "F goes back"
+tick(d, fresh=["F"]); assert d.fsub == "debug" and d._fitems()[d.fmenu] == "SHIP", "F goes back"
+tick(d, fresh=["F"]); assert d.fsub == "settings"
+tick(d, fresh=["F"]); assert d.fsub is None
+# DEBUG on the main menu too, and back to it
+d.fmenu = d._fitems().index("DEBUG"); tick(d, fresh=["C"]); assert d.fsub == "debug"
+tick(d, fresh=["C"]); assert d.fsub == "dgroup" and d.dgroup == "SHIP", "SHIP goes straight in"
+assert d._fitems()[:4] == ["INVINCIBLE: " + ("ON" if g.god else "OFF"), "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4"]
+assert d._fitems()[4].startswith("LASER")
+tick(d, fresh=["F"]); tick(d, fresh=["F"]); assert d.fsub is None and d._fitems()[d.fmenu] == "DEBUG"
+tick(d, fresh=["A"])
 # TO THE SUN: at the edge of the heat, heading in; flying on, the cabin heats
 # up to the scooping band and out again, and with fuel scoops the tank fills;
 # the cabin temperature, altitude and fuel gauges show
@@ -454,7 +464,7 @@ tick(d, fresh=["F"]); assert d.fsub is None and d._fitems()[d.fmenu] == "SETTING
 tick(d, fresh=["A"])
 g._hurt(5000.0); tick(d); assert g.over, "and with it off you can die again"
 mod.DEBUG_MENU = False
-assert "DEBUG" not in d._settings(True)
+assert "DEBUG" not in d._settings(True) and "DEBUG" not in d._fitems_top()
 mod.DEBUG_MENU = True
 os.remove(SAVE)
 print("debug cheats: ok")
@@ -475,7 +485,7 @@ assert e.cmdr.system == 7 and gal.system(7).name == "LAVE" and e.cmdr.fuel == 70
 fpick(e, "LOCAL CHART")
 assert e.fsub == "chart" and e.chart.here == 7
 tx = texts(e)
-assert "LAVE" in tx and "YOU ARE HERE" in tx and "FUEL 7.0 LY   D: DATA" in tx, tx
+assert "LAVE" in tx and "YOU ARE HERE" in tx and "RANGE 7.0 LY" in tx, tx
 tick(e, fresh=["C"]); assert e.fsub == "chart" and g.jump_t == 0, "can't jump to where you are"
 reach = dict((i, dist) for dist, i in gal.in_range(7, 70))
 assert all((0 < d <= 70) == (i in reach) for _, _, i, d in e.chart.dots if i != 7)
@@ -499,7 +509,7 @@ for _ in range(400):
 assert e.chart.sel[2] == 129, e.chart.sel
 tx = texts(e)
 d129 = reach[129]
-assert "ZAONCE" in tx and ("%d.%d LY   C: JUMP" % (d129 // 10, d129 % 10)) in tx, tx
+assert "ZAONCE" in tx and ("%d.%d LY" % (d129 // 10, d129 % 10)) in tx, tx
 tick(e, fresh=["C"])
 assert not e.paused and e.fsub is None and g.jump_t > 0 and g.msg == "HYPERSPACE 5"
 kill(g, 2)
@@ -543,7 +553,7 @@ debug(e, "RELEASE CANISTER")
 cans = [o for o in e.game.objs + e.game.new if o.kind == "can"]
 assert len(cans) == n_cans + 1 and 0 < cans[-1].z <= 700 and cans[-1].m[8] < -0.99, "ahead, coming in"
 tx = texts(e)
-assert "RELEASE CANISTER" in tx and "DEBUG: SPAWN" in tx and "C: do it   F: back" in tx, tx
+assert "RELEASE CANISTER" in tx and "DEBUG: SPAWN" in tx, tx
 tick(e, fresh=["A"])
 # dying stops a countdown; quitting to the title and coming back keeps the system
 fpick(e, "LOCAL CHART")
@@ -763,7 +773,7 @@ c.cash = 100000; c.missiles = 2
 saved_c = commander.Commander.from_dict(c.to_dict())
 assert (saved_c.hold, saved_c.laser, saved_c.missiles, "scoops" in saved_c.extras) == (35, "beam", 2, True)
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART" and d.view.verb == "TARGET"
-assert not d.cursor and "C: MOVE CURSOR" in texts(e), "the joystick changes tab until C"
+assert not d.cursor and "< LAVE >" in texts(e), "the joystick changes tab until C"
 tick(e, fresh=["C"]); assert d.cursor and d.view.active
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART", "now the joystick moves the cursor"
 tick(e, fresh=["F"]); assert d.name() == "LOCAL CHART" and not d.cursor, "F gives it back"
@@ -771,7 +781,7 @@ tick(e, fresh=["JOYRIGHT"]); assert d.name() == "GALACTIC CHART" and len(d.view.
 assert not d.cursor, "a new tab starts with the joystick on the tabs"
 tick(e, fresh=["E"]); tick(e, fresh=["B"]); assert d.name() == "GALACTIC CHART", "E / B still go"
 tx = texts(e)
-assert "GALAXY 1" in tx and "LAVE" in tx and "C: MOVE CURSOR" in tx, tx
+assert "GALAXY 1" in tx and "< LAVE >" in tx and "RANGE 7.0 LY" in tx, tx
 tick(e, fresh=["B"]); assert d.name() == "SYSTEM DATA" and d.data.name == "LAVE"
 tx = texts(e)
 assert "you are here" in tx and "Dictatorship" in tx and "Tech 5   Pop 2.5 billion" in tx, tx
@@ -818,7 +828,7 @@ d.open("GALACTIC CHART")
 far = max(d.view.dots, key=lambda dot: dot[3])
 d.use_cursor(True)
 d.view.cx, d.view.cy = float(far[0]), float(far[1]); d.view._select()
-assert any("TOO FAR  C: DATA" in t for t in texts(e))
+assert any(t.endswith("TOO FAR") for t in texts(e))
 tick(e, fresh=["C"]); assert e.target == far[2] and d.name() == "SYSTEM DATA"
 assert any("too far" in t for t in texts(e))
 launch(e)

@@ -144,7 +144,8 @@ def options_path():
 # The DEBUG cheats in groups (Settings and Options > DEBUG). The names are the
 # start of each line; some lines add the current value ("LEVEL: EASY").
 DEBUG_GROUPS = (
-    ("SHIP", ("INVINCIBLE", "SHIP CONFIG", "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4")),
+    # SHIP is also the ship's equipment (SHIP CONFIG), below these
+    ("SHIP", ("INVINCIBLE", "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4")),
     ("SPAWN", ("ADD AN ENEMY", "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ADD A THARGOID",
                "ADD THE CONSTRICTOR", "RELEASE CANISTER", "KILL ALL ENEMIES", "NEXT WAVE")),
     ("TRAVEL", ("TO THE STATION", "TO THE SUN", "DOCK NOW", "MIS-JUMP NEXT",
@@ -155,8 +156,8 @@ DEBUG_GROUPS = (
 CAREER_ONLY = ("+1000 CR", "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION",
                "MIS-JUMP NEXT", "LEGAL", "FUEL TO 1/4", "TO MISSION SYSTEM", "MISSION")
 # the cheats that work away from a flight (title screen Options, docked Options tab);
-# all but the last two need a commander
-OFF_FLIGHT = ("SHIP CONFIG", "+10 KILLS", "+1000 CR", "LEVEL", "LEGAL", "MISSION",
+# all but the last two need a commander, as does SHIP (the equipment) there
+OFF_FLIGHT = ("+10 KILLS", "+1000 CR", "LEVEL", "LEGAL", "MISSION",
               "FRAME TIME", "REPAIR SHOP")
 NO_COMMANDER = ("FRAME TIME", "REPAIR SHOP")
 MSG_TIME = 1.5          # seconds a DEBUG message stays on the Options' DEBUG page
@@ -365,8 +366,9 @@ class AceCommander(app.App):
         self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
         self.omenu = 0                   # the chosen line on the Options page
         self.dgroup = None               # the DEBUG group open in flight (fsub "dgroup")
+        self.debug_from = None           # where DEBUG was opened from in flight: None (the menu) or "settings"
         self.od_from = None              # Options' DEBUG away from a flight (mode "odebug"):
-        self.od_page = None              # the mode to go back to, the group or "ship" open,
+        self.od_page = None              # the mode to go back to, the group open,
         self.od_sel = 0                  # the chosen line,
         self.od_msg = None               # and what the last cheat did
         self.od_msg_t = 0.0
@@ -1371,6 +1373,7 @@ class AceCommander(app.App):
                 return
             if self.mode == "flight":
                 self.fsub = "debug"
+                self.debug_from = "settings"
                 self.fmenu = 0
             else:
                 self.od_from = self.mode
@@ -1463,9 +1466,9 @@ class AceCommander(app.App):
         if self.fsub == "debug":
             return self._cheat_groups(True)
         if self.fsub == "dgroup":
+            if self.dgroup == "SHIP":   # the ship cheats, then its equipment
+                return self._cheats("SHIP", True) + self._ship_items()
             return self._cheats(self.dgroup, True)
-        if self.fsub == "ship":
-            return self._ship_items()
         return self._fitems_top()
 
     # ---- DEBUG, in groups ---------------------------------------------------
@@ -1508,13 +1511,21 @@ class AceCommander(app.App):
 
     def _cheat_groups(self, flying):
         return [name for name, keys in DEBUG_GROUPS
-                if any(self._cheat_ok(k, flying) for k in keys)]
+                if any(self._cheat_ok(k, flying) for k in keys)
+                or (name == "SHIP" and (flying or self.cmdr is not None))]
+
+    @staticmethod
+    def _is_cheat(item, group):
+        for name, keys in DEBUG_GROUPS:
+            if name == group:
+                return any(item.startswith(k) for k in keys)
+        return False
 
     @staticmethod
     def _debug_title(page, group):
         if page in (None, "debug"):
             return "DEBUG - BUILD " + build()
-        if page == "ship":
+        if group == "SHIP":
             return "SHIP CONFIG"
         return "DEBUG: " + group
 
@@ -1532,7 +1543,8 @@ class AceCommander(app.App):
                 if i == sel:
                     ctx.rgb(*cockpit.DIM).rectangle(-100, y - 8, 200, 16).fill()
                 text(ctx, items[i], 0, y, 14, cockpit.GREEN if i == sel else cockpit.GREY)
-            text(ctx, help_line + "   F: back", 0, 70, 11, cockpit.GREY)
+            if help_line:
+                text(ctx, help_line + "   F: back", 0, 70, 11, cockpit.GREY)
             return
         rows = min(DEBUG_ROWS, n)
         for k in range(rows):
@@ -1542,7 +1554,8 @@ class AceCommander(app.App):
             if off == 0:
                 ctx.rgb(*cockpit.DIM).rectangle(-100, y - 8, 200, 16).fill()
             text(ctx, items[i], 0, y, 14, cockpit.GREEN if off == 0 else cockpit.GREY)
-        text(ctx, help_line + "   F: back", 0, 70, 11, cockpit.GREY)
+        if help_line:
+            text(ctx, help_line + "   F: back", 0, 70, 11, cockpit.GREY)
 
     def _mission_cheat(self):
         """DEBUG MISSION: the next stage; docking then starts the next mission."""
@@ -1560,7 +1573,7 @@ class AceCommander(app.App):
     def _od_items(self):
         if self.od_page is None:
             return self._cheat_groups(False)
-        if self.od_page == "ship":
+        if self.od_page == "SHIP":
             return self._ship_items_c()
         return self._cheats(self.od_page, False)
 
@@ -1574,10 +1587,7 @@ class AceCommander(app.App):
         items = self._od_items()
         n = max(1, len(items))
         if cancel:
-            if self.od_page == "ship":
-                self.od_page = "SHIP"
-                self.od_sel = self._od_items().index("SHIP CONFIG")
-            elif self.od_page is not None:
+            if self.od_page is not None:
                 groups = self._cheat_groups(False)
                 self.od_sel = groups.index(self.od_page) if self.od_page in groups else 0
                 self.od_page = None
@@ -1592,10 +1602,7 @@ class AceCommander(app.App):
             if self.od_page is None:
                 self.od_page = item
                 self.od_sel = 0
-            elif item == "SHIP CONFIG":
-                self.od_page = "ship"
-                self.od_sel = 0
-            elif self.od_page == "ship":
+            elif self.od_page == "SHIP":
                 self._ship_config_c(item)
             else:
                 self.od_msg = self._odebug(item)
@@ -1853,10 +1860,6 @@ class AceCommander(app.App):
             if self.career and self.cmdr is not None:
                 self.cmdr.cash += 10000
                 g.say(self.cmdr.cash_text())
-        elif item == "SHIP CONFIG":
-            self.fsub = "ship"
-            self.fmenu = 0
-            return
         elif item == "RELEASE CANISTER":
             if g.release_canister() is None:
                 g.say("TOO MANY OBJECTS")
@@ -1927,23 +1930,19 @@ class AceCommander(app.App):
         elif cancel:
             if self.fsub is None:
                 self._resume()
-            elif self.fsub == "ship":       # back to the DEBUG group
-                self.fsub = "dgroup"
-                self.dgroup = "SHIP"
-                self.fmenu = self._fitems().index("SHIP CONFIG")
             elif self.fsub == "dgroup":     # back to the groups
                 self.fsub = "debug"
                 self.fmenu = max(0, self._fitems().index(self.dgroup)
                                  if self.dgroup in self._fitems() else 0)
-            elif self.fsub == "debug":      # back to Settings
+            elif self.fsub == "debug" and self.debug_from == "settings":   # back to Settings
                 self.fsub = "settings"
                 self.fmenu = self._fitems().index("DEBUG")
+            elif self.fsub == "debug":      # back to the menu
+                self.fsub = None
+                self.fmenu = self._fitems_top().index("DEBUG")
             else:
                 self.fmenu = self._fitems_top().index("SETTINGS")
                 self.fsub = None
-        elif self.fsub == "ship":
-            if confirm:
-                self._ship_config(items[self.fmenu])
         elif self.fsub == "settings":
             left = hit("j_left" if new else "left")
             side = left or hit("j_right" if new else "right")
@@ -1956,7 +1955,11 @@ class AceCommander(app.App):
                 self.fmenu = 0
         elif self.fsub == "dgroup":
             if confirm:
-                self._debug(items[self.fmenu])
+                item = items[self.fmenu]
+                if self.dgroup == "SHIP" and not self._is_cheat(item, "SHIP"):
+                    self._ship_config(item)     # the ship's equipment
+                else:
+                    self._debug(item)
         elif confirm:
             item = items[self.fmenu]
             if item == "RESUME":
@@ -1990,6 +1993,10 @@ class AceCommander(app.App):
                 self._resume()
             elif item == "QUIT TO TITLE":
                 self._to_title()
+            elif item == "DEBUG":
+                self.fsub = "debug"
+                self.debug_from = None
+                self.fmenu = 0
             else:
                 self.fsub = "settings"
                 self.fmenu = 0
@@ -2052,6 +2059,8 @@ class AceCommander(app.App):
             items.append("STATUS")
         items.append("SETTINGS")
         items.append("QUIT TO TITLE")
+        if DEBUG_MENU:
+            items.append("DEBUG")
         return items
 
     # ---- draw -------------------------------------------------------------
@@ -2155,15 +2164,14 @@ class AceCommander(app.App):
                  0, 38, 11, cockpit.GREY)
             text(ctx, "C or F: back", 0, 53, 11, cockpit.GREY)
             return
-        if self.fsub in ("debug", "dgroup", "ship"):
-            ctx.rgba(0, 0, 0, 0.85).rectangle(-100, 62, 200, 18).fill()
+        if self.fsub in ("debug", "dgroup"):
             self._draw_list(ctx, self._debug_title(self.fsub, self.dgroup), self._fitems(),
-                            self.fmenu, "C: open" if self.fsub == "debug" else "C: do it")
+                            self.fmenu, None)
             return
         pause = self.fsub == "settings"
         text(ctx, "SETTINGS" if pause else "PAUSED", 0, -60, 18, cockpit.WHITE)
         items = self._fitems()
-        many = len(items) > 6       # equipment adds lines: closer together, no help line
+        many = len(items) > 6       # equipment adds lines: closer together
         step = 13 if many else 16
         top = -44 if many else -40
         for i, label in enumerate(items):
@@ -2172,10 +2180,6 @@ class AceCommander(app.App):
                 ctx.rgb(*cockpit.DIM).rectangle(-96, y - step / 2, 192, step).fill()
             text(ctx, label, 0, y, 12 if many else 13,
                  cockpit.GREEN if i == self.fmenu else cockpit.GREY)
-        if pause:
-            text(ctx, "C: change   F: back", 0, 54, 11, cockpit.GREY)
-        elif not many:
-            text(ctx, "C: choose   A: resume", 0, 54, 11, cockpit.GREY)
 
 
 # the badge starts app.py (the loading screen), which makes this

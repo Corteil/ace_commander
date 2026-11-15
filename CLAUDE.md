@@ -737,6 +737,15 @@ of a real flight, not from a harness.
    system's data either way; D back from System data returns with the cursor on. The
    hints: "C: MOVE CURSOR" / "< >   D: DATA", then "D: DATA  F: DONE" (the in-flight
    chart keeps "FUEL ... D: DATA").
+   Then (Brian): no hint lines on the in-flight menu pages (PAUSED, SETTINGS, DEBUG);
+   DEBUG is on the top in-flight menu again as well as at the end of Settings (F goes
+   back to wherever it was opened from, `debug_from`). The SHIP group is SHIP CONFIG
+   itself: its cheats (INVINCIBLE, REFILL MISSILES, REFILL FUEL, FUEL TO 1/4) then the
+   equipment switches (`_is_cheat`); away from a flight SHIP opens the commander's
+   equipment directly. The charts (docked and in flight) have no hints either: the
+   distance ("3.6 LY", "... TOO FAR", "YOU ARE HERE") and "RANGE 7.0 LY"; while the
+   joystick changes tabs the name is "< LAVE >" and the cursor grey, with the cursor
+   yellow and the name plain once C hands it over (`Chart.active`).
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not

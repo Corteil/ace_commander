@@ -64,9 +64,11 @@ e = ace_commander.AceCommander()
 choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
 d = e.dock
 d.open("LOCAL CHART")
-assert "< >   D: DATA" in [t[0] for t in (lambda c: (d.draw(c), c.texts)[1])(CountCtx())]
+tx_ = [t[0] for t in (lambda c: (d.draw(c), c.texts)[1])(CountCtx())]
+assert "RANGE 7.0 LY" in tx_ and "< LAVE >" in tx_, "the range, and the joystick on the tabs"
 d.use_cursor(True)
-assert "D: DATA  F: DONE" in [t[0] for t in (lambda c: (d.draw(c), c.texts)[1])(CountCtx())]
+tx_ = [t[0] for t in (lambda c: (d.draw(c), c.texts)[1])(CountCtx())]
+assert "RANGE 7.0 LY" in tx_ and "LAVE" in tx_, "the joystick on the cursor: no arrows"
 d.view.cx, d.view.cy = [(float(px), float(py)) for px, py, i, dd in d.view.dots if i != e.cmdr.system][0]
 d.view._select()
 pick = d.view.picked()

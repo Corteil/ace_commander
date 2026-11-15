@@ -222,12 +222,12 @@ assert b.cmdr.cash == cash + 10000 and cm.load(save).cash == cash + 10000, "save
 assert b.od_msg == b.cmdr.cash_text()
 b.od_sel = 4; tick(b, fresh=["C"]); assert b.cmdr.mission == 1 and cm.load(save).mission == 1
 tick(b, fresh=["F"]); assert b.od_page is None
-b.od_sel = 0; tick(b, fresh=["C"]); tick(b, fresh=["C"]); assert b.od_page == "ship"
+b.od_sel = 0; tick(b, fresh=["C"]); assert b.od_page == "SHIP", "straight to the equipment"
 items = b._od_items()
 b.od_sel = items.index("NAVY ENERGY UNIT: OFF"); tick(b, fresh=["C"])
 assert "navy" in b.cmdr.extras and "navy" in cm.load(save).extras
-tick(b, fresh=["F"]); assert b.od_page == "SHIP"
-tick(b, fresh=["F"]); tick(b, fresh=["F"]); assert b.mode == "options", "back where it came from"
+tick(b, fresh=["F"]); assert b.od_page is None
+tick(b, fresh=["F"]); assert b.mode == "options", "back where it came from"
 # and from the docked Options tab, back to it; REPAIR SHOP comes at once
 tick(b, fresh=["F"]); bs.choose(b, "CONTINUE"); assert b.mode == "docked"
 assert "REPAIR SHOP" not in b.dock.tabs
