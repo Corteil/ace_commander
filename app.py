@@ -123,7 +123,7 @@ PERF_LOG = 60           # print a PERF line to the console every this many fligh
 LAUNCH_TIME = 2.5       # seconds of launch tunnel (C skips it)
 DOCK_TIME = 3.0         # seconds of flying in through the station's tunnel on docking (C skips it)
 DOCK_HOLD = (1.0, 2.0)  # then the view of the bay stays this long, chosen at random
-EJECT_TIME = 3.0        # seconds of "ESCAPE POD LAUNCHED" before waking up docked (C skips it)
+EJECT_TIME = 3.0        # seconds of the ESCAPE POD screen before the docking scene (C skips it)
 DOCK_NAMES = {"A": "AUTHENTIC", "B": "ASSISTED", "C": "AUTOMATIC"}
 DEBUG_MENU = True       # show DEBUG, a page of cheats for testing, in the in-flight menu
 PERF_SLOW = 25          # ms over the average that makes a frame count as slow
@@ -1006,7 +1006,7 @@ class AceCommander(app.App):
             self.eject_t += dt
             if self.career and (confirm or self.eject_t >= EJECT_TIME):
                 g.ejected = False
-                self._dock()
+                self._fly_in()      # the pod is taken in: the docking tunnel, then docked
             elif not self.career and confirm:   # practice has no station: fly again
                 g.reset()
                 self.banked = 0
@@ -1107,12 +1107,17 @@ class AceCommander(app.App):
             self._bank()
             if g.docked:        # flown in: the tunnel, then the docked screens
                 g.docked = False
-                self._bank()
-                self.dock_t = 0.0
-                self.dock_hold = random.uniform(*DOCK_HOLD)
-                self._pick_tunnel()
-                self.mode = "docking"
+                self._fly_in()
         return True
+
+    def _fly_in(self):
+        """The docking scene: in through the station's tunnel, a while in the
+        bay, then the docked screens (see update, mode "docking")."""
+        self._bank()
+        self.dock_t = 0.0
+        self.dock_hold = random.uniform(*DOCK_HOLD)
+        self._pick_tunnel()
+        self.mode = "docking"
 
     # ---- in-flight menu ---------------------------------------------------
 
@@ -1131,6 +1136,7 @@ class AceCommander(app.App):
             return items
         if self.fsub == "debug":
             items = ["INVINCIBLE: " + ("ON" if self.game.god else "OFF"),
+                     "LEVEL: " + commander.LEVELS[self.game.level],
                      "FRAME TIME: " + ("ON" if self.show_ms else "OFF"),
                      "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
                      "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4", "+10 KILLS", "+1000 CR",
@@ -1218,6 +1224,17 @@ class AceCommander(app.App):
         """Do one of the DEBUG page's cheats. Kills made this way count like
         any others, so with a commander they raise the rank."""
         g = self.game
+        if item.startswith("LEVEL"):
+            # the next level, at once: the enemies, and with a commander the ranks too
+            level = (g.level + 1) % len(commander.LEVELS)
+            g.set_level(level)
+            c = self.cmdr
+            if self.career and c is not None:
+                c.level = level
+                c._needs = commander.thresholds(level)
+                self._write_setting("level", level)     # kept even if this flight ends in death
+            g.say("LEVEL: " + commander.LEVELS[level])
+            return
         if item.startswith("FRAME TIME"):
             self.show_ms = not self.show_ms
         elif item.startswith("INVINCIBLE"):

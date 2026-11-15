@@ -41,8 +41,10 @@ ECM_RANGE = 2500.0
 ECM_COST = 10.0
 BOMB_RANGE = 10000.0
 MINERALS = 12           # the good a splinter holds (market.py's list: food is 0)
-AUTO_FAST = 8000.0      # the docking computer uses the jump drive's speed further out than this
-AUTO_SLOW = 3000.0      # and slows to docking speed closer in than this
+AUTO_FAST = 8000.0      # the docking computer uses the jump drive's speed this far from where it is heading
+AUTO_LINE = 2500.0      # it lines up this far out in front of the slot
+AUTO_NEAR = 400.0       # this close to a point on its way counts as there
+AUTO_LEVEL = 1000.0     # and this close to the slot it rolls to match it
 AIM_ASSIST = 0.05      # a shot hits anything within this slope of the crosshair
 
 MISSILE_DAMAGE = 150.0
@@ -452,6 +454,9 @@ class Game:
         self.ecm_t = 0.0       # > 0 just after the ECM fired
         self.bomb_t = 0.0      # > 0 just after the energy bomb went off
         self.autodock = False  # the docking computer is flying
+        self.auto_phase = 0    # where it has got to: see start_autodock
+        self.auto_far = False  # it is far from where it is heading: the jump drive's speed
+        self.auto_level = False  # it is matching the slot's roll
 
     def say(self, msg, t=2.0):
         self.msg = msg
@@ -624,7 +629,7 @@ class Game:
             self.bump_t -= dt
         if st is not None:
             if self.autodock:
-                if sp.d_station < st.bp.front + PLAYER_R + 300.0:
+                if self.auto_phase == 2 and sp.d_station < st.bp.front + PLAYER_R + 60.0:
                     self._docked()
                     return
             elif self.docking == "C":
@@ -729,6 +734,9 @@ class Game:
         if sp is None or sp.station is None or not sp.safe or self.over:
             return "STATION TOO FAR"
         self.autodock = True
+        self.auto_phase = 0     # 0: round to the front, 1: out in front of the slot, 2: in
+        self.auto_far = False
+        self.auto_level = False  # matching the slot's roll
         self.jump_t = 0.0
         self.tractor = False
         self.say("DOCKING COMPUTER ON")
@@ -739,29 +747,71 @@ class Game:
             self.autodock = False
             self.say("DOCKING COMPUTER OFF")
 
-    def _autopilot(self):
-        """The docking computer's stick and throttle: roll the station up
-        (or down) over the crosshair, pitch onto it, and fly in, fast while
-        far off and slowly near. Returns (pitch, roll, throttle)."""
-        st = self.space.station
-        x, y, z = st.x, st.y, st.z
+    def _aim(self, x, y, z):
+        """Stick to turn onto the point (x, y, z): roll it up (or down) over
+        the crosshair, then pitch onto it. Returns (pitch, roll, off), off
+        being the angle between the nose and the point (0: dead ahead)."""
         if y >= 0:
             phi = math.atan2(x, y)      # 0: straight above the crosshair
             up = 1.0
         else:
             phi = math.atan2(-x, -y)    # 0: straight below it
             up = -1.0
-        off = math.atan2(math.sqrt(x * x + y * y), z)   # 0: dead ahead
+        off = math.atan2(math.sqrt(x * x + y * y), z)
         roll = max(-1.0, min(1.0, phi * 3.0)) if off > 0.02 else 0.0
         k = 1.0 if abs(phi) < 0.4 else 0.3
-        pitch = up * k * max(-1.0, min(1.0, off * 4.0))
-        d = self.space.d_station
-        if off > 0.3:
-            want = DOCK_SPEED * 0.5
-        elif d > AUTO_SLOW:
-            want = PLAYER_MAX
+        return up * k * max(-1.0, min(1.0, off * 4.0)), roll, off
+
+    def _autopilot(self):
+        """The docking computer's stick and throttle, as the original's does
+        it: first out to a point AUTO_LINE straight out from the slot (going
+        round the side of the station if you are behind it), then turn onto
+        the station and fly in along its axis, slowly, rolling to match the
+        slot. Returns (pitch, roll, throttle)."""
+        st = self.space.station
+        m = st.m
+        nx, ny, nz = m[6], m[7], m[8]       # the slot faces along the station's nose
+        lz = -(st.x * nx + st.y * ny + st.z * nz)   # how far out in front of the slot you are
+        line = AUTO_LINE + st.bp.front
+        if self.auto_phase == 0:
+            if lz >= line * 0.5:
+                self.auto_phase = 1
+            else:       # beside or behind: out to the side first
+                px, py, pz = -st.x - nx * lz, -st.y - ny * lz, -st.z - nz * lz
+                r = math.sqrt(px * px + py * py + pz * pz)
+                if r < 1.0:
+                    px, py, pz, r = m[0], m[1], m[2], 1.0
+                k = line / r
+                wx, wy, wz = st.x + px * k + nx * line * 0.6, st.y + py * k + ny * line * 0.6, \
+                    st.z + pz * k + nz * line * 0.6
+        if self.auto_phase == 1:
+            wx, wy, wz = st.x + nx * line, st.y + ny * line, st.z + nz * line
+        if self.auto_phase < 2:
+            d = math.sqrt(wx * wx + wy * wy + wz * wz)
+            if self.auto_phase == 1 and d < AUTO_NEAR:
+                self.auto_phase = 2
+            elif self.auto_phase == 0 and d < AUTO_NEAR:
+                self.auto_phase = 1
+        if self.auto_phase < 2:
+            pitch, roll, off = self._aim(wx, wy, wz)
+            self.auto_far = d > AUTO_FAST and off < 0.1
+            if off > 0.5:
+                want = DOCK_SPEED * 0.5
+            else:       # slowing as the point comes up, so as to turn onto the station there
+                want = max(DOCK_SPEED * 0.5, min(PLAYER_MAX, d / 60.0))
         else:
-            want = DOCK_SPEED * 0.8
+            pitch, roll, off = self._aim(st.x, st.y, st.z)
+            self.auto_far = False
+            if (off < 0.15 and self.space.d_station < st.bp.front + AUTO_LEVEL) or self.auto_level:
+                # on the axis: roll to match the slot, from then on (its roof straight across the screen)
+                a = math.atan2(m[4], m[3])
+                if a > math.pi / 2:
+                    a -= math.pi
+                elif a < -math.pi / 2:
+                    a += math.pi
+                roll = max(-1.0, min(1.0, -a * 3.0))
+                self.auto_level = True
+            want = DOCK_SPEED * 0.7
         throttle = max(-1.0, min(1.0, (want - self.speed) * 0.5))
         return pitch, roll, throttle
 
@@ -844,8 +894,7 @@ class Game:
                         and self.speed >= PLAYER_MAX and not sp.safe and self.jump_t <= 0
                         and self.cabin <= COOL_CABIN    # not near the sun
                         and not self._near())
-        if self.jumping or (self.autodock and self.speed >= PLAYER_MAX
-                            and sp.d_station > AUTO_FAST):
+        if self.jumping or (self.autodock and self.speed >= PLAYER_MAX and self.auto_far):
             fwd *= JUMP_K
         self.fwd = int(fwd)
         self._rotate(pitch * PITCH_RATE * dt, roll * ROLL_RATE * dt, fwd)

@@ -460,7 +460,20 @@ of a real flight, not from a harness.
    (`GAL_ARRIVE`), no fuel used, `docked_at` cleared. Mining laser: a rock it destroys
    breaks into SPLINTERs (asteroid 2-3, boulder 1-2; `Game._splinters`), "can" objects with
    `Obj.good = MINERALS`, which scoop as minerals; its damage is 15 (pulse 12). SHIP CONFIG
-   has a switch for each. The top in-flight menu closes up (13 px lines, no help line) when
+   has a switch for each.
+   **Build 37 (Brian's requests, 2026-11-15):** the escape pod's screen times out after
+   `EJECT_TIME` into the docking scene (`app._fly_in`, shared with flying in). The docking
+   computer lines up before going in, as the original's does (`Game._autopilot`,
+   `auto_phase`): 0, from beside or behind the station, out to a point to the side of it; 1,
+   out to `AUTO_LINE` (2500) + front straight out from the slot; 2, turn onto the station
+   and fly in at 0.7 x `DOCK_SPEED`, rolling to match the slot (`auto_level`) within
+   `AUTO_LEVEL` (1000) of it; it docks only in phase 2, within front + 100. 60 random starts in
+   the PC sim all arrive inside docking A's cone and level, never within 400 of the back of
+   the station; the worst took 29 s. On the badge, from behind with the slot facing away:
+   23.5 s game time, 3.1 ms a step. DEBUG has LEVEL (EASY / NORMAL / HARD, C goes round):
+   the enemies at once and, in a career, the commander's level and rank thresholds, written
+   into the save (`_write_setting`) so a death doesn't undo it.
+   The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
@@ -470,7 +483,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 36), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 37), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

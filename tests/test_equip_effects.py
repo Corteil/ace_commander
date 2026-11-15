@@ -138,6 +138,26 @@ assert docked == 12, docked
 g = game.Game(SHIPS); g.enter(4000, "CORIOLIS", "launch", 3); g.computer = True
 g.to_station(sp.safe_r * 3)
 assert g.start_autodock() == "STATION TOO FAR"
+# from behind the station, with the slot turned away: round the side, then in along the axis
+random.seed(5)
+g = game.Game(SHIPS); g.enter(4000, "CORIOLIS", "launch", 3); g.computer = True
+g.spawn_t = g.rock_t = 1e9
+st = g.space.station
+g.to_station(6000, False)
+game._look(st.m, 0.0, 0.0, 1.0)     # the slot faces away from you
+g.start_autodock()
+closest = 1e9
+for _ in range(int(60 / DT)):
+    m = st.m
+    if -(st.x * m[6] + st.y * m[7] + st.z * m[8]) < st.bp.front:
+        closest = min(closest, g.space.d_station)
+    g.step(DT, 0.0, 0.0, 0.0, False, False); g.encounter_t = 1e9
+    if g.docked:
+        break
+m = st.m
+cone = -(st.x * m[6] + st.y * m[7] + st.z * m[8]) / g.space.d_station
+assert g.docked and closest > 2 * st.bp.radius, closest
+assert cone >= game.SLOT_CONE_A and abs(m[3]) >= game.LEVEL_A, "on the axis, roll matched"
 print("docking computer docks you from anywhere in the safe zone: ok")
 
 # ---- galaxies -------------------------------------------------------------
@@ -212,13 +232,37 @@ for _ in range(300):
 assert e.mode == "docked"
 print("app: bomb on B, docking computer from the menu: ok")
 
+# DEBUG: LEVEL goes round the levels, for the enemies and the commander's ranks
+def debug(a, line):
+    if not a.paused:
+        tick(a, fresh=["A"])
+    a.fsub = "debug"
+    a.fmenu = [i for i, t in enumerate(a._fitems()) if t.startswith(line)][0]
+    tick(a, fresh=["C"])
+launch(e); g = e.game; g.spawn_t = g.rock_t = g.encounter_t = 1e9
+lv = c.level
+debug(e, "LEVEL")
+assert g.level == c.level == (lv + 1) % 3 and c._needs == commander.thresholds(c.level)
+assert commander.load(SAVE).level == c.level, "written into the save"
+assert ("LEVEL: " + commander.LEVELS[c.level]) in e._fitems()
+while c.level != lv:
+    debug(e, "LEVEL")
+tick(e, fresh=["A"]); assert not e.paused
+e._dock()
+print("app: DEBUG level: ok")
+
 # the escape pod: destroyed with one, you wake up docked here, no cargo, full tank
 launch(e); g = e.game; g.spawn_t = g.rock_t = g.encounter_t = 1e9
 c.fuel = 30
 g._hurt(1e6); tick(e)
 assert g.over and g.ejected and "ESCAPE POD" in texts(e)
 assert "pod" not in c.extras and c.cargo[0] == 0 and c.fuel == commander.MAX_FUEL
-for _ in range(200):
+for _ in range(int(mod.EJECT_TIME / 0.04) + 5):
+    tick(e)
+    if e.mode != "flight":
+        break
+assert e.mode == "docking", "the pod times out into the docking scene"
+for _ in range(300):
     tick(e)
     if e.mode == "docked":
         break
