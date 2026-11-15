@@ -42,6 +42,7 @@ If something moves the wrong way, or you want other buttons, change the
 constants below.
 """
 import asyncio
+import json
 import gc
 import random
 import time
@@ -266,6 +267,8 @@ class AceCommander(app.App):
         self.menu = 0           # which title screen choice is showing
         self.title = title.Title(SHIPS) if SHIPS else None
         self.cmdr = commander.load(SAVE_PATH)   # the saved commander, or None
+        # the commander as last saved, as JSON: being destroyed goes back to it
+        self.saved = json.dumps(self.cmdr.to_dict()) if self.cmdr is not None else None
         self.level = 1          # the level showing on the new-commander screen
         self.game = None
         self.career = False     # the current game counts towards the commander
@@ -513,7 +516,8 @@ class AceCommander(app.App):
                 self.level = (self.level + 1) % len(commander.LEVELS)
             elif confirm:
                 self.cmdr = commander.Commander(self.level)
-                self.cmdr.save(SAVE_PATH)
+                self.career = False     # an old commander's flight banks nothing into it
+                self._write()
                 self.menu = 0       # CONTINUE is now the first choice
                 self._dock()
         elif self.mode == "docked":
@@ -600,7 +604,7 @@ class AceCommander(app.App):
         else:
             fresh = False
         self.career = career
-        g.again = "C: back to the station" if career else "C: fly again"
+        g.again = "C: back to last save" if career else "C: fly again"
         g.scoop = self._scoop if career and self.cmdr is not None else None
         g.refuel = self._refuel if career and self.cmdr is not None else None
         if career:
@@ -651,7 +655,7 @@ class AceCommander(app.App):
         self._place()
         self.career = True
         c = self.cmdr
-        c.docked_at = c.system  # where to start again if destroyed
+        c.docked_at = c.system  # the last station docked at
         if not EQUIP:           # nowhere to buy fuel: it's free, as before the equipment
             c.fuel = commander.MAX_FUEL
         if GOODS and self.galaxy is not None and (c.market is None
@@ -659,7 +663,7 @@ class AceCommander(app.App):
             from . import market
             c.market = market.new(GOODS, c.system, self.galaxy.system(c.system).economy,
                                   random.randint(0, 255))
-        c.save(SAVE_PATH)
+        self._write()
         if self.game is not None:
             self.game.docked = False
         if self.target == c.system:
@@ -774,8 +778,45 @@ class AceCommander(app.App):
 
     def _save_docked(self):
         """Save what was bought and sold while docked."""
-        if self.cmdr is not None:
-            self.cmdr.save(SAVE_PATH)
+        self._write()
+
+    def _write(self):
+        """Save the commander, and keep a copy of what was saved: being
+        destroyed goes back to it (see _restore). Only done at a station, as
+        in the original, where you could save only while docked."""
+        c = self.cmdr
+        if c is None:
+            return
+        self.saved = json.dumps(c.to_dict())
+        c.save(SAVE_PATH)
+
+    def _write_setting(self, key, value):
+        """Change one setting in the last save, without saving the flight so far."""
+        if self.saved is None:
+            return
+        d = json.loads(self.saved)
+        d[key] = value
+        self.saved = json.dumps(d)
+        commander.Commander.from_dict(d).save(SAVE_PATH)
+
+    def _restore(self):
+        """Destroyed: as in the original, everything since the last save is
+        lost. The commander goes back to how they were when last saved (docked
+        at a station), and this flight's kills, bounties and used missiles are
+        written off so that nothing more is banked from it. (With an escape
+        pod, once it exists, only the cargo will be lost.)"""
+        if self.saved is not None:
+            self.cmdr = commander.Commander.from_dict(json.loads(self.saved))
+        else:                   # never saved: lose the cargo at least
+            self.cmdr.cargo = [0] * commander.GOODS
+        c = self.cmdr
+        g = self.game
+        self.banked = g.kills
+        self.banked_cash = g.bounty
+        g.missiles = c.missiles
+        g.fuel = c.fuel
+        self.target = None
+        self.jump_to = None
 
     def _pick_tunnel(self):
         """This station's tunnel: its slot's shape and its own ring spacing, from its
@@ -818,7 +859,8 @@ class AceCommander(app.App):
         return None
 
     def _arrive(self):
-        """The game has just jumped: move the commander and use the fuel."""
+        """The game has just jumped: move the commander and use the fuel.
+        Not saved: as in the original, only docking saves."""
         g = self.game
         g.jumped = False
         to = self.jump_to
@@ -830,7 +872,6 @@ class AceCommander(app.App):
         c.fuel = max(0, c.fuel - to[1])
         c.market = None         # a new system: its market is worked out on docking
         self.target = None
-        self._save()
         self._enter_space("arrive")
         g.say(self.galaxy.system(c.system).name, 3.0)
 
@@ -855,13 +896,9 @@ class AceCommander(app.App):
             if rank and not g.over:
                 g.say("RANK: " + rank, 3.0)
 
-    def _save(self):
-        if self.career and self.cmdr is not None:
-            self._bank()
-            self.cmdr.save(SAVE_PATH)
-
     def _to_title(self):
-        self._save()
+        """To the title screen. Nothing is saved: a flight left part-way
+        carries on with CONTINUE until the app is closed."""
         self.paused = False
         self.fsub = None
         self.mode = "menu"
@@ -934,13 +971,7 @@ class AceCommander(app.App):
             if not self.saved_over:
                 self.saved_over = True
                 if self.career and self.cmdr is not None:
-                    c = self.cmdr
-                    c.cargo = [0] * commander.GOODS     # lost with the ship
-                    # you start again at the last station you docked at
-                    if c.docked_at is not None and c.docked_at != c.system:
-                        c.system = c.docked_at
-                        self.target = None
-                self._save()
+                    self._restore()     # back to the last save, as in the original
             if confirm and self.career:
                 self._dock()
             elif confirm:
@@ -1211,7 +1242,7 @@ class AceCommander(app.App):
                     i = commander.DOCKING.index(c.docking) + (-1 if left else 1)
                     c.docking = commander.DOCKING[i % len(commander.DOCKING)]
                     self.game.set_docking(c.docking)
-                    c.save(SAVE_PATH)
+                    self._write_setting("docking", c.docking)
             elif confirm:
                 self._to_title()
         elif self.fsub == "debug":

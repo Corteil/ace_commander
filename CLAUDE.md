@@ -385,12 +385,25 @@ of a real flight, not from a harness.
    changes the ship at once, in the flight and for the commander: laser (C cycles), missiles
    (0-4), energy unit; in a career also cargo bay (20 / 35 t) and fuel scoops. Add each
    new item there as its effect is built.
-   **Starting again after being destroyed** (Brian's request): `Commander.docked_at` is
-   the last system docked at (set in `app._dock`, saved). On game over in a career the
-   commander is moved back there before the game-over save, so C ("back to the station")
-   or a later CONTINUE starts at the last station docked at, not a system jumped to and
-   never docked in. Fuel used since stays used; cargo is lost as before. Old saves have
-   no `docked_at` until they next dock (until then: the current system, as before).
+   **Being destroyed works as in the original** (build 35, Brian's choice on 2026-11-15,
+   replacing build 34's "start again at the last station, keeping everything but the
+   cargo"). The commander is saved **only when docked** (`app._write`: on docking, on
+   leaving the docked screens for the title or a launch, and a new commander), as the
+   original could save only at a station; arriving from hyperspace and quitting a flight to
+   the title no longer save. `app.saved` keeps a JSON copy of the last save. On game over
+   in a career `app._restore` puts the commander back to that copy, so the kills, bounties,
+   cargo, missiles used, fuel and system since the last dock are all lost, and sets
+   `banked` / `banked_cash` and `Game.missiles` so the dead flight banks nothing more. C
+   ("back to last save") docks there. Changing the docking style mid-flight writes only
+   that setting into the save (`app._write_setting`). A badge restart mid-flight also goes
+   back to the last dock. Starting a NEW COMMANDER no longer banks a flight the last
+   commander left part-way (it set `career` False first). Still possible: quit a flight to
+   the title, play combat practice, then CONTINUE docks the commander wherever they were,
+   with the flight's progress. `Commander.docked_at` is still saved but no longer used.
+   The escape pod (phase 4, not built) is what should save you from this: per the disc
+   source's ESCAPE routine it loses the cargo, uses up the pod, clears the legal status,
+   gives a full tank and docks you; what it does to credits and other equipment is not
+   checked yet.
    **Build 34: sun skimming** (Brian's request; main flight loop part 15). `Game._sun`:
    cabin temperature = 285 - `SUN_HEAT` x (distance / sun radius)^2, at least 30; at
    `SCOOP_TEMP` (224) or more with fuel scoops, every `SUN_CHECK` s `Game.refuel`
