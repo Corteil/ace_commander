@@ -68,23 +68,35 @@ assert "Ceerdi" in describe.mission_pages(gd, missions.BRIEF_2, "J", 2)[0][0]
 assert len(describe.mission_pages(gd, missions.BRIEF_3, "J", 2)) == 2
 assert "Energy Unit" in describe.mission_pages(gd, missions.DEBRIEF_2, "J", 2)[0][0]
 assert describe.mission_pages(gd, missions.DEBRIEF_1, "J", 0)[0][0].endswith("MESSAGE ENDS")
-# every screen of every message fits the round screen
+# every line of every message fits the round screen wherever it scrolls to,
+# and the joystick scrolls through it to the end
 for n in (missions.BRIEF_1, missions.DEBRIEF_1, missions.BRIEF_2, missions.BRIEF_3,
           missions.DEBRIEF_2):
     for gn in (0, 1, 2):
         b = briefing.Briefing(gd, n, "Commander Longname", gn,
                               game.Blueprint([e for e in SHIPS if e[0] == "CONSTRICTOR"][0]))
-        assert not b.done
+        assert not b.done and b.incoming
+        assert (b.ship is not None) == (n == missions.BRIEF_1)
+        b.tick(2.1); assert not b.incoming
         k = 0
-        while not b.done:
+        while not b.at_end():
             c = CountCtx(); b.draw(c)
             for s, (x, y), size in c.texts:
                 half = len(s) * 0.62 * size / 2
-                assert y <= briefing.BOTTOM or s.startswith("C:"), (s, y)
-                assert (half * half + (abs(y) + 6) ** 2) ** 0.5 <= 120, (s, x, y)
-            b.tick(2.1) if b.at < 0 else b.next()
+                assert (half * half + (abs(y) + size / 2) ** 2) ** 0.5 <= 120, (s, x, y)
+                if size == briefing.SIZE:
+                    assert briefing.VIEW_TOP - 1 <= y <= briefing.VIEW_BOTTOM + 1
+            b.tick(0.1, 1)
             k += 1
-        assert k < 16
+        assert k < 300 and b.scroll == b.most
+        c = CountCtx(); b.draw(c)
+        assert "MESSAGE ENDS" in [t[0] for t in c.texts], "the end is reached"
+        assert "C: continue" in [t[0] for t in c.texts]
+        b.tick(1.0, -1); assert b.scroll < b.most
+        b.next(); assert not b.done, "C pages down first"
+        while not b.at_end():
+            b.next()
+        b.next(); assert b.done
 print("the briefing texts, and every screen of them fits: ok")
 
 # ---- the rules ------------------------------------------------------------------------
@@ -252,8 +264,19 @@ assert texts(e) == ["INCOMING MESSAGE"]
 for _ in range(int(2.2 / DT)):
     tick(e)
 t = texts(e)
-assert any("Jameson" in s for s in t) and "C: more   F: skip" in t
+assert any("Jameson" in s for s in t) and "stick: scroll  C: more" in t
+s0 = e.brief.scroll
 for _ in range(10):
+    tick(e, held=["JOYDOWN"])
+s1 = e.brief.scroll
+assert s1 > s0, "the joystick scrolls"
+for _ in range(10):
+    tick(e, held=["D"])
+assert e.brief.scroll == s1, "D (also DOWN) doesn't"
+for _ in range(5):
+    tick(e, held=["JOYUP"])
+assert e.brief.scroll < s1, "and back up"
+for _ in range(30):
     if e.mode != "brief":
         break
     tick(e, fresh=["C"])

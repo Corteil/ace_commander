@@ -687,10 +687,13 @@ of a real flight, not from a harness.
    (to the stage's galaxy and system, arriving as from hyperspace). On the badge (REPL):
    making a briefing 40-190 ms, a special sentence 13 ms. Tests: `tests/test_missions.py`.
    Not yet played by hand.
-   Then (Brian: text too small to read): the briefing text is size 14 (`briefing.SIZE`,
-   was 10), 16 px lines; a paragraph that doesn't fit what is left of a screen starts the
-   next one, and the ship shows only on the first screen of each part. Mission 1's
-   briefing is now 5 screens, mission 2's plans briefing 6.
+   Then (Brian: text too small to read; then "use the joystick to scroll the text"): the
+   message is one column of size 13 text (`briefing.SIZE`, was 10), `WIDTH` 22 characters
+   a line so every line fits anywhere in the view (`VIEW_TOP` / `VIEW_BOTTOM`, +-66),
+   with the original's screens run together (`PAGE_GAP`). Joystick up / down (held)
+   scrolls at `SCROLL_SPEED` (only the joystick on the new front board, not A / D); C
+   pages down and at the end goes on; F skips. Grey bars show more above / below. The
+   Constrictor sits at the top of mission 1's column and goes once scrolled near the top.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not

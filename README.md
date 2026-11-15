@@ -154,7 +154,8 @@ Only a military laser gets through its shields, and it has an ECM. Destroy it an
 for your reward. Later, with more kills, in the third galaxy, the Navy has a second job
 for you, and the Thargoids will not like it. The texts are read from your own copy of
 the Elite source into `game_data.py`, like the system descriptions. The missions call you
-by the name set in the badge's settings, or Jameson if none is set.
+by the name set in the badge's settings, or Jameson if none is set. On a message, the
+joystick scrolls the text, C pages down (and at the end goes on) and F skips it.
 
 The Debug page can move you through them: MISSION (the next stage; docking then starts
 the next mission), TO MISSION SYSTEM and ADD THE CONSTRICTOR.

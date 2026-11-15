@@ -560,7 +560,11 @@ class AceCommander(app.App):
             self._update_docked(dt, cancel, confirm)
         elif self.mode == "brief":
             b = self.brief
-            b.tick(dt)
+            held = pad.held
+            new = FB is not None    # the joystick told apart from A and D
+            up = held("j_up" if new else "up") or held("k_UP")
+            down = held("j_down" if new else "down") or held("k_DOWN")
+            b.tick(dt, (1 if down else 0) - (1 if up else 0))
             if cancel:
                 b.skip()
             elif confirm:
