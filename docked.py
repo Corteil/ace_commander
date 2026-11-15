@@ -21,6 +21,11 @@ HOLD_X = 88
 EPRICE_X = 52       # Equip ship's price column
 
 
+def _legal(n):
+    """Legal status as a name (game.legal_name, without importing the game)."""
+    return "CLEAN" if n <= 0 else ("OFFENDER" if n < 50 else "FUGITIVE")
+
+
 def _ly(d):
     return "%d.%d LY" % (d // 10, d % 10)
 
@@ -192,8 +197,8 @@ class Docked:
             text(ctx, "COMMANDER", 0, -70, 20, cockpit.WHITE)
         ctx.rgb(*cockpit.DIM).rectangle(-90, -34, 180, 1).fill()
         text(ctx, c.rank(), 0, -20, 16, cockpit.GREEN)
-        text(ctx, "%d kills   level: %s" % (c.kills, commander.LEVELS[c.level]),
-             0, -2, 12, cockpit.YELLOW)
+        text(ctx, "%d kills  %s  %s" % (c.kills, commander.LEVELS[c.level],
+                                        _legal(c.legal)), 0, -2, 12, cockpit.YELLOW)
         nxt = c.next_rank()
         if nxt:
             text(ctx, "%d more for %s" % (nxt[1], nxt[0]), 0, 13, 12, cockpit.YELLOW)

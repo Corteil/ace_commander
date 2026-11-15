@@ -282,6 +282,7 @@ print("app: escape pod: ok")
 # the galactic hyperdrive: a countdown, then the next galaxy, once
 launch(e); g = e.game; g.spawn_t = g.rock_t = g.encounter_t = 1e9
 fuel = c.fuel
+g.legal = 30
 fpick(e, "GALACTIC JUMP")
 assert g.jump_t > 0 and e.jump_to == ("galaxy", 0)
 for _ in range(400):
@@ -290,6 +291,7 @@ for _ in range(400):
         break
 assert c.galaxy == 1 and e.galaxy_n == 1 and "hyperdrive" not in c.extras
 assert c.system == e.galaxy.nearest(*galaxy.GAL_ARRIVE) and c.fuel == fuel
+assert g.legal == 0, "a new galaxy, a clean record"
 assert c.docked_at is None and commander.load(SAVE).galaxy == 0, "saved only on docking"
 tick(e, fresh=["A"]); assert "GALACTIC JUMP" not in e._fitems(); tick(e, fresh=["A"])
 print("app: galactic hyperdrive to galaxy 2: ok")
@@ -410,4 +412,32 @@ e.dock_t = mod.DOCK_TIME; texts(e); y1 = e.tunnel.me.y
 assert y1 < y0, "it settles onto the floor"
 os.path.exists(SAVE) and os.remove(SAVE)
 print("build 41: take off and land, Repair Shop paint: ok")
+
+# ---- build 46: the station in 3D at any distance in the docking computer's view
+g = game.Game(SHIPS); g.enter(4000, "CORIOLIS", "launch", 3)
+st = g.space.station
+g.to_station(40000.0, False); g.autodock = True
+before = (st.x, st.y, st.z)
+calls = []
+real = cockpit.draw_ship
+def spy(ctx, o, rgb=None, wire_min=cockpit.WIRE_MIN, solid=False):
+    calls.append((o, wire_min, o.z))
+    return real(ctx, o, rgb, wire_min, solid)
+cockpit.draw_ship = spy
+try:
+    cockpit.draw_world(CountCtx(), g)
+finally:
+    cockpit.draw_ship = real
+s_calls = [c for c in calls if c[0] is st]
+assert s_calls and s_calls[0][1] == 0, "a wireframe, never a dot or marker"
+assert s_calls[0][2] == before[2] + cockpit.CHASE_BACK, "at its true distance from the camera: to scale (build 48)"
+assert (st.x, st.y, st.z) == before, "put back where it was"
+g.autodock = False; calls[:] = []
+cockpit.draw_ship = spy
+try:
+    cockpit.draw_world(CountCtx(), g)
+finally:
+    cockpit.draw_ship = real
+assert [c for c in calls if c[0] is st][0][1] == cockpit.WIRE_MIN, "the cockpit view as before"
+print("builds 46, 48: the station a wireframe at any distance, to scale, in the docking computer's view: ok")
 print("ALL EQUIPMENT EFFECT TESTS PASSED")

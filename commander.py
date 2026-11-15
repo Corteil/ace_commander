@@ -68,6 +68,7 @@ class Commander:
         self.system = None      # which star system the commander is in (None: the start)
         self.galaxy = 0         # which of the 8 galaxies (0 is the first)
         self.colour = 0         # the ship's paint (cockpit.SHIP_COLOURS), from the Repair Shop
+        self.legal = 0          # legal status, 0 clean to 255 (game.FUGITIVE and up: a fugitive)
         self.fuel = MAX_FUEL    # tenths of a light year
         self._needs = thresholds(self.level)
 
@@ -112,7 +113,8 @@ class Commander:
                 "system": self.system, "fuel": self.fuel, "cargo": self.cargo,
                 "market": self.market, "hold": self.hold, "missiles": self.missiles,
                 "laser": self.laser, "extras": self.extras, "docked_at": self.docked_at,
-                "galaxy": self.galaxy, "colour": self.colour}
+                "galaxy": self.galaxy, "colour": self.colour,
+                "legal": self.legal}
 
     @classmethod
     def from_dict(cls, d):
@@ -141,6 +143,9 @@ class Commander:
         if isinstance(s, int) and 0 <= s < 256:
             c.system = s
         c.fuel = max(0, min(MAX_FUEL, int(d.get("fuel", MAX_FUEL))))
+        k = d.get("legal")
+        if isinstance(k, int):
+            c.legal = max(0, min(255, k))
         k = d.get("colour")
         if isinstance(k, int) and 0 <= k < 32:
             c.colour = k

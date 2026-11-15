@@ -619,6 +619,7 @@ assert g.space is not sp and not g.space.safe and g.pending == 0, "Lave, a dicta
 k0 = e.cmdr.kills
 kill(g, 3); tick(e)
 g.pending = 0; g.encounter_t = 1e9
+g.trader_t = g.police_t = 1e9      # no traders or police in the way
 g.objs[:] = [o for o in g.objs if o.kind != "ship"]
 debug(e, "TO THE STATION")
 assert g.space.station.z == 4000.0 and g.space.safe

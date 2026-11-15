@@ -621,6 +621,8 @@ class AceCommander(app.App):
             if fresh or g.space is None:
                 self._enter_space("launch")
                 self._fit(g)
+                if self.cmdr is not None:
+                    g.illegal_cargo(self.cmdr.cargo)    # slaves, narcotics, firearms
         self.jump_to = None
         g.jump_t = 0.0
         self.saved_over = False
@@ -790,6 +792,7 @@ class AceCommander(app.App):
         g.bombs = 1 if "bomb" in c.extras else 0
         g.computer = "docking" in c.extras
         g.ship_rgb = cockpit.ship_rgb(c.colour)     # for the view from behind your ship
+        g.legal = c.legal
 
     def _refuel(self, n):
         """Fuel skimmed from the sun: n tenths of a light year into the tank.
@@ -844,6 +847,7 @@ class AceCommander(app.App):
         self.banked_cash = g.bounty
         g.missiles = c.missiles
         g.fuel = c.fuel
+        g.legal = c.legal       # nothing more from the dead flight
         self.target = None
         self.jump_to = None
 
@@ -903,12 +907,14 @@ class AceCommander(app.App):
             from . import galaxy
             c.galaxy = (c.galaxy + 1) % 8
             self._extra(c, "hyperdrive", False)     # used up
+            g.legal = 0         # a new galaxy: a clean record, as in the original
             self._place()
             c.system = self.galaxy.nearest(*galaxy.GAL_ARRIVE)
             c.docked_at = None  # nowhere docked in this galaxy yet
             to = (c.system, 0)
         c.system = to[0]
         c.fuel = max(0, c.fuel - to[1])
+        g.legal //= 2           # a jump halves your legal status
         c.market = None         # a new system: its market is worked out on docking
         self.target = None
         self._enter_space("arrive")
@@ -922,6 +928,8 @@ class AceCommander(app.App):
             return
         c = self.cmdr
         c.missiles = g.missiles             # the ones fired are gone
+        c.legal = g.legal
+        g.bad = game.bad(c.cargo)           # contraband: the police look for it
         g.fuel = c.fuel                     # for the HUD
         paid = g.bounty - self.banked_cash
         if paid > 0:
@@ -1018,6 +1026,7 @@ class AceCommander(app.App):
                     c.cargo = [0] * commander.GOODS
                     self._extra(c, "pod", False)
                     c.fuel = commander.MAX_FUEL
+                    c.legal = g.legal = 0       # the original's pod clears your record too
                     self.jump_to = None
                 # nothing else since the last save is lost; docking saves it
             self.eject_t += dt
@@ -1185,6 +1194,7 @@ class AceCommander(app.App):
                      "LEVEL: " + commander.LEVELS[self.game.level],
                      "FRAME TIME: " + ("ON" if self.show_ms else "OFF"),
                      "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
+                     "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION", "LEGAL: " + game.legal_name(self.game.legal),
                      "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4", "+10 KILLS", "+1000 CR",
                      "SHIP CONFIG", "REPAIR SHOP: " + ("ON" if self.repair_shop else "OFF"),
                      "RELEASE CANISTER", "TO THE STATION", "TO THE SUN",
@@ -1193,6 +1203,11 @@ class AceCommander(app.App):
                 items.remove("NEXT WAVE")       # waves are for combat practice
             else:
                 items.remove("+1000 CR")        # no commander, no cash or fuel
+                items.remove("ADD A TRADER")    # nor traders, police or legal status
+                items.remove("ADD POLICE")
+                items.remove("ADD A HUNTER")
+                items.remove("ANGER STATION")
+                items.remove(items[[i for i, t in enumerate(items) if t.startswith("LEGAL")][0]])
                 items.remove("FUEL TO 1/4")
             return items
         if self.fsub == "ship":
@@ -1300,6 +1315,25 @@ class AceCommander(app.App):
             g.wave += 1
             g.wave_kills = 0
             g.say("WAVE %d" % g.wave, 2.5)
+        elif item in ("ADD A TRADER", "ADD POLICE", "ADD A HUNTER"):
+            if g.space is None:
+                g.say("ONLY IN A STAR SYSTEM")
+            elif len(g.objs) + len(g.new) < game.MAX_OBJECTS:
+                if item == "ADD A TRADER":
+                    g.add_trader()
+                elif item == "ADD A HUNTER":
+                    g.add_hunter()
+                else:
+                    g.add_police(False)
+        elif item == "ANGER STATION":
+            if g.space is None:
+                g.say("ONLY IN A STAR SYSTEM")
+            else:
+                g.anger_station()
+        elif item.startswith("LEGAL"):
+            # CLEAN, OFFENDER, FUGITIVE and round again
+            g.legal = 20 if g.legal == 0 else (game.FUGITIVE if g.legal < game.FUGITIVE else 0)
+            g.say(g.legal_name())
         elif item == "ADD AN ENEMY":
             if len(g.objs) + len(g.new) < game.MAX_OBJECTS:
                 g._spawn_ship()
@@ -1552,7 +1586,8 @@ class AceCommander(app.App):
             c = self.cmdr
             text(ctx, "COMMANDER", 0, -60, 18, cockpit.WHITE)
             text(ctx, c.rank(), 0, -34, 16, cockpit.GREEN)
-            text(ctx, "%d kills   level: %s" % (c.kills, commander.LEVELS[c.level]),
+            text(ctx, "%d kills  %s  %s" % (c.kills, commander.LEVELS[c.level],
+                                            game.legal_name(c.legal)),
                  0, -12, 12, cockpit.YELLOW)
             nxt = c.next_rank()
             if nxt:

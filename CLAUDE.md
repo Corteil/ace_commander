@@ -501,6 +501,90 @@ of a real flight, not from a harness.
    for it to be optional for now: shown only when DEBUG's REPAIR SHOP is ON
    (`app.repair_shop`, not saved, applies from the next docking). Ship types are written
    up as a future phase 6 extra in `DESIGN.md`, not built.
+   **Build 42 starts phase 5: traders, police and legal status** (2026-11-15; Brian had
+   play-tested every build to 41 and was happy). `Game.legal` 0-255 (the original's FIST;
+   `legal_name`: CLEAN 0, OFFENDER 1-49, FUGITIVE 50+), saved as `Commander.legal`, copied
+   game to commander in `app._bank`, set from it in `_fit`. Launching with illegal goods
+   (`ILLEGAL`: slaves and narcotics 2 a tonne, firearms 1) raises it to at least their
+   weight (`Game.illegal_cargo`). The first hit on a trader adds `HIT_TRADER` (16), killing
+   one `KILL_TRADER` (16) more; firing on the police or the station (`_hit_station`: a shot
+   that hits nothing else with the station in the crosshair) makes you a fugitive
+   (`_crime`, `_provoke`). Each jump halves it (`app._arrive`); the escape pod clears it;
+   dying without one goes back to the saved value. Ships have `Obj.role` ("pirate",
+   "trader", "police") and two new states, "trade" and "patrol", that leave you alone;
+   only "attack" / "break" count as hostile for encounters. `Game._traffic` (called from
+   `_encounters` before the safe-zone check, so in the safe zone too): every
+   `TRADER_EVERY` (12 s), with fewer than 2 traders, one of `TRADERS` (Cobra Mk III,
+   Python, Boa, Anaconda, Moray) turns up with chance 0.45 (0.8 in the safe zone) facing the
+   station; it steers there and docks (vanishes) on reaching it; fired on, it attacks if
+   it has a laser, else flees; no bounty. Every `POLICE_EVERY` (6 s) in the safe zone,
+   with fewer than 3 police: a Viper hunting you always if a fugitive, with chance
+   legal / 64 if an offender, else now and then a patrol (`PATROL_CHANCE`); they launch
+   out of the slot when the station is within 8,400, else arrive like other ships; a patrol
+   turns on a fugitive. Radar: pirates and attackers red, police blue (`POLICE_BLUE`),
+   traders white. Status pages show the legal status. DEBUG: ADD A TRADER, ADD POLICE,
+   LEGAL (CLEAN / OFFENDER / FUGITIVE), career only. Tests: `tests/test_traffic.py`. On the
+   badge: 6.7 ms a step with three police and a trader.
+   **Build 43 (Brian):** bounty hunters (the encounter rolls' lone `HUNTERS`, now
+   `Obj.role` "hunter", `group_role`) attack offenders and fugitives and fly by the clean
+   (state "patrol", turning on you if you become an offender); firing on one is a crime
+   like a trader (`HIT_TRADER`), killing one pays no bounty. Pirates prey on traders:
+   `Game._pick_prey` picks the nearest trader that is nearer the pirate than you are and
+   within `PREY_RANGE` (6,000); the pirate steers and fires at it (50% hits, the trader
+   flees), and a trader it destroys spills its cargo (`_spill`) with no kill, bounty or
+   crime for anyone (`_kill(..., credit=False)`). Hitting a pirate turns it back on you.
+   DEBUG: ADD A HUNTER. Police numbers (Brian asked): no set number per station; at most
+   `POLICE_MOST` (3) about at once, a new one possible every `POLICE_EVERY` (6 s), so
+   destroyed ones are replaced without end. On the badge: 6.9 ms a step with two traders,
+   a hunter and three pirates. Not built yet from phase 5: Thargoids, and legal status
+   changing the market or bounties.
+   **Build 44: traffic and legal status as the original** (Brian: "go fully original",
+   after reading `~/Code/elite-source-code-bbc-micro-disc`, `elite-source-flight.asm`).
+   This replaces the build 42/43 rules above where they differ. Legal status (FIST)
+   changes only by ORing in contraband on launch (`game.bad`, `illegal_cargo`; the app
+   also keeps `Game.bad` current in `_bank`), ORing in `KILL_COP` (64) for destroying a
+   police ship, halving on each jump (SOLAR), and clearing with the escape pod or the
+   galactic hyperdrive. Firing on a trader (innocent) or the station makes the station
+   hostile (`Game.anger_station`, `Space.hostile`; ANGRY / AN2), not your record worse. A
+   hostile station refuses docking, checked before anything else on touching it
+   (`_refused`, ISDK check 1): at `DEATH_SPEED` (5) or more you are killed, slower a 5
+   damage dent, speed 1 and a bounce; the docking computer flies you in to the same end
+   (the original's goes through the same checks); it launches police after you
+   (`STATION_COPS` 4 at most, `STATION_COP_CHANCE` a second; TACTICS TN5) and no shuttles,
+   until you leave. Otherwise the station launches a Shuttle or Transporter now and then
+   (`SHUTTLE_CHANCE` a second, one at a time, making for the planet). Outside the safe zone,
+   each `ENCOUNTER_EVERY` tick (`Game._tick`, main game loop parts 2 to 4): 35/256 something
+   harmless (half the time a trader, making for the station or the planet: `Obj.dest`);
+   else a police Viper with chance (2 x BAD, ORed with legal status if police are about)
+   / 256; then, with no police about, the pirate / hunter roll (still only with no hostile
+   ships about, as before). Nothing turns up in the safe zone, and a pirate that follows
+   you in becomes "patrol" for good (TN3). Police and hunters attack at `HUNT_LEGAL` (40)
+   or more (TN1; Vipers are hunters in the original's flags), else patrol; firing on any
+   ship makes it attack you. Bounties are every ship's blueprint bounty (the police and
+   most traders: 0). Kept although not in the original, as Brian asked: pirates preying
+   on traders. DEBUG: ANGER STATION.
+   **Build 45 (Brian):** a hostile station's tractor beam (docking B) no longer takes hold,
+   and lets go if the station turns; the docking computer won't start at a hostile station
+   ("STATION HOSTILE") and switches off if it turns (not as the original, whose computer
+   flew you in to a refused docking). Leaving the safe zone ends the lockdown (`_measure`):
+   the original drops the station from the local bubble outside it (the sun takes its slot)
+   and makes a new, friendly one on the way back in (NWSPS). Police already launched stay.
+   **Build 46 (Brian):** in the docking computer's view the station is always a wireframe
+   (`draw_ship` with `wire_min` 0 never falls back to a dot or marker), and never smaller
+   than `CHASE_STATION_MIN` (12 px radius): a far one is drawn as if nearer along the same
+   line of sight, then put back (`_draw_space(ctx, sp, wire)`). The cockpit view is as before.
+   **Build 47 (Brian: a ship coming out of the station hit him on the run in):** a friendly
+   station launches no shuttle while the docking computer flies or you are within
+   `SLOT_CLEAR` (6,000) in front of its slot, inside `SLOT_CLEAR_CONE` of its axis
+   (`Game._slot_clear`); a hostile station's police still launch. A ship that isn't
+   attacking you ("trade" / "patrol") dodges sideways out of your line of travel when it is
+   within `AVOID_AHEAD` (3,000) ahead and `AVOID_SIDE` of your path, or within `AVOID_DIST`
+   heading your way (turning straight away put it back down your path). 40 docking-computer
+   runs from random directions with a shuttle already coming out: no hits, all docked.
+   **Build 48 (Brian):** the station is drawn to scale in the docking computer's view again
+   (build 46's 12 px minimum is gone); it stays a wireframe at any distance, never a dot or
+   marker. What launches from a station: a friendly one only Shuttles and Transporters, a
+   hostile one only police Vipers, as in the disc original (TACTICS for the station).
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -511,7 +595,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 41), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 48), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

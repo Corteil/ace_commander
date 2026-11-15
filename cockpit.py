@@ -34,6 +34,7 @@ RED = (1, 0.25, 0.2)
 ORANGE = (1, 0.55, 0.1)
 CYAN = (0.3, 0.9, 1)
 MAGENTA = (1, 0.3, 1)
+POLICE_BLUE = (0.35, 0.5, 1)
 GREY = (0.7, 0.7, 0.75)
 COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": MAGENTA, "pmissile": CYAN,
           "station": WHITE}
@@ -140,7 +141,7 @@ def draw_ship(ctx, o, rgb=None, wire_min=WIRE_MIN, solid=False):
     if sx - pr > 120 or sx + pr < -120 or sy - pr > 120 or sy + pr < -120:
         return False
     ctx.rgb(*(RED if o.hit > 0 else rgb or COLOUR[o.kind]))
-    if pr < 3:          # too far away to make out: a dot
+    if pr < 3 and wire_min > 0:     # too far away to make out: a dot (wire_min 0: never)
         ctx.rectangle(sx - 1, sy - 1, 2, 2).fill()
         return True
     if pr < wire_min:   # middle distance: a small marker, much cheaper than lines
@@ -833,7 +834,7 @@ def draw_world(ctx, g):
         if me is not None:
             _chase_shift(g, -CHASE_UP, CHASE_BACK)
             try:
-                _draw_world(ctx, g)
+                _draw_world(ctx, g, 0)     # the station in 3D however far off it is
                 draw_ship(ctx, me, getattr(g, "ship_rgb", CYAN), 0, True)
             finally:
                 _chase_shift(g, CHASE_UP, -CHASE_BACK)
@@ -841,7 +842,7 @@ def draw_world(ctx, g):
     _draw_world(ctx, g)
 
 
-def _draw_world(ctx, g):
+def _draw_world(ctx, g, station_wire=WIRE_MIN):
     ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
     ctx.line_width = 1.5
 
@@ -860,7 +861,7 @@ def _draw_world(ctx, g):
 
     sp = g.space
     if sp is not None:
-        _draw_space(ctx, sp)
+        _draw_space(ctx, sp, station_wire)
 
     # stardust, so speed and turning can be seen (close to you, so drawn over the
     # planet and sun); with the jump drive on, each speck is a streak back to
@@ -983,7 +984,7 @@ def _planet(ctx, sp, planet):
     ctx.rgb(*edge).arc(x, y, r, 0, TAU, 0).stroke()
 
 
-def _draw_space(ctx, sp):
+def _draw_space(ctx, sp, wire=WIRE_MIN):
     """The sun (filled), the planet (an outline, filled black if it is in
     front of the sun) and the station, in its government's colour."""
     sun = _sphere(sp.sx, sp.sy, sp.sz, sp.sr)
@@ -1010,7 +1011,9 @@ def _draw_space(ctx, sp):
             pr = st.bp.size * k
             d = math.sqrt(dx * dx + dy * dy)
             solid = abs(d - planet[2]) < pr
-        draw_ship(ctx, st, station_colour(sp.gov), WIRE_MIN, solid)
+        # wire 0 (the docking computer's view): a wireframe at its true size
+        # however far off, never a dot or marker
+        draw_ship(ctx, st, station_colour(sp.gov), wire, solid)
 
 
 # the compass, right of the radar: a ring with a dot that points to the planet,
@@ -1150,7 +1153,15 @@ def draw_hud(ctx, g, ms=None, ring=True):
             h = 22
         elif h < -6:
             h = -6
-        ctx.rgb(*(RED if o.kind == "ship" else COLOUR[o.kind]))   # hostile ships in red
+        if o.kind == "ship":    # hostile ships red, the police blue, traders white
+            if o.role == "pirate" or o.state == "attack" or o.state == "break":
+                ctx.rgb(*RED)
+            elif o.role == "police":
+                ctx.rgb(*POLICE_BLUE)
+            else:
+                ctx.rgb(*WHITE)
+        else:
+            ctx.rgb(*COLOUR[o.kind])
         if h >= 0:
             ctx.rectangle(bx, by - h, 1, h).fill()
         else:

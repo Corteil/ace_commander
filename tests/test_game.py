@@ -666,7 +666,7 @@ def pirates_in(gov, secs=600):
     for i in range(int(secs / DT)):
         g.step(DT, 0, 0, 0, False, False)
         for o in list(g.objs):
-            if o.kind == "ship":
+            if o.kind == "ship" and o.role in ("pirate", "hunter"):    # not traders or police
                 n += 1
                 if first is None:
                     first = i * DT
@@ -684,7 +684,8 @@ assert g.space.safe
 g.group = ["SIDEWINDER"] * 3; g.pending = 3; g.encounter_t = 0.0; g.rock_t = 0.0
 for _ in range(int(60 / DT)):
     g.step(DT, 0, 0, 0, False, False)
-assert not any(o.kind == "ship" for o in g.objs) and g.pending == 0, "nothing turns up in the safe zone"
+assert not any(o.kind == "ship" and o.role == "pirate" for o in g.objs) and g.pending == 0, \
+    "no pirates turn up in the safe zone (traders and the police may)"
 
 # docking: close enough to the station; not once destroyed
 g = fresh(6)

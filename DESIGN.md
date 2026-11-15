@@ -406,6 +406,11 @@ order puts the visible, low-risk work first and the parts that depend on decisio
 | 5. A living galaxy | Traders, police, legal status, rank, system danger levels, Thargoids | Play the full Elite loop |
 | 6. Extras | Other seven galaxies, mining, original content so the repo runs without Elite data, the Repair Shop, ship types | Optional |
 
+**Phase 5 started in build 42 (2026-11-15):** traders, police Vipers and legal status
+(clean, offender, fugitive), with illegal goods, shooting traders, the police or the
+station, a halving on each jump, and the escape pod clearing it. Still to do: Thargoids,
+pirates preying on traders, and whatever else legal status should change.
+
 **Phase 6 extras asked for by Brian (2026-11-15):**
 
 - **Repair Shop** (started in build 41, behind a DEBUG switch): a docked tab that repaints
