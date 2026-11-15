@@ -896,7 +896,9 @@ of a real flight, not from a harness.
    on, each stardust speck crosses the screen's edge (`EDGE_IN` to `EDGE_OUT` px from the
    middle), white, fading at `JUMP_FADE`; per-LED writes (`_leds_each`), below the bomb,
    ECM, hit and laser flashes; hyperspace flashes are blue-white (`HYPER_RGB`, Brian: more
-   blue), the jump drive's white (`DUST_RGB`). `_led_at` maps a screen direction to LED 1-12 with
+   blue), the jump drive's white (`DUST_RGB`). Tried and reverted (Brian: it lost its flashing on
+   the badge): flashing LOADING by the clock; redraws only come between imports, so in
+   step with the clock they kept seeing the same phase. It flips at each redraw. `_led_at` maps a screen direction to LED 1-12 with
    `LED_ANGLE1` (LED 1's angle, anticlockwise from 3 o'clock) and `LED_CLOCKWISE`: the
    firmware doesn't say where the LEDs are. Checked on the badge (LEDs 1, 2, 3 lit red,
    green, blue; Brian saw them at 0:10, 2:00 and 2:50 on a clock face): clockwise, and a
