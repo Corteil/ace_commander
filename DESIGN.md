@@ -404,10 +404,47 @@ order puts the visible, low-risk work first and the parts that depend on decisio
 | 3. Station and trade | Station, planet, compass, docking, market, cargo, bounties | Fly in and dock yourself, and make money trading |
 | 4. Equipment | The equipment screen and each item's effect | Spend the money on a better ship |
 | 5. A living galaxy | Traders, police, legal status, rank, system danger levels, Thargoids | Play the full Elite loop |
-| 6. Extras | Other seven galaxies, mining, original content so the repo runs without Elite data | Optional |
+| 6. Extras | Other seven galaxies, mining, original content so the repo runs without Elite data, the Repair Shop, ship types | Optional |
 
-In phase 2 there is no station to fly to yet, so arriving in a system docks you after you
-clear the encounter on the way. Phase 3 replaces that with real docking.
+**Phase 6 extras asked for by Brian (2026-11-15):**
+
+- **Repair Shop** (started in build 41, behind a DEBUG switch): a docked tab that repaints
+  your ship (`cockpit.SHIP_COLOURS`, 10 Cr a coat, saved as `Commander.colour`). The colour
+  shows in the launch and docking tunnels and the docking computer's view. It could later
+  also mend damage, if damage comes to last between flights.
+- **Ship types (future):** buy a different ship instead of the Cobra Mk III. Not in BBC
+  Elite, so the rules are ours to make: each type would bring its own top speed, turn rate,
+  hold size, missile pylons, laser mounts, shields and price, taken from the ship data
+  (`ship_data.py` already has speed, energy, laser power and missiles for all 31). It would
+  change: the tunnel and chase-view model (`Tunnel.fly`, `cockpit._my_ship`, which must
+  fit the slot: `Tunnel.fits`), `Game` constants that are now fixed (`PLAYER_MAX`,
+  `PITCH_RATE`, `ROLL_RATE`, `MAX_MISSILES`), `commander.HOLD`, and the save
+  (`Commander.ship`). Sold at the Repair Shop, perhaps only at high tech levels, with
+  trade-in of the old ship and its equipment rules to settle (does equipment move across?).
+
+Phase 2 is built (build 22): the galaxy, both charts, system data, hyperspace, fuel,
+arriving docked, the docked screens as tabs, and a hexagon tunnel on launch. The docked
+screens are four tabs for now (Status, Local chart, Galactic chart, System data); Market
+and Equip ship join them in phases 3 and 4. Docking fills the tank for nothing until there
+is a way to earn credits. The system description sentence is not built.
+
+Phase 3 is under way. Build 26 adds the star system: planet, sun, a turning station (Coriolis,
+or Dodo at tech level 10 and above), compass, jump drive, encounters a while apart with none
+in the safe zone, and docking as option C (automatic) only: reaching the station docks you.
+It replaces phase 2's "clear the ships that meet you and you are docked". Where build 26
+differs from the plan above, or fills in what it left open:
+
+- The trip: `ARRIVE_DIST` is 120,000 units from the station, two minutes at full speed
+  without the jump drive. With it, a straight run takes about 36 seconds: the drive is off
+  inside the 25,000-unit safe zone (`SAFE_DIST`), which takes 25 seconds to cross.
+- The jump drive stops for ships and missiles on the radar, not rocks or canisters, which
+  turn up often enough to keep it off most of the time.
+- Encounters: on arriving, as many ships as can attack at once; then a group of 1 to that
+  many every 25 to 45 seconds (`ENCOUNTER`) once the last group has gone.
+- The sun is on the station's side of the planet, off to one side, so it is behind you as
+  you launch.
+- Still to build in phase 3: docking options A and B and the menu choice, hitting the
+  station, the market, cargo and bounties.
 
 Phase 1 now includes the level choice for a new commander, and the button changes (A menu,
 B bomb, D missile) are best made there too, in Combat practice. Phase 3 builds all three

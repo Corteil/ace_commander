@@ -212,6 +212,7 @@ class CountCtx:
     """Checks every call is a known one with finite numbers, and counts them."""
     CENTER = "center"
     LEFT = "left"
+    RIGHT = "right"
     MIDDLE = "middle"
 
     def __init__(self):
@@ -250,6 +251,7 @@ class PilCtx:
     """Draws to a PIL image, to look at a frame. scale 3 = 720 x 720."""
     CENTER = "center"
     LEFT = "left"
+    RIGHT = "right"
     MIDDLE = "middle"
 
     def __init__(self, scale=3):
@@ -311,6 +313,13 @@ class PilCtx:
             a, b = self._p(x, y), self._p(x + w, y + h)
             self.d.rectangle([min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1])],
                              fill=self.col)
+        elif self.shape and self.shape[0] == "arc":
+            _, x, y, r = self.shape
+            self.d.ellipse([self._p(x - r, y - r), self._p(x + r, y + r)], fill=self.col)
+        else:           # a path of lines: filled as polygons
+            for pts in self.path:
+                if len(pts) > 2:
+                    self.d.polygon(pts, fill=self.col)
         self.shape = None
         self.path = []
         return self
@@ -337,7 +346,8 @@ class PilCtx:
         except OSError:
             font = ImageFont.load_default()
         x, y = self._p(*self.cur)
-        self.d.text((x, y), s, fill=self.col, font=font, anchor="mm")
+        anchor = {"left": "lm", "right": "rm"}.get(self.text_align, "mm")
+        self.d.text((x, y), s, fill=self.col, font=font, anchor=anchor)
         self.path = []
         return self
 

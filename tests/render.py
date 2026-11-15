@@ -57,6 +57,35 @@ bs.choose(a, "NEW COMMANDER")
 shot(a, "1d_level.png")
 tick(a, fresh=["CONFIRM"])
 a.cmdr.add_kills(140)
+shot(a, "1e_docked.png")
+d = a.dock
+d.open("MARKET")
+for i in (0, 0, 0, 7, 7):
+    d.sel = i; d.trade(True)
+d.pick_good(1)
+shot(a, "1j_market.png")
+for _ in range(9):
+    d.pick_good(1)
+d.cmdr.cash = 3; d.trade(True)
+shot(a, "1k_market_scrolled.png")
+d.cmdr.cash = 1000
+d.open("EQUIP SHIP")
+d.cmdr.fuel = 52; d.esel = 1; d.buy_item()
+d.pick_item(1)
+shot(a, "1l_equip.png")
+d.open("GALACTIC CHART")
+shot(a, "1f_galactic.png")
+d.target = 147; d.open("LOCAL CHART")
+shot(a, "1g_local_docked.png")
+d.open("SYSTEM DATA")
+shot(a, "1h_system_data.png")
+d.go(0); a.target = 147
+shot(a, "1i_docked_target.png")
+tick(a, fresh=["CONFIRM"])
+for i, ft in enumerate((0.25, 0.6, 0.85, 0.97)):
+    a.launch_t = ft * ace_commander.app.LAUNCH_TIME
+    shot(a, "1j_tunnel_%d.png" % i)
+a.launch_t = 99; tick(a)
 g = a.game
 g.spawn_t = g.rock_t = 1e9
 g.objs[:] = []
@@ -91,16 +120,75 @@ g.beam = 0.0
 shot(a, "3_hit.png")
 g.flash = 0.0
 
+def fpick(label):
+    a.fsub = None
+    a.fmenu = a._fitems().index(label)
+    tick(a, fresh=["CONFIRM"])
+
+
 tick(a, fresh=["A"])
 tick(a)
 shot(a, "4_menu.png")
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])
+fpick("STATUS")
 shot(a, "4b_status.png")
-tick(a, fresh=["CONFIRM"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])
+a.fsub = None; tick(a)
+shot(a, "4_menu_jump.png")
+fpick("PAUSE MENU")
 shot(a, "4c_pause_menu.png")
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])
+fpick("DEBUG")
 shot(a, "4d_debug.png")
+fpick("LOCAL CHART")
+shot(a, "4e_chart_here.png")
+for _ in range(14):
+    tick(a, held=["JOYRIGHT", "JOYUP"])
+tick(a)
+shot(a, "4f_chart_pick.png")
+a.chart.cx, a.chart.cy = -60.0, 62.0; a.chart._select()
+shot(a, "4g_chart_too_far.png")
 tick(a, fresh=["A"])
+objs = g.objs[:]
+g.objs[:] = []
+g.lock = None
+launched = g.space
+a._enter_space("arrive")
+g.pending = 0
+g.warp = 0.9; g.say("ZAONCE", 3.0)
+shot(a, "4h_arriving.png")
+g.warp = 0.0; g.msg_t = 0.0
+shot(a, "4i_arrived.png")
+g.speed = 40.0; g.jumping = True; g.fwd = 400
+for p in g.dust:
+    p[2] = 200 + (p[2] % 1300)
+shot(a, "4j_jump_drive.png")
+g.jumping = False; g.speed = 20.0
+g.to_station(2500.0)
+for _ in range(6):
+    g._space(0.3)
+shot(a, "4k_station.png")
+# docking by hand: the slot level (what docking A asks for), close in
+g.to_station(700.0)
+st = g.space.station
+game._roll(st.m, math.pi / 2 - math.atan2(st.m[3], st.m[4]))
+g._measure()
+shot(a, "4m_slot_level.png")
+# the docking tunnel: outside the mouth, going through it, stopped at the doors
+saved_mode = a.mode
+a.mode = "docking"
+for name, f in (("4n_dock_mouth.png", 0.05), ("4o_dock_through.png", 0.3),
+                ("4p_dock_doors.png", 1.0)):
+    a.dock_t = f * mod.DOCK_TIME
+    shot(a, name)
+a.mode = saved_mode
+g.space = launched
+g.speed = 0.0
+for _ in range(int(math.pi / 0.04)):     # turn round to look back at the station
+    g._rotate(0.04 * game.PITCH_RATE, 0.0, 0.0)
+g._measure()
+shot(a, "4l_looking_back.png")
+g.space = launched
+for _ in range(int(math.pi / 0.04)):
+    g._rotate(-0.04 * game.PITCH_RATE, 0.0, 0.0)
+g.objs[:] = objs
 g._hurt(1000.0)
 tick(a)
 shot(a, "5_gameover.png")

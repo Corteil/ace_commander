@@ -77,6 +77,84 @@ assert arcs(a) == 1, "ring is the fallback"
 leds.fail = False
 print("LED failure falls back to the ring: ok")
 
+# ---- the launch: the LEDs pulse in the station's colour --------------------
+cockpit = ace_commander.cockpit
+save = os.path.join(HERE, "shots", "test_leds_commander.json")
+os.makedirs(os.path.dirname(save), exist_ok=True)
+mod.SAVE_PATH = save
+a.game.over = True; tick(a, fresh=["CANCEL"])
+bs.choose(a, "NEW COMMANDER"); tick(a, fresh=["C"])
+assert a.mode == "docked"
+gov = a.galaxy.system(a.cmdr.system).government
+col = cockpit.station_colour(gov)
+assert col != cockpit.RED and cockpit.WHITE not in cockpit.STATION_COLOURS
+assert len(set(cockpit.station_colour(i) for i in range(8))) == 8, "one colour per government"
+assert cockpit.station_colour(None) == cockpit.GREEN
+assert a.dock.here.name == "LAVE"
+c = CountCtx(); a.draw(c)
+assert any(t[0] == "DOCKED" for t in c.texts)
+full = tuple(int(v * 255) for v in col)
+writes = leds.writes
+tick(a, fresh=["C"]); assert a.mode == "launch"
+seen = []
+while a.mode == "launch":
+    v = leds.values[1]
+    if not seen or v != seen[-1]:
+        seen.append(v)
+    tick(a, ms=20)
+assert seen[-1] == full, (seen[-1], full)
+bright = [v for v in seen if v != (0, 0, 0)]
+assert bright and all(v == tuple(x * max(v) // max(full) for x in full) or
+                      max(abs(v[i] - full[i] * max(v) / max(full)) for i in range(3)) <= 18
+                      for v in bright), "always the station's colour"
+peaks = sum(1 for i in range(1, len(seen) - 1) if sum(seen[i]) > sum(seen[i - 1]) and
+            sum(seen[i]) > sum(seen[i + 1]))
+assert peaks >= 5, ("a pulse for each ring", peaks, len(seen))
+assert leds.writes - writes < 200, "not written every frame regardless"
+# out in space the colour fades, then the hit flash still works
+fade = [leds.values[1]]
+for _ in range(30):
+    tick(a)
+    fade.append(leds.values[1])
+# just launched you are in the station's safe zone: the colour fades to green
+green = (0, mod.SAFE_GREEN, 0)
+assert a.game.space.safe and fade[0] == full and fade[-1] == green, fade
+before = fade[:fade.index(green)]
+assert all(sum(before[i + 1]) <= sum(before[i]) for i in range(len(before) - 1)), fade
+a.game._hurt(5.0); tick(a); assert leds.values[1] == (255, 0, 0), "a hit still flashes red"
+for _ in range(15):
+    tick(a)
+assert leds.values[1] == green
+a.game.to_station(a.game.space.safe_r + 5000); tick(a)
+assert not a.game.space.safe and leds.values[1] == (0, 0, 0), "off outside the safe zone"
+a.game.to_sun(); tick(a)
+v = leds.values[1]
+assert v[0] > 150 and v[2] == 0 and v[1] < v[0] // 3, ("near the sun: hot red", v)
+a.game.fuel_scoops = True; a.game.speed = 40.0; a.cmdr.fuel = 10
+seen = set()
+for _ in range(60):
+    tick(a, held=["F"])
+    if a.game.scooping:
+        seen.add(leds.values[1])
+assert seen and all(c[2] == 0 and c[1] == c[0] * 3 // 4 for c in seen) and len(seen) == 2, seen
+a.game.to_station(4000); tick(a); assert leds.values[1] == green, "and green again inside it"
+tick(a, fresh=["A"]); assert a.paused and leds.values[1] == (0, 0, 0), "off while paused"
+tick(a, fresh=["A"]); assert leds.values[1] == green
+# another station, another colour, in the tunnel's mouth too
+other = [i for i in range(256) if a.galaxy.system(i).government != gov][0]
+a.cmdr.system = other
+a._dock(); assert a.mode == "docked"
+tick(a, fresh=["A"]); assert a.mode == "launch"
+for _ in range(200):
+    if a.mode != "launch":
+        break
+    last = leds.values[1]
+    tick(a, ms=20)
+want = tuple(int(v * 255) for v in cockpit.station_colour(a.galaxy.system(other).government))
+assert last == want or leds.values[1] == want, (last, want)
+os.remove(save)
+print("launch: LEDs pulse in the station's colour, then fade to green in the safe zone: ok")
+
 # ---- USE_LEDS off ----------------------------------------------------------
 bs.install()
 leds, bus = bs.install_leds()

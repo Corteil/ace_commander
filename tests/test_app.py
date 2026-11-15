@@ -347,4 +347,81 @@ assert any(t[0] == "ship_data.py" for t in c.texts)
 tick(a, fresh=["C"]); assert a.mode == "menu"
 tick(a, fresh=["F"]); assert App.minimised == 1
 print("ship_data.py missing: ok")
+
+# the station tunnels: every ring is the slot, level; spacings differ
+cockpit = sys.modules["ace_commander.cockpit"]
+spacings = set()
+for seed in range(256):
+    for station in ("CORIOLIS", "DODO"):
+        tun = cockpit.Tunnel(seed, station)
+        last = cockpit.TUNNEL_RINGS - 1
+        assert tun.depth[0] == 0 and tun.depth[last] == last
+        assert all(a < b for a, b in zip(tun.depth, tun.depth[1:])), "rings in order"
+        w = max(abs(x) for x, y in tun.pts)
+        h = max(abs(y) for x, y in tun.pts)
+        assert abs(w / h - cockpit.SLOT_ASPECT[station]) < 0.05, "the slot, level"
+        spacings.add(tun.names[1])
+assert len(spacings) == len(cockpit.TUNNEL_SPACINGS), spacings
+# ships parked in the bay fit through the slot, one to a spot, on the floor
+import importlib.util
+_spec = importlib.util.spec_from_file_location(
+    "real_ship_data", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                   "ship_data.py"))
+real_ships = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(real_ships)
+game = sys.modules["ace_commander.game"]
+bps = {e[0]: game.Blueprint(e) for e in real_ships.SHIPS}
+cor = cockpit.Tunnel(5, "CORIOLIS"); dodo = cockpit.Tunnel(5, "DODO")
+assert cor.fits(bps["COBRA MK III"]) and cor.fits(bps["VIPER"])
+assert not cor.fits(bps["BOA"]) and dodo.fits(bps["BOA"]), "the Boa is too tall for a Coriolis"
+rnd = random.Random(3)
+for t in (cor, dodo):
+    t.park([bps[n] for n in ("BOA", "COBRA MK III", "VIPER", "ADDER", "MORAY", "KRAIT")], rnd)
+    assert len(t.parked) == len(cockpit.PARK_SPOTS), "one to a spot"
+    assert all(t.fits(o.bp) for o in t.parked)
+    spots = set((o.tx, round(o.depth - (cockpit.TUNNEL_RINGS - 1 - cockpit.BAY_DEPTH), 6))
+                for o in t.parked)
+    assert spots == set((x, round(d, 6)) for x, d in cockpit.PARK_SPOTS)
+    floor = cockpit.BAY_SCALE / t.aspect
+    for o in t.parked:      # resting on the floor
+        hh = max(abs(v[1]) for v in o.bp.verts) / cockpit.SHIP_SCALE
+        assert abs(o.ty - hh + floor) < 1e-9
+assert "BOA" not in [o.bp.name for o in cor.parked] and "BOA" in [o.bp.name for o in dodo.parked]
+# the bay has lit windows on both side walls, seen at the end of docking
+def frames(n_windows, f, inward=True):
+    keep = cockpit.BAY_WINDOWS
+    cockpit.BAY_WINDOWS = n_windows
+    c = CountCtx()
+    cockpit.draw_tunnel(c, f, 0.0, cockpit.GREEN, inward, cockpit.Tunnel(5))
+    cockpit.BAY_WINDOWS = keep
+    return c.calls.get("stroke", 0), c.calls.get("fill", 0)
+with3, without = frames(3, 1.0), frames(0, 1.0)
+assert with3[0] - without[0] == 3 * 2, "three window frames a side, at the end of docking"
+assert with3[1] == without[1], "only the frames: nothing filled"
+assert frames(3, 0.0) == frames(0, 0.0), "not seen from outside the mouth"
+assert frames(3, 0.05, False)[0] > frames(0, 0.05, False)[0], "seen as you launch from the bay"
+# the cabin temperature gauge: green when cool, red in the scooping band,
+# yellow and orange between; the altitude gauge fits the sun's size
+G = cockpit.ct_colour(30); Rd = cockpit.ct_colour(cockpit.SCOOP_TEMP)
+assert G[1] > 0.9 and G[0] < 0.3 and Rd[0] > 0.9 and Rd[1] < 0.2, (G, Rd)
+mid = [cockpit.ct_colour(t) for t in range(30, 256, 5)]
+assert all(b[1] <= a[1] + 1e-9 for a, b in zip(mid, mid[1:])), "less and less green"
+assert any(abs(c[0] - 1) < 0.01 and abs(c[1] - 0.9) < 0.05 for c in mid), "yellow on the way"
+assert abs(cockpit.SUN_GAUGE_ALT - ((285 - 30) / cockpit.SUN_HEAT) ** 0.5 + 1) < 1e-9
+# the station hides the planet behind it: its outline is filled black first
+class Rec:
+    def __init__(self): self.pts = []; self.filled = 0
+    def rgb(self, *a): return self
+    def begin_path(self): self.pts = []; return self
+    def move_to(self, x, y): self.pts.append((x, y)); return self
+    def line_to(self, x, y): self.pts.append((x, y)); return self
+    def fill(self): self.filled += 1; return self
+square = [(-10, -10), (10, -10), (10, 10), (-10, 10), (0, 0), (5, 0), (-10, 0)]
+for i, (x, y) in enumerate(square):
+    cockpit._PX[i] = x; cockpit._PY[i] = y; cockpit._OK[i] = True
+r = Rec(); cockpit._fill_hull(r, len(square))
+assert r.filled == 1 and set(r.pts) == {(-10, -10), (10, -10), (10, 10), (-10, 10)}, r.pts
+cockpit._OK[2] = False
+r = Rec(); cockpit._fill_hull(r, len(square))
+assert r.filled == 0, "not when part of it is behind you"
+print("station tunnels: the slot all the way, every spacing used, parked ships fit: ok")
 print("ALL APP TESTS PASSED")

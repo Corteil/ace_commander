@@ -10,3 +10,4 @@ commander.json
 # made by the tests
 tests/noship/
 tests/shots/
+game_data.py
