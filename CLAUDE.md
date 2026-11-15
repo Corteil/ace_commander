@@ -23,7 +23,14 @@ sentence.
 
 ## Files
 
-- `app.py` - menu, input (`Pad`), frame loop (`run`), LEDs, pause, PERF logging.
+- `app.py` - **the loading screen** (build 50). The badge's launcher imports
+  `<folder>.app` and starts its `__app_export__` (firmware `system/launcher/utils.py`), so
+  this file must be `app.py` and stay tiny: it draws at once, imports the other modules one
+  by one with a progress bar, then hosts the real app. On a PC (tests) the package's
+  `__init__` gives `ace.AceCommander` directly.
+- `ace.py` - **the real app** (it was `app.py` until build 49; older notes below that say
+  `app._dock`, `app.py` and so on mean this file): menu, input (`Pad`), frame loop (`run`),
+  LEDs, pause, PERF logging.
 - `game.py` - game rules, including the star system (`Space`, `Game.enter`). No badge
   imports, so it runs on a PC.
 - `cockpit.py` - flight view, HUD, radar. Built from rectangles (see Speed).
@@ -585,6 +592,33 @@ of a real flight, not from a harness.
    (build 46's 12 px minimum is gone); it stays a wireframe at any distance, never a dot or
    marker. What launches from a station: a friendly one only Shuttles and Transporters, a
    hostile one only police Vipers, as in the disc original (TACTICS for the station).
+   **Build 49: witchspace and Thargoids, and a loading screen** (2026-11-15). Loading:
+   the first start showed nothing for about 10 s because MicroPython compiles every module
+   from source (measured on the badge: ship_data 0.8 s, game 1.1 s, cockpit 0.65 s, app
+   about 1.3 s). `loader.py` (a few KB) draws at once (0.2 s) and imports `STEPS` one at a
+   time, redrawing a progress bar between them (about 6.9 s in all over the REPL), then makes
+   `app.AceCommander(host=self)` and runs it. The real app sends its button handlers
+   (`Pad(self.host)`), `app_is_foregrounded` and `minimise` through the host, the only object
+   the scheduler knows. If a module fails to import the screen says LOAD FAILED and why.
+   Witchspace (MJP, GTHG, TACTICS, read from the disc source): each normal jump has a
+   `MISJUMP_ODDS` (3/256) chance (DEBUG: MIS-JUMP NEXT, like the original's CTRL) of
+   `app._arrive` using the fuel but calling `Game.witchspace()` instead: `Space.witch`, no
+   station, planet and sun put 1e9 away, 3 stardust specks (`WITCH_DUST`), `THARGOIDS` (4)
+   Thargoids each with a Thargon (role "thargoid"), no other spawns, no jump drive, no
+   compass, no legal-status halving. `app.witch` is your chart position, the target's x
+   and its y XOR 31; `c.system` stays the system you left. You leave by hyperspace from
+   there (`Galaxy.distance_xy`, `chart.Chart(..., at=)`, `_jump_ok`); arriving clears it. A
+   Thargoid launches a Thargon in place of a missile, only below half energy; a Thargon
+   with no Thargoid left drifts (state "drift", quarter speed, harmless); any Thargon
+   scooped from below with fuel scoops is `ALIEN_ITEMS`. The escape pod is no help there
+   (GAME OVER, back to the save). Status page says WITCHSPACE. On the badge: 6.3 ms a step
+   with eight Thargoid ships. Also: the galactic chart shows the right galaxy number.
+   Tests: `tests/test_witchspace.py`, `tests/test_loader.py`.
+   **Build 50 (Brian: no loading screen on the badge):** the launcher imports
+   `<folder>.app` directly, not the package's class, so build 49's `loader.py` was never
+   used. The loader is now `app.py` and the real app `ace.py`; `__init__.py` imports nothing
+   on the badge. Checked the launcher's way on the badge: the loading screen is ready in
+   0.28 s, the game in 6.7 s. Old `loader.py` removed from the badge.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -595,7 +629,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 48), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 50), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

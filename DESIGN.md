@@ -408,8 +408,9 @@ order puts the visible, low-risk work first and the parts that depend on decisio
 
 **Phase 5 started in build 42 (2026-11-15):** traders, police Vipers and legal status
 (clean, offender, fugitive), with illegal goods, shooting traders, the police or the
-station, a halving on each jump, and the escape pod clearing it. Still to do: Thargoids,
-pirates preying on traders, and whatever else legal status should change.
+station, a halving on each jump, and the escape pod clearing it; later made fully as the
+disc original (build 44). Build 49 adds witchspace and Thargoids (a rare mis-jump), which
+finishes phase 5 apart from the disc version's two missions.
 
 **Phase 6 extras asked for by Brian (2026-11-15):**
 

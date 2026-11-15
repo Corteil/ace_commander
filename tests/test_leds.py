@@ -22,7 +22,7 @@ def arcs(a):
 bs.install()
 leds, bus = bs.install_leds()
 import ace_commander
-mod = ace_commander.app
+mod = ace_commander.ace
 assert mod.tildagonos is not None
 a = ace_commander.AceCommander()
 tick(a); tick(a, fresh=["DOWN"]); tick(a, fresh=["UP"])
@@ -159,7 +159,7 @@ print("launch: LEDs pulse in the station's colour, then fade to green in the saf
 bs.install()
 leds, bus = bs.install_leds()
 import ace_commander
-mod = ace_commander.app
+mod = ace_commander.ace
 mod.USE_LEDS = False
 a = ace_commander.AceCommander()
 bs.choose(a, "COMBAT PRACTICE"); tick(a)
@@ -170,7 +170,7 @@ print("USE_LEDS = False keeps the ring: ok")
 # ---- firmware without the LED modules --------------------------------------
 bs.install()
 import ace_commander
-mod = ace_commander.app
+mod = ace_commander.ace
 assert mod.tildagonos is None
 a = ace_commander.AceCommander()
 bs.choose(a, "COMBAT PRACTICE"); tick(a)

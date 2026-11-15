@@ -37,7 +37,7 @@ def load(sched):
         m.scheduler = sched
         sys.modules["system.scheduler"] = m
     import ace_commander
-    return ace_commander, ace_commander.app
+    return ace_commander, ace_commander.ace
 
 
 async def drive(sched, mode, n=40, other_task=True):

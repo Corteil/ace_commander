@@ -48,17 +48,17 @@ The menu also has a **Debug** page of cheats for testing: invincibility, kill al
 next wave, add an enemy, refill missiles, refill fuel, +10 kills, to the station (moves
 the station 4000 units ahead of you) and dock now. Its title
 shows the build number, read from `metadata.json`. Kills made there count towards your
-commander's rank. Set `DEBUG_MENU = False` in `app.py` to hide it.
+commander's rank. Set `DEBUG_MENU = False` in `ace.py` to hide it.
 
 With TILT, tilting the badge steers and the joystick still works. D then does two jobs: a
 tap re-zeroes the tilt and holding it for about half a second fires the missile
-(`HOLD_MISSILE` in `app.py`). To start in tilt mode, set `TILT_DEFAULT = True` in `app.py`.
+(`HOLD_MISSILE` in `ace.py`). To start in tilt mode, set `TILT_DEFAULT = True` in `ace.py`.
 
 Keyboard: `W` / `S` or up / down pitch, `A` / `D` or left / right roll, `E` / `Q` speed
 up / down, `F` or space lasers, `M` missile, `P` in-flight menu.
 
 To use other buttons, change `BTN_SPEED_UP`, `BTN_SPEED_DOWN`, `BTN_MISSILE`, `BTN_BOMB`
-and `BTN_MENU` near the top of `app.py`.
+and `BTN_MENU` near the top of `ace.py`.
 
 On firmware without the joystick's own button names, the game falls back to tilt steering
 with UP / DOWN for speed, LEFT for a missile, RIGHT to re-zero and CANCEL for the menu.
@@ -157,8 +157,8 @@ Distances and times are constants near the top of `game.py` (`ARRIVE_DIST`, `SAF
   each blip shows how far above or below you it is. Red is a hostile ship, yellow is cargo,
   magenta is a missile, grey is a rock, and the big square is the station, in its colour.
 - Top: the wave in yellow and the score in white. The small number above them is the time
-  each frame takes, in ms (`SHOW_FRAME_TIME` in `app.py`).
-- The badge's LEDs flash red when you're hit (`USE_LEDS` in `app.py`; with it off, or if
+  each frame takes, in ms (`SHOW_FRAME_TIME` in `ace.py`).
+- The badge's LEDs flash red when you're hit (`USE_LEDS` in `ace.py`; with it off, or if
   the LEDs can't be reached, a red ring flashes on screen instead).
 - Ships far away are dots, at middle distance small cross markers, and close up wireframes.
 
@@ -170,7 +170,7 @@ piece of text about 4 ms, and the badge's own app loop waits 50 ms after every u
 - everything drawn every frame is made of rectangles where it can be, including the digits;
 - only ships that look bigger than `WIRE_MIN` pixels (`cockpit.py`) are drawn as wireframes;
 - in flight and the viewer the app asks for a redraw itself rather than waiting the 50 ms
-  (`FAST_FRAMES` in `app.py`). This leans on the firmware's scheduler; if that isn't as
+  (`FAST_FRAMES` in `ace.py`). This leans on the firmware's scheduler; if that isn't as
   expected it goes back to the normal loop by itself.
 
 The menu's Speed test repeats the measurements, and the pause screen shows where a flight
@@ -178,7 +178,7 @@ frame's time went.
 
 ## Tuning
 
-Near the top of `app.py`:
+Near the top of `ace.py`:
 
 - `TILT_PITCH_SIGN`, `TILT_ROLL_SIGN`, `TILT_SWAP_AXES` if tilting goes the wrong way.
 - `INVERT_PITCH = True` if you want joystick up to dive, flight-stick style.
@@ -219,7 +219,8 @@ the two faces it sits between points back at the viewer.
 
 ## Files
 
-- `app.py` - moves between the screens; input (tilt, buttons, keyboard); in-flight menu.
+- `app.py` - the loading screen the badge starts first; it loads the rest, then runs `ace.py`.
+- `ace.py` - moves between the screens; input (tilt, buttons, keyboard); in-flight menu.
 - `title.py` - the title screen: block-letter name, tumbling ship, one-line menu.
 - `commander.py` - the saved commander: level, kills, rank, star system, fuel. No badge
   imports.
@@ -243,8 +244,8 @@ the two faces it sits between points back at the viewer.
 
 ## Install
 
-Copy `__init__.py app.py game.py cockpit.py viewer.py bench.py title.py commander.py
-galaxy.py chart.py docked.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
+Copy `__init__.py app.py ace.py game.py cockpit.py viewer.py bench.py title.py commander.py
+galaxy.py chart.py docked.py market.py equipment.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
 then restart it. On Windows, `deploy.bat all` does this.
 
 ## Credits and original material

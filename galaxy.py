@@ -132,6 +132,13 @@ class Galaxy:
             (self.ys[b] - self.ys[a]) // 2
         return 4 * _isqrt(dx * dx + dy * dy)
 
+    def distance_xy(self, x, y, b):
+        """From chart position (x, y) (in witchspace, between systems) to
+        system b, measured as distance() does."""
+        dx = x - self.xs[b]
+        dy = (y - self.ys[b]) // 2 if y >= self.ys[b] else (self.ys[b] - y) // 2
+        return 4 * _isqrt(dx * dx + dy * dy)
+
     def in_range(self, a, fuel):
         """Systems that can be reached from a with this much fuel (tenths of
         a light year), nearest first, as (distance, index). A system at no

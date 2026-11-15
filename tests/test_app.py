@@ -13,7 +13,7 @@ G = 9.81
 def load(**kw):
     bs.install(**kw)
     import ace_commander
-    return ace_commander, ace_commander.app
+    return ace_commander, ace_commander.ace
 
 
 tick = bs.tick
