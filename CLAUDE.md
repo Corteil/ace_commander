@@ -569,6 +569,10 @@ of a real flight, not from a harness.
    flew you in to a refused docking). Leaving the safe zone ends the lockdown (`_measure`):
    the original drops the station from the local bubble outside it (the sun takes its slot)
    and makes a new, friendly one on the way back in (NWSPS). Police already launched stay.
+   **Build 46 (Brian):** in the docking computer's view the station is always a wireframe
+   (`draw_ship` with `wire_min` 0 never falls back to a dot or marker), and never smaller
+   than `CHASE_STATION_MIN` (12 px radius): a far one is drawn as if nearer along the same
+   line of sight, then put back (`_draw_space(ctx, sp, wire)`). The cockpit view is as before.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -579,7 +583,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 45), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 46), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

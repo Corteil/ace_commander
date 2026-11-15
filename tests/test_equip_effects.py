@@ -412,4 +412,32 @@ e.dock_t = mod.DOCK_TIME; texts(e); y1 = e.tunnel.me.y
 assert y1 < y0, "it settles onto the floor"
 os.path.exists(SAVE) and os.remove(SAVE)
 print("build 41: take off and land, Repair Shop paint: ok")
+
+# ---- build 46: the station in 3D at any distance in the docking computer's view
+g = game.Game(SHIPS); g.enter(4000, "CORIOLIS", "launch", 3)
+st = g.space.station
+g.to_station(40000.0, False); g.autodock = True
+before = (st.x, st.y, st.z)
+calls = []
+real = cockpit.draw_ship
+def spy(ctx, o, rgb=None, wire_min=cockpit.WIRE_MIN, solid=False):
+    calls.append((o, wire_min, o.z))
+    return real(ctx, o, rgb, wire_min, solid)
+cockpit.draw_ship = spy
+try:
+    cockpit.draw_world(CountCtx(), g)
+finally:
+    cockpit.draw_ship = real
+s_calls = [c for c in calls if c[0] is st]
+assert s_calls and s_calls[0][1] == 0, "a wireframe, never a dot or marker"
+assert st.bp.isize * cockpit.FOCAL / s_calls[0][2] >= cockpit.CHASE_STATION_MIN - 0.01, "and big enough to see"
+assert (st.x, st.y, st.z) == before, "put back where it was"
+g.autodock = False; calls[:] = []
+cockpit.draw_ship = spy
+try:
+    cockpit.draw_world(CountCtx(), g)
+finally:
+    cockpit.draw_ship = real
+assert [c for c in calls if c[0] is st][0][1] == cockpit.WIRE_MIN, "the cockpit view as before"
+print("build 46: the station in 3D at any distance in the docking computer's view: ok")
 print("ALL EQUIPMENT EFFECT TESTS PASSED")

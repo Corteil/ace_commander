@@ -141,7 +141,7 @@ def draw_ship(ctx, o, rgb=None, wire_min=WIRE_MIN, solid=False):
     if sx - pr > 120 or sx + pr < -120 or sy - pr > 120 or sy + pr < -120:
         return False
     ctx.rgb(*(RED if o.hit > 0 else rgb or COLOUR[o.kind]))
-    if pr < 3:          # too far away to make out: a dot
+    if pr < 3 and wire_min > 0:     # too far away to make out: a dot (wire_min 0: never)
         ctx.rectangle(sx - 1, sy - 1, 2, 2).fill()
         return True
     if pr < wire_min:   # middle distance: a small marker, much cheaper than lines
@@ -763,6 +763,7 @@ def draw(ctx, g, ms=None, ring=True):
 
 # While the docking computer flies, the view is from behind and above your own
 # ship (Brian's idea): the camera sits CHASE_BACK behind you and CHASE_UP above.
+CHASE_STATION_MIN = 12  # pixels: in that view a far station is drawn at least this big (radius)
 CHASE_BACK = 760
 CHASE_UP = 130
 _me = None      # your ship, for that view: [Obj, the Game whose blueprint it is]
@@ -834,7 +835,7 @@ def draw_world(ctx, g):
         if me is not None:
             _chase_shift(g, -CHASE_UP, CHASE_BACK)
             try:
-                _draw_world(ctx, g)
+                _draw_world(ctx, g, 0)     # the station in 3D however far off it is
                 draw_ship(ctx, me, getattr(g, "ship_rgb", CYAN), 0, True)
             finally:
                 _chase_shift(g, CHASE_UP, -CHASE_BACK)
@@ -842,7 +843,7 @@ def draw_world(ctx, g):
     _draw_world(ctx, g)
 
 
-def _draw_world(ctx, g):
+def _draw_world(ctx, g, station_wire=WIRE_MIN):
     ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
     ctx.line_width = 1.5
 
@@ -861,7 +862,7 @@ def _draw_world(ctx, g):
 
     sp = g.space
     if sp is not None:
-        _draw_space(ctx, sp)
+        _draw_space(ctx, sp, station_wire)
 
     # stardust, so speed and turning can be seen (close to you, so drawn over the
     # planet and sun); with the jump drive on, each speck is a streak back to
@@ -984,7 +985,7 @@ def _planet(ctx, sp, planet):
     ctx.rgb(*edge).arc(x, y, r, 0, TAU, 0).stroke()
 
 
-def _draw_space(ctx, sp):
+def _draw_space(ctx, sp, wire=WIRE_MIN):
     """The sun (filled), the planet (an outline, filled black if it is in
     front of the sun) and the station, in its government's colour."""
     sun = _sphere(sp.sx, sp.sy, sp.sz, sp.sr)
@@ -1011,7 +1012,20 @@ def _draw_space(ctx, sp):
             pr = st.bp.size * k
             d = math.sqrt(dx * dx + dy * dy)
             solid = abs(d - planet[2]) < pr
-        draw_ship(ctx, st, station_colour(sp.gov), WIRE_MIN, solid)
+        if wire > 0 or st.z <= NEAR:
+            draw_ship(ctx, st, station_colour(sp.gov), wire, solid)
+            return
+        # the docking computer's view: a wireframe however far off, and never
+        # smaller than CHASE_STATION_MIN, drawn as if nearer along the same line
+        # of sight (same place on screen, same turn), then put back
+        pr = st.bp.isize * FOCAL / st.z
+        k = 1.0 if pr >= CHASE_STATION_MIN else pr / CHASE_STATION_MIN
+        x, y, z = st.x, st.y, st.z
+        st.x, st.y, st.z = x * k, y * k, z * k
+        try:
+            draw_ship(ctx, st, station_colour(sp.gov), 0, solid)
+        finally:
+            st.x, st.y, st.z = x, y, z
 
 
 # the compass, right of the radar: a ring with a dot that points to the planet,
