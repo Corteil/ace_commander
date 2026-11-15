@@ -457,7 +457,7 @@ assert e.cmdr.system == 7 and gal.system(7).name == "LAVE" and e.cmdr.fuel == 70
 fpick(e, "LOCAL CHART")
 assert e.fsub == "chart" and e.chart.here == 7
 tx = texts(e)
-assert "LAVE" in tx and "YOU ARE HERE" in tx and "FUEL 7.0 LY" in tx, tx
+assert "LAVE" in tx and "YOU ARE HERE" in tx and "FUEL 7.0 LY   D: DATA" in tx, tx
 tick(e, fresh=["C"]); assert e.fsub == "chart" and g.jump_t == 0, "can't jump to where you are"
 reach = dict((i, dist) for dist, i in gal.in_range(7, 70))
 assert all((0 < d <= 70) == (i in reach) for _, _, i, d in e.chart.dots if i != 7)
@@ -751,8 +751,8 @@ tx = texts(e)
 assert "GALAXY 1" in tx and "LAVE" in tx and "YOU ARE HERE" in tx, tx
 tick(e, fresh=["B"]); assert d.name() == "SYSTEM DATA" and d.data.name == "LAVE"
 tx = texts(e)
-assert "you are here" in tx and "Dictatorship" in tx and "Population 2.5 billion" in tx, tx
-assert "Productivity 7000 M Cr" in tx and "Radius 4116 km" in tx and "Tech level 5" in tx
+assert "you are here" in tx and "Dictatorship" in tx and "Tech 5   Pop 2.5 billion" in tx, tx
+assert "Productivity 7000 M Cr" in tx and "Radius 4116 km" in tx
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "STATUS", "tabs wrap round"
 tick(e, fresh=["E"]); assert d.name() == "SYSTEM DATA"
 tick(e, fresh=["F"]); assert d.name() == "STATUS" and e.mode == "docked", "F goes back to Status"

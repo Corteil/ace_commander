@@ -18,8 +18,8 @@ fuel, docked screens as tabs, launch tunnel), and the start of phase 3 (build 26
 sun, station, compass, jump drive, automatic docking; build 27: docking by hand; build
 30: the market; 31: scooped cargo; 32: bounties, which finishes phase 3), and the start
 of phase 4 (build 33: the Equip ship screen; build 36: every item's effect). Not built
-yet: the rest of phase 4 (see `DESIGN.md`), phases 5 and 6, and the system description
-sentence.
+yet: the disc version's two missions and the rest of phase 6 (see `DESIGN.md`). Phases 4
+and 5 are done, and the system description sentence (build 52).
 
 ## Files
 
@@ -45,6 +45,8 @@ sentence.
 - `docked.py` - the docked tabs: Status, Market, Local chart, Galactic chart, System data.
 - `market.py` - market prices, stock, buying and selling. Rules only, no badge imports.
 - `equipment.py` - the Equip ship screen's rules: what is on sale, prices, fitting.
+- `describe.py` - the system description sentence ("goat soup"): the original's extended
+  tokens from `game_data.py`, put together as DETOK does. Rules only.
 - `ship_data.py`, `game_data.py` - generated, **gitignored** (see Licensing). 31 ships; the
   galaxy's seeds, name letter pairs, starting place, the market's 17 goods and the 14
   equipment prices. Both must be copied to the badge.
@@ -625,6 +627,25 @@ of a real flight, not from a harness.
    yellow and white block letters in the same place (`letters.draw_name`, which `title.py`
    uses too; the loader imports `letters` before its first frame), and LOADING in green
    where the menu line will be.
+   **Build 52: the system description sentence, and D for system data on the charts**
+   (Brian). `tools/import_galaxy.py` also reads the extended tokens (TKN1, the ECHR / ETOK /
+   ETWO / ERND / EJMP macros, EOR VE removed), the random-choice table (MTIN) and the
+   two-letter tokens (TKN2, followed in memory by QQ16, which tokens from 228 and MT18's
+   made-up names read) into `game_data.DESC_TOKENS` (only the 192 tokens reachable from
+   token 5 and 153), `DESC_MTIN`, `DESC_PAIRS`; game_data.py is now 6.6 KB. `describe.py`
+   follows PDESC / DETOK / DETOK2 / DTS / DASC: RAND seeded with the system's s1 and s2,
+   DORND with the carry clear going in (as Ian Bell's reading; it gives the classic Lave
+   line word for word), jump codes 1, 2, 3 (name), 13 (lower case), 17 (name + "ian",
+   a final vowel dropped), 18 (1 to 4 random pairs from TKN2+2), 19 (single cap); `?` in
+   made-up names is skipped; the mission-only RUTOK sentences are left out. `docked.system_page`
+   draws System data, tighter, with the sentence wrapped below in cyan (`DESC_Y`,
+   `DESC_WIDTHS`), for the tab and for D on the in-flight local chart (`fsub` "data",
+   `ace._draw_data`; C, D or F go back). D on the docked charts opens System data for the
+   selected system without changing the target (`Docked.show`). Charts say "D: DATA". On
+   the badge: a description takes 11-15 ms (cached for the page). Tests: `tests/test_describe.py`.
+   **Build 53 (Brian):** D on the System data tab goes back to the chart tab you came from
+   (`Docked.chart_tab`, the last chart opened; the local chart if none), with the cursor on
+   the system you were looking at (`Docked.go(tab, sel)`, `back_to_chart`).
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -635,7 +656,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 51), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 53), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

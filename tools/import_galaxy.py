@@ -17,6 +17,9 @@ It takes these things from the source, and nothing else:
     its line), base price, economic factor, unit, base quantity and mask
   - the equipment price list (PRXS): each item's name (from the comment on
     its line) and price in tenths of a credit
+  - for the system description sentence ("goat soup", PDESC): the extended
+    text tokens (TKN1) that it can reach from token 5, the table of random
+    choices (MTIN) and the two-letter tokens (TKN2)
 
 How systems and prices are worked out from these is written afresh in
 galaxy.py and market.py.
@@ -37,6 +40,11 @@ PAIR = re.compile(r'^\s*EQUS\s+"(..)"')
 # a line of the equipment prices: EQUW price \ n  Name   12.3 Cr
 EQUIP = re.compile(r"^\s*EQUW\s+(\d+)\s*\\\s*(\d+)\s+(.+?)\s{2,}[\d.]+\s*Cr")
 # a line of the goods table: ITEM price, factor, 'unit', quantity, %mask \ n = Name
+# the extended tokens' macros (TKN1): ECHR 'x', ETOK n, ETWO 'a', 'b', ERND n,
+# EJMP n, and EQUB VE at the end of each token
+TOKEN_LINE = re.compile(r"^\s*(ECHR|ETOK|ETWO|ERND|EJMP|EQUB)\s+(.*?)\s*(\\.*)?$")
+QUOTED = re.compile(r"'(.)'")
+NUMBER = re.compile(r"^\s*EQUB\s+(\d+)")
 ITEM = re.compile(r"^\s*ITEM\s+(\d+)\s*,\s*(-?\d+)\s*,\s*'([tkg])'\s*,\s*(\d+)\s*,"
                   r"\s*%([01]{8})\s*\\\s*(\d+)\s*=\s*(.+?)\s*$")
 
@@ -53,8 +61,95 @@ def find_sources(paths):
             yield p
 
 
+def scan_tokens(path, found):
+    """The extended tokens (TKN1), the random-choice table (MTIN) and the
+    two-letter tokens (TKN2), from the first file that has them. Tokens are
+    kept as lists of ('kind', value) until the two-letter table is known."""
+    if "tkn1" in found and "mtin" in found and "tkn2" in found:
+        return
+    block = None
+    tokens = []
+    cur = []
+    mtin = []
+    tkn2 = []
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            m = LABEL.match(line)
+            if m:
+                block = m.group(1) if m.group(1) in ("TKN1", "MTIN", "TKN2") else None
+                continue
+            if block == "TKN1":
+                m = TOKEN_LINE.match(line)
+                if not m:
+                    continue
+                kind, arg = m.group(1), m.group(2)
+                if kind == "EQUB":
+                    if arg.strip() == "VE":
+                        tokens.append(cur)
+                        cur = []
+                    continue
+                if kind == "ECHR" or kind == "ETWO":
+                    q = QUOTED.findall(arg)
+                    if kind == "ECHR" and len(q) == 1:
+                        cur.append(("c", 39 if q[0] == "`" else ord(q[0])))
+                    elif kind == "ETWO" and len(q) == 2:
+                        cur.append(("two", q[0] + q[1]))
+                else:
+                    n = int(arg.split()[0].strip(","))
+                    cur.append(("b", n + 91 if kind == "ERND" else n))
+            elif block == "MTIN":
+                m = NUMBER.match(line)
+                if m:
+                    mtin.append(int(m.group(1)))
+            elif block == "TKN2":
+                m = PAIR.match(line)
+                if m:
+                    tkn2.append(m.group(1))
+                elif re.match(r"^\s*EQUB\s+12\s*,\s*10", line):
+                    tkn2.append("\x0c\x0a")
+    if len(tokens) > 200 and "tkn1" not in found:
+        found["tkn1"] = tokens
+    if len(mtin) >= 38 and "mtin" not in found:
+        found["mtin"] = mtin[:38]
+    if len(tkn2) >= 13 and "tkn2" not in found:
+        found["tkn2"] = tkn2
+
+
+def description_tokens(found):
+    """TKN1's tokens that the description can reach from token 5 (and 153,
+    "IAN", which MT17 prints), as bytes, decoded: 1-31 jumps, 32-90 letters,
+    91-128 random choices (MTIN), 129-214 other tokens, 215 and up pairs."""
+    # 215 is {crlf} (written ETWO '-', '-'); TKN2 is followed in memory by the
+    # 32 name pairs (QQ16), which two-letter tokens from 228 on read
+    q = found["pairs"]
+    pairs = ["--"] + found["tkn2"][1:] + [q[i:i + 2] for i in range(0, len(q), 2)]
+    tokens = found["tkn1"]
+    mtin = found["mtin"]
+    out = {}
+    todo = [5, 153]
+    while todo:
+        n = todo.pop()
+        if n in out or n >= len(tokens):
+            continue
+        b = bytearray()
+        for kind, v in tokens[n]:
+            if kind == "c":
+                b.append(v)
+            elif kind == "two":
+                b.append(215 + pairs.index(v))
+            else:
+                b.append(v)
+                if 91 <= v <= 128:
+                    todo.extend(range(mtin[v - 91], mtin[v - 91] + 5))
+                elif 129 <= v <= 214:
+                    todo.append(v)
+        out[n] = bytes(b)
+    return out
+
+
 def scan(path, found):
     """Add what this file has to found, keeping the first copy of each thing."""
+    scan_tokens(path, found)
     in_pairs = False
     in_goods = False
     in_equip = False
@@ -131,7 +226,8 @@ def main():
     found = {}
     for path in find_sources(args.paths):
         scan(path, found)
-    missing = [k for k in ("seed0", "seed1", "seed2", "pairs", "QQ0", "QQ1", "QQ14", "goods", "equip")
+    missing = [k for k in ("seed0", "seed1", "seed2", "pairs", "QQ0", "QQ1", "QQ14", "goods", "equip",
+                           "tkn1", "mtin", "tkn2")
                if k not in found]
     if missing:
         sys.exit("Not found in the .asm files under %s: %s" % (
@@ -164,6 +260,15 @@ def main():
         "EQUIPMENT = (",
     ] + ["    %r," % (e,) for e in found["equip"]] + [
         ")",
+        "# the system description sentence (describe.py): the extended tokens it",
+        "# can reach, decoded; the random choices (each the first of five tokens);",
+        "# the two-letter tokens from 215 (TKN2), followed in memory by the 32 name",
+        "# pairs (QQ16), which the random names (MT18) also read",
+        "DESC_TOKENS = {",
+    ] + ["    %d: %r," % (k, v) for k, v in sorted(description_tokens(found).items())] + [
+        "}",
+        "DESC_MTIN = %r" % bytes(found["mtin"]),
+        "DESC_PAIRS = %r" % ("".join(found["tkn2"]) + found["pairs"]),
         "",
     ]
     with open(args.output, "w") as f:

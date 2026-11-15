@@ -147,7 +147,7 @@ class _Cursor:
                 text(ctx, "%s  TOO FAR  C: DATA" % _ly(s[3]), 0, line_y, 11, cockpit.RED)
             else:
                 text(ctx, "%s   TOO FAR" % _ly(s[3]), 0, line_y, 12, cockpit.RED)
-        text(ctx, "FUEL " + _ly(self.fuel), 0, fuel_y, 10, cockpit.YELLOW)
+        text(ctx, "FUEL %s   D: DATA" % _ly(self.fuel), 0, fuel_y, 10, cockpit.YELLOW)
 
 
 class Chart(_Cursor):

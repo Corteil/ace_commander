@@ -1,18 +1,18 @@
 # Ace Commander
 
-A flight combat game and ship viewer for the EMF Tildagon / Spaceagon badge, drawn as
+A space combat game and ship viewer for the EMF Tildagon / Spaceagon badge, drawn as
 hidden-line wireframes using the ships of BBC Micro Elite. Plain MicroPython: no C and no
 custom firmware.
 
 The title screen, with a ship tumbling under the name, offers:
 
 - **New commander** / **Continue** - fight waves of pirates, shoot rocks and scoop cargo as
-  a saved commander. Your kills earn a rank, from Harmless up to Elite. A new commander picks
+  a saved commander. Your kills count towards a rank, from Harmless up to Elite. A new commander picks
   one of three levels, which sets how many kills each rank takes and how tough the enemies
-  are, and can't be changed afterwards. There is one commander; it is saved in
-  `commander.json` next to the app each time you dock, and only then, as in the original.
-- **Combat practice** - the same fight with nothing kept.
-- **Ship viewer** - every ship, one at a time, spinning.
+  are, and can't be changed afterwards. There is a single save slot; it is saved in
+  `commander.json` in the same folder as the app each time you dock, and only then, as in the original.
+- **Combat practice** - combat training that does not affect your single-player game.
+- **Ship viewer** - view the 3D assets of the game.
 - **Speed test** - times kinds of drawing on the badge.
 
 Joystick left / right changes the choice, C selects it and F leaves the app.
@@ -28,7 +28,7 @@ This is a fan-made game inspired by Elite. It is not official, licensed or endor
 
 ## Flight controls
 
-Written for the 2026 Spaceagon: the joystick steers and the lettered buttons do the rest.
+Written for the 2026 Spaceagon: use the joystick to steer and the buttons are for other functions.
 
 | Input | Action |
 |---|---|
@@ -245,7 +245,7 @@ the two faces it sits between points back at the viewer.
 ## Install
 
 Copy `__init__.py app.py letters.py ace.py game.py cockpit.py viewer.py bench.py title.py commander.py
-galaxy.py chart.py docked.py market.py equipment.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
+galaxy.py chart.py docked.py market.py equipment.py describe.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
 then restart it. On Windows, `deploy.bat all` does this.
 
 ## Credits and original material
