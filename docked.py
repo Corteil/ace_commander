@@ -7,7 +7,7 @@ either to keep going). On Equip ship the joystick picks an item and C buys
 it. On the two charts C makes the selected system the hyperspace target;
 once launched, the in-flight menu offers a jump to it.
 """
-from . import chart, cockpit, commander, describe, equipment, market
+from . import chart, cockpit, commander, describe, equipment, market, missions
 try:        # the description sentence's tables, made by tools/import_galaxy.py
     from . import game_data
 except Exception:
@@ -246,7 +246,7 @@ class Docked:
         c = self.cmdr
         s = self.data
         d = None if s.index == c.system else self.gal.distance(c.system, s.index)
-        system_page(ctx, self.gal, s, d, c.fuel, "< >   D: chart   F: status")
+        system_page(ctx, self.gal, s, d, c.fuel, "< >   D: chart   F: status", c)
 
     def _draw_market(self, ctx):
         """The goods, ROWS at a time: name, price, stock and what is in the hold."""
@@ -376,10 +376,15 @@ DESC_Y = (24, 36, 48, 60, 72)
 DESC_WIDTHS = (38, 37, 35, 32, 28)
 
 
-def system_page(ctx, gal, s, dist, fuel, help_line):
+_special = [None, None]     # the last (galaxy, system, mission) given a special sentence, and it
+
+
+def system_page(ctx, gal, s, dist, fuel, help_line, cmdr=None):
     """Everything about star system s (a galaxy.System): dist is how far it
     is from you in tenths of a light year (None: you are there), fuel what
-    you have. Used by the System data tab and by D on the in-flight chart."""
+    you have. Used by the System data tab and by D on the in-flight chart.
+    cmdr: the commander, when docked; the station you are at may then say
+    something special instead of the usual sentence (the missions' RUTOK)."""
     text = cockpit.text
     ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
     text(ctx, "SYSTEM DATA", 0, -102, 10, cockpit.GREY)
@@ -399,7 +404,16 @@ def system_page(ctx, gal, s, dist, fuel, help_line):
                  "Radius %d km" % s.radius):
         text(ctx, line, 0, y, 11, cockpit.YELLOW)
         y += 13
-    words = describe.for_system(game_data, gal, s.index) if game_data is not None else None
+    words = None
+    if cmdr is not None and dist is None and game_data is not None:
+        key = (cmdr.galaxy, s.index, cmdr.mission)
+        if _special[0] != key:
+            n = missions.special_sentence(game_data, cmdr.mission, cmdr.galaxy, s.index)
+            _special[0] = key
+            _special[1] = describe.special(game_data, n, s.name) if n else None
+        words = _special[1]
+    if not words and game_data is not None:
+        words = describe.for_system(game_data, gal, s.index)
     if words:
         for line, y in zip(describe.wrap(words, DESC_WIDTHS), DESC_Y):
             text(ctx, line, 0, y, 10, cockpit.CYAN)

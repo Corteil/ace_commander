@@ -18,8 +18,8 @@ fuel, docked screens as tabs, launch tunnel), and the start of phase 3 (build 26
 sun, station, compass, jump drive, automatic docking; build 27: docking by hand; build
 30: the market; 31: scooped cargo; 32: bounties, which finishes phase 3), and the start
 of phase 4 (build 33: the Equip ship screen; build 36: every item's effect). Not built
-yet: the disc version's two missions and the rest of phase 6 (see `DESIGN.md`). Phases 4
-and 5 are done, and the system description sentence (build 52).
+yet: the rest of phase 6 (see `DESIGN.md`). Phases 4 and 5 are done, the system
+description sentence (build 52) and the disc version's two missions (build 54).
 
 ## Files
 
@@ -46,7 +46,10 @@ and 5 are done, and the system description sentence (build 52).
 - `market.py` - market prices, stock, buying and selling. Rules only, no badge imports.
 - `equipment.py` - the Equip ship screen's rules: what is on sale, prices, fitting.
 - `describe.py` - the system description sentence ("goat soup"): the original's extended
-  tokens from `game_data.py`, put together as DETOK does. Rules only.
+  tokens from `game_data.py`, put together as DETOK does; also the mission texts and the
+  special system sentences. Rules only.
+- `missions.py` - the disc version's two missions (Constrictor, Thargoid plans). Rules only.
+- `briefing.py` - INCOMING MESSAGE and the mission texts, a screen at a time, on docking.
 - `ship_data.py`, `game_data.py` - generated, **gitignored** (see Licensing). 31 ships; the
   galaxy's seeds, name letter pairs, starting place, the market's 17 goods and the 14
   equipment prices. Both must be copied to the badge.
@@ -646,6 +649,44 @@ of a real flight, not from a harness.
    **Build 53 (Brian):** D on the System data tab goes back to the chart tab you came from
    (`Docked.chart_tab`, the last chart opened; the local chart if none), with the cursor on
    the system you were looking at (`Docked.go(tab, sel)`, `back_to_chart`).
+   **Build 54: the disc version's two missions** (2026-11-15), as DOENTRY, BRIEF,
+   DEBRIEF, BRIEF2, BRIEF3, DEBRIEF2, THERE, PDESC and the spawning code read from the disc
+   source. `Commander.mission` is the original's TP byte (saved as "mission"); the rules
+   are in `missions.py`, checked on every docking (`ace._mission_news`, after `_dock`
+   saves; it saves again if a mission moves on). Mission 1: docked in galaxy 1 or 2 with
+   256 kills (`KILLS_1`, divided by the level's `RANK_DIVISOR` like the ranks: EASY 51,
+   NORMAL 128, HARD 256) starts it; at Orarra (galaxy 2, 144,33) the encounter roll's lone
+   bounty hunter (`Game._roll`, `Game.hunt`) is the Constrictor (`role` "constrictor",
+   `Obj.ecm`) if none is about, and every lone hunter there attacks (`Game.orarra`). Only
+   the military laser hurts it, at `CONSTRICTOR_LASER` (1/4); its ECM destroys your
+   missiles within `ECM_RANGE`; the energy bomb kills it, as in the original. Killing it
+   sets `Game.got_constrictor`, which `_bank` turns into TP bit 1; the next docking
+   anywhere pays 5000 Cr and 256 kills (scaled). Mission 2: mission 1 done, galaxy 3,
+   1280 kills: go to Ceerdi (215,84), get the plans, take them to Birera (63,72); with the
+   plans (`Game.plans`) each encounter tick brings a Thargoid with chance
+   `PLANS_THARGOID` (56/256). Reward: 256 kills and the naval energy unit
+   (`extras` "navy", replacing "energy"; `NAVY_UNIT` 3x recharge against 2x;
+   `equipment.have` counts it as an energy unit). Orarra is a democracy, so the hunter
+   turns up rarely (as in the original): about 2% of the 20 s ticks.
+   Texts: `import_galaxy.py` also reads tokens 10, 11, 15, 216-223 and what they reach,
+   the two standard tokens they print (TOKN 117, 108, from the comments in
+   `elite-text-tokens.asm`), RUTOK and RUPLA / RUGAL into `DESC_TOKENS`, `DESC_RUTOK`,
+   `DESC_RU` (game_data.py 11.9 KB). `describe.mission_pages` handles the extra jump codes
+   (4 name, 5/6 standard token in Sentence Case, 8, 9/22/24/25 screen breaks, 12
+   paragraph, 23/29 lower case, 27 captain, 28 the Constrictor's trail) and gives screens
+   of paragraphs; `briefing.Briefing` shows INCOMING MESSAGE 2 s, then lays them out for
+   the round screen (`briefing.layout`, `_width`), the Constrictor turning above mission
+   1's briefing; C next, F skip (mode "brief"). The commander's name is the badge's
+   Name setting (`settings.get("name")`), else "Jameson" (`ace.DEFAULT_NAME`). The special
+   sentences show on the docked System data tab for the system you are at
+   (`system_page(..., cmdr)`): Teorge, Arredi, Anreer always, the rest only while
+   mission 1 is under way. Words come out as the source prints them in lower case
+   (e.g. "looked bound for arexe"): DTS capitalises only after {single cap}.
+   DEBUG: ADD THE CONSTRICTOR, MISSION: stage (the next of `missions.STAGES`, raising
+   kills to what the next mission needs; written into the save), TO MISSION SYSTEM
+   (to the stage's galaxy and system, arriving as from hyperspace). On the badge (REPL):
+   making a briefing 40-190 ms, a special sentence 13 ms. Tests: `tests/test_missions.py`.
+   Not yet played by hand.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -656,7 +697,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 53), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 54), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

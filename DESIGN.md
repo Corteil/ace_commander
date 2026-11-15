@@ -410,7 +410,8 @@ order puts the visible, low-risk work first and the parts that depend on decisio
 (clean, offender, fugitive), with illegal goods, shooting traders, the police or the
 station, a halving on each jump, and the escape pod clearing it; later made fully as the
 disc original (build 44). Build 49 adds witchspace and Thargoids (a rare mis-jump), which
-finishes phase 5 apart from the disc version's two missions.
+finishes phase 5 apart from the disc version's two missions, which build 54 adds (the
+Constrictor and the Thargoid plans, as the disc original; see `missions.py`).
 
 **Phase 6 extras asked for by Brian (2026-11-15):**
 

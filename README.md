@@ -144,6 +144,21 @@ Combat practice has no star system: just the endless waves of ships.
 Distances and times are constants near the top of `game.py` (`ARRIVE_DIST`, `SAFE_DIST`,
 `JUMP_K`, `ENCOUNTER` and the rest).
 
+## Missions
+
+The disc version's two missions are in, as the original runs them. Once your kill count
+is high enough, docking in the first or second galaxy brings an incoming message from
+Her Majesty's Space Navy: a prototype ship, the Constrictor, has been stolen. While you
+hunt it, the stations along its trail tell you where it went (on System data, docked).
+Only a military laser gets through its shields, and it has an ECM. Destroy it and dock
+for your reward. Later, with more kills, in the third galaxy, the Navy has a second job
+for you, and the Thargoids will not like it. The texts are read from your own copy of
+the Elite source into `game_data.py`, like the system descriptions. The missions call you
+by the name set in the badge's settings, or Jameson if none is set.
+
+The Debug page can move you through them: MISSION (the next stage; docking then starts
+the next mission), TO MISSION SYSTEM and ADD THE CONSTRICTOR.
+
 ## The screen
 
 - Left bars: speed (green, blue with the jump drive on) and laser temperature (yellow, red when it has overheated and
@@ -227,6 +242,8 @@ the two faces it sits between points back at the viewer.
 - `galaxy.py` - works out the 256 star systems from three seed numbers. No badge imports.
 - `chart.py` - the local and galactic charts.
 - `docked.py` - the docked screens.
+- `missions.py` - the two missions' rules. No badge imports.
+- `briefing.py` - the incoming messages that start and end them.
 - `game.py` - the flight game's rules, with no badge imports so it can be tested on a PC.
 - `cockpit.py` - draws the flight view, radar and gauges.
 - `viewer.py` - the ship viewer.
@@ -245,7 +262,7 @@ the two faces it sits between points back at the viewer.
 ## Install
 
 Copy `__init__.py app.py letters.py ace.py game.py cockpit.py viewer.py bench.py title.py commander.py
-galaxy.py chart.py docked.py market.py equipment.py describe.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
+galaxy.py chart.py docked.py market.py equipment.py describe.py missions.py briefing.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
 then restart it. On Windows, `deploy.bat all` does this.
 
 ## Credits and original material

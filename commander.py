@@ -6,7 +6,8 @@ Phase 2 adds the star system the commander is in and the fuel in the tank.
 Phase 3 adds cash (in tenths of a credit, as the original keeps it), the
 cargo hold, and the market at the station they are at (see market.py), and
 the docking style. Phase 4 adds the equipment (see equipment.py): missiles,
-the laser, and a list of the other items fitted.
+the laser, and a list of the other items fitted. Then the missions' progress
+(see missions.py).
 """
 import json
 
@@ -69,6 +70,7 @@ class Commander:
         self.galaxy = 0         # which of the 8 galaxies (0 is the first)
         self.colour = 0         # the ship's paint (cockpit.SHIP_COLOURS), from the Repair Shop
         self.legal = 0          # legal status, 0 clean to 255 (game.FUGITIVE and up: a fugitive)
+        self.mission = 0        # how far the two missions have got: the original's TP (missions.py)
         self.fuel = MAX_FUEL    # tenths of a light year
         self._needs = thresholds(self.level)
 
@@ -114,7 +116,7 @@ class Commander:
                 "market": self.market, "hold": self.hold, "missiles": self.missiles,
                 "laser": self.laser, "extras": self.extras, "docked_at": self.docked_at,
                 "galaxy": self.galaxy, "colour": self.colour,
-                "legal": self.legal}
+                "legal": self.legal, "mission": self.mission}
 
     @classmethod
     def from_dict(cls, d):
@@ -146,6 +148,9 @@ class Commander:
         k = d.get("legal")
         if isinstance(k, int):
             c.legal = max(0, min(255, k))
+        k = d.get("mission")
+        if isinstance(k, int):
+            c.mission = k & 0xFF
         k = d.get("colour")
         if isinstance(k, int) and 0 <= k < 32:
             c.colour = k

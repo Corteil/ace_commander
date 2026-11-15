@@ -51,7 +51,7 @@ import app
 from events.input import BUTTON_TYPES, ButtonDownEvent, ButtonUpEvent
 from system.eventbus import eventbus
 
-from . import bench, cockpit, commander, docked, game, title, viewer
+from . import bench, briefing, cockpit, commander, docked, game, missions, title, viewer
 
 try:
     import imu
@@ -136,6 +136,19 @@ try:
 except Exception:
     APP_DIR = "/apps/ace_commander"
 SAVE_PATH = APP_DIR + "/commander.json"
+DEFAULT_NAME = "Jameson"    # what the missions call you if the badge has no name set
+
+
+def cmdr_name():
+    """The badge owner's name from the badge's settings, for the mission texts."""
+    try:
+        import settings
+        n = settings.get("name")
+        if isinstance(n, str) and n.strip():
+            return n.strip()[:16]
+    except Exception:
+        pass
+    return DEFAULT_NAME
 _build = None
 
 
@@ -288,6 +301,7 @@ class AceCommander(app.App):
         self.eject_t = 0.0      # time since the escape pod was launched
         self.witch = None       # in witchspace: (x, y) on the chart, between systems
         self.misjump = False    # DEBUG: the next jump goes wrong
+        self.brief = None       # a mission message being shown (mode "brief")
         self.data_of = None     # the system whose data D shows from the in-flight chart
         self.fire_lock = False  # the lasers wait until C is let go (held on from a menu)
         self.repair_shop = False    # show the Repair Shop tab (a DEBUG switch for now)
@@ -544,6 +558,16 @@ class AceCommander(app.App):
                 self._dock()
         elif self.mode == "docked":
             self._update_docked(dt, cancel, confirm)
+        elif self.mode == "brief":
+            b = self.brief
+            b.tick(dt)
+            if cancel:
+                b.skip()
+            elif confirm:
+                b.next()
+            if b.done:
+                self.brief = None
+                self.mode = "docked"
         elif self.mode == "launch":
             self.launch_t += dt
             self._leds_station(cockpit.tunnel_glow(min(1.0, self.launch_t / LAUNCH_TIME),
@@ -670,10 +694,20 @@ class AceCommander(app.App):
         if self.galaxy is None or c is None or c.system is None:
             return
         self.game.set_docking(c.docking)
+        self._mission_flags()
         s = self.galaxy.system(c.system)
         self.game.enter(s.radius, "DODO" if s.tech >= game.DODO_TECH else "CORIOLIS", how,
                         s.government, (c.system * 37 + 11) % 5,     # the sun's colour
                         (c.system * 53 + 29) % 7)                   # and the planet's
+
+    def _mission_flags(self):
+        """Tell the game what the missions need of this system (see missions.py)."""
+        g = self.game
+        c = self.cmdr
+        gal = self.galaxy
+        g.orarra = missions.constrictor_here(c.galaxy, gal.xs[c.system], gal.ys[c.system])
+        g.hunt = g.orarra and missions.hunting(c.mission)
+        g.plans = missions.carrying_plans(c.mission)
 
     def _dock(self):
         """Show the commander docked at their star system, remember it as where
@@ -708,6 +742,27 @@ class AceCommander(app.App):
         self.fsub = None
         self.chart = None
         self.mode = "docked"
+        self._mission_news()
+
+    def _mission_news(self):
+        """Docking may start or end a mission (missions.on_docking): if so,
+        save, and show the message before the docked screens."""
+        c = self.cmdr
+        gal = self.galaxy
+        if gal is None or not getattr(game_data, "DESC_TOKENS", None):
+            return
+        n = missions.on_docking(c, gal.xs[c.system], gal.ys[c.system])
+        if n is None:
+            return
+        self._write()
+        ship = None
+        if n in missions.SHOWS_SHIP:
+            for e in SHIPS:
+                if e[0] == game.CONSTRICTOR:
+                    ship = game.Blueprint(e)
+        self.brief = briefing.Briefing(game_data, n, cmdr_name(), c.galaxy, ship)
+        if not self.brief.done:
+            self.mode = "brief"
 
     def _update_docked(self, dt, cancel, confirm):
         """The docked tabs. The joystick changes tab, except on the charts,
@@ -803,7 +858,8 @@ class AceCommander(app.App):
             return
         g.missiles = c.missiles if g.missile_bp else 0
         g.set_laser(c.laser)
-        g.energy_unit = "energy" in c.extras
+        g.energy_unit = "energy" in c.extras or "navy" in c.extras
+        g.navy = "navy" in c.extras
         g.fuel_scoops = "scoops" in c.extras
         g.ecm = "ecm" in c.extras
         g.pod = "pod" in c.extras
@@ -959,6 +1015,9 @@ class AceCommander(app.App):
             return
         c = self.cmdr
         c.missiles = g.missiles             # the ones fired are gone
+        if g.got_constrictor:               # mission 1: tell the Navy when you next dock
+            g.got_constrictor = False
+            c.mission = missions.killed(c.mission)
         c.legal = g.legal
         g.bad = game.bad(c.cargo)           # contraband: the police look for it
         g.fuel = c.fuel                     # for the HUD
@@ -1226,7 +1285,9 @@ class AceCommander(app.App):
                      "FRAME TIME: " + ("ON" if self.show_ms else "OFF"),
                      "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
                      "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION",
-                     "ADD A THARGOID", "MIS-JUMP NEXT: " + ("ON" if self.misjump else "OFF"), "LEGAL: " + game.legal_name(self.game.legal),
+                     "ADD A THARGOID", "ADD THE CONSTRICTOR",
+                     "MISSION: " + missions.stage_name(self.cmdr.mission if self.cmdr else 0),
+                     "TO MISSION SYSTEM", "MIS-JUMP NEXT: " + ("ON" if self.misjump else "OFF"), "LEGAL: " + game.legal_name(self.game.legal),
                      "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4", "+10 KILLS", "+1000 CR",
                      "SHIP CONFIG", "REPAIR SHOP: " + ("ON" if self.repair_shop else "OFF"),
                      "RELEASE CANISTER", "TO THE STATION", "TO THE SUN",
@@ -1242,6 +1303,8 @@ class AceCommander(app.App):
                 items.remove(items[[i for i, t in enumerate(items) if t.startswith("MIS-JUMP")][0]])
                 items.remove(items[[i for i, t in enumerate(items) if t.startswith("LEGAL")][0]])
                 items.remove("FUEL TO 1/4")
+                items.remove("TO MISSION SYSTEM")
+                items.remove(items[[i for i, t in enumerate(items) if t.startswith("MISSION")][0]])
             return items
         if self.fsub == "ship":
             return self._ship_items()
@@ -1358,6 +1421,22 @@ class AceCommander(app.App):
                     g.add_hunter()
                 else:
                     g.add_police(False)
+        elif item == "ADD THE CONSTRICTOR":
+            if g.add_constrictor() is None:
+                g.say("TOO MANY OBJECTS")
+        elif item.startswith("MISSION") and self.career and self.cmdr is not None:
+            # the next stage; docking then starts the next mission, if any
+            c = self.cmdr
+            c.mission = missions.next_stage(c.mission)
+            c.kills = max(c.kills, missions.stage_kills(c.mission, c))
+            self._write_setting("mission", c.mission)   # kept even if this flight ends in death
+            self._write_setting("kills", c.kills)
+            self._mission_flags()
+            g.say("MISSION: " + missions.stage_name(c.mission))
+            return
+        elif item == "TO MISSION SYSTEM" and self.career and self.cmdr is not None:
+            self._to_mission()
+            return
         elif item == "ADD A THARGOID":
             if g.add_thargoid() is None:
                 g.say("TOO MANY OBJECTS")
@@ -1410,6 +1489,32 @@ class AceCommander(app.App):
                 return
         if self.career:
             self._bank()
+
+    def _to_mission(self):
+        """A cheat: to where the current mission stage happens (galaxy and
+        system), arriving as from hyperspace; then TO THE STATION and dock."""
+        c = self.cmdr
+        g = self.game
+        w = missions.where(c.mission)
+        if w is None:
+            gal = 1 if c.mission & 15 == 0 else 2     # where the next one can start
+            if c.mission & 15 not in (0, 2):
+                g.say("DOCK ANYWHERE" if c.mission & 3 == 3 else "NO MISSION TO GO TO")
+                return
+            w = (gal, None, None)
+        c.galaxy = w[0]
+        self._place()
+        if w[1] is None:
+            c.system = self.galaxy.nearest(96, 96)
+        else:
+            c.system = self.galaxy.find(w[1], w[2])
+        c.market = None
+        self.witch = None
+        self.target = None
+        self.jump_to = None
+        self._enter_space("arrive")
+        g.say(self.galaxy.system(c.system).name, 3.0)
+        self._resume()
 
     def _resume(self):
         self.paused = False
@@ -1604,6 +1709,8 @@ class AceCommander(app.App):
             self._draw_level(ctx)
         elif self.mode == "docked":
             self.dock.draw(ctx)
+        elif self.mode == "brief":
+            self.brief.draw(ctx)
         elif self.mode == "launch":
             cockpit.draw_tunnel(ctx, min(1.0, self.launch_t / LAUNCH_TIME), self.launch_t,
                                 cockpit.station_colour(self._government()), False, self.tunnel)

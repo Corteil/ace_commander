@@ -70,6 +70,8 @@ def have(i, cmdr):
         return "fitted" if c.hold >= BIG_HOLD else ""
     if i in LASERS:
         return "fitted" if c.laser == LASERS[i] else ""
+    if i == ENERGY and "navy" in c.extras:     # mission 2's naval energy unit is better
+        return "fitted"
     return "fitted" if EXTRAS[i] in c.extras else ""
 
 
