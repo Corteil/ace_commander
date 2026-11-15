@@ -79,12 +79,12 @@ for n in (missions.BRIEF_1, missions.DEBRIEF_1, missions.BRIEF_2, missions.BRIEF
         while not b.done:
             c = CountCtx(); b.draw(c)
             for s, (x, y), size in c.texts:
-                half = len(s) * briefing.CHAR_W / 2
+                half = len(s) * 0.62 * size / 2
                 assert y <= briefing.BOTTOM or s.startswith("C:"), (s, y)
                 assert (half * half + (abs(y) + 6) ** 2) ** 0.5 <= 120, (s, x, y)
             b.tick(2.1) if b.at < 0 else b.next()
             k += 1
-        assert k < 12
+        assert k < 16
 print("the briefing texts, and every screen of them fits: ok")
 
 # ---- the rules ------------------------------------------------------------------------

@@ -8,13 +8,13 @@ import math
 from . import cockpit, describe
 
 INCOMING_TIME = 2.0     # seconds of INCOMING MESSAGE, as the original's BRIS
-LINE = 12               # pixels from one line of text to the next
+SIZE = 14               # text size (10 was too small to read on the badge)
+LINE = 16               # pixels from one line of text to the next
 PARA = 5                # and the extra space between paragraphs
-SIZE = 10               # text size
-CHAR_W = 6.2            # about how wide a character of that size is
-TOP = -88               # where the text starts on a screen without the ship
-SHIP_TOP = -42          # and with it
-BOTTOM = 76             # the last line's lowest place
+CHAR_W = SIZE * 0.62    # about how wide a character of that size is
+TOP = -84               # where the text starts on a screen without the ship
+SHIP_TOP = -38          # and with it
+BOTTOM = 72             # the last line's lowest place
 SHIP_Y = 76             # the ship's centre: this many pixels above the middle
 SHIP_Z = 580.0          # and this far away (it comes in from SHIP_FAR)
 SHIP_FAR = 6000.0
@@ -30,36 +30,56 @@ def _width(y):
     return max(10, int(2 * math.sqrt(114 * 114 - h * h) / CHAR_W))
 
 
+def _lines(words, y):
+    """A paragraph's lines from height y down: [(line, y), ...]."""
+    out = []
+    line = ""
+    for w in words.split():
+        if line and len(line) + 1 + len(w) <= _width(y):
+            line += " " + w
+            continue
+        if line:
+            out.append((line, y))
+            y += LINE
+        line = w[:_width(y)]
+    if line:
+        out.append((line, y))
+    return out
+
+
 def layout(pages):
     """Split pages ((text, ship) from describe.mission_pages) into screens
-    that fit: each a (ship, [(line, y), ...])."""
+    that fit: each a (ship, [(line, y), ...]). A paragraph that doesn't fit
+    in what is left of a screen starts the next one (and is split only if
+    it is longer than a whole screen). The ship is shown on the first
+    screen of its page only, leaving the rest more room."""
     screens = []
     for words, ship in pages:
-        top = SHIP_TOP if ship else TOP
+        show = ship
         lines = []
-        y = top
+        y = SHIP_TOP if show else TOP
         for p in words.split("\n"):
             if not p:               # an empty line between paragraphs
                 y += LINE
                 continue
-            line = ""
-            for w in p.split():
-                if line and len(line) + 1 + len(w) <= _width(y):
-                    line += " " + w
-                    continue
-                if line:
-                    lines.append((line, y))
-                    y += LINE
-                if y > BOTTOM:      # on to another screen
-                    screens.append((ship, lines))
-                    lines = []
-                    y = top
-                line = w[:_width(y)]
-            if line:
-                lines.append((line, y))
-                y += LINE + PARA
+            got = _lines(p, y)
+            if got[-1][1] > BOTTOM and lines:       # on to the next screen
+                screens.append((show, lines))
+                show = False
+                lines = []
+                y = TOP
+                got = _lines(p, y)
+            while got[-1][1] > BOTTOM:              # longer than a whole screen
+                fit = [l for l in got if l[1] <= BOTTOM]
+                screens.append((show, lines + fit))
+                show = False
+                lines = []
+                rest = " ".join(l[0] for l in got[len(fit):])
+                got = _lines(rest, TOP)
+            lines += got
+            y = got[-1][1] + LINE + PARA
         if lines:
-            screens.append((ship, lines))
+            screens.append((show, lines))
     return screens
 
 
@@ -101,7 +121,7 @@ class Briefing:
         for line, y in lines:
             text(ctx, line, 0, y, SIZE, cockpit.WHITE)
         last = self.at == len(self.screens) - 1
-        text(ctx, "C: continue" if last else "C: more   F: skip", 0, 94, SIZE, cockpit.GREY)
+        text(ctx, "C: continue" if last else "C: more   F: skip", 0, 94, 11, cockpit.GREY)
 
     def _draw_ship(self, ctx):
         from .docked import _Show
