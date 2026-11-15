@@ -1,4 +1,4 @@
-import math, os, random, shutil, sys
+import json, math, os, random, shutil, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)            # the app folder, which must be named ace_commander
 PARENT = os.path.dirname(REPO)
@@ -364,6 +364,8 @@ assert a.dock.market.name(0) == "GRAIN" and a.dock.market.name(16) == "ALIEN REL
 assert mod.EQUIP[11][0] == "GALACTIC HYPERDRIVE"
 miss = sys.modules["ace_commander.missions"]
 assert miss.ORARRA == (1, 251, 108) and miss.CEERDI == (2, 126, 43) and miss.BIRERA == (2, 250, 226)
+assert mod.DATA_TAG == "own" and json.load(open(mod.SAVE_PATH))["data"] == "own", \
+    "the save says which data set it belongs to"
 os.remove(mod.SAVE_PATH)
 print("ship_data.py missing: the game's own ships: ok")
 

@@ -5,6 +5,7 @@ ship_data.py
 __pycache__/
 badge_log.txt
 commander.json
+commander_elite.json
 options.json
 *.pyc
 

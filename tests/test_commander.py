@@ -68,6 +68,14 @@ assert commander.thresholds(0)[-2] == 800 and commander.thresholds(1)[-2] == 200
 c = commander.Commander(2)
 assert c.add_kills(7) is None and c.add_kills(1) == "MOSTLY HARMLESS"
 assert commander.Commander(9).level == 2 and commander.Commander(-3).level == 0
+# a save belongs to one data set: it won't load in the other
+import tempfile
+_p = os.path.join(tempfile.mkdtemp(), "c.json")
+_c = commander.Commander(1); _c.data = "elite"; _c.save(_p)
+assert commander.load(_p, "elite") is not None and commander.load(_p, "own") is None
+assert commander.load(_p) is not None, "no data set asked: loads"
+_c.data = ""; _c.save(_p)
+assert commander.load(_p, "own") is not None, "an older save, with none recorded, loads anywhere"
 print("ranks and levels: ok", [commander.thresholds(i)[-1] for i in range(3)])
 
 # ---- save and load ----------------------------------------------------------

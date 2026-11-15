@@ -54,7 +54,7 @@ description sentence (build 52) and the disc version's two missions (build 54).
   designs, one for each role the game knows by Elite's names, with their own names
   (entry[5], `Blueprint.title`). Made by `tools/make_original_ships.py` with
   `tools/shipmaker.py` (convex hulls from corner points, explicit faces, lines on faces).
-  Used when the Elite files are missing, or with Options > CONTENT: OWN (see `content.py`).
+  Used when the Elite files are missing, or with Options > DATA: OWN (see `content.py`).
 - `original_data.py` - **the game's own galaxy, market and equipment** (build 56),
   committed: seeds, letter pairs, start (Daenor), goods, equipment prices, and where the
   missions happen (`MISSION_PLACES`, read by `missions.use`).
@@ -827,11 +827,18 @@ of a real flight, not from a harness.
    same 14 in order, our own prices; GALACTIC HYPERDRIVE. Mission places: shipyard Tuelve
    and last seen Rotuvaga (galaxy 1), the Phantom at Elnada (galaxy 2, 13 jumps from
    where a galactic jump arrives), briefing Argatu and base Vedao (galaxy 3, 61 LY and
-   13 jumps apart, like Ceerdi and Birera). Options' SHIPS became CONTENT: ELITE / OWN,
+   13 jumps apart, like Ceerdi and Birera). Options' SHIPS became DATA: ELITE / OWN,
    saved as "own". Without our own text tables (build 57) the missions don't start and
    System data has no sentence in OWN. On the badge: content.py and its imports 2.6 s
    over the REPL. Brian's usual badge had SHIPS: OWN set, so it is now in our galaxy.
    Tests: `test_app.py` starts a commander in a copy without ship_data.py.
+   Then (Brian): the Options line is DATA: ELITE / OWN, and each data set has its own
+   commander: `commander.json` for our own data (what an app store player has),
+   `commander_elite.json` for Elite's (`ace.SAVE_PATH`, `DATA_TAG`); a save records
+   "data" and `commander.load(path, data)` won't load one from the other set (older saves
+   without it load anywhere). Brian's usual badge: his Elite commander (380 kills, both
+   missions done) was moved from commander.json to commander_elite.json (backup on the Pi
+   in ~/Code/ace_commander_save_backups/).
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).

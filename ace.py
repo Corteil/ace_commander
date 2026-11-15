@@ -133,7 +133,10 @@ try:
         APP_DIR = "/" + APP_DIR         # the badge gives a path relative to /
 except Exception:
     APP_DIR = "/apps/ace_commander"
-SAVE_PATH = APP_DIR + "/commander.json"
+# each data set keeps its own commander: their galaxy, systems and market
+# only make sense in it (content.py, Options > DATA)
+DATA_TAG = "own" if ORIGINAL_SHIPS else "elite"
+SAVE_PATH = APP_DIR + ("/commander.json" if ORIGINAL_SHIPS else "/commander_elite.json")
 def options_path():
     """options.json, next to the save: the Options page's steering and LEDs."""
     return SAVE_PATH.rsplit("/", 1)[0] + "/options.json"
@@ -318,7 +321,7 @@ class AceCommander(app.App):
         self.bench = None
         self.menu = 0           # which title screen choice is showing
         self.title = title.Title(SHIPS) if SHIPS else None
-        self.cmdr = commander.load(SAVE_PATH)   # the saved commander, or None
+        self.cmdr = commander.load(SAVE_PATH, DATA_TAG)   # the saved commander, or None
         # the commander as last saved, as JSON: being destroyed goes back to it
         self.saved = json.dumps(self.cmdr.to_dict()) if self.cmdr is not None else None
         self.level = 1          # the level showing on the new-commander screen
@@ -362,7 +365,7 @@ class AceCommander(app.App):
         self.ms = 0.0                    # smoothed frame time
         self.leds_on = False             # we have taken over the LEDs
         self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
-        self.own_ships = ORIGINAL_SHIPS  # CONTENT: OWN / ELITE, from the next start
+        self.own_ships = ORIGINAL_SHIPS  # DATA: OWN / ELITE, from the next start
         self.omenu = 0                   # the chosen line on the Options page
         self.dgroup = None               # the DEBUG group open in flight (fsub "dgroup")
         self.debug_from = None           # where DEBUG was opened from in flight: None (the menu) or "settings"
@@ -974,6 +977,7 @@ class AceCommander(app.App):
         c = self.cmdr
         if c is None:
             return
+        c.data = DATA_TAG
         self.saved = json.dumps(c.to_dict())
         c.save(SAVE_PATH)
 
@@ -1362,8 +1366,8 @@ class AceCommander(app.App):
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
         if tildagonos is not None:
             items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))
-        if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose content, from the next start
-            items.append("CONTENT: " + ("OWN" if self.own_ships else "ELITE")
+        if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose data, from the next start
+            items.append("DATA: " + ("OWN" if self.own_ships else "ELITE")
                          + ("" if self.own_ships == ORIGINAL_SHIPS else " (RESTART)"))
         if DEBUG_MENU:
             items.append("DEBUG")
@@ -1404,7 +1408,7 @@ class AceCommander(app.App):
             if self.game is not None:
                 self.game.set_docking(c.docking)
             self._write_setting("docking", c.docking)
-        elif item.startswith("CONTENT"):
+        elif item.startswith("DATA"):
             self.own_ships = not self.own_ships
             self._save_options()
         elif item.startswith("LEDS"):
