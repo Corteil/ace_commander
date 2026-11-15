@@ -282,6 +282,7 @@ class AceCommander(app.App):
         self.galaxy = None      # made the first time a commander flies
         self.galaxy_n = 0       # which of the 8 galaxies self.galaxy is
         self.eject_t = 0.0      # time since the escape pod was launched
+        self.fire_lock = False  # the lasers wait until C is let go (held on from a menu)
         self.chart = None       # the local chart, while it is open
         self.jump_to = None     # (system, distance) the hyperspace countdown is for
         self.dt = 0.0           # seconds since the last update
@@ -626,6 +627,7 @@ class AceCommander(app.App):
         self.d_t = None
         self.paused = False
         self.fsub = None
+        self.fire_lock = True   # the C that launched you (or chose this) isn't a shot
         self.mode = "flight"
 
     def _place(self):
@@ -1096,6 +1098,11 @@ class AceCommander(app.App):
         if hit("k_M"):
             missile = True
         fire = held("confirm") or held("k_F") or held("k_SPACE")
+        if self.fire_lock:      # held on from a menu or the launch: fire once it is let go
+            if fire:
+                fire = False
+            else:
+                self.fire_lock = False
         if g.autodock and self._took_controls(new):
             g.stop_autodock()       # taking the controls switches the docking computer off
         pitch = jy if INVERT_PITCH else -jy
@@ -1309,6 +1316,7 @@ class AceCommander(app.App):
         self.paused = False
         self.fsub = None
         self.zero = None
+        self.fire_lock = True   # the C that chose a menu line isn't a shot
 
     def _update_fmenu(self, new, menu, cancel, confirm):
         hit = self.pad.hit

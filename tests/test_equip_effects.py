@@ -327,4 +327,29 @@ g.autodock = True; g.jump_t = 0.01; g.step(DT, 0, 0, 0, False, False)
 assert g.jumped and not g.autodock, "a jump switches it off"
 os.path.exists(SAVE) and os.remove(SAVE)
 print("build 38: held buttons, cleared on docking and jumping, chase view: ok")
+
+# ---- build 39: C held on from a menu or the launch doesn't fire --------------
+e = ace_commander.AceCommander()
+choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
+e.dock.go(0)
+for _ in range(80):             # C launches, skips the tunnel, and stays held
+    tick(e, held=["C"])
+    if e.mode == "flight":
+        break
+assert e.mode == "flight"
+g = e.game; g.spawn_t = g.rock_t = g.encounter_t = 1e9
+heat = g.heat
+for _ in range(5):
+    tick(e, held=["C"])
+assert g.beam <= 0 and g.heat <= heat, "no shot from the C held on from launching"
+tick(e); tick(e, held=["C"]); assert g.beam > 0, "a new press fires"
+tick(e)
+for _ in range(10):
+    tick(e)
+tick(e, fresh=["A"]); e.fmenu = e._fitems().index("RESUME")
+g.beam = 0.0; heat = g.heat
+for _ in range(5):
+    tick(e, held=["C"])
+assert not e.paused and g.beam <= 0, "nor from the C that chose RESUME"
+print("build 39: held C after a menu or launch doesn't fire: ok")
 print("ALL EQUIPMENT EFFECT TESTS PASSED")
