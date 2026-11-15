@@ -13,7 +13,6 @@ button handlers, foreground checks and minimise through it.
 """
 import gc
 import sys
-import time
 
 import app
 
@@ -26,16 +25,6 @@ GREEN = (0.3, 1, 0.4)      # the title screen's menu line
 GREY = (0.6, 0.6, 0.6)
 DIM = (0.15, 0.3, 0.18)
 _letters = None             # letters.py, the name in block letters: loaded first
-FLASH_MS = 500              # LOADING is on this long, then off this long, by the clock
-WAIT_MS = 200               # after a quick import, wait up to this long to redraw on the change
-
-
-def _now():
-    """Milliseconds, on the badge and on a PC."""
-    try:
-        return time.ticks_ms()
-    except AttributeError:
-        return int(time.time() * 1000)
 
 
 class AceCommander(app.App):
@@ -44,7 +33,7 @@ class AceCommander(app.App):
         self.real = None        # the real app, once everything is loaded
         self.done = 0           # modules loaded so far
         self.error = None       # why loading failed, if it did
-        self.t0 = _now()        # LOADING flashes by the clock from here
+        self.shown = True       # LOADING flashes: on, then off, at each redraw
 
     async def run(self, render_update):
         global _letters
@@ -55,6 +44,7 @@ class AceCommander(app.App):
             pass
         for name in STEPS:
             await render_update()           # show how far it has got
+            self.shown = not self.shown
             try:
                 __import__(pkg + "." + name)
             except Exception as e:
@@ -64,22 +54,8 @@ class AceCommander(app.App):
                     raise
             self.done += 1
             gc.collect()
-            # the screen can only change between imports: after a quick one,
-            # wait for a flash change that is nearly due, so it lands on time
-            while self._until_change() <= WAIT_MS:
-                await render_update()
-                if self._until_change() > WAIT_MS:
-                    break
         self.real = sys.modules[pkg + ".ace"].AceCommander(self)
         await self.real.run(render_update)
-
-    def _shown(self):
-        """LOADING's flash, by the clock: on for FLASH_MS, off for FLASH_MS."""
-        return (_elapsed(self.t0) // FLASH_MS) % 2 == 0
-
-    def _until_change(self):
-        """Milliseconds until the flash next changes."""
-        return FLASH_MS - _elapsed(self.t0) % FLASH_MS
 
     def draw(self, ctx):
         if self.real is not None:
@@ -103,16 +79,9 @@ class AceCommander(app.App):
         else:
             if self.done < n:
                 _text(ctx, STEPS[self.done], 0, 28, 10, GREY)
-            if self._shown():   # flashing, where the menu line will be
+            if self.shown:      # flashing, where the menu line will be
                 _text(ctx, "LOADING", 0, 84, 13, GREEN)
         ctx.restore()
-
-
-def _elapsed(t0):
-    try:
-        return time.ticks_diff(_now(), t0)
-    except AttributeError:
-        return _now() - t0
 
 
 def _text(ctx, s, x, y, size, rgb):
