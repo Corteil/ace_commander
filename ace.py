@@ -1478,6 +1478,8 @@ class AceCommander(app.App):
             if self.career:
                 return key != "NEXT WAVE"       # waves are for combat practice
             return key not in CAREER_ONLY       # no commander: no cash, traffic or legal status
+        if key == "TO MISSION SYSTEM":      # docked: moved there and docked again
+            return self.cmdr is not None and (self.mode == "docked" or self.od_from == "docked")
         if key not in OFF_FLIGHT:
             return False
         return self.cmdr is not None or key in NO_COMMANDER
@@ -1652,6 +1654,13 @@ class AceCommander(app.App):
             return game.legal_name(c.legal)
         if item.startswith("MISSION"):
             return self._mission_cheat()
+        if item == "TO MISSION SYSTEM":
+            why = self._mission_move()
+            if why:
+                return why
+            self.game = None        # any flight left part-way is from somewhere else
+            self._dock()            # docked there: its mission message, if any
+            return None
         return None
 
     def _ship_items_c(self):
@@ -1877,14 +1886,24 @@ class AceCommander(app.App):
     def _to_mission(self):
         """A cheat: to where the current mission stage happens (galaxy and
         system), arriving as from hyperspace; then TO THE STATION and dock."""
-        c = self.cmdr
         g = self.game
+        why = self._mission_move()
+        if why:
+            g.say(why)
+            return
+        self._enter_space("arrive")
+        g.say(self.galaxy.system(self.cmdr.system).name, 3.0)
+        self._resume()
+
+    def _mission_move(self):
+        """Put the commander where the current mission stage happens (galaxy
+        and system). Returns why not, or None."""
+        c = self.cmdr
         w = missions.where(c.mission)
         if w is None:
             gal = 1 if c.mission & 15 == 0 else 2     # where the next one can start
             if c.mission & 15 not in (0, 2):
-                g.say("DOCK ANYWHERE" if c.mission & 3 == 3 else "NO MISSION TO GO TO")
-                return
+                return "DOCK ANYWHERE" if c.mission & 3 == 3 else "NO MISSION TO GO TO"
             w = (gal, None, None)
         c.galaxy = w[0]
         self._place()
@@ -1896,9 +1915,7 @@ class AceCommander(app.App):
         self.witch = None
         self.target = None
         self.jump_to = None
-        self._enter_space("arrive")
-        g.say(self.galaxy.system(c.system).name, 3.0)
-        self._resume()
+        return None
 
     def _resume(self):
         self.paused = False
@@ -1966,12 +1983,12 @@ class AceCommander(app.App):
                 self._resume()
             elif item == "STATUS":
                 self.fsub = "status"
-            elif item == "LOCAL CHART":
+            elif item == "LOCAL CHART" or item == "HYPERSPACE":   # no target: pick one
                 from . import chart
                 self.chart = chart.Chart(self.galaxy, self.cmdr.system, self.cmdr.fuel,
                                          self.target, at=self.witch)
                 self.fsub = "chart"
-            elif item.startswith("JUMP"):
+            elif item.startswith("HYPERSPACE: "):
                 to = self._jump_ok()
                 if to is not None:
                     self.jump_to = to
@@ -2041,9 +2058,12 @@ class AceCommander(app.App):
     def _fitems_top(self):
         items = ["RESUME"]
         if self.career:
-            to = self._jump_ok()
-            if to is not None and self.game is not None and self.game.jump_t <= 0:
-                items.append("JUMP: " + self.galaxy.system(to[0]).name)
+            # always there, unless a countdown is on: with a target in range it
+            # jumps, without one it opens the local chart to pick one
+            if self.galaxy is not None and self.game is not None and self.game.jump_t <= 0:
+                to = self._jump_ok()
+                items.append("HYPERSPACE: " + self.galaxy.system(to[0]).name if to is not None
+                             else "HYPERSPACE")
             if self.galaxy is not None:
                 items.append("LOCAL CHART")
             g = self.game

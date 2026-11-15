@@ -746,6 +746,14 @@ of a real flight, not from a harness.
    distance ("3.6 LY", "... TOO FAR", "YOU ARE HERE") and "RANGE 7.0 LY"; while the
    joystick changes tabs the name is "< LAVE >" and the cursor grey, with the cursor
    yellow and the name plain once C hands it over (`Chart.active`).
+   Then (Brian picked MISSION in the docked DEBUG and then had no jump): TO MISSION
+   SYSTEM also works from the docked Options tab's DEBUG (a TRAVEL group with just it):
+   `_mission_move` puts the commander there and `_dock()` docks again, so that stage's
+   message plays (`self.game` is dropped first). Not on the title screen's Options.
+   Then (Brian): the in-flight menu always has a HYPERSPACE line in a commander's flight
+   (replacing build 22's "JUMP: name", shown only with a target in range): "HYPERSPACE:
+   DISO" with a target in range starts the countdown; plain "HYPERSPACE" opens the local
+   chart to pick one. Hidden during a countdown.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
