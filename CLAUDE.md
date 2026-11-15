@@ -794,6 +794,11 @@ of a real flight, not from a harness.
    hub always, the ring's six pieces only side-on (|nose . view| < 0.5), the spokes
    never: each fill costs about 2 ms on the badge. Halo now 9-10 ms averaged over all
    angles (Elite's Dodo 3-6), about 8.7 face on, as you fly in to dock.
+   Then (Brian: the slot looked wrong close up): Elite's slots are long up the station
+   (along its roof), so lined up for docking (roof across the screen, docking A's rule
+   and the docking computer's roll) they lie level, as the tunnels draw them; ours were
+   long across it and stood upright. Both now stand like Elite's (Halo 34 x 68, Drum
+   24 x 72); the test checks against ship_data.py when it is there.
    Tests: `tests/test_original_ships.py`; `test_app.py` runs a copy without ship_data.py.
    Next in publishing prep: our own galaxy, goods and equipment (56), our own words and
    mission texts (57), then the README, DEBUG off, level names and the app store (58).

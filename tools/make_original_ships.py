@@ -43,8 +43,9 @@ def ring_station():
            for z in (back, front) for k in range(6)]
     faces = s.hull(hub)
     front_face = [f for f in faces if s.faces[f][1][2] > 0][0]
-    # the docking slot: a 2:1 letterbox in the front face
-    sw, sh = 34, 17
+    # the docking slot: 2:1, its long side up the station (along its roof),
+    # as the game expects: lined up for docking, it lies level on the screen
+    sw, sh = 17, 34
     corners = [s.vertex((x, y, front)) for x, y in ((-sw, -sh), (sw, -sh), (sw, sh), (-sw, sh))]
     for k in range(4):
         s.line(corners[k], corners[(k + 1) % 4], front_face)
@@ -239,7 +240,8 @@ def coriolis():
            for z in (-150, 150) for k in range(8)]
     faces = s.hull(pts)
     front = [f for f in faces if s.faces[f][1][2] > 0][0]
-    c = [s.vertex((x, y, 150)) for x, y in ((-36, -12), (36, -12), (36, 12), (-36, 12))]
+    # 3:1, long side up the station (see ring_station)
+    c = [s.vertex((x, y, 150)) for x, y in ((-12, -36), (12, -36), (12, 36), (-12, 36))]
     for k in range(4):
         s.line(c[k], c[(k + 1) % 4], front)
     return s.blueprint(_stats(s, 0, 11, 0, 110, 255, 0, 0, 5, gun=0))

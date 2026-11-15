@@ -13,6 +13,18 @@ from badge_stubs import CountCtx
 bs.install()
 from ace_commander import cockpit, game, original_ships
 SHIPS = original_ships.SHIPS
+# which way round Elite's slots are, if ship_data.py is there to compare with
+ship_data_slots = []
+try:
+    from ace_commander import ship_data
+    for e in ship_data.SHIPS:
+        if e[0] in ("CORIOLIS", "DODO"):
+            fr = max(v[2] for v in e[1])
+            sl = [v for v in e[1] if v[2] == fr and abs(v[0]) < 40 and abs(v[1]) < 40]
+            ship_data_slots.append((e[0], max(v[0] for v in sl) - min(v[0] for v in sl),
+                                    max(v[1] for v in sl) - min(v[1] for v in sl)))
+except ImportError:
+    pass
 DT = 0.04
 
 # ---- the data ------------------------------------------------------------------
@@ -60,10 +72,14 @@ for e in SHIPS:
 for key in ("CORIOLIS", "DODO"):
     e = [x for x in SHIPS if x[0] == key][0]
     front = max(v[2] for v in e[1])
-    slot = [v for v in e[1] if v[2] == front and abs(v[0]) < 40 and abs(v[1]) < 20]
+    slot = [v for v in e[1] if v[2] == front and abs(v[0]) < 40 and abs(v[1]) < 40]
     w = max(v[0] for v in slot) - min(v[0] for v in slot)
     h = max(v[1] for v in slot) - min(v[1] for v in slot)
-    assert abs(w / h - cockpit.SLOT_ASPECT[key]) < 0.1, (key, w, h)
+    # long side up the station, as Elite's: lined up for docking it lies level
+    assert abs(h / w - cockpit.SLOT_ASPECT[key]) < 0.1, (key, w, h)
+    old = [x for x in ship_data_slots if x[0] == key]
+    for k, ow, oh in old:
+        assert (oh > ow) == (h > w), "the same way round as Elite's " + key
 print("original ships: 31 roles, sound data, own names, outward faces, slots at the front: ok")
 
 # ---- drawn from all round --------------------------------------------------------
