@@ -7,7 +7,8 @@ custom firmware.
 The title screen, with a ship tumbling under the name, offers:
 
 - **New commander** / **Continue** - fight waves of pirates, shoot rocks and scoop cargo as
-  a saved commander. Your kills count towards a rank, from Harmless up to Elite. A new commander picks
+  a saved commander. Your kills count towards a rank, from Harmless up to Elite (with Ace, our own, just
+  before it). A new commander picks
   one of three levels, which sets how many kills each rank takes and how tough the enemies
   are, and can't be changed afterwards. There is a single save slot; it is saved in
   `commander.json` in the same folder as the app each time you dock, and only then, as in the original.
@@ -83,9 +84,10 @@ While docked there are four screens; the small squares at the top show which one
 - **System data** - government, economy, tech level, population, productivity and size
   of the target system (or of where you are, with no target).
 
-Joystick left / right changes screen. On the two charts the joystick moves the cursor
-instead, and E / B change screen. On a chart, C makes the selected system your hyperspace
-target and shows its data; C on your own system clears the target. A launches from any
+Joystick left / right changes screen, and so do E / B. On the two charts, C hands the
+joystick to the cursor and F hands it back; with the cursor, C makes the selected system
+your hyperspace target and shows its data (C on your own system clears the target), and
+D shows a system's data without targeting it. A launches from any
 screen, and F goes back to Status, then to the title screen.
 
 Launching flies you out along the station's hexagonal tunnel (about 2.5 seconds; C skips

@@ -47,6 +47,8 @@ try:
 except Handed:
     pass
 assert frames[0][0] == 0 and "LOADING" in frames[0][1]
+shown = ["LOADING" in f[1] for f in frames[:len(loader.STEPS)]]
+assert shown[:4] == [True, False, True, False], "LOADING flashes on and off"
 # the name in block letters, where and as the title screen draws it (build 51)
 from ace_commander import letters, title
 assert loader._letters is letters

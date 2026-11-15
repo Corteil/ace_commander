@@ -49,7 +49,10 @@ def launch(a):
 
 
 # ---- ranks and levels -------------------------------------------------------
-assert commander.thresholds(2) == (0, 8, 16, 32, 64, 128, 512, 2560, 6400), "hardest is the original"
+assert commander.thresholds(2) == (0, 8, 16, 32, 64, 128, 512, 2560, 4000, 6400), \
+    "hardest is the original, with ACE (ours) between Deadly and Elite"
+c = commander.Commander(2); c.add_kills(3999); assert c.rank() == "DEADLY"
+assert c.next_rank() == ("ACE", 1) and c.add_kills(1) == "ACE" and c.next_rank() == ("ELITE", 2400)
 assert commander.thresholds(0)[-1] == 1280 and commander.thresholds(1)[-1] == 3200
 assert commander.thresholds(0)[5] == 26, "Competent on the easiest level"
 for level in range(3):
@@ -61,6 +64,7 @@ assert c.add_kills(1) is None and c.add_kills(1) == "MOSTLY HARMLESS"
 assert c.add_kills(0) is None
 c.add_kills(1300)
 assert c.rank() == "ELITE" and c.next_rank() is None
+assert commander.thresholds(0)[-2] == 800 and commander.thresholds(1)[-2] == 2000, "ACE"
 c = commander.Commander(2)
 assert c.add_kills(7) is None and c.add_kills(1) == "MOSTLY HARMLESS"
 assert commander.Commander(9).level == 2 and commander.Commander(-3).level == 0
@@ -759,10 +763,15 @@ c.cash = 100000; c.missiles = 2
 saved_c = commander.Commander.from_dict(c.to_dict())
 assert (saved_c.hold, saved_c.laser, saved_c.missiles, "scoops" in saved_c.extras) == (35, "beam", 2, True)
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART" and d.view.verb == "TARGET"
-tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART", "the joystick moves the cursor here"
-tick(e, fresh=["B"]); assert d.name() == "GALACTIC CHART" and len(d.view.dots) == 256
+assert not d.cursor and "C: MOVE CURSOR" in texts(e), "the joystick changes tab until C"
+tick(e, fresh=["C"]); assert d.cursor and d.view.active
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART", "now the joystick moves the cursor"
+tick(e, fresh=["F"]); assert d.name() == "LOCAL CHART" and not d.cursor, "F gives it back"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "GALACTIC CHART" and len(d.view.dots) == 256
+assert not d.cursor, "a new tab starts with the joystick on the tabs"
+tick(e, fresh=["E"]); tick(e, fresh=["B"]); assert d.name() == "GALACTIC CHART", "E / B still go"
 tx = texts(e)
-assert "GALAXY 1" in tx and "LAVE" in tx and "YOU ARE HERE" in tx, tx
+assert "GALAXY 1" in tx and "LAVE" in tx and "C: MOVE CURSOR" in tx, tx
 tick(e, fresh=["B"]); assert d.name() == "SYSTEM DATA" and d.data.name == "LAVE"
 tx = texts(e)
 assert "you are here" in tx and "Dictatorship" in tx and "Tech 5   Pop 2.5 billion" in tx, tx
@@ -783,6 +792,7 @@ tick(e, fresh=["E"]); assert d.name() == "SYSTEM DATA"
 tick(e, fresh=["F"]); assert d.name() == "STATUS" and e.mode == "docked", "F goes back to Status"
 # pick Diso (147) on the galactic chart by steering to it
 d.open("GALACTIC CHART")
+tick(e, fresh=["C"])        # the joystick to the cursor
 tx_, ty_ = [(dot[0], dot[1]) for dot in d.view.dots if dot[2] == 147][0]
 for _ in range(400):
     v = d.view
@@ -806,6 +816,7 @@ d.open("LOCAL CHART"); assert d.view.sel[2] == 147, "the chart opens on the targ
 # a far system can be looked up, but not jumped to
 d.open("GALACTIC CHART")
 far = max(d.view.dots, key=lambda dot: dot[3])
+d.use_cursor(True)
 d.view.cx, d.view.cy = float(far[0]), float(far[1]); d.view._select()
 assert any("TOO FAR  C: DATA" in t for t in texts(e))
 tick(e, fresh=["C"]); assert e.target == far[2] and d.name() == "SYSTEM DATA"

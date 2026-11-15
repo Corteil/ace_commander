@@ -825,14 +825,17 @@ class AceCommander(app.App):
             self.mode = "brief"
 
     def _update_docked(self, dt, cancel, confirm):
-        """The docked tabs. The joystick changes tab, except on the charts,
-        where it moves the cursor and E / B change tab instead. C launches
-        from Status and picks a target on a chart. A launches from any tab.
-        F goes back to Status, and from Status to the title screen."""
+        """The docked tabs. The joystick changes tab, and E / B do too. On a
+        chart C hands the joystick to the cursor, then C picks a target and F
+        hands it back. C launches from Status. A launches from any tab. F goes
+        back to Status, and from Status to the title screen."""
         d = self.dock
         hit = self.pad.hit
         new = FB is not None
         d.tick(dt)
+        if cancel and d.view is not None and d.cursor:
+            d.use_cursor(False)     # F: the joystick goes back to changing tabs
+            return
         if cancel:
             if d.tab:
                 d.go(0)
@@ -849,7 +852,7 @@ class AceCommander(app.App):
         if new and hit(BTN_BOMB):
             d.go(d.tab + 1)
             return
-        if d.view is not None:
+        if d.view is not None and d.cursor:
             if confirm:
                 d.pick()
                 self.target = d.target
@@ -859,6 +862,13 @@ class AceCommander(app.App):
                 jx, jy = self._steer(False, STICK if new else ANY, new)
                 d.view.move(jx, jy, dt)
             return
+        if d.view is not None:              # the joystick changes tab (below) until C
+            if confirm:
+                d.use_cursor(True)
+                return
+            if (new and hit(BTN_MISSILE)) or hit("k_D"):
+                d.show(d.view.picked())
+                return
         if hit("j_left" if new else "left"):
             d.go(d.tab - 1)
         elif hit("j_right" if new else "right"):

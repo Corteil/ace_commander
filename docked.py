@@ -73,6 +73,7 @@ class Docked:
         self.target = target if gal is not None else None   # a system index, or None
         self.here = gal.system(cmdr.system) if gal is not None else None
         self.view = None        # the chart, on the chart tabs
+        self.cursor = False     # on a chart: the joystick moves the cursor (after C), not the tab
         self.chart_tab = None   # the last chart tab opened: where D on System data goes back to
         self.data = None        # the galaxy.System on the System data tab
 
@@ -91,6 +92,7 @@ class Docked:
         c = self.cmdr
         self.view = None
         self.data = None
+        self.cursor = False
         if sel is None:
             sel = self.target
         if n == "LOCAL CHART":
@@ -102,6 +104,14 @@ class Docked:
             self.chart_tab = n
         elif n == "SYSTEM DATA":
             self.data = self.gal.system(self.target if self.target is not None else c.system)
+        if self.view is not None:
+            self.view.active = False
+
+    def use_cursor(self, on):
+        """On a chart: C gives the joystick to the cursor, F gives it back to the tabs."""
+        self.cursor = on
+        if self.view is not None:
+            self.view.active = on
 
     def pick(self):
         """C on a chart: the selected system becomes the target and its data
@@ -248,6 +258,7 @@ class Docked:
         name = self.chart_tab if self.chart_tab in self.tabs else "LOCAL CHART"
         if name in self.tabs:
             self.go(self.tabs.index(name), self.data.index if self.data is not None else None)
+            self.use_cursor(True)       # carry on looking round
 
     def show(self, index):
         """D on a chart: open System data for system index, leaving the

@@ -44,6 +44,7 @@ class _Cursor:
         self.here = here
         self.fuel = fuel
         self.verb = verb    # what C does with a system in range: "JUMP" or "TARGET"
+        self.active = True  # the joystick moves the cursor (docked: only after C)
         self.dots = []
         self.sel = None     # the dot nearest the cursor
         self.info = None    # its galaxy.System
@@ -135,6 +136,12 @@ class _Cursor:
     def _texts(self, ctx, name_y, line_y, fuel_y):
         text = cockpit.text
         s = self.sel
+        if not self.active:     # docked, the joystick changing tabs
+            if s is not None:
+                text(ctx, self.info.name, 0, name_y, 15, cockpit.WHITE)
+            text(ctx, "C: MOVE CURSOR", 0, line_y, 12, cockpit.GREEN)
+            text(ctx, "< >   D: DATA", 0, fuel_y, 10, cockpit.YELLOW)
+            return
         if s is not None:
             text(ctx, self.info.name, 0, name_y, 15, cockpit.WHITE)
             if s[2] == self.here:
@@ -147,7 +154,10 @@ class _Cursor:
                 text(ctx, "%s  TOO FAR  C: DATA" % _ly(s[3]), 0, line_y, 11, cockpit.RED)
             else:
                 text(ctx, "%s   TOO FAR" % _ly(s[3]), 0, line_y, 12, cockpit.RED)
-        text(ctx, "FUEL %s   D: DATA" % _ly(self.fuel), 0, fuel_y, 10, cockpit.YELLOW)
+        if self.verb == "TARGET":       # docked: F gives the joystick back to the tabs
+            text(ctx, "D: DATA  F: DONE", 0, fuel_y, 10, cockpit.YELLOW)
+        else:
+            text(ctx, "FUEL %s   D: DATA" % _ly(self.fuel), 0, fuel_y, 10, cockpit.YELLOW)
 
 
 class Chart(_Cursor):

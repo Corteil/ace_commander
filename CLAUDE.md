@@ -728,6 +728,15 @@ of a real flight, not from a harness.
    (`_make_dock`). Lists of at most `DEBUG_ROWS` are drawn in order (`_draw_list`). The
    in-flight Settings page no longer shows the frame / rules / world / hud timings.
    Tests reach a cheat with `mod.cheat_group(line)`.
+   Then (Brian): a rank ACE (4000 kills in the original's count, so EASY 800, NORMAL 2000,
+   HARD 4000) between DEADLY and ELITE (`commander.RANKS`; not in the original). The
+   loading screen's LOADING flashes, on and off at each redraw (`app.AceCommander.shown`;
+   redraws come between imports, about 0.4 s apart). Docked charts: the joystick changes
+   tab as on every tab (E / B too); C hands it to the cursor (`Docked.use_cursor`,
+   `Docked.cursor`, `Chart.active`), then C picks a target and F hands it back; D shows a
+   system's data either way; D back from System data returns with the cursor on. The
+   hints: "C: MOVE CURSOR" / "< >   D: DATA", then "D: DATA  F: DONE" (the in-flight
+   chart keeps "FUEL ... D: DATA").
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not

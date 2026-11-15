@@ -64,7 +64,9 @@ e = ace_commander.AceCommander()
 choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
 d = e.dock
 d.open("LOCAL CHART")
-assert "FUEL 7.0 LY   D: DATA" in [t[0] for t in (lambda c: (d.draw(c), c.texts)[1])(CountCtx())]
+assert "< >   D: DATA" in [t[0] for t in (lambda c: (d.draw(c), c.texts)[1])(CountCtx())]
+d.use_cursor(True)
+assert "D: DATA  F: DONE" in [t[0] for t in (lambda c: (d.draw(c), c.texts)[1])(CountCtx())]
 d.view.cx, d.view.cy = [(float(px), float(py)) for px, py, i, dd in d.view.dots if i != e.cmdr.system][0]
 d.view._select()
 pick = d.view.picked()

@@ -17,7 +17,8 @@ import json
 LEVELS = ("EASY", "NORMAL", "HARD")
 RANK_DIVISOR = (5, 2, 1)    # the original's kill counts are divided by this
 
-# rank, and the kills it takes in the original game
+# rank, and the kills it takes in the original game; ACE is ours (Brian's
+# choice), between Deadly and Elite
 RANKS = (
     ("HARMLESS", 0),
     ("MOSTLY HARMLESS", 8),
@@ -27,6 +28,7 @@ RANKS = (
     ("COMPETENT", 128),
     ("DANGEROUS", 512),
     ("DEADLY", 2560),
+    ("ACE", 4000),
     ("ELITE", 6400),
 )
 
