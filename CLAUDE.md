@@ -772,7 +772,7 @@ of a real flight, not from a harness.
    **Build 55: publishing prep begins, the game's own ships** (Brian: a full game with
    our own content, our own names, Claude designs the ships). `original_ships.py` (31
    roles: KESTREL in the Cobra Mk III's role, WARDEN police, GNAT, HORNET, STINGER, MULE,
-   SKINK, KITE, GRUB, HARRIER, LANCET, BULWARK, BARGE, LEVIATHAN, EEL, PHANTOM (mission
+   SKINK, KITE, GRUB, HARRIER, LANCET, BULWARK, BARGE, LEVIATHAN, MANTA, PHANTOM (mission
    1), VORN MOTHERSHIP and DRONE (aliens), SHUTTLE, HAULER, DRUM STATION (low tech, 3:1
    slot) and HALO STATION (high tech: a six-sided ring on three flat spokes round a hub,
    2:1 docking slot in the hub's front), rocks, canister, plate, missile, pod). Sizes near
