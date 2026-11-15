@@ -78,6 +78,37 @@ assert cockpit.COLOUR["missile"] == cockpit.ORANGE
 assert cockpit.COLOUR["pmissile"] == cockpit.LIGHT_PURPLE
 assert cockpit.LIGHT_PURPLE not in cockpit.LASER_COLOURS.values()
 print("laser colours on screen and LEDs, white bomb flash, missile colours: ok")
+# the jump: white on the LEDs where the hyperspace streaks leave the screen
+import math as _m
+a1 = mod.LED_ANGLE1 * _m.pi / 180
+assert a._led_at(_m.cos(a1) * 100, -_m.sin(a1) * 100) == 1, "LED 1 where it is"
+a2 = a1 - (_m.pi / 6 if mod.LED_CLOCKWISE else -_m.pi / 6)
+assert a._led_at(_m.cos(a2) * 100, -_m.sin(a2) * 100) == 2, "and the next round from it"
+g.beam = 0.0; g.flash = 0.0
+seen_lit = set()
+WT = mod.game.WARP_TIME
+g.warp = WT
+for _ in range(int(WT / 0.04)):
+    tick(a)
+    for i in range(1, 13):
+        v = leds.values[i]
+        assert v[0] == v[1] == v[2], "white"
+        if v[0] > 0:
+            seen_lit.add(i)
+    lit_now = [i for i in range(1, 13) if leds.values[i][0] > 0]
+assert len(seen_lit) >= 6, ("streaks leave all round the screen", seen_lit)
+for _ in range(20):
+    tick(a)
+assert not any(leds.values[i] == (255, 255, 255) for i in range(1, 13)), "and fade away"
+# and with the jump drive, where the stardust streaks off the edge
+z = 2000.0
+fx = mod.cockpit.FOCAL
+g.dust[:] = [[_m.cos(a1) * 110 * z / fx, _m.sin(a1) * 110 * z / fx, z]]   # y up in the world
+g.jumping = True
+mod.AceCommander._jump_flashes(a)
+g.jumping = False
+assert a.jump_leds[1] == 255 and sum(1 for v in a.jump_leds[1:] if v) == 1, a.jump_leds
+print("jump: white LED flashes round the ring where the streaks leave: ok")
 
 g._hurt(10.0); tick(a); assert leds.values[5] == (255, 0, 0)
 tick(a, fresh=["A"]); tick(a)                       # paused
