@@ -1183,7 +1183,8 @@ def draw_hud(ctx, g, ms=None, ring=True):
                 else:
                     ctx.rectangle(bx, by, 1, -h).fill()
                 ctx.rectangle(bx - 2, by - h - 2, 5, 5).fill()
-        _compass(ctx, sp)
+        if not sp.witch:        # nothing to point at in witchspace
+            _compass(ctx, sp)
         if g.cabin > COOL_CABIN:
             _sun_gauges(ctx, g, sp)
 

@@ -83,7 +83,8 @@ class Docked:
         if n == "LOCAL CHART":
             self.view = chart.Chart(self.gal, c.system, c.fuel, self.target, "TARGET")
         elif n == "GALACTIC CHART":
-            self.view = chart.GalChart(self.gal, c.system, c.fuel, self.target, "TARGET")
+            self.view = chart.GalChart(self.gal, c.system, c.fuel, self.target, "TARGET",
+                                       c.galaxy + 1)
         elif n == "SYSTEM DATA":
             self.data = self.gal.system(self.target if self.target is not None else c.system)
 

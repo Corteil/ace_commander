@@ -165,6 +165,19 @@ AVOID_DIST = 1200.0
 AVOID_AHEAD = 3000.0    # and one in your path this far ahead (within AVOID_SIDE of it) gets out of it
 AVOID_SIDE = 300.0
 
+# Witchspace and Thargoids, as the original (MJP, GTHG, TACTICS): one jump in
+# MISJUMP_ODDS goes wrong and drops you in witchspace, short of your target,
+# with no planet, sun or station and hardly any stardust, among THARGOIDS
+# Thargoids, each with a Thargon. Nothing else turns up there. A Thargoid
+# launches a Thargon in place of a missile, only once below half its energy;
+# a Thargon with no Thargoid left drifts aimlessly at half speed. Any Thargon
+# can be scooped (from below, with fuel scoops) as alien items. The escape pod
+# can't save you in witchspace. You leave by hyperspace, from where you are.
+MISJUMP_ODDS = 3 / 256.0
+THARGOIDS = 4
+ALIEN_ITEMS = 16        # the good a scooped Thargon becomes (market.py's list)
+WITCH_DUST = 3          # stardust in witchspace (10 elsewhere)
+
 # The ships parked in a station's docking bay depend on the system: pirate
 # craft where the government is weak, traders and police where it is strong,
 # shuttles where the tech level is low, the newest ships where it is high.
@@ -420,6 +433,7 @@ class Space:
         self.d_station = 1e9    # distance to the station
         self.safe_r = radius * SAFE_K   # the safe zone round the station
         self.safe = False       # within it
+        self.witch = False      # witchspace: no planet, sun or station (see Game.witchspace)
 
 
 class Game:
@@ -626,6 +640,9 @@ class Game:
             st.x, st.y, st.z = sx, sy, sz
             _look(st.m, ux, uy, uz)         # the slot is on the nose
         self.space = sp
+        while len(self.dust) < 10:      # all the stardust again, after witchspace
+            self.dust.append([random.randint(-500, 500), random.randint(-500, 500),
+                              random.randint(100, 1500)])
         self.autodock = False
         self.auto_phase = 0
         self.auto_level = False
@@ -634,6 +651,61 @@ class Game:
         if self.msg == "WAVE 1":    # waves are for combat practice only
             self.msg_t = 0.0
         self._measure()
+
+    def witchspace(self, n=THARGOIDS):
+        """A mis-jump: put the player in witchspace (MJP), with n Thargoids
+        about, each with a Thargon. The planet and sun are put out of reach
+        and there is no station."""
+        sp = Space(None, 4000.0, None)
+        far = 1e9
+        sp.px = sp.py = sp.pz = far
+        sp.sx, sp.sy, sp.sz = -far, far, far
+        sp.witch = True
+        self.space = sp
+        self.dust = self.dust[:WITCH_DUST]
+        self.autodock = False
+        self.tractor = False
+        self.pending = 0
+        self.group = []
+        for _ in range(n):
+            self.add_thargoid()
+        self._measure()
+        self.say("WITCHSPACE", 3.0)
+
+    def add_thargoid(self):
+        """A Thargoid round you (GTHG), with a Thargon beside it."""
+        bp = self.types.get("THARGOID")
+        if bp is None or len(self.objs) + len(self.new) >= MAX_OBJECTS - 1:
+            return None
+        o = self._spawn_ship(bp)
+        o.role = "thargoid"
+        o.state = "attack"
+        self._thargon(o)
+        return o
+
+    def _thargon(self, parent):
+        """A Thargon launched from its Thargoid mothership."""
+        bp = self.types.get("THARGON")
+        if bp is None or len(self.objs) + len(self.new) >= MAX_OBJECTS:
+            return None
+        k = parent.bp.radius + bp.radius + 60
+        m = parent.m
+        t = Obj(bp, "ship", parent.x + m[0] * k, parent.y + m[1] * k, parent.z + m[2] * k)
+        t.m = list(m)
+        t.speed = bp.speed * 0.5
+        t.role = "thargoid"
+        t.state = "attack"
+        self.new.append(t)
+        return t
+
+    def _any_thargoid(self):
+        for o in self.objs:
+            if o.bp.name == "THARGOID" and not o.dead:
+                return True
+        for o in self.new:
+            if o.bp.name == "THARGOID":
+                return True
+        return False
 
     def to_station(self, dist=4000.0, slot=True):
         """A cheat: move the star system so the station is dist ahead, with
@@ -1016,7 +1088,7 @@ class Game:
         fwd = self.speed * SPEED_K * dt
         sp = self.space
         # the jump drive: speed up held at full speed, with no ships about
-        self.jumping = (sp is not None and not self.over and throttle > 0
+        self.jumping = (sp is not None and not sp.witch and not self.over and throttle > 0
                         and self.speed >= PLAYER_MAX and not sp.safe and self.jump_t <= 0
                         and self.cabin <= COOL_CABIN    # not near the sun
                         and not self._near())
@@ -1186,6 +1258,17 @@ class Game:
             d = 1.0
         if kind == "ship":
             bp = o.bp
+            if o.state == "drift":      # a Thargon with no mothership: adrift
+                o.speed = bp.speed * 0.25
+                v = o.speed * SPEED_K * dt / THINK_EVERY
+                o.x += m[6] * v
+                o.y += m[7] * v
+                o.z += m[8] * v
+                return
+            if bp.name == "THARGON" and not self._any_thargoid():
+                o.state = "drift"       # half speed, aimless (TACTICS part 1)
+                o.prey = None
+                return
             if (o.role == "pirate" and self.space is not None and self.space.safe
                     and (o.state == "attack" or o.state == "break")):
                 o.state = "patrol"      # near the station a pirate loses its nerve (TN3)
@@ -1234,7 +1317,13 @@ class Game:
                             o.beam = 0.2
                             if random.random() < min(0.7, 0.3 + 0.05 * self.wave) * self.aim_k:
                                 self._hurt((3.0 + bp.laser * 2.5) * self.damage_k)
-                        if (o.missiles and self.missile_bp and aim > 0.9
+                        if o.role == "thargoid" and bp.name == "THARGOID":
+                            # a Thargon instead of a missile, once below half energy
+                            if (o.missiles and o.energy < bp.energy * 0.5
+                                    and random.random() < 0.5 * dt):
+                                o.missiles -= 1
+                                self._thargon(o)
+                        elif (o.missiles and self.missile_bp and aim > 0.9
                                 and random.random() < 0.12 * dt):
                             o.missiles -= 1
                             self._launch(o)
@@ -1365,6 +1454,10 @@ class Game:
             # a canister is scooped, but only with fuel scoops and from below
             # (it passes under the ship), as in the original; otherwise it is
             # hit like anything else
+            if (o.kind == "ship" and o.bp.name == "THARGON" and self.fuel_scoops and o.y < 0
+                    and self.scoop is not None):
+                o.kind = "can"          # scooped like cargo: alien items
+                o.good = ALIEN_ITEMS
             if o.kind == "can" and (self.fuel_scoops and o.y < 0 or self.scoop is None):
                 o.dead = True
                 if self.scoop is None:      # practice: a pick-up instead of cargo
@@ -1580,7 +1673,10 @@ class Game:
             self.lock = None
             self.locked = False
             self._boom(0.0, 0.0, 150.0, 20)
-            if self.pod:        # the escape pod gets away; the ship and its cargo are lost
+            if self.pod and self.space is not None and self.space.witch:
+                self.pod = False        # no station to reach from witchspace
+                self.say("GAME OVER", 1e9)
+            elif self.pod:      # the escape pod gets away; the ship and its cargo are lost
                 self.pod = False
                 self.ejected = True
                 self.say("ESCAPE POD LAUNCHED", 1e9)
@@ -1835,6 +1931,8 @@ class Game:
         """In a star system ships come in groups, a while apart, and none
         come near the station. The group's ships turn up a second or so
         apart."""
+        if self.space.witch:    # nothing turns up in witchspace: the Thargoids are already here
+            return
         self._station_ships(dt)
         if self.space.safe:
             self.pending = 0

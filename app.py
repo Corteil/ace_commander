@@ -259,9 +259,13 @@ class Pad:
 
 
 class AceCommander(app.App):
-    def __init__(self):
+    def __init__(self, host=None):
+        """host: the app object the badge's scheduler knows, when this one is
+        started by loader.py; button events, foreground checks and minimise
+        go through it. None: this is that object."""
         super().__init__()
-        self.pad = Pad(self)
+        self.host = host if host is not None else self
+        self.pad = Pad(self.host)
         # menu (the title screen) | level | docked | launch | flight | viewer | bench
         self.mode = "menu"
         self.bench = None
@@ -282,6 +286,8 @@ class AceCommander(app.App):
         self.galaxy = None      # made the first time a commander flies
         self.galaxy_n = 0       # which of the 8 galaxies self.galaxy is
         self.eject_t = 0.0      # time since the escape pod was launched
+        self.witch = None       # in witchspace: (x, y) on the chart, between systems
+        self.misjump = False    # DEBUG: the next jump goes wrong
         self.fire_lock = False  # the lasers wait until C is let go (held on from a menu)
         self.repair_shop = False    # show the Repair Shop tab (a DEBUG switch for now)
         self.chart = None       # the local chart, while it is open
@@ -344,11 +350,17 @@ class AceCommander(app.App):
                 try:
                     scheduler.render_needed.set()
                     await asyncio.sleep(0)      # the renderer and other tasks run here
-                    if scheduler.app_is_foregrounded(self):
+                    if scheduler.app_is_foregrounded(self.host):
                         continue
                 except Exception:
                     self.fast = False           # firmware differs: stay on the normal path
             await render_update()
+
+    def minimise(self):
+        if self.host is not self:
+            self.host.minimise()        # the scheduler only knows the loader
+        else:
+            super().minimise()
 
     # ---- LEDs -------------------------------------------------------------
 
@@ -671,6 +683,7 @@ class AceCommander(app.App):
         self.career = True
         c = self.cmdr
         c.docked_at = c.system  # the last station docked at
+        self.witch = None
         if not EQUIP:           # nowhere to buy fuel: it's free, as before the equipment
             c.fuel = commander.MAX_FUEL
         if GOODS and self.galaxy is not None and (c.market is None
@@ -848,6 +861,7 @@ class AceCommander(app.App):
         g.missiles = c.missiles
         g.fuel = c.fuel
         g.legal = c.legal       # nothing more from the dead flight
+        self.witch = None       # back where you last saved
         self.target = None
         self.jump_to = None
 
@@ -888,7 +902,10 @@ class AceCommander(app.App):
         """The hyperspace target, if the fuel will reach it: (system, distance)."""
         if self.target is None or self.galaxy is None or not self.career:
             return None
-        d = self.galaxy.distance(self.cmdr.system, self.target)
+        if self.witch is not None:      # from where you are, between systems
+            d = self.galaxy.distance_xy(self.witch[0], self.witch[1], self.target)
+        else:
+            d = self.galaxy.distance(self.cmdr.system, self.target)
         if 0 < d <= self.cmdr.fuel:
             return self.target, d
         return None
@@ -912,6 +929,15 @@ class AceCommander(app.App):
             c.system = self.galaxy.nearest(*galaxy.GAL_ARRIVE)
             c.docked_at = None  # nowhere docked in this galaxy yet
             to = (c.system, 0)
+        elif self.witch is None and (self.misjump or random.random() < game.MISJUMP_ODDS):
+            # a mis-jump (MJP): the fuel is used, but you end up in witchspace,
+            # short of the target and above or below it on the chart
+            self.misjump = False
+            c.fuel = max(0, c.fuel - to[1])
+            self.witch = (self.galaxy.xs[to[0]], self.galaxy.ys[to[0]] ^ 31)
+            g.witchspace()
+            return
+        self.witch = None
         c.system = to[0]
         c.fuel = max(0, c.fuel - to[1])
         g.legal //= 2           # a jump halves your legal status
@@ -1194,7 +1220,8 @@ class AceCommander(app.App):
                      "LEVEL: " + commander.LEVELS[self.game.level],
                      "FRAME TIME: " + ("ON" if self.show_ms else "OFF"),
                      "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
-                     "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION", "LEGAL: " + game.legal_name(self.game.legal),
+                     "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION",
+                     "ADD A THARGOID", "MIS-JUMP NEXT: " + ("ON" if self.misjump else "OFF"), "LEGAL: " + game.legal_name(self.game.legal),
                      "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4", "+10 KILLS", "+1000 CR",
                      "SHIP CONFIG", "REPAIR SHOP: " + ("ON" if self.repair_shop else "OFF"),
                      "RELEASE CANISTER", "TO THE STATION", "TO THE SUN",
@@ -1207,6 +1234,7 @@ class AceCommander(app.App):
                 items.remove("ADD POLICE")
                 items.remove("ADD A HUNTER")
                 items.remove("ANGER STATION")
+                items.remove(items[[i for i, t in enumerate(items) if t.startswith("MIS-JUMP")][0]])
                 items.remove(items[[i for i, t in enumerate(items) if t.startswith("LEGAL")][0]])
                 items.remove("FUEL TO 1/4")
             return items
@@ -1325,6 +1353,12 @@ class AceCommander(app.App):
                     g.add_hunter()
                 else:
                     g.add_police(False)
+        elif item == "ADD A THARGOID":
+            if g.add_thargoid() is None:
+                g.say("TOO MANY OBJECTS")
+        elif item.startswith("MIS-JUMP NEXT"):
+            self.misjump = not self.misjump     # like the original's CTRL during a jump
+            g.say("MIS-JUMP NEXT " + ("ON" if self.misjump else "OFF"))
         elif item == "ANGER STATION":
             if g.space is None:
                 g.say("ONLY IN A STAR SYSTEM")
@@ -1437,7 +1471,7 @@ class AceCommander(app.App):
             elif item == "LOCAL CHART":
                 from . import chart
                 self.chart = chart.Chart(self.galaxy, self.cmdr.system, self.cmdr.fuel,
-                                         self.target)
+                                         self.target, at=self.witch)
                 self.fsub = "chart"
             elif item.startswith("JUMP"):
                 to = self._jump_ok()
@@ -1594,7 +1628,8 @@ class AceCommander(app.App):
                 text(ctx, "%d more for %s" % (nxt[1], nxt[0]), 0, 6, 12, cockpit.YELLOW)
             if self.galaxy is not None:
                 text(ctx, "%s   fuel %d.%d LY" % (
-                    self.galaxy.system(c.system).name, c.fuel // 10, c.fuel % 10),
+                    "WITCHSPACE" if self.witch is not None else self.galaxy.system(c.system).name,
+                    c.fuel // 10, c.fuel % 10),
                     0, 23, 12, cockpit.CYAN)
             from . import market
             text(ctx, "hold %d/%dt   %s" % (market.hold_used(c.cargo), c.hold, c.cash_text()),

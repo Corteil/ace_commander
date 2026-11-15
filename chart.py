@@ -151,17 +151,23 @@ class _Cursor:
 
 
 class Chart(_Cursor):
-    """The local chart, centred on where you are."""
+    """The local chart, centred on where you are: a system (here), or a
+    chart position between systems (at, in witchspace; here is then None)."""
 
-    def __init__(self, gal, here, fuel, sel=None, verb="JUMP"):
+    def __init__(self, gal, here, fuel, sel=None, verb="JUMP", at=None):
+        if at is not None:
+            here = None
+            x0, y0 = at
+        else:
+            x0 = gal.xs[here]
+            y0 = gal.ys[here]
         _Cursor.__init__(self, gal, here, fuel, sel, verb)
-        x0 = gal.xs[here]
-        y0 = gal.ys[here]
         for i in range(len(gal.xs)):
             px = (gal.xs[i] - x0) * SX2 // 2
             py = (gal.ys[i] - y0) * SY2 // 2
             if px * px + py * py <= EDGE * EDGE:
-                self.dots.append((px, py, i, gal.distance(here, i)))
+                d = gal.distance(here, i) if at is None else gal.distance_xy(x0, y0, i)
+                self.dots.append((px, py, i, d))
         self._start(sel)
 
     def draw(self, ctx):
@@ -191,8 +197,9 @@ class GalChart(_Cursor):
 
     speed = G_CURSOR_SPEED
 
-    def __init__(self, gal, here, fuel, sel=None, verb="TARGET"):
+    def __init__(self, gal, here, fuel, sel=None, verb="TARGET", number=1):
         _Cursor.__init__(self, gal, here, fuel, sel, verb)
+        self.number = number    # which galaxy, 1 to 8, for the title
         for i in range(len(gal.xs)):
             self.dots.append(((gal.xs[i] - 128) * GX5 // 5, (gal.ys[i] - 128) * GY5 // 5,
                               i, gal.distance(here, i)))
@@ -225,6 +232,6 @@ class GalChart(_Cursor):
         if s is not None:
             ok = self.target() is not None or s[2] == self.here
             self._box(ctx, s[0], s[1], 4, cockpit.GREEN if ok else cockpit.RED)
-        cockpit.text(ctx, "GALAXY 1", 0, -96, 10, cockpit.GREY)
+        cockpit.text(ctx, "GALAXY %d" % self.number, 0, -96, 10, cockpit.GREY)
         self._texts(ctx, -76, 74, 92)
         self._cursor(ctx, 3, 4)
