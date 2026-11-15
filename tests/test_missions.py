@@ -352,6 +352,21 @@ assert c.mission == 14 and "navy" in c.extras and e.mode == "brief"
 tick(e, fresh=["F"])
 launch(e)
 assert e.game.navy and e.game.energy_unit and not e.game.plans
+# TO MISSION SYSTEM from the docked Options tab's DEBUG: docked there at once,
+# with that stage's message
+c.mission = 6; e._dock()
+if e.mode == "brief":
+    tick(e, fresh=["F"])
+e.dock.open("OPTIONS"); e.dock.osel = len(e._settings(True)) - 1
+tick(e, fresh=["C"]); assert e.mode == "odebug"
+assert "TRAVEL" in e._od_items()
+e.od_sel = e._od_items().index("TRAVEL"); tick(e, fresh=["C"])
+assert e._od_items() == ["TO MISSION SYSTEM"], e._od_items()
+tick(e, fresh=["C"])
+assert e.galaxy.system(c.system).name == "CEERDI" and c.mission == 10 and e.mode == "brief"
+tick(e, fresh=["F"]); assert e.mode == "docked"
+c.mission = 14
+launch(e)
 # the pause menu's CONSTRICTOR setting, saved; 2 MIN to start with; shown
 # only while mission 1 is under way
 assert c.quick_con and e.game.con_wait == missions.QUICK_WAIT
