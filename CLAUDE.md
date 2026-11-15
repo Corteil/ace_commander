@@ -581,6 +581,10 @@ of a real flight, not from a harness.
    within `AVOID_AHEAD` (3,000) ahead and `AVOID_SIDE` of your path, or within `AVOID_DIST`
    heading your way (turning straight away put it back down your path). 40 docking-computer
    runs from random directions with a shuttle already coming out: no hits, all docked.
+   **Build 48 (Brian):** the station is drawn to scale in the docking computer's view again
+   (build 46's 12 px minimum is gone); it stays a wireframe at any distance, never a dot or
+   marker. What launches from a station: a friendly one only Shuttles and Transporters, a
+   hostile one only police Vipers, as in the disc original (TACTICS for the station).
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -591,7 +595,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 47), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 48), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

@@ -763,7 +763,6 @@ def draw(ctx, g, ms=None, ring=True):
 
 # While the docking computer flies, the view is from behind and above your own
 # ship (Brian's idea): the camera sits CHASE_BACK behind you and CHASE_UP above.
-CHASE_STATION_MIN = 12  # pixels: in that view a far station is drawn at least this big (radius)
 CHASE_BACK = 760
 CHASE_UP = 130
 _me = None      # your ship, for that view: [Obj, the Game whose blueprint it is]
@@ -1012,20 +1011,9 @@ def _draw_space(ctx, sp, wire=WIRE_MIN):
             pr = st.bp.size * k
             d = math.sqrt(dx * dx + dy * dy)
             solid = abs(d - planet[2]) < pr
-        if wire > 0 or st.z <= NEAR:
-            draw_ship(ctx, st, station_colour(sp.gov), wire, solid)
-            return
-        # the docking computer's view: a wireframe however far off, and never
-        # smaller than CHASE_STATION_MIN, drawn as if nearer along the same line
-        # of sight (same place on screen, same turn), then put back
-        pr = st.bp.isize * FOCAL / st.z
-        k = 1.0 if pr >= CHASE_STATION_MIN else pr / CHASE_STATION_MIN
-        x, y, z = st.x, st.y, st.z
-        st.x, st.y, st.z = x * k, y * k, z * k
-        try:
-            draw_ship(ctx, st, station_colour(sp.gov), 0, solid)
-        finally:
-            st.x, st.y, st.z = x, y, z
+        # wire 0 (the docking computer's view): a wireframe at its true size
+        # however far off, never a dot or marker
+        draw_ship(ctx, st, station_colour(sp.gov), wire, solid)
 
 
 # the compass, right of the radar: a ring with a dot that points to the planet,

@@ -430,7 +430,7 @@ finally:
     cockpit.draw_ship = real
 s_calls = [c for c in calls if c[0] is st]
 assert s_calls and s_calls[0][1] == 0, "a wireframe, never a dot or marker"
-assert st.bp.isize * cockpit.FOCAL / s_calls[0][2] >= cockpit.CHASE_STATION_MIN - 0.01, "and big enough to see"
+assert s_calls[0][2] == before[2] + cockpit.CHASE_BACK, "at its true distance from the camera: to scale (build 48)"
 assert (st.x, st.y, st.z) == before, "put back where it was"
 g.autodock = False; calls[:] = []
 cockpit.draw_ship = spy
@@ -439,5 +439,5 @@ try:
 finally:
     cockpit.draw_ship = real
 assert [c for c in calls if c[0] is st][0][1] == cockpit.WIRE_MIN, "the cockpit view as before"
-print("build 46: the station in 3D at any distance in the docking computer's view: ok")
+print("builds 46, 48: the station a wireframe at any distance, to scale, in the docking computer's view: ok")
 print("ALL EQUIPMENT EFFECT TESTS PASSED")
