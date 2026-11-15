@@ -107,6 +107,18 @@ face_on = c.calls.get("fill", 0)
 o.m = [0.0, 0.0, 1.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0]      # side on
 c = CountCtx(); cockpit.draw_ship(c, o, None, 0, False)
 assert face_on == 1 and c.calls.get("fill", 0) > face_on, (face_on, c.calls.get("fill", 0))
+# close in front of a station's slot only its front shows: the hidden-line test
+# is made from a point on each face, not the station's middle (which showed
+# the drum's back rim as you flew in)
+for key in ("CORIOLIS", "DODO"):
+    st = game.Blueprint([e for e in SHIPS if e[0] == key][0])
+    o = O(); o.bp = st
+    o.m = [-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0]     # its slot towards you
+    o.x, o.y, o.z = 20.0, -10.0, st.front + 300.0
+    cockpit.draw_ship(CountCtx(), o, None, 0, False)
+    for f, n in enumerate(st.normals):
+        if n != (0, 0, 0) and n[2] <= 0 and key == "CORIOLIS":
+            assert not cockpit._VIS[f], (key, f, n)
 print("drawn from all round: ok")
 
 # ---- playing with them --------------------------------------------------------------

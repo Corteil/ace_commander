@@ -133,6 +133,8 @@ _PY = [0] * 96      # screen y
 _OK = [False] * 96  # False if the vertex is behind the viewer
 _VIS = [False] * 64  # which faces of the ship being drawn can be seen
 _PZ = [0] * 96      # how far away each vertex is
+_VX = [0] * 96      # and where it is across and up, before the perspective
+_VY = [0] * 96
 
 
 def draw_ship(ctx, o, rgb=None, wire_min=WIRE_MIN, solid=False):
@@ -175,27 +177,43 @@ def draw_ship(ctx, o, rgb=None, wire_min=WIRE_MIN, solid=False):
     py = _PY
     ok = _OK
     dz = _PZ
+    wx = _VX
+    wy = _VY
     i = 0
     for vx, vy, vz in bp.verts:
         pz = z + ((vx * m2 + vy * m5 + vz * m8) >> 12)
+        qx = x + ((vx * m0 + vy * m3 + vz * m6) >> 12)
+        qy = y + ((vx * m1 + vy * m4 + vz * m7) >> 12)
         dz[i] = pz
+        wx[i] = qx
+        wy[i] = qy
         if pz < INEAR:
             ok[i] = False   # behind the viewer
         else:
             ok[i] = True
-            px[i] = (x + ((vx * m0 + vy * m3 + vz * m6) >> 12)) * IFOCAL // pz
-            py[i] = -((y + ((vx * m1 + vy * m4 + vz * m7) >> 12)) * IFOCAL // pz)
+            px[i] = qx * IFOCAL // pz
+            py[i] = -(qy * IFOCAL // pz)
         i += 1
 
-    # Elite's hidden-line rule: a face shows if its normal points back along
-    # the line from the viewer to the ship. A zero normal always shows.
+    # A face shows if its normal points back towards you from a point on the
+    # face. (Elite judged it from the ship's middle, which is the same far off
+    # but shows the far side of a big ship you are close to, such as a
+    # station's back rim as you fly in.) A zero normal always shows.
     vis = _VIS
+    fv = bp.face_vert
     i = 0
     for nx, ny, nz in bp.normals:
-        vis[i] = ((nx == 0 and ny == 0 and nz == 0)
-                  or ((nx * m0 + ny * m3 + nz * m6) >> 8) * x
-                  + ((nx * m1 + ny * m4 + nz * m7) >> 8) * y
-                  + ((nx * m2 + ny * m5 + nz * m8) >> 8) * z < 0)
+        if nx == 0 and ny == 0 and nz == 0:
+            vis[i] = True
+        else:
+            v = fv[i]
+            if v < 0:
+                ax, ay, az = x, y, z
+            else:
+                ax, ay, az = wx[v], wy[v], dz[v]
+            vis[i] = (((nx * m0 + ny * m3 + nz * m6) >> 8) * ax
+                      + ((nx * m1 + ny * m4 + nz * m7) >> 8) * ay
+                      + ((nx * m2 + ny * m5 + nz * m8) >> 8) * az < 0)
         i += 1
 
     col = RED if o.hit > 0 else rgb or COLOUR[o.kind]

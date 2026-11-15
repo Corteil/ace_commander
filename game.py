@@ -345,6 +345,13 @@ class Blueprint:
         self.verts = entry[1]
         self.edges = entry[2]
         self.normals = entry[3]
+        # a vertex on each face (-1: none), for the hidden-line test
+        self.face_vert = [-1] * len(self.normals)
+        for a, b, f1, f2 in self.edges:
+            if self.face_vert[f1] < 0:
+                self.face_vert[f1] = a
+            if self.face_vert[f2] < 0:
+                self.face_vert[f2] = a
         stats = entry[4] if len(entry) > 4 else None
         size2 = 1.0
         for x, y, z in self.verts:

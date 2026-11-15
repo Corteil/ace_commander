@@ -799,6 +799,12 @@ of a real flight, not from a harness.
    and the docking computer's roll) they lie level, as the tunnels draw them; ours were
    long across it and stood upright. Both now stand like Elite's (Halo 34 x 68, Drum
    24 x 72); the test checks against ship_data.py when it is there.
+   Then (Brian: the drum's back showed when docking): the hidden-line test is now made
+   from a vertex on each face (`Blueprint.face_vert`, view-space positions in
+   `cockpit._VX`, `_VY`, `_PZ`), not from the ship's centre as Elite's was; the centre
+   test called a big ship's near-edge-on sides visible close up, drawing the back rim.
+   Exact for convex shapes at any distance; also fixes Elite's Coriolis; no measurable
+   cost on the badge.
    Tests: `tests/test_original_ships.py`; `test_app.py` runs a copy without ship_data.py.
    Next in publishing prep: our own galaxy, goods and equipment (56), our own words and
    mission texts (57), then the README, DEBUG off, level names and the app store (58).
