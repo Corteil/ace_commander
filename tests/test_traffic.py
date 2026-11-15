@@ -138,6 +138,75 @@ assert n == 0
 cx = CountCtx(); cockpit.draw_hud(cx, g)
 print("police: hunt fugitives, leave the clean alone, launch from the slot; the station: ok")
 
+# ---- bounty hunters (build 43) --------------------------------------------
+g = system(); g.space.safe = False
+h = g.add_hunter(); g.objs.extend(g.new); g.new = []
+assert h.role == "hunter" and h.state == "patrol", "flies by a clean pilot"
+for _ in range(int(10 / DT)):
+    g.step(DT, 0, 0, 0, False, False); g.trader_t = g.police_t = 1e9
+assert g.hull == 100.0 and h.state == "patrol"
+g.legal = 10
+g.step(DT, 0, 0, 0, False, False); g.step(DT, 0, 0, 0, False, False); g.step(DT, 0, 0, 0, False, False)
+assert h.state in ("attack", "break"), "turns on an offender"
+g = system(legal=5); h = g.add_hunter(); assert h.state == "attack", "after a wanted pilot at once"
+# from the encounter rolls: in an anarchy, hunters fly by the clean
+g = system(gov=0); g.to_station(g.space.safe_r + 5000); g.encounter_t = 0.0
+random.seed(11); hunters = []
+for _ in range(400):
+    g.encounter_t = 0.0; g.skip = 0
+    g._roll()
+    if g.group_role == "hunter":
+        hunters.append(1)
+    g.pending = 0; g.group = []
+assert 100 < len(hunters) < 220, len(hunters)
+g._new_group(["ASP MK II"], "hunter"); g.spawn_t = 0.0
+g.step(DT, 0, 0, 0, False, False)
+hs = [o for o in g.objs + g.new if o.role == "hunter"]
+assert hs and hs[0].state == "patrol"
+# firing on a hunter is a crime, and killing it pays nothing
+g = system(); h = g.add_hunter(); ahead(g, h); h.energy = 1000.0
+g.step(DT, 0, 0, 0, True, False)
+assert h.state == "attack" and g.legal == game.HIT_TRADER
+h.energy = 1.0; g.cool = 0.0; g.heat = 0.0; b = g.bounty
+g.step(DT, 0, 0, 0, True, False)
+assert h.dead and g.bounty == b and g.legal == game.HIT_TRADER
+print("bounty hunters: fly by the clean, hunt the wanted, a crime to fire on: ok")
+
+# ---- pirates prey on traders ----------------------------------------------
+g = system(); g.space.safe = False; g.god = True
+t = g.add_trader(); g.objs.extend(g.new); g.new = []
+t.x, t.y, t.z = 3000.0, 0.0, 8000.0; t.speed = 0.0
+pir = game.Obj(g.types["SIDEWINDER"], "ship", 3000.0, 0.0, 6000.0)
+game._look(pir.m, 0.0, 0.0, 1.0); g.objs.append(pir)
+for _ in range(10):
+    g.step(DT, 0, 0, 0, False, False)
+assert pir.prey is t, "goes for the trader nearer it than you"
+for _ in range(int(60 / DT)):
+    g.step(DT, 0, 0, 0, False, False); g.trader_t = g.police_t = 1e9
+    t.speed = 0.0
+    if t.dead:
+        break
+assert t.dead and g.kills == 0 and g.legal == 0 and g.bounty == 0, "nobody's kill, nobody's crime"
+for _ in range(4):
+    g.step(DT, 0, 0, 0, False, False)
+assert pir.prey is None or pir.dead, "then back to you (unless it flew off out of range)"
+# fire on the pirate and it turns on you
+g = system(); g.space.safe = False
+t = g.add_trader(); g.objs.extend(g.new); g.new = []
+t.x, t.y, t.z = 500.0, 0.0, 4000.0
+pir = game.Obj(g.types["SIDEWINDER"], "ship", 0.0, 0.0, 1500.0)
+game._look(pir.m, 1.0, 0.0, 0.0); pir.energy = 1000.0; g.objs.append(pir)
+pir.prey = t
+g.step(DT, 0, 0, 0, True, False)
+assert pir.prey is None and g.legal == 0, "hitting a pirate is no crime"
+# a trader far off, or further than you, is left alone
+g = system()
+t = g.add_trader(); g.objs.extend(g.new); g.new = []
+t.x, t.y, t.z = 0.0, 0.0, -9000.0
+pir = game.Obj(g.types["SIDEWINDER"], "ship", 0.0, 0.0, 3000.0); g.objs.append(pir)
+assert g._pick_prey(pir, 3000.0) is None
+print("pirates go for a nearer trader, its cargo spills, no credit: ok")
+
 # ---- in the app: saved, carried, halved by jumps, cleared by the pod ---------
 c = commander.Commander(); c.legal = 70
 assert commander.Commander.from_dict(c.to_dict()).legal == 70

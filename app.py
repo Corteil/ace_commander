@@ -1192,7 +1192,7 @@ class AceCommander(app.App):
                      "LEVEL: " + commander.LEVELS[self.game.level],
                      "FRAME TIME: " + ("ON" if self.show_ms else "OFF"),
                      "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
-                     "ADD A TRADER", "ADD POLICE", "LEGAL: " + game.legal_name(self.game.legal),
+                     "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "LEGAL: " + game.legal_name(self.game.legal),
                      "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4", "+10 KILLS", "+1000 CR",
                      "SHIP CONFIG", "REPAIR SHOP: " + ("ON" if self.repair_shop else "OFF"),
                      "RELEASE CANISTER", "TO THE STATION", "TO THE SUN",
@@ -1203,6 +1203,7 @@ class AceCommander(app.App):
                 items.remove("+1000 CR")        # no commander, no cash or fuel
                 items.remove("ADD A TRADER")    # nor traders, police or legal status
                 items.remove("ADD POLICE")
+                items.remove("ADD A HUNTER")
                 items.remove(items[[i for i, t in enumerate(items) if t.startswith("LEGAL")][0]])
                 items.remove("FUEL TO 1/4")
             return items
@@ -1311,12 +1312,14 @@ class AceCommander(app.App):
             g.wave += 1
             g.wave_kills = 0
             g.say("WAVE %d" % g.wave, 2.5)
-        elif item == "ADD A TRADER" or item == "ADD POLICE":
+        elif item in ("ADD A TRADER", "ADD POLICE", "ADD A HUNTER"):
             if g.space is None:
                 g.say("ONLY IN A STAR SYSTEM")
             elif len(g.objs) + len(g.new) < game.MAX_OBJECTS:
                 if item == "ADD A TRADER":
                     g.add_trader()
+                elif item == "ADD A HUNTER":
+                    g.add_hunter()
                 else:
                     g.add_police(g.legal > 0)
         elif item.startswith("LEGAL"):

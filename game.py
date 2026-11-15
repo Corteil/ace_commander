@@ -139,6 +139,13 @@ TRADER_MOST = 2
 # while you are in its safe zone: every POLICE_EVERY seconds, with fewer than
 # POLICE_MOST about, always for a fugitive, with chance legal / 64 for an
 # offender, and now and then on patrol for anyone (they leave the clean alone).
+# Bounty hunters (HUNTERS, from the encounter rolls) are after offenders and
+# fugitives: a clean pilot sees one fly by; it turns on you if you become an
+# offender, and firing on it is a crime like firing on a trader. Pirates go
+# for a trader rather than you when one is nearer them than you are
+# (PREY_RANGE at most); a trader they destroy drops its cargo and counts
+# for nobody.
+PREY_RANGE = 6000.0
 POLICE = "VIPER"
 POLICE_EVERY = 6.0
 POLICE_MOST = 3
@@ -330,7 +337,8 @@ class Obj:
         self.aim = None     # [dx, dy, dz] heading used while breaking away
         self.target = None  # what a player missile is chasing
         self.good = None    # a splinter: the good it holds (a canister: None, any of several)
-        self.role = "pirate"    # ships: "pirate", "trader" or "police"
+        self.role = "pirate"    # ships: "pirate", "trader", "police" or "hunter"
+        self.prey = None        # a pirate's: the trader it is after (None: you)
         self.missiles = bp.missiles
         self.beam = 0.0     # > 0 while this ship's laser is drawn
         self.hit = 0.0      # > 0 while flashing from a hit
@@ -479,6 +487,7 @@ class Game:
         self.fwd = 0           # how far everything slid towards you last step (whole units)
         self.pending = 0       # ships of the current encounter still to turn up
         self.group = []        # their types (names), in the order they come
+        self.group_role = "pirate"  # and who they are: "pirate" or "hunter"
         self.encounter_t = 0.0  # time until the next roll for an encounter
         self.skip = 0          # rolls still to skip after the last encounter
         self.docked = False    # set on reaching the station; whoever is watching takes over
@@ -1106,11 +1115,24 @@ class Game:
             d = 1.0
         if kind == "ship":
             bp = o.bp
-            tx, ty, tz = -o.x / d, -o.y / d, -o.z / d   # direction to the player
+            prey = o.prey
+            if prey is not None and (prey.dead or (o.state != "attack" and o.state != "break")):
+                o.prey = prey = None
+            if prey is None and o.role == "pirate" and o.state == "attack" and self.space is not None:
+                prey = o.prey = self._pick_prey(o, d)
+            if prey is not None:    # after a trader
+                px, py, pz = prey.x - o.x, prey.y - o.y, prey.z - o.z
+                dist = math.sqrt(px * px + py * py + pz * pz)
+                if dist < 1.0:
+                    dist = 1.0
+                tx, ty, tz = px / dist, py / dist, pz / dist
+            else:
+                dist = d
+                tx, ty, tz = -o.x / d, -o.y / d, -o.z / d   # direction to the player
             turn = TURN_RATE * dt
             want = bp.speed
             if o.state == "attack":
-                if d < BREAK_DIST:
+                if dist < BREAK_DIST:
                     o.state = "break"
                     o.t = _rnd(1.2, 2.4)
                     o.aim = list(_unit(_rnd(-1, 1) - tx * 0.5,
@@ -1121,7 +1143,17 @@ class Game:
                     want = bp.speed * 0.75
                     aim = m[6] * tx + m[7] * ty + m[8] * tz
                     o.cool -= dt
-                    if not self.over and d < FIRE_RANGE:
+                    if prey is not None:
+                        if dist < FIRE_RANGE and bp.laser and aim > 0.96 and o.cool <= 0:
+                            o.cool = _rnd(0.5, 1.1)
+                            if random.random() < 0.5:
+                                prey.energy -= 3.0 + bp.laser * 2.5
+                                prey.hit = 0.12
+                                if prey.state == "trade":
+                                    prey.state = "flee"     # running for it
+                                if prey.energy <= 0:
+                                    self._kill(prey, credit=False)
+                    elif not self.over and d < FIRE_RANGE:
                         if bp.laser and aim > 0.96 and o.cool <= 0:
                             o.cool = _rnd(0.5, 1.1)
                             o.beam = 0.2
@@ -1155,6 +1187,8 @@ class Game:
                         _turn(m, dx / ds, dy / ds, dz / ds, turn * 0.5)
                 if o.role == "police" and self.legal >= FUGITIVE and not self.over:
                     o.state = "attack"      # the police have seen who you are
+                elif o.role == "hunter" and self.legal > 0 and not self.over:
+                    o.state = "attack"      # there's a price on your head
             else:   # flee
                 _turn(m, -tx, -ty, -tz, turn)
             o.speed += (want - o.speed) * min(1.0, 2.0 * dt)
@@ -1372,33 +1406,32 @@ class Game:
         self.new.append(c)
         return c
 
-    def _kill(self, o, mine=False):
+    def _kill(self, o, mine=False, credit=True):
         """o is destroyed. mine: by the mining laser, so a rock breaks into
-        splinters you can scoop for minerals."""
+        splinters you can scoop for minerals. credit False: not by you (a
+        pirate got a trader), so no kill, bounty or crime, but its cargo
+        still spills."""
         if o.dead:
             return
         o.dead = True
         bp = o.bp
         self._boom(o.x, o.y, o.z, 8 + 2 * min(bp.explosions, 6))
-        if o.role == "pirate":
+        if not credit:
+            pass
+        elif o.role == "pirate":
             self.bounty += bp.bounty    # tenths of a credit; rocks have small ones too
         elif o.role == "trader":
             self._crime(self.legal + KILL_TRADER)
-        else:
+        elif o.role == "police":
             self._crime(max(self.legal, FUGITIVE))
-        if o.kind == "ship":
+        # a bounty hunter: no bounty, and the crime was firing on it (_provoke)
+        if o.kind == "ship" and not credit:
+            self._spill(o)
+        elif o.kind == "ship":
             self.kills += 1
             self.wave_kills += 1
             self.score += 10 + bp.bounty // 5
-            if self.can_bp and bp.canisters:
-                for _ in range(random.randint(0, min(bp.canisters, 2))):
-                    c = Obj(self.can_bp, "can", o.x + _rnd(-80, 80),
-                            o.y + _rnd(-80, 80), o.z + _rnd(-80, 80))
-                    dx, dy, dz = _unit(_rnd(-1, 1), _rnd(-1, 1), _rnd(-1, 1))
-                    _look(c.m, dx, dy, dz)
-                    c.speed = _rnd(1, 4)
-                    c.spin = _rnd(-2, 2)
-                    self.new.append(c)
+            self._spill(o)
             if self.space is None and self.wave_kills >= 2 + self.wave:     # practice only
                 self.wave += 1
                 self.wave_kills = 0
@@ -1413,6 +1446,19 @@ class Game:
             self.score += 2
             if mine:
                 self._splinters(o)
+
+    def _spill(self, o):
+        """A destroyed ship's cargo: up to two canisters."""
+        bp = o.bp
+        if self.can_bp and bp.canisters:
+            for _ in range(random.randint(0, min(bp.canisters, 2))):
+                c = Obj(self.can_bp, "can", o.x + _rnd(-80, 80),
+                        o.y + _rnd(-80, 80), o.z + _rnd(-80, 80))
+                dx, dy, dz = _unit(_rnd(-1, 1), _rnd(-1, 1), _rnd(-1, 1))
+                _look(c.m, dx, dy, dz)
+                c.speed = _rnd(1, 4)
+                c.spin = _rnd(-2, 2)
+                self.new.append(c)
 
     def _splinters(self, rock):
         """A rock broken up by the mining laser: an asteroid into two or three
@@ -1486,14 +1532,32 @@ class Game:
     def _provoke(self, o):
         """You fired on o. A trader or the police turns on you (a trader
         without a laser runs), and it goes on your record."""
-        if o.kind != "ship" or o.role == "pirate":
+        if o.kind != "ship":
+            return
+        o.prey = None           # whatever it was after, now it's after you
+        if o.role == "pirate":
             return
         if o.state == "trade" or o.state == "patrol":
             o.state = "attack" if o.bp.laser else "flee"
-            if o.role == "trader":
+            if o.role == "trader" or o.role == "hunter":
                 self._crime(self.legal + HIT_TRADER)
         if o.role == "police":
             self._crime(max(self.legal, FUGITIVE))
+
+    def _pick_prey(self, o, d):
+        """The trader pirate o should go for instead of you: the nearest one
+        to it, if nearer than you and within PREY_RANGE; else None."""
+        best = None
+        best_d2 = min(d, PREY_RANGE)
+        best_d2 *= best_d2
+        for t in self.objs:
+            if t.role == "trader" and not t.dead and t.kind == "ship":
+                dx, dy, dz = t.x - o.x, t.y - o.y, t.z - o.z
+                d2 = dx * dx + dy * dy + dz * dz
+                if d2 < best_d2:
+                    best = t
+                    best_d2 = d2
+        return best
 
     def _hit_station(self):
         """A shot that hit nothing else: did it hit the station? Then you are
@@ -1559,6 +1623,16 @@ class Game:
             _look(o.m, dx, dy, dz)
         return o
 
+    def add_hunter(self):
+        """A bounty hunter round you: after you if you are wanted, else flying by."""
+        names = [n for n in HUNTERS if n in self.types]
+        if not names:
+            return None
+        o = self._spawn_ship(self.types[random.choice(names)])
+        o.role = "hunter"
+        o.state = "attack" if self.legal > 0 else "patrol"
+        return o
+
     def add_police(self, hunt):
         """A police Viper: out of the station's slot if it is near enough,
         or arriving near you. hunt: after you; otherwise on patrol."""
@@ -1618,11 +1692,16 @@ class Game:
             if self.spawn_t <= 0 and count < MAX_OBJECTS:
                 self.spawn_t = _rnd(0.8, 2.0)
                 name = self.group.pop(0) if self.group else None
-                if self._spawn_ship(self.types.get(name)) is None:
+                o = self._spawn_ship(self.types.get(name))
+                if o is None:
                     self.pending = 0
                     self.group = []
                 else:
                     self.pending -= 1
+                    if self.group_role == "hunter":
+                        o.role = "hunter"
+                        # after offenders and fugitives; flies by the clean
+                        o.state = "attack" if self.legal > 0 else "patrol"
         elif hostile == 0:
             self.encounter_t -= dt
             if self.encounter_t <= 0:
@@ -1648,7 +1727,7 @@ class Game:
                 return
         if random.random() < HUNTER_CHANCE:
             self.skip = 1
-            self._new_group([random.choice(HUNTERS)])
+            self._new_group([random.choice(HUNTERS)], "hunter")
         else:
             n = min(random.randint(1, PACK_MOST), self.max_hostile)
             self.skip = n - 1
@@ -1660,7 +1739,8 @@ class Game:
         ANDed together, as in the original)."""
         return PIRATES[random.randint(0, 255) & random.randint(0, 255) & 7]
 
-    def _new_group(self, names):
+    def _new_group(self, names, role="pirate"):
+        self.group_role = role
         self.group = list(names)
         self.pending = len(names)
         self.spawn_t = 0.0

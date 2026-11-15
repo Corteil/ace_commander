@@ -666,7 +666,7 @@ def pirates_in(gov, secs=600):
     for i in range(int(secs / DT)):
         g.step(DT, 0, 0, 0, False, False)
         for o in list(g.objs):
-            if o.kind == "ship" and o.role == "pirate":     # not traders or police
+            if o.kind == "ship" and o.role in ("pirate", "hunter"):    # not traders or police
                 n += 1
                 if first is None:
                     first = i * DT

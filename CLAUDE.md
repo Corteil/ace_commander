@@ -524,8 +524,20 @@ of a real flight, not from a harness.
    turns on a fugitive. Radar: pirates and attackers red, police blue (`POLICE_BLUE`),
    traders white. Status pages show the legal status. DEBUG: ADD A TRADER, ADD POLICE,
    LEGAL (CLEAN / OFFENDER / FUGITIVE), career only. Tests: `tests/test_traffic.py`. On the
-   badge: 6.7 ms a step with three police and a trader. Not built yet from phase 5: pirates
-   attacking traders, Thargoids, and legal status changing the market or bounties.
+   badge: 6.7 ms a step with three police and a trader.
+   **Build 43 (Brian):** bounty hunters (the encounter rolls' lone `HUNTERS`, now
+   `Obj.role` "hunter", `group_role`) attack offenders and fugitives and fly by the clean
+   (state "patrol", turning on you if you become an offender); firing on one is a crime
+   like a trader (`HIT_TRADER`), killing one pays no bounty. Pirates prey on traders:
+   `Game._pick_prey` picks the nearest trader that is nearer the pirate than you are and
+   within `PREY_RANGE` (6,000); the pirate steers and fires at it (50% hits, the trader
+   flees), and a trader it destroys spills its cargo (`_spill`) with no kill, bounty or
+   crime for anyone (`_kill(..., credit=False)`). Hitting a pirate turns it back on you.
+   DEBUG: ADD A HUNTER. Police numbers (Brian asked): no set number per station; at most
+   `POLICE_MOST` (3) about at once, a new one possible every `POLICE_EVERY` (6 s), so
+   destroyed ones are replaced without end. On the badge: 6.9 ms a step with two traders,
+   a hunter and three pirates. Not built yet from phase 5: Thargoids, and legal status
+   changing the market or bounties.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -536,7 +548,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 42), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 43), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
