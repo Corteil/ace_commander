@@ -753,7 +753,8 @@ class AceCommander(app.App):
         if self.target == c.system:
             self.target = None
         self.dock = docked.Docked(c, self.galaxy, self.target, GOODS, EQUIP,
-                                  self._ship_bp(), self.repair_shop)
+                                  self._ship_bp(), self.repair_shop,
+                                  (lambda: self._settings(True), self._change))
         self.docked = True
         self.jump_to = None
         self.paused = False
@@ -835,6 +836,13 @@ class AceCommander(app.App):
                 d.pick_paint(1)
             elif hit("C" if new else "confirm"):
                 d.buy_paint()
+        elif d.name() == "OPTIONS":
+            if hit("j_up" if new else "up"):
+                d.pick_option(-1)
+            elif hit("j_down" if new else "down"):
+                d.pick_option(1)
+            elif hit("C" if new else "confirm"):
+                d.change_option()
         elif d.name() == "SYSTEM DATA" and ((new and hit(BTN_MISSILE)) or hit("k_D")):
             d.back_to_chart()       # D: back to the chart you came from
         elif d.name() == "MARKET":

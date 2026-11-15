@@ -654,7 +654,7 @@ print("launching, arriving, flying to the station, docking, refuelling: ok")
 # ---- the docked tabs, targets, and the jump line in the in-flight menu ----
 d = e.dock
 assert d.tabs == ("STATUS", "MARKET", "EQUIP SHIP", "LOCAL CHART", "GALACTIC CHART",
-                  "SYSTEM DATA")
+                  "SYSTEM DATA", "OPTIONS")
 assert d.tab == 0 and any("< > screens" in t for t in texts(e))
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "MARKET"
 # ---- the market (Lave: rich agricultural, so food is cheap and computers dear)
@@ -753,7 +753,18 @@ tick(e, fresh=["B"]); assert d.name() == "SYSTEM DATA" and d.data.name == "LAVE"
 tx = texts(e)
 assert "you are here" in tx and "Dictatorship" in tx and "Tech 5   Pop 2.5 billion" in tx, tx
 assert "Productivity 7000 M Cr" in tx and "Radius 4116 km" in tx
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "OPTIONS"
+tx = texts(e)
+before = c.docking
+assert "STEER: JOYSTICK" in tx and "DOCKING: " + mod.DOCK_NAMES[before] in tx, tx
+assert "CONSTRICTOR: 2 MIN" in tx
+tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["C"])
+after = commander.DOCKING[(commander.DOCKING.index(before) + 1) % 3]
+assert c.docking == after and "DOCKING: " + mod.DOCK_NAMES[after] in texts(e), "C changes it"
+assert commander.load(SAVE).docking == after, "saved"
+tick(e, fresh=["C"]); tick(e, fresh=["C"]); assert c.docking == before
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "STATUS", "tabs wrap round"
+tick(e, fresh=["E"]); assert d.name() == "OPTIONS"
 tick(e, fresh=["E"]); assert d.name() == "SYSTEM DATA"
 tick(e, fresh=["F"]); assert d.name() == "STATUS" and e.mode == "docked", "F goes back to Status"
 # pick Diso (147) on the galactic chart by steering to it
@@ -818,8 +829,8 @@ assert "LOCAL CHART" not in choose_p._fitems_top()
 gd = mod.game_data; mod.game_data = None
 n = ace_commander.AceCommander()
 choose(n, "CONTINUE")
-assert n.mode == "docked" and n.galaxy is None and n.dock.tabs == ("STATUS",)
-assert "COMMANDER" in texts(n) and "LAVE" not in texts(n) and "F: title screen" in texts(n)
+assert n.mode == "docked" and n.galaxy is None and n.dock.tabs == ("STATUS", "OPTIONS")
+assert "COMMANDER" in texts(n) and "LAVE" not in texts(n) and "< > screens   F: title" in texts(n)
 tick(n, fresh=["JOYRIGHT"]); tick(n, fresh=["B"]); assert n.dock.tab == 0
 launch(n)
 assert "LOCAL CHART" not in n._fitems_top()

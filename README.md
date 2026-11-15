@@ -15,7 +15,8 @@ The title screen, with a ship tumbling under the name, offers:
 - **Ship viewer** - view the 3D assets of the game.
 - **Options** - steering (joystick or tilt) and the badge's LEDs, kept in `options.json`
   next to the app; with a commander also the docking style and how soon mission 1's
-  Constrictor turns up, kept in the commander's save. The same as the in-flight Settings.
+  Constrictor turns up, kept in the commander's save. The same as the in-flight Settings
+  and the docked Options tab.
 - **Speed test** - times kinds of drawing on the badge.
 
 Joystick left / right changes the choice, C selects it and F leaves the app.

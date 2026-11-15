@@ -710,6 +710,10 @@ of a real flight, not from a harness.
    (`use_leds`, replacing the fixed `USE_LEDS`, which is now only the default). Steering
    and LEDs are kept in `options.json` beside the save (`options_path()`, gitignored);
    the test stubs delete it on each `install()`.
+   Then (Brian): an OPTIONS docked tab too, the last (`docked.TABS`; `Docked(...,
+   options=(items function, change function))`, given `_settings(True)` and `_change` by
+   `_dock`; also with no game_data, after Status). Joystick up / down picks, C changes
+   (left / right still change tab, so DOCKING only goes forward there).
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not

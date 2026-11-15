@@ -14,7 +14,7 @@ except Exception:
     game_data = None
 
 TABS = ("STATUS", "MARKET", "EQUIP SHIP", "REPAIR SHOP", "LOCAL CHART", "GALACTIC CHART",
-        "SYSTEM DATA")
+        "SYSTEM DATA", "OPTIONS")
 PAINT_PRICE = 100   # tenths of a credit: a new colour at the Repair Shop costs 10.0 Cr
 SPIN = 0.8          # radians a second the Repair Shop's ship turns
 ROWS = 6            # goods shown at once on the market
@@ -36,9 +36,13 @@ def _ly(d):
 
 class Docked:
     def __init__(self, cmdr, gal, target=None, goods=None, equip=None, ship=None,
-                 repair=False):
+                 repair=False, options=None):
         """ship is your ship's blueprint, for the Repair Shop, which is shown
-        only with repair (a DEBUG switch for now)."""
+        only with repair (a DEBUG switch for now). options: (a function giving
+        the settings' lines, a function changing one: given the line and
+        whether to go back), the app's, for the Options tab; None: no tab."""
+        self.options = options
+        self.osel = 0           # the line picked on Options
         self.cmdr = cmdr
         self.ship = ship
         self.spin = 0.0         # the Repair Shop's ship, turning
@@ -46,12 +50,13 @@ class Docked:
         self.gal = gal          # None without game_data.py: then only Status
         self.equip = equip
         if gal is None:
-            self.tabs = TABS[:1]
+            self.tabs = TABS[:1] + (("OPTIONS",) if options else ())
         else:                   # an older game_data.py may not have goods or equipment
             self.tabs = tuple(t for t in TABS
                               if not (t == "MARKET" and not (goods and cmdr.market is not None))
                               and not (t == "EQUIP SHIP" and not equip)
-                              and not (t == "REPAIR SHOP" and not (repair and ship)))
+                              and not (t == "REPAIR SHOP" and not (repair and ship))
+                              and not (t == "OPTIONS" and not options))
         self.market = None
         if "MARKET" in self.tabs:
             self.market = market.Market(goods, gal.system(cmdr.system).economy, cmdr)
@@ -106,6 +111,15 @@ class Docked:
             return
         self.target = None if i == self.cmdr.system else i
         self.open("SYSTEM DATA")
+
+    # ---- options --------------------------------------------------------------
+
+    def pick_option(self, step):
+        self.osel = (self.osel + step) % len(self.options[0]())
+
+    def change_option(self, back=False):
+        items = self.options[0]()
+        self.options[1](items[self.osel % len(items)], back)
 
     # ---- the market ---------------------------------------------------------
 
@@ -183,6 +197,8 @@ class Docked:
             self._draw_equip(ctx)
         elif self.name() == "REPAIR SHOP":
             self._draw_repair(ctx)
+        elif self.name() == "OPTIONS":
+            self._draw_options(ctx)
         else:
             self._draw_status(ctx)
         if len(self.tabs) > 1:      # which tab is open
@@ -282,6 +298,23 @@ class Docked:
         else:
             text(ctx, "C: buy   D: sell", 0, 75, 11, cockpit.GREY)
         text(ctx, "< > screens   F: status", 0, 91, 11, cockpit.GREY)
+
+    def _draw_options(self, ctx):
+        """The same settings as the title screen's Options and the in-flight
+        Settings."""
+        text = cockpit.text
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        text(ctx, "OPTIONS", 0, -94, 14, cockpit.GREY)
+        items = self.options[0]()
+        sel = self.osel % len(items)
+        y = -60
+        for i, label in enumerate(items):
+            if i == sel:
+                ctx.rgb(*cockpit.DIM).rectangle(-104, y - 9, 208, 18).fill()
+            text(ctx, label, 0, y, 14, cockpit.GREEN if i == sel else cockpit.GREY)
+            y += 20
+        text(ctx, "up / down: pick   C: change", 0, 66, 11, cockpit.GREY)
+        text(ctx, "< > screens   F: status", 0, 82, 11, cockpit.GREY)
 
     def _draw_repair(self, ctx):
         """Your ship turning in the chosen colour, the colours as a row of
