@@ -261,7 +261,8 @@ def launch(a):
 def debug(a, line):
     if not a.paused:
         tick(a, fresh=["A"])
-    a.fsub = "debug"
+    a.fsub = "dgroup"
+    a.dgroup = mod.cheat_group(line)
     a.fmenu = [i for i, t in enumerate(a._fitems()) if t.startswith(line)][0]
     tick(a, fresh=["C"])
 

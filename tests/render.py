@@ -135,7 +135,7 @@ a.fsub = None; tick(a)
 shot(a, "4_menu_jump.png")
 fpick("SETTINGS")
 shot(a, "4c_pause_menu.png")
-fpick("DEBUG")
+fpick("SETTINGS"); a.fsub = "debug"; a.fmenu = 0
 shot(a, "4d_debug.png")
 fpick("LOCAL CHART")
 shot(a, "4e_chart_here.png")

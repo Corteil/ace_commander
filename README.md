@@ -49,11 +49,14 @@ commander's rank, kills, star system and fuel), **Settings** (steering JOYSTICK 
 the docking style, and how soon mission 1's Constrictor turns up; joystick left / right or
 C changes one) and **Quit to title**.
 
-The menu also has a **Debug** page of cheats for testing: invincibility, kill all enemies,
-next wave, add an enemy, refill missiles, refill fuel, +10 kills, to the station (moves
-the station 4000 units ahead of you) and dock now. Its title
-shows the build number, read from `metadata.json`. Kills made there count towards your
-commander's rank. Set `DEBUG_MENU = False` in `ace.py` to hide it.
+Settings ends with **Debug**, cheats for testing in five groups: Ship (invincibility, ship
+config, refills), Spawn (add ships of each kind, release a canister, kill all enemies),
+Travel (to the station, to the sun, dock now, mis-jump next, to the mission system),
+Commander (+10 kills, +1000 Cr, level, legal status, anger the station, mission stage) and
+Display (frame time, Repair Shop). Its title shows the build number, read from
+`metadata.json`. Kills made there count towards your commander's rank. The Options page
+and the docked Options tab have Debug too, with the cheats that work away from a flight.
+Set `DEBUG_MENU = False` in `ace.py` to hide it.
 
 With TILT, tilting the badge steers and the joystick still works. D then does two jobs: a
 tap re-zeroes the tilt and holding it for about half a second fires the missile
@@ -164,7 +167,7 @@ the Elite source into `game_data.py`, like the system descriptions. The missions
 by the name set in the badge's settings, or Jameson if none is set. On a message, the
 joystick scrolls the text, C pages down (and at the end goes on) and F skips it.
 
-The Debug page can move you through them: MISSION (the next stage; docking then starts
+The Debug cheats can move you through them: MISSION (the next stage; docking then starts
 the next mission), TO MISSION SYSTEM and ADD THE CONSTRICTOR; SHIP CONFIG has NAVY ENERGY UNIT.
 
 ## The screen

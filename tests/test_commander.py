@@ -155,7 +155,7 @@ assert commander.load(SAVE).kills == 0, "not written every kill"
 tick(a, fresh=["A"])
 tx = texts(a)
 assert "STATUS" in tx
-assert a._fitems() == ["RESUME", "LOCAL CHART", "STATUS", "SETTINGS", "QUIT TO TITLE", "DEBUG"], a._fitems()
+assert a._fitems() == ["RESUME", "LOCAL CHART", "STATUS", "SETTINGS", "QUIT TO TITLE"], a._fitems()
 assert texts(a)
 fpick(a, "STATUS"); assert a.fsub == "status"
 tx = texts(a)
@@ -212,7 +212,7 @@ show = a.show_ms; a.show_ms = False   # its own digits
 a.draw(CountCtx())
 cockpit_mod.number = real_number; a.show_ms = show
 assert digits == [], "no wave or score on a commander's HUD"
-tick(a, fresh=["A"]); a.fsub = "debug"; assert "NEXT WAVE" not in a._fitems(); a.fsub = None
+tick(a, fresh=["A"]); assert "NEXT WAVE" not in a._cheats("SPAWN", True)
 tick(a, fresh=["A"])
 # scooped canisters go into the commander's hold, with fuel scoops fitted
 g = a.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
@@ -332,34 +332,46 @@ launch(d)
 g = d.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
 
 def debug(a, line):
-    """Open the in-flight menu, go to DEBUG and press C on this line of it."""
+    """Open the in-flight menu, go Settings > DEBUG > the line's group and
+    press C on the line, as a player would."""
     if not a.paused:
         tick(a, fresh=["A"])
-    if a.fsub != "debug":
+    group = mod.cheat_group(line)
+    if not (a.fsub == "dgroup" and a.dgroup == group):
         a.fsub = None
-        a.fmenu = a._fitems_top().index("DEBUG")
-        tick(a, fresh=["C"])
-    assert a.fsub == "debug"
+        a.fmenu = a._fitems_top().index("SETTINGS"); tick(a, fresh=["C"])
+        a.fmenu = a._fitems().index("DEBUG"); tick(a, fresh=["C"])
+        assert a.fsub == "debug"
+        a.fmenu = a._fitems().index(group); tick(a, fresh=["C"])
+    assert a.fsub == "dgroup" and a.dgroup == group
     a.fmenu = [i for i, s in enumerate(a._fitems()) if s.startswith(line)][0]
     tick(a, fresh=["C"])
 
 tick(d, fresh=["A"])
-assert texts(d)[-1] != "" and "DEBUG" in texts(d)
+assert texts(d)[-1] != "" and "SETTINGS" in texts(d)
 debug(d, "INVINCIBLE"); debug(d, "INVINCIBLE")
+assert "DEBUG: SHIP" in texts(d), "a group's page"
 import json as _json
 _ver = _json.load(open(os.path.join(os.path.dirname(mod.__file__), "metadata.json")))["version"]
-assert "DEBUG - BUILD %s" % _ver in texts(d), "the DEBUG page shows the build"
+tick(d, fresh=["F"])
+tx = texts(d)
+assert "DEBUG - BUILD %s" % _ver in tx, "the DEBUG page shows the build"
+assert d._fitems() == ["SHIP", "SPAWN", "TRAVEL", "COMMANDER", "DISPLAY"], d._fitems()
 debug(d, "INVINCIBLE")
+assert "INVINCIBLE: ON" in texts(d) and g.god
+# seven lines at a time, the chosen one in the middle, going round the end of the list
+debug(d, "ADD AN ENEMY")
+d.fmenu = 0
 tx = texts(d)
 items = d._fitems()
-assert "INVINCIBLE: ON" in tx and g.god
-# seven lines at a time, the chosen one in the middle, going round the end of the list
-assert d.fmenu == 0 and len(items) > mod.DEBUG_ROWS
+assert len(items) > mod.DEBUG_ROWS, items
 shown = [t for t in tx if t in items]
 assert shown == [items[i % len(items)] for i in range(-3, 4)], shown
-assert "DOCK NOW" in shown and items[3] in shown and items[4] not in shown
+assert items[3] in shown and items[4] not in shown
 tick(d, fresh=["JOYUP"]); assert d.fmenu == len(items) - 1, "up from the top goes round"
 tick(d, fresh=["JOYDOWN"]); assert d.fmenu == 0
+g.objs[:] = [o for o in g.objs if o.kind != "ship"]
+g.new[:] = [o for o in g.new if o.kind != "ship"]
 # the frame time counter can be switched off and on
 assert d.show_ms
 debug(d, "FRAME TIME"); assert not d.show_ms and "FRAME TIME: OFF" in texts(d)
@@ -401,7 +413,7 @@ ship("CARGO BAY"); assert d.cmdr.hold == 35 and "CARGO BAY: 35T" in d._fitems()
 ship("CARGO BAY"); assert d.cmdr.hold == 20
 ship("FUEL SCOOPS"); assert g.fuel_scoops and "scoops" in d.cmdr.extras
 ship("FUEL SCOOPS"); assert not g.fuel_scoops and "scoops" not in d.cmdr.extras
-tick(d, fresh=["F"]); assert d.fsub == "debug" and d._fitems()[d.fmenu] == "SHIP CONFIG", "F goes back"
+tick(d, fresh=["F"]); assert d.fsub == "dgroup" and d._fitems()[d.fmenu] == "SHIP CONFIG", "F goes back"
 # TO THE SUN: at the edge of the heat, heading in; flying on, the cabin heats
 # up to the scooping band and out again, and with fuel scoops the tank fills;
 # the cabin temperature, altitude and fuel gauges show
@@ -432,11 +444,13 @@ assert g.cabin == game.COOL_CABIN and "CT" not in tx and "FU" not in tx, "the ga
 tick(d, fresh=["A"])
 debug(d, "REFILL MISSILES")
 debug(d, "INVINCIBLE"); assert not g.god
-tick(d, fresh=["F"]); assert d.fsub is None and d._fitems()[d.fmenu] == "DEBUG", "F goes back"
+tick(d, fresh=["F"]); assert d.fsub == "debug" and d._fitems()[d.fmenu] == "SHIP", "F goes back"
+tick(d, fresh=["F"]); assert d.fsub == "settings" and d._fitems()[d.fmenu] == "DEBUG"
+tick(d, fresh=["F"]); assert d.fsub is None and d._fitems()[d.fmenu] == "SETTINGS"
 tick(d, fresh=["A"])
 g._hurt(5000.0); tick(d); assert g.over, "and with it off you can die again"
 mod.DEBUG_MENU = False
-assert "DEBUG" not in d._fitems_top()
+assert "DEBUG" not in d._settings(True)
 mod.DEBUG_MENU = True
 os.remove(SAVE)
 print("debug cheats: ok")
@@ -525,7 +539,7 @@ debug(e, "RELEASE CANISTER")
 cans = [o for o in e.game.objs + e.game.new if o.kind == "can"]
 assert len(cans) == n_cans + 1 and 0 < cans[-1].z <= 700 and cans[-1].m[8] < -0.99, "ahead, coming in"
 tx = texts(e)
-assert "RELEASE CANISTER" in tx and "DOCK NOW" in tx and "C: do it   F: back" in tx, tx
+assert "RELEASE CANISTER" in tx and "DEBUG: SPAWN" in tx and "C: do it   F: back" in tx, tx
 tick(e, fresh=["A"])
 # dying stops a countdown; quitting to the title and coming back keeps the system
 fpick(e, "LOCAL CHART")

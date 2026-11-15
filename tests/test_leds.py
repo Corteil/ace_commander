@@ -208,6 +208,40 @@ b.omenu = 2; tick(b, fresh=["C"])
 assert not b.cmdr.quick_con
 from ace_commander import commander as cm
 d = cm.load(save); assert d.docking == "A" and d.quick_con is False
+# Options > DEBUG away from a flight: only the cheats that work there, in groups
+assert b._settings(True)[-1] == "DEBUG"
+b.omenu = len(b._settings(True)) - 1; tick(b, fresh=["C"])
+assert b.mode == "odebug" and b._od_items() == ["SHIP", "COMMANDER", "DISPLAY"]
+c = CountCtx(); b.draw(c); assert any(t[0].startswith("DEBUG - BUILD") for t in c.texts)
+b.od_sel = 1; tick(b, fresh=["C"])
+assert b._od_items() == ["+10 KILLS", "+1000 CR", "LEVEL: " + cm.LEVELS[b.cmdr.level],
+                         "LEGAL: CLEAN", "MISSION: NONE"], b._od_items()
+cash = b.cmdr.cash
+b.od_sel = 1; tick(b, fresh=["C"])
+assert b.cmdr.cash == cash + 10000 and cm.load(save).cash == cash + 10000, "saved at once"
+assert b.od_msg == b.cmdr.cash_text()
+b.od_sel = 4; tick(b, fresh=["C"]); assert b.cmdr.mission == 1 and cm.load(save).mission == 1
+tick(b, fresh=["F"]); assert b.od_page is None
+b.od_sel = 0; tick(b, fresh=["C"]); tick(b, fresh=["C"]); assert b.od_page == "ship"
+items = b._od_items()
+b.od_sel = items.index("NAVY ENERGY UNIT: OFF"); tick(b, fresh=["C"])
+assert "navy" in b.cmdr.extras and "navy" in cm.load(save).extras
+tick(b, fresh=["F"]); assert b.od_page == "SHIP"
+tick(b, fresh=["F"]); tick(b, fresh=["F"]); assert b.mode == "options", "back where it came from"
+# and from the docked Options tab, back to it; REPAIR SHOP comes at once
+tick(b, fresh=["F"]); bs.choose(b, "CONTINUE"); assert b.mode == "docked"
+assert "REPAIR SHOP" not in b.dock.tabs
+b.dock.open("OPTIONS"); b.dock.osel = len(b._settings(True)) - 1
+tick(b, fresh=["C"]); assert b.mode == "odebug" and b.od_from == "docked"
+b.od_sel = b._od_items().index("DISPLAY"); tick(b, fresh=["C"])
+b.od_sel = [i for i, t in enumerate(b._od_items()) if t.startswith("REPAIR")][0]
+tick(b, fresh=["C"]); assert b.repair_shop and "REPAIR SHOP" in b.dock.tabs
+tick(b, fresh=["F"]); tick(b, fresh=["F"]); assert b.mode == "docked" and b.dock.name() == "OPTIONS"
+b.repair_shop = False
+b.dock.go(0); tick(b, fresh=["F"]); bs.choose(b, "OPTIONS")
+# no commander: just DISPLAY
+n_ = ace_commander.AceCommander(); n_.cmdr = None
+assert n_._cheat_groups(False) == ["DISPLAY"]
 # the in-flight Settings page has the same lines
 tick(b, fresh=["F"]); bs.choose(b, "CONTINUE")
 b.dock.go(0); tick(b, fresh=["C"])

@@ -714,6 +714,20 @@ of a real flight, not from a harness.
    options=(items function, change function))`, given `_settings(True)` and `_change` by
    `_dock`; also with no game_data, after Status). Joystick up / down picks, C changes
    (left / right still change tab, so DOCKING only goes forward there).
+   Then (Brian, option 2): DEBUG is a sub-menu of Settings / Options, no longer on the
+   top in-flight menu, in groups (`DEBUG_GROUPS`: SHIP, SPAWN, TRAVEL, COMMANDER,
+   DISPLAY). In flight: Settings > DEBUG (fsub "debug", the groups, title with the build)
+   > a group (fsub "dgroup", `dgroup`) > a cheat (`_debug` as before); SHIP CONFIG (fsub
+   "ship") goes back to the SHIP group; F goes back a level each time. Practice drops
+   `CAREER_ONLY`; a commander's flight drops NEXT WAVE. Away from a flight (title
+   Options, docked Options tab): mode "odebug" (`od_from`, `od_page`, `od_sel`), only
+   `OFF_FLIGHT` cheats (SHIP CONFIG, +10 KILLS, +1000 CR, LEVEL, LEGAL, MISSION, FRAME
+   TIME, REPAIR SHOP; the last two without a commander), each written into the save at
+   once (`_write_setting`); SHIP CONFIG there works on the commander (`_ship_items_c`,
+   `_ship_config_c`); REPAIR SHOP from the docked tab adds or removes the tab at once
+   (`_make_dock`). Lists of at most `DEBUG_ROWS` are drawn in order (`_draw_list`). The
+   in-flight Settings page no longer shows the frame / rules / world / hud timings.
+   Tests reach a cheat with `mod.cheat_group(line)`.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not

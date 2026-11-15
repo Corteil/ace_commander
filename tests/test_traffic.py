@@ -335,7 +335,8 @@ assert g.legal == 10 and c.legal == 10 and g.bad == 10, "launching with slaves"
 def debug(a, line):
     if not a.paused:
         tick(a, fresh=["A"])
-    a.fsub = "debug"
+    a.fsub = "dgroup"
+    a.dgroup = mod.cheat_group(line)
     a.fmenu = [i for i, t in enumerate(a._fitems()) if t.startswith(line)][0]
     tick(a, fresh=["C"])
 debug(e, "LEGAL"); assert g.legal == game.FUGITIVE
@@ -374,8 +375,9 @@ cx = CountCtx(); e.dock.draw(cx); assert any("CLEAN" in t[0] for t in cx.texts)
 # practice has none of it
 p = ace_commander.AceCommander()
 choose(p, "COMBAT PRACTICE")
-tick(p, fresh=["A"]); p.fsub = "debug"
-assert not any(t.startswith(("LEGAL", "ADD A TRADER", "ADD POLICE", "ANGER")) for t in p._fitems())
+tick(p, fresh=["A"])
+every = [t for g_ in p._cheat_groups(True) for t in p._cheats(g_, True)]
+assert not any(t.startswith(("LEGAL", "ADD A TRADER", "ADD POLICE", "ANGER")) for t in every)
 os.remove(SAVE)
 print("app: legal status saved, from illegal cargo, halved by jumps, cleared by the pod: ok")
 print("ALL TRAFFIC TESTS PASSED")
