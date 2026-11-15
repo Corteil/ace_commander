@@ -897,8 +897,10 @@ of a real flight, not from a harness.
    middle), white, fading at `JUMP_FADE`; per-LED writes (`_leds_each`), below the bomb,
    ECM, hit and laser flashes. `_led_at` maps a screen direction to LED 1-12 with
    `LED_ANGLE1` (LED 1's angle, anticlockwise from 3 o'clock) and `LED_CLOCKWISE`: the
-   firmware doesn't say where the LEDs are, so these are a guess (75, clockwise) until
-   checked on the badge.
+   firmware doesn't say where the LEDs are. Checked on the badge (LEDs 1, 2, 3 lit red,
+   green, blue; Brian saw them at 0:10, 2:00 and 2:50 on a clock face): clockwise, and a
+   30-degree fit puts LED 1 at 20 degrees past 12, so LED_ANGLE1 = 70; each reading is
+   within 15 degrees (half a step) of the fit. The spacing may be uneven (pairs).
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).

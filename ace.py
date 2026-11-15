@@ -77,8 +77,8 @@ SAFE_GREEN = 60         # the LEDs are this green (0-255) in the safe zone round
 # Where the 12 ring LEDs are round the screen, for effects that light the LED
 # nearest a point on the edge (the jump: white as streaks leave the screen):
 # LED 1's angle in degrees, anticlockwise from straight right (3 o'clock), and
-# whether the numbers go round clockwise. Checked on the badge (see CLAUDE.md).
-LED_ANGLE1 = 75.0
+# whether the numbers go round clockwise (they do), checked on the badge.
+LED_ANGLE1 = 70.0      # LED 1 about 20 degrees past 12 o'clock (Brian saw 1, 2, 3 at 0:10, 2:00, 2:50)
 LED_CLOCKWISE = True
 JUMP_FADE = 900.0       # how fast a jump flash fades, 0-255 a second
 EDGE_IN = 100           # a streak or speck this far from the middle (pixels) is leaving the screen
