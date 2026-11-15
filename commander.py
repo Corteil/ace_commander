@@ -13,7 +13,7 @@ import json
 
 # The level is picked when the commander is made and never changes. It sets
 # how many kills each rank needs here, and how tough the enemies are in
-# game.py. The names and the divisors are placeholders until they are agreed.
+# game.py.
 LEVELS = ("EASY", "NORMAL", "HARD")
 RANK_DIVISOR = (5, 2, 1)    # the original's kill counts are divided by this
 
@@ -74,6 +74,7 @@ class Commander:
         self.legal = 0          # legal status, 0 clean to 255 (game.FUGITIVE and up: a fugitive)
         self.mission = 0        # how far the two missions have got: the original's TP (missions.py)
         self.quick_con = True   # the Constrictor turns up after missions.QUICK_WAIT (else rarely, as the original)
+        self.data = ""          # the data set the commander belongs to: "elite" or "own" ("" unknown)
         self.fuel = MAX_FUEL    # tenths of a light year
         self._needs = thresholds(self.level)
 
@@ -120,7 +121,7 @@ class Commander:
                 "laser": self.laser, "extras": self.extras, "docked_at": self.docked_at,
                 "galaxy": self.galaxy, "colour": self.colour,
                 "legal": self.legal, "mission": self.mission,
-                "quick_con": self.quick_con}
+                "quick_con": self.quick_con, "data": self.data}
 
     @classmethod
     def from_dict(cls, d):
@@ -152,6 +153,8 @@ class Commander:
         k = d.get("legal")
         if isinstance(k, int):
             c.legal = max(0, min(255, k))
+        if isinstance(d.get("data"), str):
+            c.data = d["data"]
         if isinstance(d.get("quick_con"), bool):
             c.quick_con = d["quick_con"]
         k = d.get("mission")
@@ -178,12 +181,16 @@ class Commander:
             return False
 
 
-def load(path):
-    """The commander saved at path, or None if there isn't a readable one."""
+def load(path, data=None):
+    """The commander saved at path, or None if there isn't a readable one, or
+    if it belongs to another data set than data ("elite" or "own"; a save
+    from before data sets were recorded loads anywhere)."""
     try:
         with open(path) as f:
             d = json.loads(f.read())
         if not isinstance(d, dict):
+            return None
+        if data and d.get("data") and d.get("data") != data:
             return None
         return Commander.from_dict(d)
     except (OSError, ValueError, TypeError, KeyError):

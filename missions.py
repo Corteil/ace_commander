@@ -32,6 +32,19 @@ except ImportError:         # imported on its own, as the PC tests do
 ORARRA = (1, 144, 33)       # (galaxy, x, y) on the chart: where the Constrictor is
 CEERDI = (2, 215, 84)       # mission 2's briefing
 BIRERA = (2, 63, 72)        # and where the plans go
+
+
+def use(data):
+    """Take the mission systems from the content in use (its MISSION_PLACES),
+    if it says; otherwise they are the original's (Elite's game_data)."""
+    global ORARRA, CEERDI, BIRERA
+    places = getattr(data, "MISSION_PLACES", None)
+    if places:
+        ORARRA = places["constrictor"]
+        CEERDI = places["briefing"]
+        BIRERA = places["base"]
+    else:
+        ORARRA, CEERDI, BIRERA = (1, 144, 33), (2, 215, 84), (2, 63, 72)
 QUICK_WAIT = 120.0          # seconds outside Orarra's safe zone before it comes (quick_con)
 KILLS_1 = 256               # the original's kill counts for each mission
 KILLS_2 = 1280
@@ -161,6 +174,12 @@ def special_sentence(game_data, tp, galaxy, index):
     """The system's special sentence (PDESC, RUTOK) when you are docked
     there, or None for the usual one: a few always, the rest only while
     mission 1 is under way."""
+    own = getattr(game_data, "SPECIAL", None)
+    if own:
+        for n, (gal, system, always, _) in enumerate(own):
+            if system == index and gal == galaxy:
+                return n + 1 if always or tp & 1 else None
+        return None
     ru = getattr(game_data, "DESC_RU", None)
     if not ru:
         return None

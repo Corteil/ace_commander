@@ -65,8 +65,11 @@ def layout(pages, ship=False):
 
 
 class Briefing:
-    def __init__(self, game_data, token, cmdr_name, galaxy, ship_bp=None):
-        pages = describe.mission_pages(game_data, token, cmdr_name, galaxy)
+    def __init__(self, game_data, token, cmdr_name, galaxy, ship_bp=None, pages=None):
+        """pages: the message itself, (text, shows the ship) for each part,
+        in place of a mission's (token)."""
+        if pages is None:
+            pages = describe.mission_pages(game_data, token, cmdr_name, galaxy)
         self.ship = ship_bp if pages and pages[0][1] else None
         self.lines, last = layout(pages, self.ship is not None)
         self.most = max(0.0, float(last - (VIEW_BOTTOM - VIEW_TOP)))  # furthest it scrolls

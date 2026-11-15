@@ -333,13 +333,25 @@ def _roll(m, a):
 
 
 class Blueprint:
-    """One ship type from ship_data.py."""
+    """One ship type from ship_data.py (or original_ships.py)."""
 
     def __init__(self, entry):
-        self.name = entry[0]
+        self.name = entry[0]    # the role the game knows it by
+        self.title = entry[5] if len(entry) > 5 else entry[0]   # the name shown
+        # convex parts, for a shape that isn't convex (the ring station):
+        # (vertex numbers, edge numbers, when it hides what is behind: 0 never,
+        # 1 always, 2 seen side-on) each, drawn back to front
+        self.parts = entry[6] if len(entry) > 6 else None
         self.verts = entry[1]
         self.edges = entry[2]
         self.normals = entry[3]
+        # a vertex on each face (-1: none), for the hidden-line test
+        self.face_vert = [-1] * len(self.normals)
+        for a, b, f1, f2 in self.edges:
+            if self.face_vert[f1] < 0:
+                self.face_vert[f1] = a
+            if self.face_vert[f2] < 0:
+                self.face_vert[f2] = a
         stats = entry[4] if len(entry) > 4 else None
         size2 = 1.0
         for x, y, z in self.verts:

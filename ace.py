@@ -35,8 +35,9 @@ Ship viewer
     Joystick or buttons turn the ship, CONFIRM (or N) next ship, P previous
     ship, CANCEL back to the title screen.
 
-Ships come from ship_data.py, next to this file. Make it with
-tools/import_ships.py from your own copy of the Elite source.
+Ships come from ship_data.py, next to this file, if you have made it with
+tools/import_ships.py from your own copy of the Elite source; otherwise the
+game's own ships, original_ships.py.
 
 If something moves the wrong way, or you want other buttons, change the
 constants below.
@@ -63,15 +64,12 @@ try:
 except ImportError:
     KEYBOARD_BUTTONS = {}
 
-try:
-    from .ship_data import SHIPS
-except Exception:
-    SHIPS = ()
-
-try:    # the galaxy's starting numbers, made by tools/import_galaxy.py
-    from . import game_data
-except Exception:
-    game_data = None
+from . import content     # Elite's ships and galaxy, or the game's own (content.py)
+SHIPS = content.SHIPS
+game_data = content.DATA
+ORIGINAL_SHIPS = content.OWN        # the game's own content, not Elite's
+HAVE_ELITE_SHIPS = content.HAVE_ELITE   # Elite's files are there: Options can switch
+missions.use(game_data)
 GOODS = getattr(game_data, "GOODS", None)   # the market's goods, if game_data.py has them
 EQUIP = getattr(game_data, "EQUIPMENT", None)   # and the equipment
 SAFE_GREEN = 60         # the LEDs are this green (0-255) in the safe zone round a station
@@ -125,7 +123,14 @@ DOCK_TIME = 3.0         # seconds of flying in through the station's tunnel on d
 DOCK_HOLD = (1.0, 2.0)  # then the view of the bay stays this long, chosen at random
 EJECT_TIME = 3.0        # seconds of the ESCAPE POD screen before the docking scene (C skips it)
 DOCK_NAMES = {"A": "AUTHENTIC", "B": "ASSISTED", "C": "AUTOMATIC"}
-DEBUG_MENU = True       # show DEBUG, a page of cheats for testing, in the in-flight menu
+# DEBUG, a page of cheats for testing (the in-flight menu, Settings and
+# Options): True or False, or None to show it only if a file called debug.txt
+# is in the app's folder (always on a PC, where the tests run), or once it has
+# been found: the Easter egg, docking at systems that spell EGG_WORD in the
+# first galaxy (see AceCommander._egg)
+DEBUG_MENU = None
+EGG_WORD = "DRAKE"      # a male duck: no system name starts with C or U for DUCKS
+EGG_STOPS = 1           # dockings elsewhere forgiven between letters (to refuel)
 PERF_SLOW = 25          # ms over the average that makes a frame count as slow
 
 # the app's folder; the commander is saved there
@@ -135,10 +140,35 @@ try:
         APP_DIR = "/" + APP_DIR         # the badge gives a path relative to /
 except Exception:
     APP_DIR = "/apps/ace_commander"
-SAVE_PATH = APP_DIR + "/commander.json"
+# each data set keeps its own commander: their galaxy, systems and market
+# only make sense in it (content.py, Options > DATA)
+DATA_TAG = "own" if ORIGINAL_SHIPS else "elite"
+SAVE_PATH = APP_DIR + ("/commander.json" if ORIGINAL_SHIPS else "/commander_elite.json")
+
+
+def _debug_wanted():
+    import sys
+    if sys.implementation.name != "micropython":
+        return True
+    try:
+        open(APP_DIR + "/debug.txt").close()
+        return True
+    except OSError:
+        pass
+    try:                # found with the Easter egg
+        with open(options_path()) as f:
+            return bool(json.loads(f.read()).get("debug"))
+    except Exception:
+        return False
+
+
 def options_path():
-    """options.json, next to the save: the Options page's steering and LEDs."""
+    """options.json, next to the save: the Options page's choices."""
     return SAVE_PATH.rsplit("/", 1)[0] + "/options.json"
+
+
+if DEBUG_MENU is None:
+    DEBUG_MENU = _debug_wanted()
 
 
 # The DEBUG cheats in groups (Settings and Options > DEBUG). The names are the
@@ -320,7 +350,7 @@ class AceCommander(app.App):
         self.bench = None
         self.menu = 0           # which title screen choice is showing
         self.title = title.Title(SHIPS) if SHIPS else None
-        self.cmdr = commander.load(SAVE_PATH)   # the saved commander, or None
+        self.cmdr = commander.load(SAVE_PATH, DATA_TAG)   # the saved commander, or None
         # the commander as last saved, as JSON: being destroyed goes back to it
         self.saved = json.dumps(self.cmdr.to_dict()) if self.cmdr is not None else None
         self.level = 1          # the level showing on the new-commander screen
@@ -364,7 +394,10 @@ class AceCommander(app.App):
         self.ms = 0.0                    # smoothed frame time
         self.leds_on = False             # we have taken over the LEDs
         self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
+        self.own_ships = ORIGINAL_SHIPS  # DATA: OWN / ELITE, from the next start
         self.omenu = 0                   # the chosen line on the Options page
+        self.egg = 0                     # letters of EGG_WORD docked at so far
+        self.egg_miss = 0                # and dockings elsewhere since the last
         self.dgroup = None               # the DEBUG group open in flight (fsub "dgroup")
         self.debug_from = None           # where DEBUG was opened from in flight: None (the menu) or "settings"
         self.od_from = None              # Options' DEBUG away from a flight (mode "odebug"):
@@ -808,13 +841,46 @@ class AceCommander(app.App):
         self.chart = None
         self.mode = "docked"
         self._mission_news()
+        self._egg()
+
+    def _egg(self):
+        """The Easter egg: dock at systems whose names start with the letters
+        of EGG_WORD, in order, in the first galaxy, and the DEBUG menu is
+        yours. One docking elsewhere between letters is forgiven (to refuel:
+        no route has every step on one tank); more starts again. Kept in
+        options.json."""
+        global DEBUG_MENU
+        c = self.cmdr
+        if DEBUG_MENU or c is None or c.galaxy != 0 or self.galaxy is None:
+            return
+        ch = self.galaxy.system(c.system).name[:1]
+        if ch == EGG_WORD[self.egg]:
+            self.egg += 1
+            self.egg_miss = 0
+        elif ch == EGG_WORD[0]:
+            self.egg = 1                # a fresh start
+            self.egg_miss = 0
+        else:
+            self.egg_miss += 1
+            if self.egg_miss > EGG_STOPS:
+                self.egg = self.egg_miss = 0
+        if self.egg >= len(EGG_WORD):
+            DEBUG_MENU = True
+            self.egg = self.egg_miss = 0
+            if self.mode == "docked":   # not over a mission's message
+                self.brief = briefing.Briefing(game_data, 0, "", 0, None, pages=(
+                    ("QUACK!\nYou have found the hidden DEBUG menu: cheats, at the end of "
+                     "Settings and Options and on the in-flight menu.\nMESSAGE ENDS", False),))
+                self.mode = "brief"
+        self._save_options()
 
     def _mission_news(self):
         """Docking may start or end a mission (missions.on_docking): if so,
         save, and show the message before the docked screens."""
         c = self.cmdr
         gal = self.galaxy
-        if gal is None or not getattr(game_data, "DESC_TOKENS", None):
+        if gal is None or not (getattr(game_data, "DESC_TOKENS", None)
+                               or getattr(game_data, "MISSION_TEXTS", None)):
             return
         n = missions.on_docking(c, gal.xs[c.system], gal.ys[c.system])
         if n is None:
@@ -975,6 +1041,7 @@ class AceCommander(app.App):
         c = self.cmdr
         if c is None:
             return
+        c.data = DATA_TAG
         self.saved = json.dumps(c.to_dict())
         c.save(SAVE_PATH)
 
@@ -1363,6 +1430,9 @@ class AceCommander(app.App):
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
         if tildagonos is not None:
             items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))
+        if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose data, from the next start
+            items.append("DATA: " + ("OWN" if self.own_ships else "ELITE")
+                         + ("" if self.own_ships == ORIGINAL_SHIPS else " (RESTART)"))
         if DEBUG_MENU:
             items.append("DEBUG")
         return items
@@ -1402,6 +1472,9 @@ class AceCommander(app.App):
             if self.game is not None:
                 self.game.set_docking(c.docking)
             self._write_setting("docking", c.docking)
+        elif item.startswith("DATA"):
+            self.own_ships = not self.own_ships
+            self._save_options()
         elif item.startswith("LEDS"):
             self.use_leds = not self.use_leds
             if not self.use_leds:
@@ -1419,11 +1492,18 @@ class AceCommander(app.App):
                 self.use_tilt = d["tilt"] and self.tilt_ok
             if isinstance(d.get("leds"), bool):
                 self.use_leds = d["leds"]
+            if isinstance(d.get("egg"), int) and isinstance(d.get("egg_miss"), int):
+                self.egg, self.egg_miss = d["egg"], d["egg_miss"]
+            own = d.get("own", d.get("own_ships"))
+            if isinstance(own, bool):
+                self.own_ships = own
 
     def _save_options(self):
         try:
             with open(options_path(), "w") as f:
-                f.write(json.dumps({"tilt": self.use_tilt, "leds": self.use_leds}))
+                f.write(json.dumps({"tilt": self.use_tilt, "leds": self.use_leds,
+                                    "own": self.own_ships, "egg": self.egg,
+                                    "egg_miss": self.egg_miss, "debug": DEBUG_MENU}))
         except Exception:
             pass
 

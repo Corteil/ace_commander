@@ -50,7 +50,10 @@ class Title:
         self._load()
 
     def _load(self):
-        name, verts, edges, normals = self.ships[self.order[self.turn]][:4]
+        e = self.ships[self.order[self.turn]]
+        name, verts, edges, normals = e[:4]
+        self.key = name             # the role (FIRST names roles)
+        name = e[5] if len(e) > 5 else name     # the name shown
         r2 = 1.0
         for x, y, z in verts:
             d = x * x + y * y + z * z

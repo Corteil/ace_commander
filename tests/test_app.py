@@ -1,4 +1,4 @@
-import math, os, random, shutil, sys
+import json, math, os, random, shutil, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)            # the app folder, which must be named ace_commander
 PARENT = os.path.dirname(REPO)
@@ -333,7 +333,7 @@ for _ in range(50):
     tick(a, held=["JOYUP", "C", "F"]); frame(a)
 print("no imu / no keyboard modules: ok")
 
-# ---- ship_data.py missing ---------------------------------------------------
+# ---- ship_data.py missing: the game's own ships ---------------------------
 tmp = os.path.join(HERE, "noship")
 shutil.rmtree(tmp, ignore_errors=True)
 shutil.copytree(REPO, os.path.join(tmp, "ace_commander"),
@@ -341,13 +341,47 @@ shutil.copytree(REPO, os.path.join(tmp, "ace_commander"),
 sys.path.insert(0, tmp)
 sys.path.remove(PARENT)
 pkg, mod = load()
+assert "noship" in pkg.__file__ and mod.ORIGINAL_SHIPS and len(mod.SHIPS) == 31
+a = pkg.AceCommander()
+c = frame(a); fits(c)
+assert a.title.name == "KESTREL", "the title screen shows the ships' own names"
+choose(a, "COMBAT PRACTICE")
+g = a.game
+assert g.types["COBRA MK III"].title == "KESTREL"
+for _ in range(200):
+    tick(a, held=["JOYUP", "C"]); frame(a)
+# and the game's own galaxy, market and equipment (build 56)
+cont = sys.modules["ace_commander.content"]
+assert cont.OWN and cont.DATA.__name__.endswith("original_data") and mod.game_data is cont.DATA
+a.mode = "menu"
+a.cmdr = None
+mod.SAVE_PATH = os.path.join(HERE, "shots", "test_app_own.json")
+if os.path.exists(mod.SAVE_PATH):
+    os.remove(mod.SAVE_PATH)
+choose(a, "NEW COMMANDER"); tick(a, fresh=["C"])
+assert a.mode == "docked" and a.galaxy.system(a.cmdr.system).name == "DAENOR"
+assert a.dock.market.name(0) == "GRAIN" and a.dock.market.name(16) == "ALIEN RELICS"
+assert mod.EQUIP[11][0] == "GALACTIC HYPERDRIVE"
+miss = sys.modules["ace_commander.missions"]
+assert miss.ORARRA == (1, 251, 108) and miss.CEERDI == (2, 126, 43) and miss.BIRERA == (2, 250, 226)
+assert mod.DATA_TAG == "own" and json.load(open(mod.SAVE_PATH))["data"] == "own", \
+    "the save says which data set it belongs to"
+os.remove(mod.SAVE_PATH)
+print("ship_data.py missing: the game's own ships: ok")
+
+# ---- and original_ships.py missing too ----------------------------------------
+shutil.rmtree(tmp, ignore_errors=True)
+shutil.copytree(REPO, os.path.join(tmp, "ace_commander"),
+                ignore=shutil.ignore_patterns("ship_data.py", "original_ships.py", "__pycache__",
+                                              ".git", "tests"))
+pkg, mod = load()
 assert "noship" in pkg.__file__ and mod.SHIPS == ()
 a = pkg.AceCommander()
 c = frame(a); fits(c)
 assert any(t[0] == "ship_data.py" for t in c.texts)
 tick(a, fresh=["C"]); assert a.mode == "menu"
 tick(a, fresh=["F"]); assert App.minimised == 1
-print("ship_data.py missing: ok")
+print("no ships at all: ok")
 
 # the station tunnels: every ring is the slot, level; spacings differ
 cockpit = sys.modules["ace_commander.cockpit"]
@@ -419,10 +453,10 @@ class Rec:
 square = [(-10, -10), (10, -10), (10, 10), (-10, 10), (0, 0), (5, 0), (-10, 0)]
 for i, (x, y) in enumerate(square):
     cockpit._PX[i] = x; cockpit._PY[i] = y; cockpit._OK[i] = True
-r = Rec(); cockpit._fill_hull(r, len(square))
+r = Rec(); cockpit._fill_hull(r, range(len(square)))
 assert r.filled == 1 and set(r.pts) == {(-10, -10), (10, -10), (10, 10), (-10, 10)}, r.pts
 cockpit._OK[2] = False
-r = Rec(); cockpit._fill_hull(r, len(square))
+r = Rec(); cockpit._fill_hull(r, range(len(square)))
 assert r.filled == 0, "not when part of it is behind you"
 print("station tunnels: the slot all the way, every spacing used, parked ships fit: ok")
 print("ALL APP TESTS PASSED")

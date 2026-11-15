@@ -17,7 +17,7 @@ import sys
 import app
 
 # in the order they are imported: each after the ones it needs
-STEPS = ("ship_data", "game_data", "commander", "galaxy", "market", "equipment", "game",
+STEPS = ("ship_data", "game_data", "content", "commander", "galaxy", "market", "equipment", "game",
          "cockpit", "chart", "title", "viewer", "bench", "describe", "missions", "briefing",
          "docked", "ace")
 OPTIONAL = ("ship_data", "game_data")   # made from your own copy of Elite: may be missing

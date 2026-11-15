@@ -50,6 +50,18 @@ description sentence (build 52) and the disc version's two missions (build 54).
   special system sentences. Rules only.
 - `missions.py` - the disc version's two missions (Constrictor, Thargoid plans). Rules only.
 - `briefing.py` - INCOMING MESSAGE and the mission texts, a screen at a time, on docking.
+- `original_ships.py` - **the game's own ships** (build 55), committed: 31 original
+  designs, one for each role the game knows by Elite's names, with their own names
+  (entry[5], `Blueprint.title`). Made by `tools/make_original_ships.py` with
+  `tools/shipmaker.py` (convex hulls from corner points, explicit faces, lines on faces).
+  Used when the Elite files are missing, or with Options > DATA: OWN (see `content.py`).
+- `original_data.py` - **the game's own galaxy, market and equipment** (build 56),
+  committed: seeds, letter pairs, start (Daenor), goods, equipment prices, and where the
+  missions happen (`MISSION_PLACES`, read by `missions.use`).
+- `content.py` - decides once at start-up whose content is used: Elite's
+  (`ship_data.py` + `game_data.py`) or the game's own (`original_*`). Own if either Elite
+  file is missing or options.json has "own" (old key "own_ships"). `ace.SHIPS`,
+  `ace.game_data` and `docked.game_data` come from it.
 - `ship_data.py`, `game_data.py` - generated, **gitignored** (see Licensing). 31 ships; the
   galaxy's seeds, name letter pairs, starting place, the market's 17 goods and the 14
   equipment prices. Both must be copied to the badge.
@@ -764,6 +776,109 @@ of a real flight, not from a harness.
    the pulse laser.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
+   **Build 55: publishing prep begins, the game's own ships** (Brian: a full game with
+   our own content, our own names, Claude designs the ships). `original_ships.py` (31
+   roles: KESTREL in the Cobra Mk III's role, WARDEN police, GNAT, HORNET, STINGER, MULE,
+   SKINK, KITE, GRUB, HARRIER, LANCET, BULWARK, BARGE, LEVIATHAN, MANTA, PHANTOM (mission
+   1), VORN MOTHERSHIP and DRONE (aliens), SHUTTLE, HAULER, DRUM STATION (low tech, 3:1
+   slot) and HALO STATION (high tech: a six-sided ring on three flat spokes round a hub,
+   2:1 docking slot in the hub's front), rocks, canister, plate, missile, pod). Sizes near
+   the originals' (the game's balance and the bay slots depend on them); stats our own
+   (none within 3 values of Elite's, checked against ship_data.py); hit areas capped at
+   9800. `ace.py` imports `ship_data` and falls back to `original_ships`
+   (`ORIGINAL_SHIPS`, `HAVE_ELITE_SHIPS`); Options (title and docked, not in flight) has
+   SHIPS: ELITE / OWN when ship_data.py is there, read from options.json at the next start
+   (`_want_own_ships`). The viewer and title screen show the titles. The draw limits went
+   from 48 vertices / 24 faces to 96 / 64 (`cockpit._PX`, `_VIS`). On the badge (real
+   ctx): Halo 5.8-6.7 ms against Elite's Dodo 3.1-3.9; Drum 2.3-2.7 (Coriolis 2.4-4.8);
+   Kestrel 2.6 (Cobra 2.8). The ring's faces point out from each segment's own middle
+   (not the ring's radius, which flipped them). Stations still collide as the old ones
+   did (by distance from the centre), so you can fly through the Halo's ring unharmed.
+   Then (Brian: the Halo didn't hide all its hidden lines; Elite's rule is only right for
+   convex shapes): a blueprint may have convex parts (entry[6], `Blueprint.parts`:
+   vertices, edges and when it hides), drawn back to front by mean depth (`_PZ`); a part
+   nearer than the centre blacks out its outline first (`_fill_hull(ctx, indices)`), the
+   hub always, the ring's six pieces only side-on (|nose . view| < 0.5), the spokes
+   never: each fill costs about 2 ms on the badge. Halo now 9-10 ms averaged over all
+   angles (Elite's Dodo 3-6), about 8.7 face on, as you fly in to dock.
+   Then (Brian: the slot looked wrong close up): Elite's slots are long up the station
+   (along its roof), so lined up for docking (roof across the screen, docking A's rule
+   and the docking computer's roll) they lie level, as the tunnels draw them; ours were
+   long across it and stood upright. Both now stand like Elite's (Halo 34 x 68, Drum
+   24 x 72); the test checks against ship_data.py when it is there.
+   Then (Brian: the drum's back showed when docking): the hidden-line test is now made
+   from a vertex on each face (`Blueprint.face_vert`, view-space positions in
+   `cockpit._VX`, `_VY`, `_PZ`), not from the ship's centre as Elite's was; the centre
+   test called a big ship's near-edge-on sides visible close up, drawing the back rim.
+   Exact for convex shapes at any distance; also fixes Elite's Coriolis; no measurable
+   cost on the badge.
+   Tests: `tests/test_original_ships.py`; `test_app.py` runs a copy without ship_data.py.
+   Next in publishing prep: our own galaxy, goods and equipment (56), our own words and
+   mission texts (57), then the README, DEBUG off, level names and the app store (58).
+   **Build 56: the game's own galaxy, market and equipment** (`original_data.py`,
+   `content.py`). Seeds 0x7CBF 0x1FAB 0xE606 and our own 31 letter pairs (no TH, which
+   made "THTHKAVE"; PA, not PE, which made "PEE..."), picked for readable names and
+   checked for rude words in all eight galaxies; start at Daenor (128,141), a
+   Confederacy, rich agricultural, tech 6, 12 systems within 7 LY. Goods keep each slot's
+   job (0-7 in canisters, 3/6/10 illegal, 12 mining, 13-15 kg/g, 16 alien): GRAIN,
+   FABRICS, ISOTOPES, CONTRABAND, SPIRITS, LUXURIES, STIMS, ELECTRONICS, MACHINERY,
+   ALLOYS, WEAPONS, SILKS, ORE, GOLD, PLATINUM, GEMS, ALIEN RELICS; our own numbers, the
+   same shape of economy (compared price and stock for every economy). Equipment: the
+   same 14 in order, our own prices; GALACTIC HYPERDRIVE. Mission places: shipyard Tuelve
+   and last seen Rotuvaga (galaxy 1), the Phantom at Elnada (galaxy 2, 13 jumps from
+   where a galactic jump arrives), briefing Argatu and base Vedao (galaxy 3, 61 LY and
+   13 jumps apart, like Ceerdi and Birera). Options' SHIPS became DATA: ELITE / OWN,
+   saved as "own". Without our own text tables (build 57) the missions don't start and
+   System data has no sentence in OWN. On the badge: content.py and its imports 2.6 s
+   over the REPL. Brian's usual badge had SHIPS: OWN set, so it is now in our galaxy.
+   Tests: `test_app.py` starts a commander in a copy without ship_data.py.
+   Then (Brian): the Options line is DATA: ELITE / OWN, and each data set has its own
+   commander: `commander.json` for our own data (what an app store player has),
+   `commander_elite.json` for Elite's (`ace.SAVE_PATH`, `DATA_TAG`); a save records
+   "data" and `commander.load(path, data)` won't load one from the other set (older saves
+   without it load anywhere). Brian's usual badge: his Elite commander (380 kills, both
+   missions done) was moved from commander.json to commander_elite.json (backup on the Pi
+   in ~/Code/ace_commander_save_backups/).
+   **Build 57: the game's own words** (`original_data.py`). System data sentences from
+   our own grammar (`DESCRIBE`: `<word>` choices, %N name, %I adjective, %R made-up name;
+   `describe._Grammar`, a 16-bit xorshift seeded from the system's s1 and s2, "a" made
+   "an" before a vowel); every system in all eight galaxies has one that fits the page,
+   over 240 different per galaxy. The agreed mission texts (`MISSION_TEXTS` by
+   missions.py's numbers, [NAME] and [TRAIL] filled in by `describe.mission_pages`;
+   `TRAIL` by galaxy: Rotuvaga in the first, "jumped to this galaxy" in the second).
+   Trail clues (`SPECIAL`: galaxy, system, always, words; read by
+   `missions.special_sentence` and `describe.special`): Tuelve, Rotuvaga, Kalimii in
+   galaxy 1; Linaqu, Gaorsaka, Pamivaes, Soilliro, Reorrove, Litudade, Tudekai, Elnada
+   along the route in galaxy 2; three always-on sentences. `_mission_news` runs with
+   MISSION_TEXTS as well as Elite's DESC_TOKENS. With DATA: OWN the whole game now runs
+   without Elite's files. Tests: `tests/test_original_data.py` plays both missions in a
+   copy of the app without ship_data.py and game_data.py. Not yet on the badge (Brian
+   asked to be asked first).
+   **Build 58: release prep** (Brian: MIT licence; ask before publishing). `LICENSE`
+   (MIT, "Corteil", with a note that it doesn't cover the Elite-derived files);
+   `tildagon.toml` and `metadata.json` with license, url and a new description (134 of
+   the store's 140 characters), version 58. The badge's app store (firmware
+   `app_store.py`) downloads the GitHub release tarball, unpacks all of it in memory and
+   installs it as `/apps/<owner>_<repo>` (Corteil_ace_commander): `.gitattributes` marks
+   tests, tools, CLAUDE.md, DESIGN.md, deploy.bat and the git files export-ignore (the
+   folders and `folder/**`: `check-attr` doesn't apply `folder/` to the files in it),
+   so the tarball is 111 KB / 410 KB unpacked (231 / 809 before). Publishing (per the
+   docs): the repo topic `tildagon-app` and a release; listed within about 15 minutes at
+   apps.badge.emfcamp.org; errors at apps.badge.emfcamp.org/errors/. Not done yet: ask
+   Brian first. `DEBUG_MENU = None`: shown only if `debug.txt` is in the app's folder
+   (always on a PC), so store installs have no cheats (git-ignored). README rewritten for
+   players. Level names EASY / NORMAL / HARD kept (no longer placeholders). Tests:
+   `tests/test_install.py` builds the release's file list (git ls-files less
+   export-ignore), installs it as Corteil_ace_commander and starts it through app.py.
+   Then (Brian): the DEBUG menu stays in the release as an Easter egg. Dock at systems
+   whose names start with the letters of `EGG_WORD` ("DRAKE", a male duck: no name in our
+   galaxy starts with C or U, so DUCKS can't be spelled) in order, in the first galaxy;
+   one docking elsewhere between letters is forgiven (`EGG_STOPS`, to refuel: no route has
+   every step within one 7 LY tank), two start again (`AceCommander._egg`, progress
+   `egg` / `egg_miss` in options.json). Then "QUACK!" (a `Briefing` with its own
+   `pages`) and `DEBUG_MENU` is on for good ("debug": true in options.json, read by
+   `_debug_wanted`). A route from the start: Daenor, (a stop such as Idei), Reares,
+   Arorzu, Kasaxipa, Elkasoso. Not in the README on purpose.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
@@ -774,7 +889,7 @@ of a real flight, not from a harness.
    each new thing that is slow to reach by playing, and turn it off before publishing.
    Its title shows the build (build 54), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
-7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
+7. Level names are EASY / NORMAL / HARD (kept for release, build 58); their numbers are
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
 
 Measured on the badge in build 15: the title screen takes about 29 ms to draw (clear 7,

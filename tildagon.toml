@@ -7,5 +7,7 @@ class = "AceCommander"
 
 [metadata]
 author = "Corteil"
-description = "Wireframe space combat inspired by BBC Micro Elite: fly by tilt, joystick or keyboard, plus a ship viewer."
-version = "54"
+license = "MIT"
+url = "https://github.com/Corteil/ace_commander"
+description = "Wireframe space trading and combat: fly, trade, dock and take on two Navy missions across eight galaxies. Inspired by BBC Micro Elite."
+version = "58"

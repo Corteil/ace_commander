@@ -128,10 +128,13 @@ def text(ctx, s, x, y, size, rgb, align=0):
 # whole pixels.
 IFOCAL = int(FOCAL)
 INEAR = int(NEAR)
-_PX = [0] * 48      # screen x of each vertex of the ship being drawn
-_PY = [0] * 48      # screen y
-_OK = [False] * 48  # False if the vertex is behind the viewer
-_VIS = [False] * 24  # which faces of the ship being drawn can be seen
+_PX = [0] * 96      # screen x of each vertex of the ship being drawn
+_PY = [0] * 96      # screen y
+_OK = [False] * 96  # False if the vertex is behind the viewer
+_VIS = [False] * 64  # which faces of the ship being drawn can be seen
+_PZ = [0] * 96      # how far away each vertex is
+_VX = [0] * 96      # and where it is across and up, before the perspective
+_VY = [0] * 96
 
 
 def draw_ship(ctx, o, rgb=None, wire_min=WIRE_MIN, solid=False):
@@ -173,31 +176,74 @@ def draw_ship(ctx, o, rgb=None, wire_min=WIRE_MIN, solid=False):
     px = _PX
     py = _PY
     ok = _OK
+    dz = _PZ
+    wx = _VX
+    wy = _VY
     i = 0
     for vx, vy, vz in bp.verts:
         pz = z + ((vx * m2 + vy * m5 + vz * m8) >> 12)
+        qx = x + ((vx * m0 + vy * m3 + vz * m6) >> 12)
+        qy = y + ((vx * m1 + vy * m4 + vz * m7) >> 12)
+        dz[i] = pz
+        wx[i] = qx
+        wy[i] = qy
         if pz < INEAR:
             ok[i] = False   # behind the viewer
         else:
             ok[i] = True
-            px[i] = (x + ((vx * m0 + vy * m3 + vz * m6) >> 12)) * IFOCAL // pz
-            py[i] = -((y + ((vx * m1 + vy * m4 + vz * m7) >> 12)) * IFOCAL // pz)
+            px[i] = qx * IFOCAL // pz
+            py[i] = -(qy * IFOCAL // pz)
         i += 1
 
-    # Elite's hidden-line rule: a face shows if its normal points back along
-    # the line from the viewer to the ship. A zero normal always shows.
+    # A face shows if its normal points back towards you from a point on the
+    # face. (Elite judged it from the ship's middle, which is the same far off
+    # but shows the far side of a big ship you are close to, such as a
+    # station's back rim as you fly in.) A zero normal always shows.
     vis = _VIS
+    fv = bp.face_vert
     i = 0
     for nx, ny, nz in bp.normals:
-        vis[i] = ((nx == 0 and ny == 0 and nz == 0)
-                  or ((nx * m0 + ny * m3 + nz * m6) >> 8) * x
-                  + ((nx * m1 + ny * m4 + nz * m7) >> 8) * y
-                  + ((nx * m2 + ny * m5 + nz * m8) >> 8) * z < 0)
+        if nx == 0 and ny == 0 and nz == 0:
+            vis[i] = True
+        else:
+            v = fv[i]
+            if v < 0:
+                ax, ay, az = x, y, z
+            else:
+                ax, ay, az = wx[v], wy[v], dz[v]
+            vis[i] = (((nx * m0 + ny * m3 + nz * m6) >> 8) * ax
+                      + ((nx * m1 + ny * m4 + nz * m7) >> 8) * ay
+                      + ((nx * m2 + ny * m5 + nz * m8) >> 8) * az < 0)
         i += 1
 
+    col = RED if o.hit > 0 else rgb or COLOUR[o.kind]
+    if bp.parts:    # not convex: its convex parts back to front, each hiding what is behind
+        order = []
+        for vs, es, hides in bp.parts:
+            d = 0
+            for v in vs:
+                d += dz[v]
+            order.append((d // len(vs), vs, es, hides))
+        order.sort(key=lambda t: -t[0])
+        edges = bp.edges
+        side_on = -2048 < m8 < 2048     # the nose more across the view than along it
+        for d, vs, es, hides in order:
+            # blacking out costs about 2 ms: only a part nearer than the middle
+            # can hide another, and some only when seen side-on
+            if d < z and (hides == 1 or (hides == 2 and side_on)):
+                _fill_hull(ctx, vs)
+            ctx.rgb(*col)
+            ctx.begin_path()
+            for e in es:
+                a, b, f1, f2 = edges[e]
+                if (vis[f1] or vis[f2]) and ok[a] and ok[b]:
+                    ctx.move_to(px[a], py[a])
+                    ctx.line_to(px[b], py[b])
+            ctx.stroke()
+        return True
     if solid:
-        _fill_hull(ctx, len(bp.verts))
-    ctx.rgb(*(RED if o.hit > 0 else rgb or COLOUR[o.kind]))
+        _fill_hull(ctx, range(len(bp.verts)))
+    ctx.rgb(*col)
     ctx.begin_path()
     for a, b, f1, f2 in bp.edges:
         if (vis[f1] or vis[f2]) and ok[a] and ok[b]:
@@ -207,13 +253,13 @@ def draw_ship(ctx, o, rgb=None, wire_min=WIRE_MIN, solid=False):
     return True
 
 
-def _fill_hull(ctx, n):
-    """Fill black the outline round the first n projected vertices (the
-    smallest convex shape holding them all), if none is behind the viewer."""
+def _fill_hull(ctx, idx):
+    """Fill black the outline round the projected vertices numbered in idx
+    (the smallest convex shape holding them all), if none is behind the viewer."""
     px = _PX
     py = _PY
     pts = []
-    for i in range(n):
+    for i in idx:
         if not _OK[i]:
             return
         pts.append((px[i], py[i]))
