@@ -28,6 +28,8 @@ sentence.
   this file must be `app.py` and stay tiny: it draws at once, imports the other modules one
   by one with a progress bar, then hosts the real app. On a PC (tests) the package's
   `__init__` gives `ace.AceCommander` directly.
+- `letters.py` - the name in block letters (rectangles), shared by `title.py` and the
+  loading screen; imports nothing.
 - `ace.py` - **the real app** (it was `app.py` until build 49; older notes below that say
   `app._dock`, `app.py` and so on mean this file): menu, input (`Pad`), frame loop (`run`),
   LEDs, pause, PERF logging.
@@ -619,6 +621,10 @@ of a real flight, not from a harness.
    used. The loader is now `app.py` and the real app `ace.py`; `__init__.py` imports nothing
    on the badge. Checked the launcher's way on the badge: the loading screen is ready in
    0.28 s, the game in 6.7 s. Old `loader.py` removed from the badge.
+   **Build 51 (Brian):** the loading screen matches the title screen: the name in the same
+   yellow and white block letters in the same place (`letters.draw_name`, which `title.py`
+   uses too; the loader imports `letters` before its first frame), and LOADING in green
+   where the menu line will be.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -629,7 +635,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 50), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 51), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

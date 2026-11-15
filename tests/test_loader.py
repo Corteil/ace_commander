@@ -46,7 +46,14 @@ try:
     asyncio.run(ld.run(render_update))
 except Handed:
     pass
-assert frames[0][0] == 0 and "LOADING" in frames[0][1] and "ACE" in frames[0][1]
+assert frames[0][0] == 0 and "LOADING" in frames[0][1]
+# the name in block letters, where and as the title screen draws it (build 51)
+from ace_commander import letters, title
+assert loader._letters is letters
+c = CountCtx(); loader.AceCommander().draw(c)
+n_name = len(letters.ACE) + len(letters.COMMANDER)
+assert c.calls.get("rectangle", 0) >= n_name + 1     # the name, the background, the bar
+assert title._ACE is letters.ACE and title._COMMANDER is letters.COMMANDER
 assert [f[0] for f in frames[:len(loader.STEPS)]] == list(range(len(loader.STEPS))), \
     "a frame drawn before each module"
 assert ld.done == len(loader.STEPS)
