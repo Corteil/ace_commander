@@ -115,41 +115,45 @@ SUN_HEAT = 36.0
 SCOOP_TEMP = 224
 SUN_CHECK = 1.0
 
-# Phase 5: traders, police and legal status, as in the original as far as it
-# is known. Legal status is a number 0 to 255 (the original's FIST): 0 clean,
-# 1 to 49 an offender, FUGITIVE or more a fugitive. Launching with illegal
-# goods raises it to at least 2 x (slaves + narcotics) + firearms (tonnes);
-# firing on a trader (the first hit on each) adds HIT_TRADER and killing one
-# KILL_TRADER more; firing on the police or the station makes you a fugitive.
-# Each hyperspace jump halves it.
+# Phase 5: traders, police and legal status, as the original (BBC Micro disc
+# version) does them. Legal status is the original's FIST, 0 to 255: 0 clean,
+# 1 to 49 an offender, FUGITIVE or more a fugitive. It changes only like this:
+#   - launching ORs in the contraband in your hold, (slaves + narcotics) x 2 +
+#     firearms (BAD, ILLEGAL)
+#   - destroying a police ship ORs in 64 (KILL_COP): a fugitive at once
+#   - each hyperspace jump halves it (SOLAR); the escape pod and the galactic
+#     hyperdrive clear it
+# Firing on a trader (an innocent bystander) or on the station makes the
+# station hostile (ANGRY / AN2), not your record worse. A hostile station
+# refuses docking: at DEATH_SPEED or more that is the end, slower a small dent
+# (SLOW_CRASH, MA67); it launches police after you (STATION_COPS at most, with
+# chance STATION_COP_CHANCE a second) and stays hostile until you leave.
 FUGITIVE = 50
-HIT_TRADER = 16
-KILL_TRADER = 16
+HUNT_LEGAL = 40         # bounty hunters (and the police, who are hunters too) attack at this or more
+KILL_COP = 64
 ILLEGAL = {3: 2, 6: 2, 10: 1}   # good number (market.py's list): weight a tonne
-# Traders fly about the star system, towards the station, and leave you alone
-# unless you fire on them; then the ones with a laser fight back and the rest
-# flee. Every TRADER_EVERY seconds, with fewer than TRADER_MOST about, one
-# turns up with chance TRADER_CHANCE (TRADER_NEAR in the safe zone).
+DEATH_SPEED = 5         # Elite speed units: a refused docking this fast kills you
+SLOW_CRASH = 5.0
+STATION_COPS = 4
+STATION_COP_CHANCE = 0.1
+# Every ENCOUNTER_EVERY seconds (the original's once every 256 main loops),
+# outside the safe zone: with chance 35/256 something harmless, half the time
+# a trader (TRADERS, half of them making for the station to dock, half for the
+# planet); otherwise a police Viper with chance (2 x BAD, ORed with your legal
+# status if police are already about) / 256, and then, if there are no police
+# about, the roll for pirates or a bounty hunter (ENCOUNTER_EVERY above).
+# Nothing turns up inside the safe zone, but a station that isn't hostile
+# launches a Shuttle or Transporter now and then (SHUTTLE_CHANCE a second, one
+# at a time), and a pirate that follows you in loses its aggression (TN3).
 TRADERS = ("COBRA MK III", "PYTHON", "BOA", "ANACONDA", "MORAY")
-TRADER_EVERY = 12.0
-TRADER_CHANCE = 0.45
-TRADER_NEAR = 0.8
-TRADER_MOST = 2
-# Police Vipers launch from the station (or arrive near you, if it is far off)
-# while you are in its safe zone: every POLICE_EVERY seconds, with fewer than
-# POLICE_MOST about, always for a fugitive, with chance legal / 64 for an
-# offender, and now and then on patrol for anyone (they leave the clean alone).
-# Bounty hunters (HUNTERS, from the encounter rolls) are after offenders and
-# fugitives: a clean pilot sees one fly by; it turns on you if you become an
-# offender, and firing on it is a crime like firing on a trader. Pirates go
-# for a trader rather than you when one is nearer them than you are
-# (PREY_RANGE at most); a trader they destroy drops its cargo and counts
-# for nobody.
-PREY_RANGE = 6000.0
+SHUTTLES = ("SHUTTLE", "TRANSPORTER")
+BENIGN = 35 / 256.0
+SHUTTLE_CHANCE = 0.018
 POLICE = "VIPER"
-POLICE_EVERY = 6.0
-POLICE_MOST = 3
-PATROL_CHANCE = 0.12
+# Pirates go for a trader rather than you when one is nearer them than you are
+# (PREY_RANGE at most); a trader they destroy spills its cargo and counts for
+# nobody. (Not in the original, where pirates only ever go for you.)
+PREY_RANGE = 6000.0
 
 # The ships parked in a station's docking bay depend on the system: pirate
 # craft where the government is weak, traders and police where it is strong,
@@ -186,6 +190,16 @@ LEVELS = (
     (4, 1.0, 1.0),
     (5, 1.3, 1.3),
 )
+
+
+def bad(cargo):
+    """How bad the contraband in a hold is (BAD): (slaves + narcotics) x 2 +
+    firearms, in tonnes."""
+    w = 0
+    for i, k in ILLEGAL.items():
+        if i < len(cargo):
+            w += k * cargo[i]
+    return min(255, w)
 
 
 def legal_name(legal):
@@ -338,6 +352,7 @@ class Obj:
         self.target = None  # what a player missile is chasing
         self.good = None    # a splinter: the good it holds (a canister: None, any of several)
         self.role = "pirate"    # ships: "pirate", "trader", "police" or "hunter"
+        self.dest = "station"   # a trader's: where it is making for, "station" or "planet"
         self.prey = None        # a pirate's: the trader it is after (None: you)
         self.missiles = bp.missiles
         self.beam = 0.0     # > 0 while this ship's laser is drawn
@@ -389,6 +404,7 @@ class Space:
         self.sr = radius * SUN_SIZE
         self.station = Obj(station_bp, "station", 0.0, 0.0, 0.0) if station_bp else None
         self.gov = gov          # the system's government (0 to 7), for the station's colour
+        self.hostile = False    # you fired on it, or on an innocent ship: it refuses docking
         self.sun = 2            # which colour the sun is (cockpit.SUN_COLOURS): yellow
         self.planet = 0         # and the planet (cockpit.PLANET_COLOURS): blue
         self.d_station = 1e9    # distance to the station
@@ -501,8 +517,8 @@ class Game:
         self.ecm_t = 0.0       # > 0 just after the ECM fired
         self.bomb_t = 0.0      # > 0 just after the energy bomb went off
         self.autodock = False  # the docking computer is flying
-        self.trader_t = TRADER_EVERY * 0.5  # time to the next roll for a trader
-        self.police_t = 2.0    # time to the next look for the police
+        self.station_t = 1.0   # time to the station's next chance to launch a ship
+        self.bad = 0           # the contraband in the hold (BAD), set by whoever runs the game
         self.auto_phase = 0    # where it has got to: see start_autodock
         self.auto_far = False  # it is far from where it is heading: the jump drive's speed
         self.auto_level = False  # it is matching the slot's roll
@@ -684,10 +700,16 @@ class Game:
         if st is not None:
             if self.autodock:
                 if self.auto_phase == 2 and sp.d_station < st.bp.front + PLAYER_R + 60.0:
+                    if sp.hostile:
+                        self._refused(sp, st)
+                        return
                     self._docked()
                     return
             elif self.docking == "C":
-                if sp.d_station < DOCK_DIST:
+                if sp.d_station < DOCK_DIST and self.bump_t <= 0:
+                    if sp.hostile:
+                        self._refused(sp, st)
+                        return
                     self._docked()
                     return
             elif sp.d_station < CAPTURE_DIST:
@@ -720,6 +742,34 @@ class Game:
             if n > 0 and self.refuel(n) > 0:
                 self.scooping = True
                 self.say("FUEL SCOOPS ON", 1.2)
+
+    def _refused(self, sp, st):
+        """Docking at a hostile station: it fails, as in the original. At
+        DEATH_SPEED or more you are killed; slower, a small dent, a sudden
+        stop, and a bounce clear of it."""
+        self.autodock = False
+        self.tractor = False
+        if self.speed >= DEATH_SPEED:
+            self.say("STATION HOSTILE")
+            self._hurt(1e6)
+            if not self.over:       # invincible: bounce off instead
+                self.speed = 0.0
+            else:
+                return
+        else:
+            self._hurt(SLOW_CRASH)
+            self.say("DOCKING REFUSED")
+            self.speed = 1.0
+        self.bump_t = 1.0
+        d = sp.d_station
+        # clear of where it would try again (docking C docks anywhere within DOCK_DIST)
+        out = (DOCK_DIST if self.docking == "C" else st.bp.front + PLAYER_R) + BOUNCE
+        if d > 1.0:
+            k = out / d - 1.0
+            self._shift(st.x * k, st.y * k, st.z * k)
+        else:
+            self._shift(0.0, 0.0, out)
+        self._measure()
 
     def _docked(self):
         self.docked = True
@@ -756,6 +806,9 @@ class Game:
                 d = sp.d_station
         front = st.bp.front
         if d >= front + PLAYER_R or self.bump_t > 0:
+            return False
+        if sp.hostile:          # checked first, as in the original (ISDK check 1)
+            self._refused(sp, st)
             return False
         if self.docking == "A":
             ok = cone >= SLOT_CONE_A and head >= HEAD_A and abs(m[3]) >= LEVEL_A
@@ -1115,6 +1168,10 @@ class Game:
             d = 1.0
         if kind == "ship":
             bp = o.bp
+            if (o.role == "pirate" and self.space is not None and self.space.safe
+                    and (o.state == "attack" or o.state == "break")):
+                o.state = "patrol"      # near the station a pirate loses its nerve (TN3)
+                o.prey = None
             prey = o.prey
             if prey is not None and (prey.dead or (o.state != "attack" and o.state != "break")):
                 o.prey = prey = None
@@ -1177,18 +1234,22 @@ class Game:
                 sp = self.space
                 st = sp.station if sp is not None else None
                 if o.state == "trade" and st is not None:
-                    # on its way to the station; reaching it, it docks
-                    dx, dy, dz = st.x - o.x, st.y - o.y, st.z - o.z
+                    # on its way to the station (reaching it, it docks) or the planet
+                    if o.dest == "station":
+                        dx, dy, dz = st.x - o.x, st.y - o.y, st.z - o.z
+                        reach = st.bp.front + bp.radius + 150
+                    else:
+                        dx, dy, dz = sp.px - o.x, sp.py - o.y, sp.pz - o.z
+                        reach = sp.pr + bp.radius
                     ds = math.sqrt(dx * dx + dy * dy + dz * dz)
-                    if ds < st.bp.front + bp.radius + 150:
+                    if ds < reach:
                         o.dead = True
                         return
                     if ds > 1.0:
                         _turn(m, dx / ds, dy / ds, dz / ds, turn * 0.5)
-                if o.role == "police" and self.legal >= FUGITIVE and not self.over:
-                    o.state = "attack"      # the police have seen who you are
-                elif o.role == "hunter" and self.legal > 0 and not self.over:
-                    o.state = "attack"      # there's a price on your head
+                if ((o.role == "police" or o.role == "hunter") and self.legal >= HUNT_LEGAL
+                        and not self.over):
+                    o.state = "attack"      # there's a price on your head (TN1)
             else:   # flee
                 _turn(m, -tx, -ty, -tz, turn)
             o.speed += (want - o.speed) * min(1.0, 2.0 * dt)
@@ -1416,15 +1477,10 @@ class Game:
         o.dead = True
         bp = o.bp
         self._boom(o.x, o.y, o.z, 8 + 2 * min(bp.explosions, 6))
-        if not credit:
-            pass
-        elif o.role == "pirate":
-            self.bounty += bp.bounty    # tenths of a credit; rocks have small ones too
-        elif o.role == "trader":
-            self._crime(self.legal + KILL_TRADER)
-        elif o.role == "police":
-            self._crime(max(self.legal, FUGITIVE))
-        # a bounty hunter: no bounty, and the crime was firing on it (_provoke)
+        if credit:
+            self.bounty += bp.bounty    # tenths of a credit (the police and most traders: none)
+            if o.role == "police":
+                self._crime(KILL_COP)   # you shot the sheriff
         if o.kind == "ship" and not credit:
             self._spill(o)
         elif o.kind == "ship":
@@ -1517,32 +1573,34 @@ class Game:
     def legal_name(self):
         return legal_name(self.legal)
 
-    def _crime(self, legal):
-        """Legal status goes up to legal (it never goes down this way); say
-        so if it is now worse."""
-        legal = min(255, int(legal))
-        if legal <= self.legal:
-            return
+    def _crime(self, bits):
+        """OR bits into the legal status, as the original does with FIST;
+        say so if that makes it worse."""
         before = legal_name(self.legal)
-        self.legal = legal
-        now = legal_name(legal)
+        self.legal = (self.legal | int(bits)) & 255
+        now = legal_name(self.legal)
         if now != before:
             self.say(now, 2.5)
 
+    def anger_station(self):
+        """The station turns hostile (AN2): it refuses docking and sends
+        police after you, until you leave."""
+        sp = self.space
+        if sp is not None and not sp.hostile:
+            sp.hostile = True
+            self.say("STATION HOSTILE", 2.5)
+
     def _provoke(self, o):
-        """You fired on o. A trader or the police turns on you (a trader
-        without a laser runs), and it goes on your record."""
+        """You fired on o (ANGRY). A trader, a hunter or the police turns on
+        you (one without a laser runs). Firing on an innocent trader makes
+        the station hostile; your record is unchanged."""
         if o.kind != "ship":
             return
         o.prey = None           # whatever it was after, now it's after you
-        if o.role == "pirate":
-            return
         if o.state == "trade" or o.state == "patrol":
             o.state = "attack" if o.bp.laser else "flee"
-            if o.role == "trader" or o.role == "hunter":
-                self._crime(self.legal + HIT_TRADER)
-        if o.role == "police":
-            self._crime(max(self.legal, FUGITIVE))
+        if o.role == "trader":
+            self.anger_station()
 
     def _pick_prey(self, o, d):
         """The trader pirate o should go for instead of you: the nearest one
@@ -1560,63 +1618,90 @@ class Game:
         return best
 
     def _hit_station(self):
-        """A shot that hit nothing else: did it hit the station? Then you are
-        a fugitive."""
+        """A shot that hit nothing else: did it hit the station? Then the
+        station is hostile."""
         st = self.space.station
         if st is None or st.z <= 0 or st.z > LASER_RANGE:
             return
         r = st.bp.radius
         if st.x * st.x + st.y * st.y < r * r:
-            self._crime(max(self.legal, FUGITIVE))
+            self.anger_station()
 
     def illegal_cargo(self, cargo):
-        """Launching with these goods (tonnes by good number): legal status
-        goes up to at least what they weigh (see ILLEGAL)."""
-        w = 0
-        for i, k in ILLEGAL.items():
-            if i < len(cargo):
-                w += k * cargo[i]
-        if w > self.legal:
+        """Launching with these goods (tonnes by good number): their weight
+        (BAD) is ORed into the legal status, as in the original."""
+        w = bad(cargo)
+        self.bad = w
+        if w and (self.legal | w) != self.legal:
             self._crime(w)
             self.say("ILLEGAL CARGO", 2.5)
 
-    def _traffic(self, dt, count):
-        """Traders about the star system, and the police near the station."""
-        sp = self.space
-        n_trade = n_police = 0
+    def _count(self, role):
+        n = 0
         for o in self.objs:
-            if o.kind == "ship" and not o.dead:
-                if o.role == "trader":
-                    n_trade += 1
-                elif o.role == "police":
-                    n_police += 1
-        self.trader_t -= dt
-        if self.trader_t <= 0:
-            self.trader_t = TRADER_EVERY
-            if (n_trade < TRADER_MOST and count < MAX_OBJECTS - 2
-                    and random.random() < (TRADER_NEAR if sp.safe else TRADER_CHANCE)):
-                self.add_trader()
-        self.police_t -= dt
-        if self.police_t <= 0:
-            self.police_t = POLICE_EVERY
-            if sp.safe and n_police < POLICE_MOST and count < MAX_OBJECTS - 1:
-                if self.legal >= FUGITIVE or random.random() * 64 < self.legal:
-                    self.add_police(True)
-                elif n_police == 0 and random.random() < PATROL_CHANCE:
-                    self.add_police(False)
+            if o.kind == "ship" and not o.dead and o.role == role:
+                n += 1
+        return n
 
-    def add_trader(self):
-        """A trader somewhere round you, on its way to the station."""
+    def _station_ships(self, dt):
+        """What the station launches, in or out of the safe zone (TACTICS for
+        the station): police after you while it is hostile, and otherwise a
+        Shuttle or Transporter now and then."""
+        sp = self.space
+        if sp.station is None or sp.d_station > DESPAWN * 0.6:
+            return
+        self.station_t -= dt
+        if self.station_t > 0:
+            return
+        self.station_t = 1.0
+        if len(self.objs) + len(self.new) >= MAX_OBJECTS:
+            return
+        if sp.hostile:
+            if self._count("police") < STATION_COPS and random.random() < STATION_COP_CHANCE:
+                self.add_police(True, True)
+        elif random.random() < SHUTTLE_CHANCE:
+            for o in self.objs:
+                if o.role == "trader" and o.bp.name in SHUTTLES and not o.dead:
+                    return
+            self.add_shuttle()
+
+    def _tick(self, hostile, count):
+        """Once every ENCOUNTER_EVERY seconds outside the safe zone: maybe a
+        trader, maybe the police, maybe pirates (main game loop parts 2 to 4)."""
+        if random.random() < BENIGN:
+            if random.random() < 0.5 and count < MAX_OBJECTS - 2:
+                self.add_trader()
+            return
+        cops = self._count("police")
+        t = min(255, 2 * self.bad)
+        if cops:
+            t |= self.legal
+        if random.random() * 256 < t and count < MAX_OBJECTS - 1:
+            self.add_police(False)
+            cops += 1
+        if cops:
+            return
+        if hostile == 0 and self.pending == 0:
+            self._roll()
+
+    def add_trader(self, dest=None):
+        """A trader somewhere round you, making for the station or the
+        planet (dest, or either at random)."""
         names = [n for n in TRADERS if n in self.types]
         if not names:
             return None
         o = self._spawn_ship(self.types[random.choice(names)])
         o.role = "trader"
         o.state = "trade"
+        o.dest = dest or random.choice(("station", "planet"))
         o.speed = o.bp.speed * 0.6
-        st = self.space.station if self.space is not None else None
-        if st is not None:      # facing the station, not you
-            dx, dy, dz = _unit(st.x - o.x, st.y - o.y, st.z - o.z)
+        sp = self.space
+        st = sp.station if sp is not None else None
+        if st is not None:      # facing where it is going, not you
+            if o.dest == "station":
+                dx, dy, dz = _unit(st.x - o.x, st.y - o.y, st.z - o.z)
+            else:
+                dx, dy, dz = _unit(sp.px - o.x, sp.py - o.y, sp.pz - o.z)
             _look(o.m, dx, dy, dz)
         else:
             dx, dy, dz = _unit(_rnd(-1, 1), _rnd(-0.3, 0.3), _rnd(-1, 1))
@@ -1630,27 +1715,49 @@ class Game:
             return None
         o = self._spawn_ship(self.types[random.choice(names)])
         o.role = "hunter"
-        o.state = "attack" if self.legal > 0 else "patrol"
+        o.state = "attack" if self.legal >= HUNT_LEGAL else "patrol"
         return o
 
-    def add_police(self, hunt):
-        """A police Viper: out of the station's slot if it is near enough,
-        or arriving near you. hunt: after you; otherwise on patrol."""
+    def _from_station(self, bp):
+        """A ship launched out of the station's slot, heading out."""
+        st = self.space.station
+        m = st.m
+        k = st.bp.front + bp.radius + 100
+        o = Obj(bp, "ship", st.x + m[6] * k, st.y + m[7] * k, st.z + m[8] * k)
+        _look(o.m, m[6], m[7], m[8])
+        o.speed = bp.speed
+        self.new.append(o)
+        return o
+
+    def add_shuttle(self):
+        """A Shuttle or Transporter out of the station, making for the planet."""
+        names = [n for n in SHUTTLES if n in self.types]
+        sp = self.space
+        if not names or sp is None or sp.station is None:
+            return None
+        o = self._from_station(self.types[random.choice(names)])
+        o.role = "trader"
+        o.state = "trade"
+        o.dest = "planet"
+        o.speed = o.bp.speed * 0.6
+        return o
+
+    def add_police(self, hunt, station=False):
+        """A police Viper: out of the station's slot (station, and it is near
+        enough), or arriving near you. hunt: after you; otherwise after you
+        only if your legal status is HUNT_LEGAL or more (they are bounty
+        hunters too), and on patrol until then."""
         bp = self.types.get(POLICE)
         if bp is None:
             return None
         sp = self.space
         st = sp.station if sp is not None else None
-        if st is not None and sp.d_station < DESPAWN * 0.6:
-            m = st.m
-            k = st.bp.front + bp.radius + 100
-            o = Obj(bp, "ship", st.x + m[6] * k, st.y + m[7] * k, st.z + m[8] * k)
-            _look(o.m, m[6], m[7], m[8])
-            o.speed = bp.speed
-            self.new.append(o)
+        if station and st is not None and sp.d_station < DESPAWN * 0.6:
+            o = self._from_station(bp)
         else:
             o = self._spawn_ship(bp)
         o.role = "police"
+        hunt = hunt or self.legal >= HUNT_LEGAL
         o.state = "attack" if hunt else "patrol"
         if hunt:
             self.say("POLICE", 1.5)
@@ -1683,7 +1790,7 @@ class Game:
         """In a star system ships come in groups, a while apart, and none
         come near the station. The group's ships turn up a second or so
         apart."""
-        self._traffic(dt, count)
+        self._station_ships(dt)
         if self.space.safe:
             self.pending = 0
             return
@@ -1700,13 +1807,12 @@ class Game:
                     self.pending -= 1
                     if self.group_role == "hunter":
                         o.role = "hunter"
-                        # after offenders and fugitives; flies by the clean
-                        o.state = "attack" if self.legal > 0 else "patrol"
-        elif hostile == 0:
-            self.encounter_t -= dt
-            if self.encounter_t <= 0:
-                self.encounter_t = ENCOUNTER_EVERY
-                self._roll()
+                        # after serious offenders and fugitives; flies by the rest (TN1)
+                        o.state = "attack" if self.legal >= HUNT_LEGAL else "patrol"
+        self.encounter_t -= dt
+        if self.encounter_t <= 0:
+            self.encounter_t = ENCOUNTER_EVERY
+            self._tick(hostile, count)
         self.rock_t -= dt
         if self.rock_t <= 0:
             self.rock_t = _rnd(9, 18)

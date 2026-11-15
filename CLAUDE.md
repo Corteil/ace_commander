@@ -538,6 +538,31 @@ of a real flight, not from a harness.
    destroyed ones are replaced without end. On the badge: 6.9 ms a step with two traders,
    a hunter and three pirates. Not built yet from phase 5: Thargoids, and legal status
    changing the market or bounties.
+   **Build 44: traffic and legal status as the original** (Brian: "go fully original",
+   after reading `~/Code/elite-source-code-bbc-micro-disc`, `elite-source-flight.asm`).
+   This replaces the build 42/43 rules above where they differ. Legal status (FIST)
+   changes only by ORing in contraband on launch (`game.bad`, `illegal_cargo`; the app
+   also keeps `Game.bad` current in `_bank`), ORing in `KILL_COP` (64) for destroying a
+   police ship, halving on each jump (SOLAR), and clearing with the escape pod or the
+   galactic hyperdrive. Firing on a trader (innocent) or the station makes the station
+   hostile (`Game.anger_station`, `Space.hostile`; ANGRY / AN2), not your record worse. A
+   hostile station refuses docking, checked before anything else on touching it
+   (`_refused`, ISDK check 1): at `DEATH_SPEED` (5) or more you are killed, slower a 5
+   damage dent, speed 1 and a bounce; the docking computer flies you in to the same end
+   (the original's goes through the same checks); it launches police after you
+   (`STATION_COPS` 4 at most, `STATION_COP_CHANCE` a second; TACTICS TN5) and no shuttles,
+   until you leave. Otherwise the station launches a Shuttle or Transporter now and then
+   (`SHUTTLE_CHANCE` a second, one at a time, making for the planet). Outside the safe zone,
+   each `ENCOUNTER_EVERY` tick (`Game._tick`, main game loop parts 2 to 4): 35/256 something
+   harmless (half the time a trader, making for the station or the planet: `Obj.dest`);
+   else a police Viper with chance (2 x BAD, ORed with legal status if police are about)
+   / 256; then, with no police about, the pirate / hunter roll (still only with no hostile
+   ships about, as before). Nothing turns up in the safe zone, and a pirate that follows
+   you in becomes "patrol" for good (TN3). Police and hunters attack at `HUNT_LEGAL` (40)
+   or more (TN1; Vipers are hunters in the original's flags), else patrol; firing on any
+   ship makes it attack you. Bounties are every ship's blueprint bounty (the police and
+   most traders: 0). Kept although not in the original, as Brian asked: pirates preying
+   on traders. DEBUG: ANGER STATION.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -548,7 +573,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 43), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 44), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

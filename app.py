@@ -907,6 +907,7 @@ class AceCommander(app.App):
             from . import galaxy
             c.galaxy = (c.galaxy + 1) % 8
             self._extra(c, "hyperdrive", False)     # used up
+            g.legal = 0         # a new galaxy: a clean record, as in the original
             self._place()
             c.system = self.galaxy.nearest(*galaxy.GAL_ARRIVE)
             c.docked_at = None  # nowhere docked in this galaxy yet
@@ -928,6 +929,7 @@ class AceCommander(app.App):
         c = self.cmdr
         c.missiles = g.missiles             # the ones fired are gone
         c.legal = g.legal
+        g.bad = game.bad(c.cargo)           # contraband: the police look for it
         g.fuel = c.fuel                     # for the HUD
         paid = g.bounty - self.banked_cash
         if paid > 0:
@@ -1192,7 +1194,7 @@ class AceCommander(app.App):
                      "LEVEL: " + commander.LEVELS[self.game.level],
                      "FRAME TIME: " + ("ON" if self.show_ms else "OFF"),
                      "KILL ALL ENEMIES", "NEXT WAVE", "ADD AN ENEMY",
-                     "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "LEGAL: " + game.legal_name(self.game.legal),
+                     "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION", "LEGAL: " + game.legal_name(self.game.legal),
                      "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4", "+10 KILLS", "+1000 CR",
                      "SHIP CONFIG", "REPAIR SHOP: " + ("ON" if self.repair_shop else "OFF"),
                      "RELEASE CANISTER", "TO THE STATION", "TO THE SUN",
@@ -1204,6 +1206,7 @@ class AceCommander(app.App):
                 items.remove("ADD A TRADER")    # nor traders, police or legal status
                 items.remove("ADD POLICE")
                 items.remove("ADD A HUNTER")
+                items.remove("ANGER STATION")
                 items.remove(items[[i for i, t in enumerate(items) if t.startswith("LEGAL")][0]])
                 items.remove("FUEL TO 1/4")
             return items
@@ -1321,7 +1324,12 @@ class AceCommander(app.App):
                 elif item == "ADD A HUNTER":
                     g.add_hunter()
                 else:
-                    g.add_police(g.legal > 0)
+                    g.add_police(False)
+        elif item == "ANGER STATION":
+            if g.space is None:
+                g.say("ONLY IN A STAR SYSTEM")
+            else:
+                g.anger_station()
         elif item.startswith("LEGAL"):
             # CLEAN, OFFENDER, FUGITIVE and round again
             g.legal = 20 if g.legal == 0 else (game.FUGITIVE if g.legal < game.FUGITIVE else 0)

@@ -29,6 +29,7 @@ def system(gov=3, seed=1, legal=0):
     g.encounter_t = 1e9
     g.rock_t = 1e9
     g.legal = legal
+    g.speed = 0.0       # sitting still unless a test says otherwise
     return g
 
 
@@ -43,28 +44,36 @@ def ahead(g, o, z=1500.0):
 # ---- legal status ---------------------------------------------------------
 assert [game.legal_name(n) for n in (0, 1, 49, 50, 255)] == \
     ["CLEAN", "OFFENDER", "OFFENDER", "FUGITIVE", "FUGITIVE"]
-g = system()
 cargo = [0] * 17
-g.illegal_cargo(cargo); assert g.legal == 0
+assert game.bad(cargo) == 0
 cargo[3] = 2; cargo[6] = 1; cargo[10] = 4      # slaves, narcotics, firearms
-g.illegal_cargo(cargo); assert g.legal == 2 * 2 + 2 * 1 + 4 and g.msg == "ILLEGAL CARGO"
-g.legal = 30; g.illegal_cargo(cargo); assert g.legal == 30, "never lowers it"
-print("legal status, illegal cargo: ok")
+assert game.bad(cargo) == (2 + 1) * 2 + 4
+g = system()
+g.illegal_cargo(cargo); assert g.legal == 10 and g.bad == 10 and g.msg == "ILLEGAL CARGO"
+g.legal = 32; g.illegal_cargo(cargo); assert g.legal == 32 | 10, "ORed in, as the original does"
+print("legal status, contraband (BAD), ORed in on launch: ok")
 
 # ---- traders --------------------------------------------------------------
-g = system()
-assert g.space.safe
+# outside the safe zone, from the ticks: a trader 35/256 x 1/2 of the time
+g = system(); g.to_station(g.space.safe_r + 6000)
+random.seed(5); n = 0
+for _ in range(2000):
+    g.objs = []; g.new = []; g.pending = 0; g.skip = 99
+    g._tick(0, 0)
+    n += sum(1 for o in g.new if o.role == "trader")
+assert 70 < n < 210, n
+# in the safe zone nothing turns up but the station's shuttles
+g = system(); assert g.space.safe
 seen = []
-for _ in range(int(90 / DT)):
+for _ in range(int(240 / DT)):
     g.step(DT, 0, 0, 0, False, False)
-    seen += [o for o in g.objs if o.role == "trader" and o not in seen]
-assert seen and all(o.bp.name in game.TRADERS and o.state == "trade" for o in seen), \
-    "traders turn up in the safe zone"
-assert not any(o.role == "pirate" for o in g.objs)
-assert g.hull == 100.0, "they leave you alone"
-# one heads for the station and docks there
+    seen += [o for o in g.objs if o.kind == "ship" and o not in seen]
+assert seen and all(o.bp.name in game.SHUTTLES and o.role == "trader" for o in seen), \
+    [o.bp.name for o in seen]
+assert len([o for o in g.objs if o.bp.name in game.SHUTTLES]) <= 1
+# traders make for the station (and dock) or the planet
 g = system()
-t = g.add_trader(); g.objs.extend(g.new); g.new = []
+t = g.add_trader("station"); g.objs.extend(g.new); g.new = []
 st = g.space.station
 t.x, t.y, t.z = st.x + 3000.0, st.y, st.z
 for _ in range(int(60 / DT)):
@@ -73,139 +82,162 @@ for _ in range(int(60 / DT)):
         break
 d = math.sqrt((t.x - st.x) ** 2 + (t.y - st.y) ** 2 + (t.z - st.z) ** 2)
 assert t.dead and d < 1500 and g.kills == 0, ("it reaches the station and docks", d)
-# fire on one: it fights back, you are an offender; kill it: worse, and no bounty
+g = system(); t = g.add_trader("planet")
+assert t.dest == "planet" and t.m[6] * g.space.px + t.m[7] * g.space.py + t.m[8] * g.space.pz > 0
+# fire on one: it fights back and the station turns hostile; your record is clean
 g = system()
-t = g.add_trader(); ahead(g, t)
-t.energy = 1000.0
+t = g.add_trader(); ahead(g, t); t.energy = 1000.0
 g.step(DT, 0, 0, 0, True, False)
-assert t.state == "attack" and g.legal == game.HIT_TRADER and g.msg == "OFFENDER"
-g.cool = 0.0; g.step(DT, 0, 0, 0, True, False)
-assert g.legal == game.HIT_TRADER, "only the first hit counts"
+assert t.state == "attack" and g.space.hostile and g.legal == 0 and g.msg == "STATION HOSTILE"
 t.energy = 1.0; g.cool = 0.0; g.heat = 0.0
 g.step(DT, 0, 0, 0, True, False)
-assert t.dead and g.legal == game.HIT_TRADER + game.KILL_TRADER and g.bounty == 0
-# a trader with no laser runs instead
+assert t.dead and g.legal == 0 and g.kills == 1 and g.bounty == t.bp.bounty
+# one with no laser runs
 g = system()
 t = g.add_trader(); ahead(g, t)
 t.bp = game.Blueprint(next(e for e in SHIPS if e[0] == t.bp.name)); t.bp.laser = 0
 g.step(DT, 0, 0, 0, True, False)
 assert t.state == "flee"
-print("traders: turn up, dock, fight back or run when fired on, no bounty: ok")
+print("traders: from the ticks, shuttles from the station, dock or land, fired on: ok")
 
-# ---- police ---------------------------------------------------------------
-g = system(legal=game.FUGITIVE)
-for _ in range(int(20 / DT)):
-    g.step(DT, 0, 0, 0, False, False); g.trader_t = 1e9
-    g.god = True
-cops = [o for o in g.objs if o.role == "police"]
-assert cops and all(o.bp.name == game.POLICE and o.state in ("attack", "break") for o in cops), \
-    "a fugitive in the safe zone: police come after you"
-assert len(cops) <= game.POLICE_MOST
-# the clean are left alone
-g = system(seed=3)
-for _ in range(int(120 / DT)):
-    g.step(DT, 0, 0, 0, False, False); g.trader_t = 1e9
-assert all(o.state == "patrol" for o in g.objs if o.role == "police") and g.hull == 100.0
-# out of the station's slot when it is near
-g = system()
-p = g.add_police(False); st = g.space.station
-d = math.sqrt((p.x - st.x) ** 2 + (p.y - st.y) ** 2 + (p.z - st.z) ** 2)
-assert d < st.bp.front + p.bp.radius + 200 and p.state == "patrol"
-# fire on a patrol: a fugitive at once
-p.x, p.y, p.z = 0.0, 0.0, 1500.0; game._look(p.m, 1.0, 0.0, 0.0); p.speed = 0.0
-g.objs.extend(g.new); g.new = []
-p.energy = 1000.0
-g.step(DT, 0, 0, 0, True, False)
-assert g.legal >= game.FUGITIVE and p.state == "attack" and g.msg == "FUGITIVE"
-# a patrol turns on a fugitive by itself
-g = system()
-p = g.add_police(False); g.objs.extend(g.new); g.new = []
-g.legal = game.FUGITIVE
-for _ in range(10):
-    g.step(DT, 0, 0, 0, False, False)
-assert p.state in ("attack", "break")
-# shooting the station
+# ---- the hostile station ----------------------------------------------------
 g = system()
 g.to_station(3000.0)
 g.step(DT, 0, 0, 0, True, False)
-assert g.legal >= game.FUGITIVE, "firing on the station"
-# hostile counts only the ones attacking: traders don't hold up the pirates
-g = system()
-g.add_trader(); g.add_police(False); g.objs.extend(g.new); g.new = []
-n = sum(1 for o in g.objs if o.kind == "ship" and o.state in ("attack", "break"))
-assert n == 0
-# the radar colours
-cx = CountCtx(); cockpit.draw_hud(cx, g)
-print("police: hunt fugitives, leave the clean alone, launch from the slot; the station: ok")
+assert g.space.hostile and g.legal == 0, "firing on the station angers it"
+# it launches police after you, four at most
+g = system(); g.god = True; g.anger_station()
+for _ in range(int(90 / DT)):
+    g.step(DT, 0, 0, 0, False, False)
+cops = [o for o in g.objs if o.role == "police"]
+assert 1 <= len(cops) <= game.STATION_COPS and all(o.state in ("attack", "break") for o in cops)
+assert not any(o.bp.name in game.SHUTTLES for o in g.objs), "no shuttles from a hostile station"
+# docking refused: fast, the end; slow, a dent and a bounce
+for style in ("A", "B", "C"):
+    g = system(); g.set_docking(style); g.anger_station()
+    g.to_station(400.0)
+    g.speed = 10.0
+    for _ in range(int(3 / DT)):
+        g.step(DT, 0, 0, 0, False, False)
+        if g.over or g.docked:
+            break
+    assert g.over and not g.docked, style
+g = system(); g.set_docking("C"); g.anger_station()
+g.to_station(game.DOCK_DIST - 50.0)
+g.speed = 2.0
+g.step(DT, 0, 0, 0, False, False)
+assert not g.over and not g.docked and g.speed <= 1.0 and g.space.d_station > game.DOCK_DIST
+assert g.msg == "DOCKING REFUSED" and g.shield == 100.0 - game.SLOW_CRASH
+# the docking computer flies you in all the same, to the same end
+g = system(); g.computer = True; g.anger_station()
+g.to_station(6000.0, False); g.start_autodock()
+for _ in range(int(60 / DT)):
+    g.step(DT, 0, 0, 0, False, False)
+    if g.over or g.docked:
+        break
+assert g.over and not g.docked
+# a new system (or launch): a new station, not hostile
+g.reset(); g.enter(6000, "CORIOLIS", "launch", 3); assert not g.space.hostile
+print("hostile station: refuses docking (fatal at speed 5+), launches police: ok")
 
-# ---- bounty hunters (build 43) --------------------------------------------
+# ---- police and bounty hunters ------------------------------------------------
+# police from the ticks: only with contraband (or your record, once police are about)
+g = system(); g.to_station(g.space.safe_r + 6000)
+random.seed(2); g.legal = 60
+cops = 0
+for _ in range(500):
+    g.objs = []; g.new = []; g.pending = 0; g.skip = 99
+    g._tick(1, 0)
+    cops += sum(1 for o in g.new if o.role == "police")
+assert cops == 0, "a fugitive with an empty hold and no police about: none from the ticks"
+g.bad = 40; cops = 0
+for _ in range(500):
+    g.objs = []; g.new = []; g.pending = 0
+    g._tick(1, 0)
+    cops += sum(1 for o in g.new if o.role == "police")
+assert 100 < cops < 300, cops      # 80/256 of the 87% that aren't harmless
+# they are hunters too: after you at 40 or more, on patrol below
+g = system(legal=39); p = g.add_police(False); assert p.state == "patrol"
+g.legal = 40; g.objs.extend(g.new); g.new = []
+for _ in range(4):
+    g.step(DT, 0, 0, 0, False, False)
+assert p.state in ("attack", "break")
+# fire on one: it turns on you; destroy it: a fugitive (64 ORed in)
+g = system(); p = g.add_police(False); ahead(g, p); p.energy = 1000.0
+g.step(DT, 0, 0, 0, True, False)
+assert p.state == "attack" and g.legal == 0, "hitting a Viper only angers it"
+p.energy = 1.0; g.cool = 0.0; g.heat = 0.0
+g.step(DT, 0, 0, 0, True, False)
+assert p.dead and g.legal == game.KILL_COP and g.msg == "FUGITIVE"
+g = system(legal=3); g.objs.append(game.Obj(g.types["VIPER"], "ship", 0.0, 0.0, 3000.0))
+g.objs[-1].role = "police"; g._kill(g.objs[-1]); assert g.legal == 3 | 64
+# out of the slot when the station sends it
+g = system(); p = g.add_police(True, True); st = g.space.station
+d = math.sqrt((p.x - st.x) ** 2 + (p.y - st.y) ** 2 + (p.z - st.z) ** 2)
+assert d < st.bp.front + p.bp.radius + 200 and p.state == "attack"
+# hunters: 40 or more
 g = system(); g.space.safe = False
 h = g.add_hunter(); g.objs.extend(g.new); g.new = []
-assert h.role == "hunter" and h.state == "patrol", "flies by a clean pilot"
-for _ in range(int(10 / DT)):
-    g.step(DT, 0, 0, 0, False, False); g.trader_t = g.police_t = 1e9
-assert g.hull == 100.0 and h.state == "patrol"
-g.legal = 10
-g.step(DT, 0, 0, 0, False, False); g.step(DT, 0, 0, 0, False, False); g.step(DT, 0, 0, 0, False, False)
-assert h.state in ("attack", "break"), "turns on an offender"
-g = system(legal=5); h = g.add_hunter(); assert h.state == "attack", "after a wanted pilot at once"
-# from the encounter rolls: in an anarchy, hunters fly by the clean
-g = system(gov=0); g.to_station(g.space.safe_r + 5000); g.encounter_t = 0.0
-random.seed(11); hunters = []
-for _ in range(400):
-    g.encounter_t = 0.0; g.skip = 0
-    g._roll()
-    if g.group_role == "hunter":
-        hunters.append(1)
-    g.pending = 0; g.group = []
-assert 100 < len(hunters) < 220, len(hunters)
+assert h.role == "hunter" and h.state == "patrol"
+g.legal = 39
+for _ in range(int(5 / DT)):
+    g.step(DT, 0, 0, 0, False, False)
+assert h.state == "patrol" and g.hull == 100.0, "an offender under 40 is left alone"
+g.legal = 40
+for _ in range(4):
+    g.step(DT, 0, 0, 0, False, False)
+assert h.state in ("attack", "break")
+g = system(legal=45); assert g.add_hunter().state == "attack"
+g = system(); h = g.add_hunter(); ahead(g, h); h.energy = 1000.0
+g.step(DT, 0, 0, 0, True, False)
+assert h.state == "attack" and g.legal == 0 and not g.space.hostile
+# the encounter roll's hunters
+g = system(gov=0); g.to_station(g.space.safe_r + 5000)
 g._new_group(["ASP MK II"], "hunter"); g.spawn_t = 0.0
 g.step(DT, 0, 0, 0, False, False)
 hs = [o for o in g.objs + g.new if o.role == "hunter"]
 assert hs and hs[0].state == "patrol"
-# firing on a hunter is a crime, and killing it pays nothing
-g = system(); h = g.add_hunter(); ahead(g, h); h.energy = 1000.0
-g.step(DT, 0, 0, 0, True, False)
-assert h.state == "attack" and g.legal == game.HIT_TRADER
-h.energy = 1.0; g.cool = 0.0; g.heat = 0.0; b = g.bounty
-g.step(DT, 0, 0, 0, True, False)
-assert h.dead and g.bounty == b and g.legal == game.HIT_TRADER
-print("bounty hunters: fly by the clean, hunt the wanted, a crime to fire on: ok")
+# hostile counts only the ones attacking
+g = system()
+g.add_trader(); g.add_police(False); g.objs.extend(g.new); g.new = []
+assert sum(1 for o in g.objs if o.kind == "ship" and o.state in ("attack", "break")) == 0
+cx = CountCtx(); cockpit.draw_hud(cx, g)
+print("police and hunters: contraband, 40 or more, killing a Viper makes a fugitive: ok")
 
-# ---- pirates prey on traders ----------------------------------------------
-g = system(); g.space.safe = False; g.god = True
+# ---- pirates ------------------------------------------------------------------
+# a pirate that follows you into the safe zone loses its nerve
+g = system(); assert g.space.safe
+pir = game.Obj(g.types["SIDEWINDER"], "ship", 0.0, 0.0, 3000.0); g.objs.append(pir)
+for _ in range(4):
+    g.step(DT, 0, 0, 0, False, False)
+assert pir.state == "patrol"
+for _ in range(int(10 / DT)):
+    g.step(DT, 0, 0, 0, False, False)
+assert g.hull == 100.0
+# they go for a nearer trader
+g = system(); g.to_station(g.space.safe_r + 6000); g.god = True
 t = g.add_trader(); g.objs.extend(g.new); g.new = []
-t.x, t.y, t.z = 3000.0, 0.0, 8000.0; t.speed = 0.0
-pir = game.Obj(g.types["SIDEWINDER"], "ship", 3000.0, 0.0, 6000.0)
+t.x, t.y, t.z = 2500.0, 0.0, 5000.0; t.speed = 0.0; t.energy = 20.0
+pir = game.Obj(g.types["SIDEWINDER"], "ship", 2500.0, 0.0, 3500.0)
 game._look(pir.m, 0.0, 0.0, 1.0); g.objs.append(pir)
 for _ in range(10):
     g.step(DT, 0, 0, 0, False, False)
-assert pir.prey is t, "goes for the trader nearer it than you"
+assert pir.prey is t
 for _ in range(int(60 / DT)):
-    g.step(DT, 0, 0, 0, False, False); g.trader_t = g.police_t = 1e9
+    g.step(DT, 0, 0, 0, False, False); g.encounter_t = 1e9
     t.speed = 0.0
     if t.dead:
         break
-assert t.dead and g.kills == 0 and g.legal == 0 and g.bounty == 0, "nobody's kill, nobody's crime"
+assert t.dead and g.kills == 0 and g.legal == 0 and g.bounty == 0 and not g.space.hostile
 for _ in range(4):
     g.step(DT, 0, 0, 0, False, False)
-assert pir.prey is None or pir.dead, "then back to you (unless it flew off out of range)"
-# fire on the pirate and it turns on you
-g = system(); g.space.safe = False
-t = g.add_trader(); g.objs.extend(g.new); g.new = []
-t.x, t.y, t.z = 500.0, 0.0, 4000.0
-pir = game.Obj(g.types["SIDEWINDER"], "ship", 0.0, 0.0, 1500.0)
-game._look(pir.m, 1.0, 0.0, 0.0); pir.energy = 1000.0; g.objs.append(pir)
-pir.prey = t
-g.step(DT, 0, 0, 0, True, False)
-assert pir.prey is None and g.legal == 0, "hitting a pirate is no crime"
-# a trader far off, or further than you, is left alone
-g = system()
+assert pir.prey is None or pir.dead
+g = system(); g.to_station(g.space.safe_r + 6000)
 t = g.add_trader(); g.objs.extend(g.new); g.new = []
 t.x, t.y, t.z = 0.0, 0.0, -9000.0
 pir = game.Obj(g.types["SIDEWINDER"], "ship", 0.0, 0.0, 3000.0); g.objs.append(pir)
 assert g._pick_prey(pir, 3000.0) is None
-print("pirates go for a nearer trader, its cargo spills, no credit: ok")
+print("pirates: calm in the safe zone, go for a nearer trader: ok")
 
 # ---- in the app: saved, carried, halved by jumps, cleared by the pod ---------
 c = commander.Commander(); c.legal = 70
@@ -222,10 +254,9 @@ for _ in range(200):
     if e.mode == "flight":
         break
 g = e.game
-g.trader_t = g.police_t = 1e9
+g.encounter_t = 1e9; g.station_t = 1e9
 tick(e)
-assert g.legal == 10 and c.legal == 10, "launching with slaves"
-assert "OFFENDER" in [t[0] for t in (lambda cx: (e.draw(cx), cx.texts)[1])(CountCtx())] or True
+assert g.legal == 10 and c.legal == 10 and g.bad == 10, "launching with slaves"
 # DEBUG: LEGAL goes round CLEAN, OFFENDER, FUGITIVE
 def debug(a, line):
     if not a.paused:
@@ -239,6 +270,7 @@ debug(e, "LEGAL"); assert g.legal == 20
 n = len(g.objs) + len(g.new)
 debug(e, "ADD A TRADER"); debug(e, "ADD POLICE")
 assert len(g.objs) + len(g.new) == n + 2
+debug(e, "ANGER STATION"); assert g.space.hostile
 tick(e, fresh=["A"]); tick(e)
 assert c.legal == 20
 # a jump halves it
@@ -269,7 +301,7 @@ cx = CountCtx(); e.dock.draw(cx); assert any("CLEAN" in t[0] for t in cx.texts)
 p = ace_commander.AceCommander()
 choose(p, "COMBAT PRACTICE")
 tick(p, fresh=["A"]); p.fsub = "debug"
-assert not any(t.startswith(("LEGAL", "ADD A TRADER", "ADD POLICE")) for t in p._fitems())
+assert not any(t.startswith(("LEGAL", "ADD A TRADER", "ADD POLICE", "ANGER")) for t in p._fitems())
 os.remove(SAVE)
 print("app: legal status saved, from illegal cargo, halved by jumps, cleared by the pod: ok")
 print("ALL TRAFFIC TESTS PASSED")
