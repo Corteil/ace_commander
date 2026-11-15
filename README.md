@@ -10,7 +10,7 @@ The title screen, with a ship tumbling under the name, offers:
   a saved commander. Your kills earn a rank, from Harmless up to Elite. A new commander picks
   one of three levels, which sets how many kills each rank takes and how tough the enemies
   are, and can't be changed afterwards. There is one commander; it is saved in
-  `commander.json` next to the app when you quit to the title screen or are destroyed.
+  `commander.json` next to the app each time you dock, and only then, as in the original.
 - **Combat practice** - the same fight with nothing kept.
 - **Ship viewer** - every ship, one at a time, spinning.
 - **Speed test** - times kinds of drawing on the badge.
@@ -133,9 +133,11 @@ government's colour, with its docking slot facing the planet.
 - **The compass**, right of the radar, points to the planet, and to the station once you
   are in the safe zone: a bright dot if it is ahead of you, a dim one if behind.
 - **Docking:** fly up to the station and you are docked. This is the automatic way for now;
-  docking by hand comes next. Docking fills the tank for nothing and saves the commander.
-- Flying into the planet or the sun destroys you. If you are destroyed, C takes you back
-  to the station you last reached.
+  docking by hand comes next. Docking saves the commander.
+- Flying into the planet or the sun destroys you. Being destroyed works as in the original:
+  everything since your last save is lost (kills, cash, cargo, missiles used, where you
+  went), and C takes you back to the station where you last saved. The escape pod, which
+  will save you from this, isn't built yet.
 
 Combat practice has no star system: just the endless waves of ships.
 

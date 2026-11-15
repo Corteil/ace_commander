@@ -142,8 +142,8 @@ tick(a, fresh=["A"]); assert a.paused and leds.values[1] == (0, 0, 0), "off whil
 tick(a, fresh=["A"]); assert leds.values[1] == green
 # another station, another colour, in the tunnel's mouth too
 other = [i for i in range(256) if a.galaxy.system(i).government != gov][0]
-a.cmdr.system = a.cmdr.docked_at = other
-a.game.over = True; tick(a, fresh=["C"]); assert a.mode == "docked"
+a.cmdr.system = other
+a._dock(); assert a.mode == "docked"
 tick(a, fresh=["A"]); assert a.mode == "launch"
 for _ in range(200):
     if a.mode != "launch":

@@ -171,7 +171,8 @@ assert commander.load(SAVE).docking == "C", "the choice is saved straight away"
 tick(a, fresh=["JOYRIGHT"]); assert a.cmdr.docking == "A" and a.game.docking == "A"
 tick(a, fresh=["JOYLEFT"]); tick(a, fresh=["JOYLEFT"]); assert a.cmdr.docking == "B"
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
-assert a.mode == "menu" and commander.load(SAVE).kills == 6, "quitting to the title saves"
+assert a.mode == "menu" and commander.load(SAVE).kills == 0, "quitting to the title mid-flight saves nothing"
+assert a.cmdr.kills == 6, "but the flight carries on with CONTINUE"
 assert a.choices()[0] == "CONTINUE" and a.menu == 0
 assert texts(a) == ["< CONTINUE >"]
 
@@ -184,7 +185,7 @@ assert a.cmdr.kills == 6 and a.cmdr.cash == practice_cash, "no kills or bounties
 assert a.game.bounty == 3 * a.game.types["SIDEWINDER"].bounty and not a.game.msg.endswith(" Cr")
 tick(a, fresh=["A"]); assert "STATUS" not in texts(a)
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
-assert a.mode == "menu" and commander.load(SAVE).kills == 6
+assert a.mode == "menu" and commander.load(SAVE).kills == 0
 choose(a, "CONTINUE")
 assert a.mode == "docked" and a.cmdr.kills == 6, "practice kills aren't banked by docking"
 launch(a)
@@ -240,16 +241,25 @@ fpick(a, "STATUS"); assert any("hold 1/20t" in t for t in texts(a)); tick(a, fre
 a.cmdr.cargo[12] = 19                   # 19 t of minerals: room for one more
 scoop_one(a); assert market_mod.hold_used(a.cmdr.cargo) == 20
 scoop_one(a); assert market_mod.hold_used(a.cmdr.cargo) == 20 and g.msg == "HOLD FULL"
-# dying saves, and loses the cargo; flying again keeps the commander
+# dying goes back to the last save, as in the original: the kills, bounties,
+# cargo and missiles since docking are lost
 g.objs[:] = []
+before = commander.load(SAVE).to_dict()
+assert before["kills"] == 6 and sum(a.cmdr.cargo) > 0
 kill(g, 2); tick(a)
+assert a.cmdr.kills == 8 and a.cmdr.cash > before["credits"] * 10
+g.missiles = 0
 g._hurt(1000.0); tick(a)
-assert g.over and commander.load(SAVE).kills == 8, "saved at game over"
-assert sum(a.cmdr.cargo) == 0 and sum(commander.load(SAVE).cargo) == 0, "the cargo is lost with the ship"
-assert "C: back to the station" in texts(a)
-tick(a, fresh=["C"]); assert a.mode == "docked" and a.cmdr.kills == 8
+assert g.over and a.cmdr.to_dict() == before, "back to the last save"
+assert commander.load(SAVE).to_dict() == before, "and nothing new is written"
+assert "C: back to last save" in texts(a)
+for _ in range(5):
+    tick(a)
+assert a.cmdr.kills == 6 and a.cmdr.missiles == before["missiles"], "nothing banked after dying"
+tick(a, fresh=["C"]); assert a.mode == "docked" and a.cmdr.kills == 6
+assert a.cmdr.to_dict() == before and commander.load(SAVE).to_dict() == before
 launch(a); assert not g.over and g.kills == 0
-kill(g); tick(a); assert a.cmdr.kills == 9
+kill(g); tick(a); assert a.cmdr.kills == 7
 # bounties are paid into the commander's cash as you go, and the cash is shown
 cash = a.cmdr.cash
 kills_before = a.cmdr.kills
@@ -268,7 +278,7 @@ kill(g, need); tick(a)
 assert g.msg.startswith("RANK: ") and a.cmdr.cash == cash + rock + side * (1 + need), "a new rank shows instead"
 assert commander.load(SAVE).cash < a.cmdr.cash
 fpick(a, "PAUSE MENU"); tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"])
-assert a.mode == "menu" and commander.load(SAVE).cash == a.cmdr.cash, "and saved with the commander"
+assert a.mode == "menu" and commander.load(SAVE).cash < a.cmdr.cash, "quitting mid-flight saves nothing"
 choose(a, "CONTINUE"); assert a.mode == "flight"
 flight_kills = g.kills
 total_kills = a.cmdr.kills
@@ -278,11 +288,13 @@ assert total_kills == kills_before + 1 + need
 fpick(a, "PAUSE MENU"); tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"]); assert a.mode == "menu"
 choose(a, "CONTINUE"); assert a.mode == "flight" and g.kills == flight_kills and not a.docked
 
-# a new app instance (the badge restarted) finds the commander
+# a new app instance (the badge restarted) finds the commander as last saved,
+# docked: the flight since is lost, as in the original
 fpick(a, "PAUSE MENU")
 tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"]); assert a.mode == "menu"
 b = ace_commander.AceCommander()
-assert b.cmdr.kills == total_kills and b.cmdr.level == 0 and b.choices()[0] == "CONTINUE"
+assert b.cmdr.kills == commander.load(SAVE).kills == 6 < total_kills
+assert b.cmdr.level == 0 and b.choices()[0] == "CONTINUE"
 choose(b, "NEW COMMANDER")
 assert any("replaces your saved commander" in t for t in texts(b))
 tick(b, fresh=["JOYRIGHT"]); tick(b, fresh=["C"])
@@ -290,14 +302,25 @@ launch(b)
 assert b.cmdr.kills == 0 and b.cmdr.level == 2 and b.game.level == 2
 assert commander.load(SAVE).level == 2
 
+# a new commander gets nothing from a flight the last one left part-way
+n = ace_commander.AceCommander()
+choose(n, "CONTINUE"); launch(n)
+kill(n.game, 2); tick(n); assert n.cmdr.kills == 2
+n.game.missiles = 1; n.game.bounty += 5000; tick(n)
+fpick(n, "PAUSE MENU"); tick(n, fresh=["JOYUP"]); tick(n, fresh=["C"]); assert n.mode == "menu"
+choose(n, "NEW COMMANDER"); tick(n, fresh=["C"])
+assert n.mode == "docked" and n.cmdr.kills == 0 and n.cmdr.cash == 1000
+assert n.cmdr.missiles == commander.START_MISSILES, (n.cmdr.kills, n.cmdr.cash, n.cmdr.missiles)
+
 # a save that can't be written doesn't stop the game
 mod.SAVE_PATH = os.path.join(HERE, "no", "such", "folder", "x.json")
 c = ace_commander.AceCommander()
 assert c.cmdr is None
 choose(c, "NEW COMMANDER"); tick(c, fresh=["C"]); launch(c)
 assert c.mode == "flight" and c.career
-kill(c.game); tick(c); c.game._hurt(1000.0); tick(c)
-assert c.cmdr.kills == 1
+kill(c.game); tick(c); assert c.cmdr.kills == 1
+c.game._hurt(1000.0); tick(c)
+assert c.cmdr.kills == 0, "back to the last save, kept in memory though it couldn't be written"
 os.remove(SAVE)
 print("new commander, rank, status, save, continue, practice kept apart: ok")
 
@@ -476,8 +499,8 @@ assert g.space is not None and abs(g.space.d_station - game.ARRIVE_DIST) < 1
 assert g.space.gov == e.galaxy.system(129).government
 assert g.warp > 0 and not g.objs and not g.jumped and g.kills == 2
 saved = commander.load(SAVE)
-assert (saved.system, saved.fuel, saved.kills) == (129, 70 - d129, 2), "arriving saves"
-assert e.cmdr.market is None and saved.market is None, "a new system: its market comes on docking"
+assert saved.system == 7 and saved.fuel != e.cmdr.fuel, "arriving doesn't save: only docking does"
+assert e.cmdr.market is None, "a new system: its market comes on docking"
 texts(e)        # the streaks draw
 for _ in range(60):
     tick(e)
@@ -508,14 +531,14 @@ tick(e, fresh=["A"])
 fpick(e, "LOCAL CHART")
 e.chart.cx, e.chart.cy = [(float(px), float(py)) for px, py, i, d in e.chart.dots if i == 7][0]
 e.chart._select(); tick(e, fresh=["C"]); assert g.jump_t > 0
-# destroyed at Zaonce, never having docked there: you start again at Lave,
-# the last station you docked at, with the fuel for the jump still spent
+# destroyed at Zaonce, never having docked there: back to the last save, at
+# Lave, as it was then (the jump's fuel too)
 assert e.cmdr.docked_at == 7
-fuel = e.cmdr.fuel
+saved = commander.load(SAVE)
 g._hurt(5000.0); tick(e); tick(e)
-assert g.over and g.jump_t == 0 and e.cmdr.system == 7 and e.cmdr.fuel == fuel
-assert commander.load(SAVE).system == 7, "saved there too"
-assert g.again == "C: back to the station"
+assert g.over and g.jump_t == 0 and e.cmdr.system == 7
+assert e.cmdr.to_dict() == saved.to_dict(), "back to the last save"
+assert g.again == "C: back to last save"
 tick(e, fresh=["C"]); assert e.mode == "docked" and "LAVE" in texts(e)
 # docked at Zaonce, destroyed there: you start again at Zaonce
 e.cmdr.system = 129; e._dock()
@@ -593,6 +616,7 @@ for _ in range(200):
         break
 assert e.cmdr.system == 7 and e.cmdr.fuel == 70 - d129
 assert g.space is not sp and not g.space.safe and g.pending == 0, "Lave, a dictatorship: no ambush"
+k0 = e.cmdr.kills
 kill(g, 3); tick(e)
 g.pending = 0; g.encounter_t = 1e9
 g.objs[:] = [o for o in g.objs if o.kind != "ship"]
@@ -610,9 +634,9 @@ for _ in range(400):
 assert "docking" in seen, "flying in shows the docking tunnel first"
 assert 1.0 <= e.dock_hold <= 2.0, "the view of the bay stays 1 to 2 s"
 assert e.mode == "docked" and e.docked, "flying into the station docks you"
-assert e.cmdr.fuel == fuel_before < 70 and e.cmdr.kills == 2 + 3, "docking doesn't refuel"
+assert e.cmdr.fuel == fuel_before < 70 and e.cmdr.kills == k0 + 3, "docking doesn't refuel"
 saved = commander.load(SAVE)
-assert (saved.system, saved.fuel, saved.kills) == (7, fuel_before, 5), "docking saves"
+assert (saved.system, saved.fuel, saved.kills) == (7, fuel_before, k0 + 3), "docking saves"
 tx = texts(e)
 assert "LAVE" in tx and "DOCKED" in tx
 launch(e)
@@ -800,5 +824,5 @@ assert "LOCAL CHART" not in n._fitems_top()
 fpick(n, "STATUS"); texts(n)
 mod.game_data = gd
 os.remove(SAVE)
-print("local chart, hyperspace countdown, fuel, arriving saves: ok")
+print("local chart, hyperspace countdown, fuel, only docking saves: ok")
 print("ALL COMMANDER TESTS PASSED")
