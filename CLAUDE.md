@@ -896,7 +896,11 @@ of a real flight, not from a harness.
    on, each stardust speck crosses the screen's edge (`EDGE_IN` to `EDGE_OUT` px from the
    middle), white, fading at `JUMP_FADE`; per-LED writes (`_leds_each`), below the bomb,
    ECM, hit and laser flashes; hyperspace flashes are blue-white (`HYPER_RGB`, Brian: more
-   blue), the jump drive's white (`DUST_RGB`). `_led_at` maps a screen direction to LED 1-12 with
+   blue), the jump drive's white (`DUST_RGB`). The loading screen's LOADING now flashes by the clock
+   (`app.FLASH_MS` 500 on / 500 off, `_shown`, `_until_change`) instead of at each
+   redraw, which bunched up over quick imports; after an import, if a change is due within
+   `WAIT_MS` (200) it redraws on it. A long import (ace.py about 1.3 s) still holds the
+   screen still: nothing can redraw during an import. `_led_at` maps a screen direction to LED 1-12 with
    `LED_ANGLE1` (LED 1's angle, anticlockwise from 3 o'clock) and `LED_CLOCKWISE`: the
    firmware doesn't say where the LEDs are. Checked on the badge (LEDs 1, 2, 3 lit red,
    green, blue; Brian saw them at 0:10, 2:00 and 2:50 on a clock face): clockwise, and a

@@ -19,6 +19,12 @@ assert loader.__app_export__ is loader.AceCommander, "what the badge's launcher 
 for name in loader.STEPS:
     assert os.path.exists(os.path.join(REPO, name + ".py")) or name in loader.OPTIONAL, name
 
+# a pretend clock: each look at it moves it on 37 ms
+clock = [0]
+def fake_now():
+    clock[0] += 37
+    return clock[0]
+loader._now = fake_now
 ld = loader.AceCommander()
 assert ld.real is None and ld.done == 0
 frames = []
@@ -47,8 +53,16 @@ try:
 except Handed:
     pass
 assert frames[0][0] == 0 and "LOADING" in frames[0][1]
-shown = ["LOADING" in f[1] for f in frames[:len(loader.STEPS)]]
-assert shown[:4] == [True, False, True, False], "LOADING flashes on and off"
+shown = ["LOADING" in f[1] for f in frames]
+assert True in shown and False in shown, "LOADING flashes on and off"
+# by the clock: on for FLASH_MS, off for FLASH_MS, whatever the steps take
+t = ld.t0
+for ms, on in ((0, True), (loader.FLASH_MS - 1, True), (loader.FLASH_MS, False),
+               (2 * loader.FLASH_MS - 1, False), (2 * loader.FLASH_MS, True)):
+    clock[0] = t + ms - 37
+    assert ld._shown() == on, (ms, on)
+clock[0] = t + loader.FLASH_MS - 60 - 37
+assert ld._until_change() == 60
 # the name in block letters, where and as the title screen draws it (build 51)
 from ace_commander import letters, title
 assert loader._letters is letters
@@ -56,8 +70,8 @@ c = CountCtx(); loader.AceCommander().draw(c)
 n_name = len(letters.ACE) + len(letters.COMMANDER)
 assert c.calls.get("rectangle", 0) >= n_name + 1     # the name, the background, the bar
 assert title._ACE is letters.ACE and title._COMMANDER is letters.COMMANDER
-assert [f[0] for f in frames[:len(loader.STEPS)]] == list(range(len(loader.STEPS))), \
-    "a frame drawn before each module"
+assert sorted(set(f[0] for f in frames)) == list(range(len(loader.STEPS) + 1)) or \
+    set(range(len(loader.STEPS))) <= set(f[0] for f in frames), "a frame drawn before each module"
 assert ld.done == len(loader.STEPS)
 real = ld.real
 assert isinstance(real, ace_commander.ace.AceCommander) and real.host is ld
