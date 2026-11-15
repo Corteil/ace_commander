@@ -36,6 +36,14 @@ CYAN = (0.3, 0.9, 1)
 MAGENTA = (1, 0.3, 1)
 POLICE_BLUE = (0.35, 0.5, 1)
 GREY = (0.7, 0.7, 0.75)
+# your laser's beam, by type (game.LASERS); the LEDs flash the same colour on
+# each shot. Enemy lasers are ORANGE, which none of these is.
+LASER_COLOURS = {
+    "pulse": RED,
+    "beam": (0.25, 0.5, 1),
+    "military": GREEN,
+    "mining": YELLOW,
+}
 COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": MAGENTA, "pmissile": CYAN,
           "station": WHITE}
 PLANET = (0.35, 0.6, 1)
@@ -906,7 +914,7 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
                               -(int(p[1]) * IFOCAL // z) - 1, 2.5, 2.5).fill()
 
     if g.beam > 0:      # the player's twin lasers meet at the crosshair
-        ctx.rgb(*RED)
+        ctx.rgb(*LASER_COLOURS.get(g.laser, RED))
         ctx.begin_path()
         ctx.move_to(-60, 100)
         ctx.line_to(0, 0)

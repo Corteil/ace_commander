@@ -51,6 +51,25 @@ assert seen == [255, 160, 80, 0], seen
 assert leds.writes == 1 + len(seen), leds.writes
 print("hit flash on LEDs, fading", seen, ": ok")
 
+# your laser: each type its own colour, on screen and on the LEDs, at each shot
+from ace_commander import cockpit
+seen = {}
+for kind in ("pulse", "beam", "military", "mining"):
+    g.set_laser(kind); g.heat = 0.0; g.hot = False; g.cool = 0.0; g.flash = 0.0
+    tick(a, held=["C"])
+    assert g.beam > 0, kind
+    r, gr, b = cockpit.LASER_COLOURS[kind]
+    want = (int(r * 255), int(gr * 255), int(b * 255))
+    assert leds.values[1] == want, (kind, leds.values[1])
+    seen[kind] = want
+    c = CountCtx(); cockpit.draw_world(c, g)
+    for _ in range(10):
+        tick(a)
+    assert leds.values[1] != want, "and off again between shots"
+assert len(set(seen.values())) == 4, "four different colours"
+assert cockpit.ORANGE not in cockpit.LASER_COLOURS.values(), "none like the enemy's"
+g.set_laser("pulse")
+
 g._hurt(10.0); tick(a); assert leds.values[5] == (255, 0, 0)
 tick(a, fresh=["A"]); tick(a)                       # paused
 assert a.paused and leds.values == RED12(0)

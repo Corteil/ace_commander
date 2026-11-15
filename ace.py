@@ -478,6 +478,9 @@ class AceCommander(app.App):
             self._leds(160)
         elif g.flash > 0:
             self._leds(80)
+        elif g.beam > 0:        # your laser firing: its own colour
+            r, gr, b = cockpit.LASER_COLOURS.get(g.laser, cockpit.RED)
+            self._leds_rgb(int(r * 255), int(gr * 255), int(b * 255))
         elif self.glow > 0:     # just launched: the station's colour fades away
             self._leds_station(self.glow)
             self.glow -= self.dt * 2.0
