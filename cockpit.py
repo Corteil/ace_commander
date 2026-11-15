@@ -34,6 +34,7 @@ RED = (1, 0.25, 0.2)
 ORANGE = (1, 0.55, 0.1)
 CYAN = (0.3, 0.9, 1)
 MAGENTA = (1, 0.3, 1)
+LIGHT_PURPLE = (0.75, 0.6, 1)
 POLICE_BLUE = (0.35, 0.5, 1)
 GREY = (0.7, 0.7, 0.75)
 # your laser's beam, by type (game.LASERS); the LEDs flash the same colour on
@@ -44,7 +45,8 @@ LASER_COLOURS = {
     "military": GREEN,
     "mining": YELLOW,
 }
-COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": MAGENTA, "pmissile": CYAN,
+# enemy missiles are orange like enemy lasers (all enemy fire), yours light purple
+COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": ORANGE, "pmissile": LIGHT_PURPLE,
           "station": WHITE}
 PLANET = (0.35, 0.6, 1)
 # each system's planet is one of these, picked from its number (Space.planet):

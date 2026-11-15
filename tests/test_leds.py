@@ -69,6 +69,15 @@ for kind in ("pulse", "beam", "military", "mining"):
 assert len(set(seen.values())) == 4, "four different colours"
 assert cockpit.ORANGE not in cockpit.LASER_COLOURS.values(), "none like the enemy's"
 g.set_laser("pulse")
+# the energy bomb flashes the LEDs white (as the screen), not red like a hit
+g.bomb_t = 0.4; g.flash = 0.0; g.beam = 0.0; tick(a)
+assert leds.values[1] == (255, 255, 255), leds.values[1]
+g.bomb_t = 0.0; tick(a)
+# missiles: the enemy's orange like their lasers, yours light purple; no laser shares them
+assert cockpit.COLOUR["missile"] == cockpit.ORANGE
+assert cockpit.COLOUR["pmissile"] == cockpit.LIGHT_PURPLE
+assert cockpit.LIGHT_PURPLE not in cockpit.LASER_COLOURS.values()
+print("laser colours on screen and LEDs, white bomb flash, missile colours: ok")
 
 g._hurt(10.0); tick(a); assert leds.values[5] == (255, 0, 0)
 tick(a, fresh=["A"]); tick(a)                       # paused
