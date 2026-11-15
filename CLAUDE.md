@@ -905,6 +905,13 @@ of a real flight, not from a harness.
    green, blue; Brian saw them at 0:10, 2:00 and 2:50 on a clock face): clockwise, and a
    30-degree fit puts LED 1 at 20 degrees past 12, so LED_ANGLE1 = 70; each reading is
    within 15 degrees (half a step) of the fit. The spacing may be uneven (pairs).
+   **Build 59: released** (2026-11-15, Brian: "release it"). Version 59 merged to main
+   (PR #20); release v59 from main (github.com/Corteil/ace_commander/releases/tag/v59);
+   repo topic `tildagon-app` added. GitHub's v59 tarball checked: 112 KB, only the 25 app
+   files (export-ignore works on GitHub too). All 18 test files pass on a clean clone of
+   main. The store lists it within about 15 minutes at apps.badge.emfcamp.org; problems
+   at apps.badge.emfcamp.org/errors/. A new version: bump `version` in tildagon.toml
+   and metadata.json, merge to main, make a release.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
