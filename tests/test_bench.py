@@ -11,7 +11,7 @@ tick = bs.tick
 
 bs.install()
 import ace_commander
-mod = ace_commander.app
+mod = ace_commander.ace
 a = ace_commander.AceCommander()
 c = CountCtx(); a.draw(c)
 labels = [t[0] for t in c.texts]

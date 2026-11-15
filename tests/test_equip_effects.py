@@ -12,7 +12,7 @@ from badge_stubs import CountCtx
 bs.install()
 import ace_commander
 from ace_commander import commander, game, galaxy
-mod = ace_commander.app
+mod = ace_commander.ace
 tick, choose = bs.tick, bs.choose
 SAVE = os.path.join(HERE, "shots", "test_equip_effects.json")
 os.makedirs(os.path.dirname(SAVE), exist_ok=True)

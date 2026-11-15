@@ -12,7 +12,7 @@ import ace_commander
 from ace_commander import commander, game
 from ace_commander import market as market_mod
 from ace_commander import equipment as equipment_mod
-mod = ace_commander.app
+mod = ace_commander.ace
 tick, choose = bs.tick, bs.choose
 SAVE = os.path.join(HERE, "shots", "test_commander.json")
 os.makedirs(os.path.dirname(SAVE), exist_ok=True)

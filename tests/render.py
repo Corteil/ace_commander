@@ -15,7 +15,7 @@ OUT = os.path.join(HERE, "shots")
 os.makedirs(OUT, exist_ok=True)
 bs.install()
 import ace_commander
-mod = ace_commander.app
+mod = ace_commander.ace
 game = mod.game
 
 
@@ -37,9 +37,9 @@ def place(g, name, kind, x, y, z, nose):
 
 
 random.seed(3)
-ace_commander.app.SAVE_PATH = os.path.join(OUT, "render_commander.json")
-if os.path.exists(ace_commander.app.SAVE_PATH):
-    os.remove(ace_commander.app.SAVE_PATH)
+ace_commander.ace.SAVE_PATH = os.path.join(OUT, "render_commander.json")
+if os.path.exists(ace_commander.ace.SAVE_PATH):
+    os.remove(ace_commander.ace.SAVE_PATH)
 for n in os.listdir(OUT):
     if n.endswith(".png"):
         os.remove(os.path.join(OUT, n))
@@ -83,7 +83,7 @@ d.go(0); a.target = 147
 shot(a, "1i_docked_target.png")
 tick(a, fresh=["CONFIRM"])
 for i, ft in enumerate((0.25, 0.6, 0.85, 0.97)):
-    a.launch_t = ft * ace_commander.app.LAUNCH_TIME
+    a.launch_t = ft * ace_commander.ace.LAUNCH_TIME
     shot(a, "1j_tunnel_%d.png" % i)
 a.launch_t = 99; tick(a)
 g = a.game

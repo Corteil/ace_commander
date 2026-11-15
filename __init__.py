@@ -1,9 +1,8 @@
-# On the badge (MicroPython) the app starts with a loading screen (loader.py)
-# that imports the rest, which takes a while the first time. On a PC, where
-# the tests run, there is nothing to wait for: the app itself.
+# The badge's launcher imports this folder's app.py and starts its
+# __app_export__: that is the loading screen (app.py), which then imports the
+# rest, the real app among it (ace.py). On a PC, where the tests run, there is
+# nothing to wait for: the package gives the real app.
 import sys
-if sys.implementation.name == "micropython":
-    from .loader import AceCommander
-else:
-    from .app import AceCommander
-__all__ = ['AceCommander']
+if sys.implementation.name != "micropython":
+    from .ace import AceCommander
+    __all__ = ['AceCommander']

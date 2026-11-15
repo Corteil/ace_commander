@@ -1,5 +1,6 @@
-"""loader.py, the badge's entry point: a loading screen while the app's
-modules are imported (build 49)."""
+"""app.py, the badge's entry point (the launcher imports <folder>.app): a
+loading screen while the other modules are imported (builds 49, 50); the real
+app is ace.py."""
 import asyncio, os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -11,9 +12,10 @@ from badge_stubs import CountCtx, App
 
 bs.install()
 import ace_commander
-from ace_commander import loader
+from ace_commander import app as loader
 
-assert ace_commander.AceCommander is ace_commander.app.AceCommander, "on a PC: the app itself"
+assert ace_commander.AceCommander is ace_commander.ace.AceCommander, "on a PC: the app itself"
+assert loader.__app_export__ is loader.AceCommander, "what the badge's launcher starts"
 for name in loader.STEPS:
     assert os.path.exists(os.path.join(REPO, name + ".py")) or name in loader.OPTIONAL, name
 
@@ -49,13 +51,13 @@ assert [f[0] for f in frames[:len(loader.STEPS)]] == list(range(len(loader.STEPS
     "a frame drawn before each module"
 assert ld.done == len(loader.STEPS)
 real = ld.real
-assert isinstance(real, ace_commander.app.AceCommander) and real.host is ld
+assert isinstance(real, ace_commander.ace.AceCommander) and real.host is ld
 assert real.mode == "menu"
 # drawing and minimise go through
 c = CountCtx(); ld.draw(c); assert c.depth == 0
 App.minimised = 0
 real.minimise(); assert App.minimised == 1
-alone = ace_commander.app.AceCommander()
+alone = ace_commander.ace.AceCommander()
 assert alone.host is alone
 # a module that won't load: the screen says so
 ld2 = loader.AceCommander()
