@@ -19,17 +19,19 @@ ROLL_RATE = 1.7
 
 LASER_RANGE = 7000.0
 LASER_COOL = 0.16      # heat lost per second
-# the front laser, by type: (seconds between shots, damage a hit, heat a shot
-# (1.0 = overheated)). The beam laser fires twice as fast and heats faster;
-# the military laser hits harder too (Elite's power 23 against the pulse
-# laser's 15). The mining laser fires like the pulse laser, a little harder, and
-# breaks rocks into splinters you can scoop (see Game._kill).
+# the front laser, by type: (seconds between hits, damage a hit, heat a hit
+# (1.0 = overheated)). Damage is Elite's laser power: pulse and beam 15,
+# military 23, mining 50. The pulse and mining lasers fire separate shots;
+# the beam and military lasers (CONTINUOUS) are a steady beam while you hold
+# fire, hitting what is in the sights every 0.09 s, until they overheat. The
+# mining laser breaks rocks into splinters you can scoop (see Game._kill).
 LASERS = {
-    "pulse": (0.18, 12.0, 0.05),
-    "beam": (0.09, 12.0, 0.04),
-    "military": (0.09, 18.0, 0.045),
-    "mining": (0.18, 15.0, 0.05),
+    "pulse": (0.18, 15.0, 0.05),
+    "beam": (0.09, 15.0, 0.04),
+    "military": (0.09, 23.0, 0.045),
+    "mining": (0.18, 50.0, 0.05),
 }
+CONTINUOUS = ("beam", "military")
 ENERGY_UNIT = 2.0      # an energy unit makes the shields and hull recharge this much faster
 NAVY_UNIT = 3.0        # and the naval one, mission 2's reward, this much (the original's 3 against 2)
 # The rest of the equipment (phase 4). The ECM fires by itself when an enemy
@@ -219,11 +221,12 @@ PICKUP_MISSILE = 0.5   # combat practice: how often a canister holds a missile a
 
 # What the level changes: (most hostile ships at once, how often enemy lasers
 # hit compared with level 1, how much damage they and their missiles do
-# compared with level 1). Level 1 is the game as it was before levels.
+# compared with level 1, how much energy every ship has compared with its
+# blueprint: how many hits it takes). Level 1 (NORMAL) is the original's.
 LEVELS = (
-    (3, 0.7, 0.7),
-    (4, 1.0, 1.0),
-    (5, 1.3, 1.3),
+    (3, 0.7, 0.7, 0.75),
+    (4, 1.0, 1.0, 1.0),
+    (5, 1.3, 1.3, 1.25),
 )
 
 
@@ -391,6 +394,8 @@ class Obj:
         self.m = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
         self.speed = 0.0    # Elite speed units, along the nose
         self.energy = float(bp.energy)
+        self.max_energy = self.energy   # its full energy (the level scales a ship's: Game.step)
+        self.leveled = False
         self.state = "attack"   # ships: "attack", "break", "flee", or "trade" / "patrol" (leaving you alone)
         self.t = 0.0
         self.cool = _rnd(0.5, 2.0)
@@ -515,7 +520,7 @@ class Game:
     def set_level(self, level):
         """0 easiest to 2 hardest. Takes effect straight away."""
         self.level = max(0, min(len(LEVELS) - 1, int(level)))
-        self.max_hostile, self.aim_k, self.damage_k = LEVELS[self.level]
+        self.max_hostile, self.aim_k, self.damage_k, self.energy_k = LEVELS[self.level]
 
     def reset(self):
         self.objs = []
@@ -1163,6 +1168,12 @@ class Game:
             self._hyper(dt)
 
         if self.new:
+            k = self.energy_k
+            for o in self.new:      # the level makes ships tougher or weaker
+                if o.kind == "ship" and not o.leveled:
+                    o.leveled = True
+                    o.energy *= k
+                    o.max_energy = o.energy
             self.objs.extend(self.new)
             self.new = []
         self.objs = [o for o in self.objs if not o.dead]
@@ -1372,7 +1383,7 @@ class Game:
                                 self._hurt((3.0 + bp.laser * 2.5) * self.damage_k)
                         if o.role == "thargoid" and bp.name == "THARGOID":
                             # a Thargon instead of a missile, once below half energy
-                            if (o.missiles and o.energy < bp.energy * 0.5
+                            if (o.missiles and o.energy < o.max_energy * 0.5
                                     and random.random() < 0.5 * dt):
                                 o.missiles -= 1
                                 self._thargon(o)
@@ -1380,7 +1391,7 @@ class Game:
                                 and random.random() < 0.12 * dt):
                             o.missiles -= 1
                             self._launch(o)
-                    if o.energy < bp.energy * 0.25:
+                    if o.energy < o.max_energy * 0.25:
                         o.state = "flee"
             elif o.state == "break":
                 v = o.aim
@@ -1590,6 +1601,8 @@ class Game:
             if self.lock_t >= LOCK_TIME:
                 self.locked = True
 
+        if fire and not self.hot and self.laser in CONTINUOUS:
+            self.beam = max(self.beam, 0.1)     # a steady beam while fire is held
         if fire and not self.hot and self.cool <= 0:
             self.cool = self.laser_period
             self.beam = 0.07

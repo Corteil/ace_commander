@@ -521,7 +521,30 @@ def firing(kind, secs=1.5):
 pulse, beam, mil = firing("pulse"), firing("beam"), firing("military")
 assert beam[0] >= 1.6 * pulse[0], (pulse, beam)
 assert beam[2] > pulse[2], "the beam laser heats faster"
-assert abs(mil[1] / mil[0] - 1.5 * pulse[1] / pulse[0]) < 0.01, "military: half as much again a hit"
+assert abs(mil[1] / mil[0] - 23.0 / 15 * pulse[1] / pulse[0]) < 0.01, "military: Elite's 23 to 15"
+assert [game.LASERS[k][1] for k in ("pulse", "beam", "military", "mining")] == [15, 15, 23, 50], \
+    "Elite's laser powers"
+# the beam and military lasers are a steady beam while fire is held; the
+# pulse laser flashes for each shot
+def drawn(kind):
+    g = fresh(11); g.set_laser(kind)
+    on = 0
+    for _ in range(40):
+        g.step(DT, 0, 0, 0, True, False)
+        on += g.beam > 0
+    return on
+assert drawn("beam") == drawn("military") == 40 and drawn("pulse") < 30
+# the level sets how much energy ships have: how many hits they take
+en = []
+for level in range(3):
+    g = game.Game(SHIPS, level)
+    o = g._spawn_ship(g.types["SIDEWINDER"]); g.step(DT, 0, 0, 0, False, False)
+    en.append(o.energy)
+    assert o.max_energy == o.energy
+bp_e = game.Blueprint([e for e in SHIPS if e[0] == "SIDEWINDER"][0]).energy
+assert en == [bp_e * 0.75, bp_e, bp_e * 1.25], en
+g = game.Game(SHIPS, 2); o = g._spawn_ship(g.types["SIDEWINDER"]); g.step(DT, 0, 0, 0, False, False)
+e1 = o.energy; g.step(DT, 0, 0, 0, False, False); assert o.energy == e1, "scaled once"
 g = fresh(); g.set_laser("no such laser"); assert g.laser == "pulse"
 # the energy unit doubles the recharge
 def recharged(unit):
