@@ -671,7 +671,13 @@ class Game:
             sp.d_station = 1e9
         else:
             sp.d_station = math.sqrt(st.x * st.x + st.y * st.y + st.z * st.z)
-        sp.safe = sp.d_station < sp.safe_r
+        safe = sp.d_station < sp.safe_r
+        if sp.safe and not safe and sp.hostile:
+            # out of the safe zone the original drops the station from the local
+            # bubble (the sun takes its slot) and makes a new one, not hostile,
+            # when you come back (NWSPS): the lockdown is over
+            sp.hostile = False
+        sp.safe = safe
 
     def _near(self):
         """True if a ship or missile is within radar range. In comparisons
@@ -793,7 +799,7 @@ class Game:
                 if not slow or d > CAPTURE_DIST * 1.2:
                     self.tractor = False
                     self.say("TRACTOR LOST" if slow else "TOO FAST")
-            elif slow and cone >= SLOT_CONE_B and head >= HEAD_B:
+            elif slow and cone >= SLOT_CONE_B and head >= HEAD_B and not sp.hostile:
                 self.tractor = True
                 self.say("TRACTOR BEAM")
             if self.tractor and d > 1.0:
@@ -840,6 +846,8 @@ class Game:
             return "NO DOCKING COMPUTER"
         if sp is None or sp.station is None or not sp.safe or self.over:
             return "STATION TOO FAR"
+        if sp.hostile:      # it would only fly you in to a refused docking
+            return "STATION HOSTILE"
         self.autodock = True
         self.auto_phase = 0     # 0: round to the front, 1: out in front of the slot, 2: in
         self.auto_far = False
@@ -1584,10 +1592,14 @@ class Game:
 
     def anger_station(self):
         """The station turns hostile (AN2): it refuses docking and sends
-        police after you, until you leave."""
+        police after you, until you leave its safe zone. Its tractor beam
+        lets go and the docking computer switches off and won't start (in
+        the original the computer flew you in to a refused docking)."""
         sp = self.space
         if sp is not None and not sp.hostile:
             sp.hostile = True
+            self.tractor = False        # no help from it now
+            self.autodock = False       # nor from the docking computer
             self.say("STATION HOSTILE", 2.5)
 
     def _provoke(self, o):

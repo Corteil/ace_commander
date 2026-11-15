@@ -563,6 +563,12 @@ of a real flight, not from a harness.
    ship makes it attack you. Bounties are every ship's blueprint bounty (the police and
    most traders: 0). Kept although not in the original, as Brian asked: pirates preying
    on traders. DEBUG: ANGER STATION.
+   **Build 45 (Brian):** a hostile station's tractor beam (docking B) no longer takes hold,
+   and lets go if the station turns; the docking computer won't start at a hostile station
+   ("STATION HOSTILE") and switches off if it turns (not as the original, whose computer
+   flew you in to a refused docking). Leaving the safe zone ends the lockdown (`_measure`):
+   the original drops the station from the local bubble outside it (the sun takes its slot)
+   and makes a new, friendly one on the way back in (NWSPS). Police already launched stay.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -573,7 +579,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 44), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 45), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

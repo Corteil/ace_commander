@@ -128,15 +128,29 @@ g.speed = 2.0
 g.step(DT, 0, 0, 0, False, False)
 assert not g.over and not g.docked and g.speed <= 1.0 and g.space.d_station > game.DOCK_DIST
 assert g.msg == "DOCKING REFUSED" and g.shield == 100.0 - game.SLOW_CRASH
-# the docking computer flies you in all the same, to the same end
+# the docking computer won't take you in, and switches off if the station turns
 g = system(); g.computer = True; g.anger_station()
-g.to_station(6000.0, False); g.start_autodock()
-for _ in range(int(60 / DT)):
-    g.step(DT, 0, 0, 0, False, False)
-    if g.over or g.docked:
-        break
-assert g.over and not g.docked
-# a new system (or launch): a new station, not hostile
+g.to_station(6000.0, False)
+assert g.start_autodock() == "STATION HOSTILE" and not g.autodock
+g = system(); g.computer = True; g.to_station(6000.0, False)
+assert g.start_autodock() is None and g.autodock
+g.anger_station(); assert not g.autodock
+# nor does the tractor beam take hold (docking B)
+g = system(); g.set_docking("B"); g.anger_station()
+g.to_station(1200.0); g.speed = 10.0
+g.step(DT, 0, 0, 0, False, False)
+assert not g.tractor
+g = system(); g.set_docking("B"); g.to_station(1200.0); g.speed = 10.0
+g.step(DT, 0, 0, 0, False, False); assert g.tractor
+g.anger_station(); assert not g.tractor, "it lets go"
+# leaving the safe zone ends the lockdown (the original makes a new station)
+g = system(); g.anger_station(); assert g.space.safe and g.space.hostile
+g.to_station(g.space.safe_r + 1000.0); g.step(DT, 0, 0, 0, False, False)
+assert not g.space.safe and not g.space.hostile
+g.to_station(3000.0); g.step(DT, 0, 0, 0, False, False)
+assert g.space.safe and not g.space.hostile
+# so does a new system (or launch)
+g = system(); g.anger_station()
 g.reset(); g.enter(6000, "CORIOLIS", "launch", 3); assert not g.space.hostile
 print("hostile station: refuses docking (fatal at speed 5+), launches police: ok")
 
