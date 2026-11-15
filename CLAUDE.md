@@ -854,6 +854,22 @@ of a real flight, not from a harness.
    without Elite's files. Tests: `tests/test_original_data.py` plays both missions in a
    copy of the app without ship_data.py and game_data.py. Not yet on the badge (Brian
    asked to be asked first).
+   **Build 58: release prep** (Brian: MIT licence; ask before publishing). `LICENSE`
+   (MIT, "Corteil", with a note that it doesn't cover the Elite-derived files);
+   `tildagon.toml` and `metadata.json` with license, url and a new description (134 of
+   the store's 140 characters), version 58. The badge's app store (firmware
+   `app_store.py`) downloads the GitHub release tarball, unpacks all of it in memory and
+   installs it as `/apps/<owner>_<repo>` (Corteil_ace_commander): `.gitattributes` marks
+   tests, tools, CLAUDE.md, DESIGN.md, deploy.bat and the git files export-ignore (the
+   folders and `folder/**`: `check-attr` doesn't apply `folder/` to the files in it),
+   so the tarball is 111 KB / 410 KB unpacked (231 / 809 before). Publishing (per the
+   docs): the repo topic `tildagon-app` and a release; listed within about 15 minutes at
+   apps.badge.emfcamp.org; errors at apps.badge.emfcamp.org/errors/. Not done yet: ask
+   Brian first. `DEBUG_MENU = None`: shown only if `debug.txt` is in the app's folder
+   (always on a PC), so store installs have no cheats (git-ignored). README rewritten for
+   players. Level names EASY / NORMAL / HARD kept (no longer placeholders). Tests:
+   `tests/test_install.py` builds the release's file list (git ls-files less
+   export-ignore), installs it as Corteil_ace_commander and starts it through app.py.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
@@ -864,7 +880,7 @@ of a real flight, not from a harness.
    each new thing that is slow to reach by playing, and turn it off before publishing.
    Its title shows the build (build 54), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
-7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
+7. Level names are EASY / NORMAL / HARD (kept for release, build 58); their numbers are
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
 
 Measured on the badge in build 15: the title screen takes about 29 ms to draw (clear 7,

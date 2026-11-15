@@ -13,7 +13,7 @@ import json
 
 # The level is picked when the commander is made and never changes. It sets
 # how many kills each rank needs here, and how tough the enemies are in
-# game.py. The names and the divisors are placeholders until they are agreed.
+# game.py.
 LEVELS = ("EASY", "NORMAL", "HARD")
 RANK_DIVISOR = (5, 2, 1)    # the original's kill counts are divided by this
 

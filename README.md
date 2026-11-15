@@ -1,302 +1,172 @@
 # Ace Commander
 
-A space combat game and ship viewer for the EMF Tildagon / Spaceagon badge, drawn as
-hidden-line wireframes using the ships of BBC Micro Elite. Plain MicroPython: no C and no
-custom firmware.
+A wireframe space trading and combat game for the EMF Camp Tildagon / Spaceagon badge.
+Fly between the stars, trade, fight pirates and bounty hunters, dock at space stations, and
+take on two missions for the Commonwealth Navy across eight galaxies. Plain MicroPython: no
+C and no custom firmware.
 
-The title screen, with a ship tumbling under the name, offers:
+It is a fan-made game inspired by BBC Micro Elite (1984), written from scratch, with its own
+ships, galaxy, market and words. It is not official, licensed or endorsed. See
+[Credits](#credits-and-original-material).
 
-- **New commander** / **Continue** - fight waves of pirates, shoot rocks and scoop cargo as
-  a saved commander. Your kills count towards a rank, from Harmless up to Elite (with Ace, our own, just
-  before it). A new commander picks
-  one of three levels, which sets how many kills each rank takes and how tough the enemies
-  are, and can't be changed afterwards. There is a single save slot; it is saved in
-  `commander.json` in the same folder as the app each time you dock, and only then, as in the original.
-- **Combat practice** - combat training that does not affect your single-player game.
-- **Ship viewer** - view the 3D assets of the game.
-- **Options** - steering (joystick or tilt) and the badge's LEDs, kept in `options.json`
-  next to the app; with a commander also the docking style and how soon mission 1's
-  Constrictor turns up, kept in the commander's save. The same as the in-flight Settings
-  and the docked Options tab.
-- **Speed test** - times kinds of drawing on the badge.
+## Install
 
-Joystick left / right changes the choice, C selects it and F leaves the app.
+From the badge's **App store**: Games > Ace Commander.
 
-A commander is somewhere in a galaxy of 256 star systems and can jump between them by
-hyperspace (see [Hyperspace](#hyperspace)). Continue and New commander start you docked
-(see [Docked](#docked)), and you fly through each system to its space station (see
-[In a star system](#in-a-star-system)). Not in yet: docking by hand, and trading. The plan
-for those is in [DESIGN.md](DESIGN.md).
+By hand: copy the files below to `/apps/ace_commander/` on the badge (for example with
+`mpremote fs cp`), then restart it:
 
-This is a fan-made game inspired by Elite. It is not official, licensed or endorsed. See
-[Credits and original material](#credits-and-original-material).
+```
+__init__.py app.py ace.py bench.py briefing.py chart.py cockpit.py commander.py content.py
+describe.py docked.py equipment.py galaxy.py game.py letters.py market.py missions.py
+original_data.py original_ships.py title.py viewer.py tildagon.toml metadata.json
+```
 
-## Flight controls
+The game shows a loading screen for a few seconds while it starts.
 
-Written for the 2026 Spaceagon: use the joystick to steer and the buttons are for other functions.
+## The title screen
+
+A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves the app.
+
+- **New commander** / **Continue**: the game. Pick a level (EASY, NORMAL or HARD) for a new
+  commander: it sets how many kills each rank takes and how tough the enemies are. Your
+  commander is saved each time you dock, and only then. Being destroyed takes you back to
+  your last save, unless you have an escape pod.
+- **Combat practice**: endless waves of ships, with nothing kept.
+- **Ship viewer**: every ship in the game, turning.
+- **Options**: steering (joystick or tilt), the docking style, how soon mission 1's target
+  turns up, and the badge's LEDs.
+- **Speed test**: times kinds of drawing on the badge.
+
+## Flying
 
 | Input | Action |
 |---|---|
 | Joystick | pitch and roll |
 | C, or press the joystick (hold) | lasers |
-| D | fire a missile at the boxed target |
-| B | energy bomb (not in the game yet) |
+| D | fire a missile at the boxed target (it locks after two seconds in the sights) |
+| B | energy bomb, if fitted |
 | F / E | speed up / slow down |
-| A | in-flight menu, which pauses the game |
+| A | the in-flight menu, which pauses the game |
 
-In the in-flight menu the joystick moves up and down, C selects, F goes back and A
-resumes. It has the **Local chart** (see [Hyperspace](#hyperspace)), **Status** (your
-commander's rank, kills, star system and fuel), **Settings** (steering JOYSTICK or TILT,
-the docking style, and how soon mission 1's Constrictor turns up; joystick left / right or
-C changes one) and **Quit to title**.
+The in-flight menu: **Hyperspace** (to your target, or open the local chart to pick one),
+**Local chart**, **Status**, **Settings** and **Quit to title**, plus **Docking computer**
+or **Galactic jump** when you have them. Joystick up / down picks, C chooses, F goes back,
+A resumes.
 
-Settings ends with **Debug**, cheats for testing in five groups: Ship (invincibility, ship
-config, refills), Spawn (add ships of each kind, release a canister, kill all enemies),
-Travel (to the station, to the sun, dock now, mis-jump next, to the mission system),
-Commander (+10 kills, +1000 Cr, level, legal status, anger the station, mission stage) and
-Display (frame time, Repair Shop). Its title shows the build number, read from
-`metadata.json`. Kills made there count towards your commander's rank. The Options page
-and the docked Options tab have Debug too, with the cheats that work away from a flight.
-Set `DEBUG_MENU = False` in `ace.py` to hide it.
+With tilt steering, tilting the badge steers and the joystick still works; a tap on D
+re-zeroes the tilt and holding it fires a missile. A USB keyboard works too: `W` / `S` and
+`A` / `D` (or the arrows) steer, `E` / `Q` speed up / down, `F` or space lasers, `M`
+missile, `P` the menu.
 
-With TILT, tilting the badge steers and the joystick still works. D then does two jobs: a
-tap re-zeroes the tilt and holding it for about half a second fires the missile
-(`HOLD_MISSILE` in `ace.py`). To start in tilt mode, set `TILT_DEFAULT = True` in `ace.py`.
-
-Keyboard: `W` / `S` or up / down pitch, `A` / `D` or left / right roll, `E` / `Q` speed
-up / down, `F` or space lasers, `M` missile, `P` in-flight menu.
-
-To use other buttons, change `BTN_SPEED_UP`, `BTN_SPEED_DOWN`, `BTN_MISSILE`, `BTN_BOMB`
-and `BTN_MENU` near the top of `ace.py`.
-
-On firmware without the joystick's own button names, the game falls back to tilt steering
-with UP / DOWN for speed, LEFT for a missile, RIGHT to re-zero and CANCEL for the menu.
-
-## Docked
-
-While docked there are four screens; the small squares at the top show which one is open.
-
-- **Status** - the system you are at, your rank, kills, fuel, credits and hyperspace
-  target. C launches.
-- **Local chart** - the systems round you, as in flight.
-- **Galactic chart** - all 256 systems of the galaxy. The small ring round you is your
-  fuel range.
-- **System data** - government, economy, tech level, population, productivity and size
-  of the target system (or of where you are, with no target).
-
-Joystick left / right changes screen, and so do E / B. On the two charts, C hands the
-joystick to the cursor and F hands it back; with the cursor, C makes the selected system
-your hyperspace target and shows its data (C on your own system clears the target), and
-D shows a system's data without targeting it. A launches from any
-screen, and F goes back to Status, then to the title screen.
-
-Launching flies you out along the station's hexagonal tunnel (about 2.5 seconds; C skips
-it). A station's colour shows what kind of government runs the system: orange for an
-anarchy, yellow feudal, magenta multi-government, pink dictatorship, violet communist,
-blue confederacy, cyan democracy and green corporate state. It is on "DOCKED", the
-government's name and the tunnel's last ring, and the badge's LEDs pulse in it as each ring
-goes by, flash full as you leave the tunnel, then fade.
-
-## Hyperspace
-
-A commander starts at Lave with a full tank, which is 7 light years of fuel. The in-flight menu (A)
-always has **Hyperspace** just below Resume. If you picked a target while docked and it is
-in range, it reads **Hyperspace: name** and starts the jump straight away. Otherwise:
-
-1. Press A and choose **Hyperspace** (or **Local chart**). The green cross in the middle is where you are, the
-   ring is how far your fuel reaches, and each dot is a star system (white if you can reach
-   it, grey if not).
-2. Move the yellow cursor with the joystick. The system nearest the cursor gets a box, with
-   its name at the top and its distance at the bottom.
-3. Press C to jump there, or F to go back.
-
-The game resumes with a five-second countdown, then you arrive in the new system with
-everything from the old one left behind, a long way from its station (see
-[In a star system](#in-a-star-system)). The jump uses fuel for its distance, and the
-commander is saved on arriving. Combat practice has no chart.
-
-The system data screen has no description sentence yet: the original builds it from text
-tables that `game_data.py` doesn't read.
-The Debug page has **Refill fuel**, **To the station** and **Dock now** as shortcuts.
-
-The galaxy needs `game_data.py` (see [Ships and galaxy data](#ships-and-galaxy-data)).
-Without it the game still runs, with no Local chart.
+The badge's LEDs: red when you are hit, your laser's colour as you fire (pulse magenta,
+beam blue, military green, mining yellow), white for the energy bomb, violet for the ECM,
+green in a station's safe zone, orange to red near a sun, yellow pulses while you scoop
+fuel from it.
 
 ## In a star system
 
-A commander's flight is in a star system, with a planet (a blue circle, sized from the
-system's radius), a sun (a filled yellow circle) and a space station: a Coriolis, or a
-Dodo where the tech level is 10 or more. The station turns slowly and is drawn in its
-government's colour, with its docking slot facing the planet.
+You arrive from hyperspace a long way out. The compass points to the station; hold speed
+up at full speed for the jump drive, which works only with no ships about and outside the
+station's safe zone.
 
-- **Launching** leaves you just outside the slot, facing the planet, with the station
-  behind you.
-- **Arriving** from hyperspace puts you 120,000 units from the station, which is two
-  minutes at full speed, with the planet beyond it. As many ships as can attack at once
-  (3, 4 or 5 by level) come to meet you. After that a group of ships turns up every 25 to
-  45 seconds, but none within 25,000 units of the station (the safe zone).
-- **The jump drive:** hold speed up (F) at full speed with no ships or missiles on the
-  radar and you go 8 times faster; the speed bar turns blue and the stardust turns to
-  streaks. It stops when a ship
-  appears and at the edge of the safe zone. Flying straight from arriving to docked takes
-  about 36 seconds this way.
-- **The compass**, right of the radar, points to the planet, and to the station once you
-  are in the safe zone: a bright dot if it is ahead of you, a dim one if behind.
-- **Docking:** fly up to the station and you are docked. This is the automatic way for now;
-  docking by hand comes next. Docking saves the commander.
-- Flying into the planet or the sun destroys you. Being destroyed works as in the original:
-  everything since your last save is lost (kills, cash, cargo, missiles used, where you
-  went), and C takes you back to the station where you last saved. The escape pod, which
-  will save you from this, isn't built yet.
+- **Encounters**: pirates and bounty hunters turn up from time to time, more often in
+  anarchies and feudal systems; traders and the police go about their business. Nothing
+  turns up in the safe zone.
+- **Legal status**: carrying contraband, stims or weapons, or destroying a police ship,
+  makes you an offender or a fugitive, and the police and bounty hunters come after you.
+  Each jump halves it. Firing on a trader or the station makes the station refuse you.
+- **Docking**: three styles, in Settings or Options. Automatic takes you in when you reach
+  the station. Assisted: line up with the slot, slow down, and a tractor beam pulls you in.
+  Authentic: fly into the slot yourself, level with it and slowly. A docking computer can
+  fly you in from the safe zone.
+- **The sun**: fly close with fuel scoops to skim fuel, watching the cabin temperature.
+- **Cargo**: destroyed ships drop canisters; scoop them (with fuel scoops) by passing over
+  them. A mining laser breaks rocks into splinters you can scoop as ore.
+- **Witchspace**: now and then a jump goes wrong and leaves you between the stars with the
+  alien Vorn.
 
-Combat practice has no star system: just the endless waves of ships.
+## Docked
 
-Distances and times are constants near the top of `game.py` (`ARRIVE_DIST`, `SAFE_DIST`,
-`JUMP_K`, `ENCOUNTER` and the rest).
+Screens, shown by the squares at the top: **Status**, **Market**, **Equip ship**, **Local
+chart**, **Galactic chart**, **System data** and **Options**. Joystick left / right (or E /
+B) changes screen; A launches from any screen, C from Status; F goes back to Status, then
+to the title.
+
+- **Market**: joystick up / down picks a good, C buys, D sells. Prices depend on the
+  system's economy: cheap food in agricultural systems, cheap machinery in industrial ones.
+- **Equip ship**: fuel, missiles, lasers, a larger hold, ECM, fuel scoops, escape pod,
+  energy bomb, energy unit, docking computer and galactic hyperdrive; more is on sale at
+  higher tech levels.
+- **Charts**: press C to move the cursor (F gives the joystick back to the screens); C picks
+  a hyperspace target, D shows a system's data.
+- **System data**: the system's government, economy, tech level, population and a line
+  about it.
 
 ## Missions
 
-The disc version's two missions are in, as the original runs them. Once your kill count
-is high enough, docking in the first or second galaxy brings an incoming message from
-Her Majesty's Space Navy: a prototype ship, the Constrictor, has been stolen. While you
-hunt it, the stations along its trail tell you where it went (on System data, docked).
-It turns up at Orarra, in the second galaxy, after two minutes outside the
-station's safe zone (or, with CONSTRICTOR: ORIGINAL in the in-flight Settings, as rarely as in
-the original). Only a military laser gets through its shields, and it has an ECM. Destroy it and dock
-for your reward. Later, with more kills, in the third galaxy, the Navy has a second job
-for you, and the Thargoids will not like it. The texts are read from your own copy of
-the Elite source into `game_data.py`, like the system descriptions. The missions call you
-by the name set in the badge's settings, or Jameson if none is set. On a message, the
-joystick scrolls the text, C pages down (and at the end goes on) and F skips it.
+Once you have enough kills, docking in the first or second galaxy brings an incoming
+message from the Navy: a prototype ship has been stolen. Stations along its trail have
+heard things (System data, while you hunt it). Only a military laser hurts it, and its ECM
+stops missiles. Later, in the third galaxy, the Navy has a second job for you, and the Vorn
+won't like it. The messages call you by the name in the badge's settings.
 
-The Debug cheats can move you through them: MISSION (the next stage; docking then starts
-the next mission), TO MISSION SYSTEM and ADD THE CONSTRICTOR; SHIP CONFIG has NAVY ENERGY UNIT.
+## Your own copy of Elite's data (optional)
 
-## The screen
-
-- Left bars: speed (green, blue with the jump drive on) and laser temperature (yellow, red when it has overheated and
-  locked out).
-- Right bars: shield (blue) and energy (green). Shields soak up hits and recharge after a
-  few seconds without damage; when energy runs out the game is over.
-- Green squares: missiles left. A diamond marks the ship in the missile sights: red at
-  first, green once it has stayed there for two seconds and the missile has locked on. D only
-  fires at a green diamond; before that it says NO LOCK.
-- Radar at the bottom: left-right is left-right, up the ellipse is ahead, and the stick on
-  each blip shows how far above or below you it is. Red is a hostile ship, yellow is cargo,
-  magenta is a missile, grey is a rock, and the big square is the station, in its colour.
-- Top: the wave in yellow and the score in white. The small number above them is the time
-  each frame takes, in ms (`SHOW_FRAME_TIME` in `ace.py`).
-- The badge's LEDs flash red when you're hit (`USE_LEDS` in `ace.py`; with it off, or if
-  the LEDs can't be reached, a red ring flashes on screen instead).
-- Ships far away are dots, at middle distance small cross markers, and close up wireframes.
-
-## Speed
-
-Measured on the badge, a filled rectangle costs about 0.03 ms, a line about 0.35 ms and a
-piece of text about 4 ms, and the badge's own app loop waits 50 ms after every update. So:
-
-- everything drawn every frame is made of rectangles where it can be, including the digits;
-- only ships that look bigger than `WIRE_MIN` pixels (`cockpit.py`) are drawn as wireframes;
-- in flight and the viewer the app asks for a redraw itself rather than waiting the 50 ms
-  (`FAST_FRAMES` in `ace.py`). This leans on the firmware's scheduler; if that isn't as
-  expected it goes back to the normal loop by itself.
-
-The menu's Speed test repeats the measurements, and the pause screen shows where a flight
-frame's time went.
-
-## Tuning
-
-Near the top of `ace.py`:
-
-- `TILT_PITCH_SIGN`, `TILT_ROLL_SIGN`, `TILT_SWAP_AXES` if tilting goes the wrong way.
-- `INVERT_PITCH = True` if you want joystick up to dive, flight-stick style.
-
-Speeds, damage, ranges and how fast enemies turn are constants at the top of `game.py`.
-
-## Ships and galaxy data
-
-The app has no ships of its own. It reads `ship_data.py`, which you generate from your own
-copy of the Elite source (31 ships, with each one's energy, speed, laser and missiles).
-Without it the menu shows "ship_data.py not found".
-
-`ship_data.py` is **not in this repo**. It is derived from Elite (c) Acornsoft 1984 and the
-source repo it comes from has no licence, so it is listed in `.gitignore`. Make it yourself:
-
-1. Get the source, for example
-   [elite-source-code-bbc-micro-disc](https://github.com/markmoxon/elite-source-code-bbc-micro-disc).
-2. Run the converter on it:
-
-   ```
-   python3 tools/import_ships.py path/to/elite-source-code-bbc-micro-disc
-   ```
-
-   Add `--list` to see which ships it finds.
-3. That writes `ship_data.py` in the current folder.
-
-The galaxy works the same way. `game_data.py` holds the three seed numbers every star system
-is worked out from, the letter pairs their names are built from, and where a new commander
-starts. It is also derived from Elite and also **not in this repo**. Make it from the same
-source:
+The game has its own ships and galaxy. If you have your own copy of the Elite source, you
+can make Elite's ships, galaxy, market, texts and missions for your own use:
 
 ```
+python3 tools/import_ships.py path/to/elite-source-code-bbc-micro-disc
 python3 tools/import_galaxy.py path/to/elite-source-code-bbc-micro-disc
 ```
 
-Hidden lines are removed the way the original game does it: an edge is drawn only if one of
-the two faces it sits between points back at the viewer.
+for example from [Mark Moxon's annotated source](https://github.com/markmoxon/elite-source-code-bbc-micro-disc).
+Copy the resulting `ship_data.py` and `game_data.py` to the badge with the rest, and choose
+**Options > DATA: ELITE** (it applies from the next start). Each data set keeps its own
+commander (`commander.json` for the game's own, `commander_elite.json` for Elite's). These
+two files are derived from Elite (c) Acornsoft 1984, whose source has no licence: they are
+git-ignored and must not be published or put in the app store.
 
-## Files
+## For developers
 
-- `app.py` - the loading screen the badge starts first; it loads the rest, then runs `ace.py`.
-- `ace.py` - moves between the screens; input (tilt, buttons, keyboard); in-flight menu.
-- `title.py` - the title screen: block-letter name, tumbling ship, one-line menu.
-- `commander.py` - the saved commander: level, kills, rank, star system, fuel. No badge
-  imports.
-- `galaxy.py` - works out the 256 star systems from three seed numbers. No badge imports.
-- `chart.py` - the local and galactic charts.
-- `docked.py` - the docked screens.
-- `missions.py` - the two missions' rules. No badge imports.
-- `briefing.py` - the incoming messages that start and end them.
-- `game.py` - the flight game's rules, with no badge imports so it can be tested on a PC.
-- `cockpit.py` - draws the flight view, radar and gauges.
-- `viewer.py` - the ship viewer.
-- `bench.py` - the menu's Speed test: times kinds of drawing on the badge.
-- `deploy.bat` - double-click to copy the app to the badge, restart it, and save what the
-  badge prints to `badge_log.txt` (`deploy.bat all` also copies `ship_data.py` and
-  `game_data.py`).
-- `tools/import_ships.py` - makes `ship_data.py`. Stays on your PC.
-- `tools/import_galaxy.py` - makes `game_data.py`. Stays on your PC.
-- `tests/` - tests that run on a PC with stand-ins for the badge: `python tests/run_all.py`.
-- `CLAUDE.md` - project notes: firmware facts, measurements and what's next.
-- `DESIGN.md` - design for the rest of the game. Phase 1 (title screen, commander, levels,
-  new buttons) and phase 2 (galaxy, charts, system data, hyperspace) are built, and phase
-  3 is under way: a station to fly to (build 26). Docking by hand and trading are not built.
-
-## Install
-
-Copy `__init__.py app.py letters.py ace.py game.py cockpit.py viewer.py bench.py title.py commander.py
-galaxy.py chart.py docked.py market.py equipment.py describe.py missions.py briefing.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
-then restart it. On Windows, `deploy.bat all` does this.
+- `python3 tests/run_all.py` runs the PC test suite, with stand-ins for the badge firmware
+  (`tests/badge_stubs.py`). The repo folder must be called `ace_commander`.
+  `tests/test_install.py` checks the app as the app store installs it.
+- `tools/make_original_ships.py` makes `original_ships.py` from the ship designs, using
+  `tools/shipmaker.py` (convex hulls from corner points, explicit faces, convex parts for
+  shapes like the ring station).
+- `original_data.py` holds the game's own galaxy, goods, equipment, words and missions;
+  `content.py` picks it or Elite's at start-up.
+- A file called `debug.txt` in the app's folder on the badge shows a **Debug** page of
+  cheats (at the end of Settings and Options, and on the in-flight menu). It is always shown
+  on a PC.
+- Release tarballs leave out tests, tools and notes (`.gitattributes`), so only the app goes
+  onto the badge.
+- `CLAUDE.md` has project notes: firmware facts, measurements and the build history.
+  `DESIGN.md` has the design.
 
 ## Credits and original material
 
 Elite was written by David Braben and Ian Bell and published by Acornsoft in 1984. This
 project is a fan-made game inspired by it, for the EMF Camp badge.
 
-- **Code:** written from scratch in MicroPython. It contains no original Elite code and
+- **Code**: written from scratch in MicroPython. It contains no original Elite code and
   nothing translated from it.
-- **Ideas re-implemented in new code:** the hidden-line rule, steering by rotating the
-  universe around the player, the radar with height sticks, and the ship names. One message,
-  "RIGHT ON COMMANDER!", is a line from the original.
-- **Ship models and stats:** these are the original's own data and are **not in this repo**.
-  The game needs them to run, so each user generates `ship_data.py` locally (see
-  [Ships](#ships)) from Mark Moxon's annotated source at [bbcelite.com](https://elite.bbcelite.com/).
-  That source repo has no licence, which is why the generated file is git-ignored and should
-  not be published.
-- **Badge firmware:** `tests/badge_stubs.py` mirrors the button-matching rules of the
+- **Ideas re-implemented in new code**: the hidden-line rule, steering by rotating the
+  universe around the player, the radar with height sticks, galaxies worked out from seed
+  numbers, and the shape of the two missions. One message, "RIGHT ON COMMANDER!", is a line
+  from the original.
+- **Ships, galaxy, market and words**: the game's own (`original_ships.py`,
+  `original_data.py`), designed for Ace Commander.
+- **Badge firmware**: `tests/badge_stubs.py` mirrors the button-matching rules of the
   [badge firmware](https://github.com/emfcamp/badge-2024-software) so the tests behave like
   the badge.
 
-"No original code" is not the same as "no legal issue". The ship data is the part someone
-could object to, so it should not go into the badge app store. The game was first called
-Elite and was renamed Ace Commander to keep clear of the original's name.
+The game was first called Elite and was renamed Ace Commander to keep clear of the
+original's name.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE). The licence covers this repository's own work, not the
+optional Elite-derived files you make yourself.

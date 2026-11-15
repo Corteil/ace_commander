@@ -123,7 +123,11 @@ DOCK_TIME = 3.0         # seconds of flying in through the station's tunnel on d
 DOCK_HOLD = (1.0, 2.0)  # then the view of the bay stays this long, chosen at random
 EJECT_TIME = 3.0        # seconds of the ESCAPE POD screen before the docking scene (C skips it)
 DOCK_NAMES = {"A": "AUTHENTIC", "B": "ASSISTED", "C": "AUTOMATIC"}
-DEBUG_MENU = True       # show DEBUG, a page of cheats for testing, in the in-flight menu
+# DEBUG, a page of cheats for testing (the in-flight menu, Settings and
+# Options): True or False, or None to show it only if a file called debug.txt
+# is in the app's folder (and always on a PC, where the tests run), so an app
+# store install has none and a developer's badge can
+DEBUG_MENU = None
 PERF_SLOW = 25          # ms over the average that makes a frame count as slow
 
 # the app's folder; the commander is saved there
@@ -137,6 +141,21 @@ except Exception:
 # only make sense in it (content.py, Options > DATA)
 DATA_TAG = "own" if ORIGINAL_SHIPS else "elite"
 SAVE_PATH = APP_DIR + ("/commander.json" if ORIGINAL_SHIPS else "/commander_elite.json")
+
+
+def _debug_wanted():
+    import sys
+    if sys.implementation.name != "micropython":
+        return True
+    try:
+        open(APP_DIR + "/debug.txt").close()
+        return True
+    except OSError:
+        return False
+
+
+if DEBUG_MENU is None:
+    DEBUG_MENU = _debug_wanted()
 def options_path():
     """options.json, next to the save: the Options page's steering and LEDs."""
     return SAVE_PATH.rsplit("/", 1)[0] + "/options.json"

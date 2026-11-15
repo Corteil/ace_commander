@@ -11,7 +11,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 failed = []
 for name in ("test_game.py", "test_app.py", "test_commander.py", "test_galaxy.py", "test_market.py",
-             "test_equipment.py", "test_equip_effects.py", "test_traffic.py", "test_witchspace.py", "test_loader.py", "test_describe.py", "test_missions.py", "test_original_ships.py", "test_original_data.py",
+             "test_equipment.py", "test_equip_effects.py", "test_traffic.py", "test_witchspace.py", "test_loader.py", "test_describe.py", "test_missions.py", "test_original_ships.py", "test_original_data.py", "test_install.py",
              "test_leds.py",
              "test_bench.py", "test_run.py"):
     r = subprocess.run([sys.executable, os.path.join(HERE, name)], capture_output=True, text=True)
