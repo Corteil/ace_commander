@@ -150,7 +150,9 @@ The disc version's two missions are in, as the original runs them. Once your kil
 is high enough, docking in the first or second galaxy brings an incoming message from
 Her Majesty's Space Navy: a prototype ship, the Constrictor, has been stolen. While you
 hunt it, the stations along its trail tell you where it went (on System data, docked).
-Only a military laser gets through its shields, and it has an ECM. Destroy it and dock
+It turns up at Orarra, in the second galaxy, after two minutes outside the
+station's safe zone (or, with CONSTRICTOR: ORIGINAL in the pause menu, as rarely as in
+the original). Only a military laser gets through its shields, and it has an ECM. Destroy it and dock
 for your reward. Later, with more kills, in the third galaxy, the Navy has a second job
 for you, and the Thargoids will not like it. The texts are read from your own copy of
 the Elite source into `game_data.py`, like the system descriptions. The missions call you
@@ -158,7 +160,7 @@ by the name set in the badge's settings, or Jameson if none is set. On a message
 joystick scrolls the text, C pages down (and at the end goes on) and F skips it.
 
 The Debug page can move you through them: MISSION (the next stage; docking then starts
-the next mission), TO MISSION SYSTEM and ADD THE CONSTRICTOR.
+the next mission), TO MISSION SYSTEM and ADD THE CONSTRICTOR; SHIP CONFIG has NAVY ENERGY UNIT.
 
 ## The screen
 

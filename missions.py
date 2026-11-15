@@ -7,7 +7,10 @@ DEBRIEF2, THERE, PDESC), written afresh:
    are) and Her Majesty's Space Navy asks you to find and destroy a stolen
    prototype, the Constrictor. While you hunt it, the stations along its
    trail say where it went (the special system sentences, RUTOK). It is in
-   Orarra, in galaxy 2, where it turns up in place of a lone bounty hunter.
+   Orarra, in galaxy 2, where it turns up in place of a lone bounty hunter
+   (rare in a democracy like Orarra, as in the original) or, with the
+   pause menu's CONSTRICTOR: 2 MIN (Commander.quick_con, the default), after
+   QUICK_WAIT seconds outside the safe zone.
    Only a military laser hurts it, and only a quarter as much; it has an
    ECM. Dock after killing it: 5000 Cr and 256 more kills.
 2. The Thargoid plans. With mission 1 done, dock in galaxy 3 with at least
@@ -29,6 +32,7 @@ except ImportError:         # imported on its own, as the PC tests do
 ORARRA = (1, 144, 33)       # (galaxy, x, y) on the chart: where the Constrictor is
 CEERDI = (2, 215, 84)       # mission 2's briefing
 BIRERA = (2, 63, 72)        # and where the plans go
+QUICK_WAIT = 120.0          # seconds outside Orarra's safe zone before it comes (quick_con)
 KILLS_1 = 256               # the original's kill counts for each mission
 KILLS_2 = 1280
 REWARD_KILLS = 256          # each mission's reward in kills

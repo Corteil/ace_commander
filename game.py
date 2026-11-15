@@ -459,6 +459,8 @@ class Game:
         self.navy = False           # the naval energy unit: NAVY_UNIT times instead
         self.orarra = False         # in the Constrictor's system (missions.constrictor_here)
         self.hunt = False           # and the Constrictor is there to be found
+        self.con_wait = None        # seconds outside the safe zone before it comes; None: only by the roll
+        self.con_t = 0.0            # time spent outside the safe zone towards that
         self.plans = False          # carrying mission 2's plans: Thargoids come after you
         self.got_constrictor = False    # set when you destroy it; the app notes it
         self.fuel_scoops = True     # without them a canister is hit, not scooped
@@ -619,6 +621,7 @@ class Game:
         "arrive": out of hyperspace, ARRIVE_DIST from the station, with the
         planet beyond it, and in an anarchy or a feudal system as many
         pirates as can attack at once waiting (gov None: no ambush)."""
+        self.con_t = 0.0        # a new visit: the quick Constrictor's wait starts again
         bp = self.types.get(station) or self.types.get("CORIOLIS")
         r = max(4000.0, radius_km * PLANET_SCALE)
         sp = Space(bp, r, gov)
@@ -1988,6 +1991,10 @@ class Game:
         if self.space.safe:
             self.pending = 0
             return
+        if self.hunt and self.con_wait is not None and not self._any(CONSTRICTOR):
+            self.con_t += dt
+            if self.con_t >= self.con_wait and self.add_constrictor() is not None:
+                self.con_t = 0.0
         if self.pending > 0:
             self.spawn_t -= dt
             if self.spawn_t <= 0 and count < MAX_OBJECTS:

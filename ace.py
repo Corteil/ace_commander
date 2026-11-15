@@ -711,6 +711,7 @@ class AceCommander(app.App):
         gal = self.galaxy
         g.orarra = missions.constrictor_here(c.galaxy, gal.xs[c.system], gal.ys[c.system])
         g.hunt = g.orarra and missions.hunting(c.mission)
+        g.con_wait = missions.QUICK_WAIT if c.quick_con else None
         g.plans = missions.carrying_plans(c.mission)
 
     def _dock(self):
@@ -1281,6 +1282,8 @@ class AceCommander(app.App):
             items = [steer]
             if self.career and self.cmdr is not None:
                 items.append("DOCKING: " + DOCK_NAMES[self.cmdr.docking])
+                if missions.hunting(self.cmdr.mission):     # only matters while you hunt it
+                    items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
             items.append("QUIT TO TITLE")
             return items
         if self.fsub == "debug":
@@ -1320,7 +1323,8 @@ class AceCommander(app.App):
         g = self.game
         onoff = lambda b: "ON" if b else "OFF"
         items = ["LASER: " + g.laser.upper(), "MISSILES: %d" % g.missiles,
-                 "ENERGY UNIT: " + onoff(g.energy_unit)]
+                 "ENERGY UNIT: " + onoff(g.energy_unit and not g.navy),
+                 "NAVY ENERGY UNIT: " + onoff(g.navy)]
         if self.career and self.cmdr is not None:
             c = self.cmdr
             items += ["CARGO BAY: %dT" % c.hold, "FUEL SCOOPS: " + onoff(g.fuel_scoops)]
@@ -1345,9 +1349,18 @@ class AceCommander(app.App):
                 if c is not None:
                     c.missiles = g.missiles
         elif item.startswith("ENERGY UNIT"):
-            g.energy_unit = not g.energy_unit
+            g.energy_unit = not (g.energy_unit and not g.navy)
+            g.navy = False
             if c is not None:
+                self._extra(c, "navy", False)
                 self._extra(c, "energy", g.energy_unit)
+        elif item.startswith("NAVY ENERGY UNIT"):
+            # mission 2's reward, at once: it takes the place of the usual unit
+            g.navy = not g.navy
+            g.energy_unit = g.navy
+            if c is not None:
+                self._extra(c, "energy", False)
+                self._extra(c, "navy", g.navy)
         elif item.startswith("CARGO BAY") and c is not None:
             from . import equipment
             c.hold = commander.HOLD if c.hold >= equipment.BIG_HOLD else equipment.BIG_HOLD
@@ -1568,6 +1581,12 @@ class AceCommander(app.App):
                 if (confirm or side) and self.tilt_ok:
                     self.use_tilt = not self.use_tilt
                     self.zero = None
+            elif item.startswith("CONSTRICTOR"):
+                if confirm or side:     # how soon mission 1's Constrictor turns up at Orarra
+                    c = self.cmdr
+                    c.quick_con = not c.quick_con
+                    self._mission_flags()
+                    self._write_setting("quick_con", c.quick_con)
             elif item.startswith("DOCKING"):
                 if confirm or side:     # C and right go A, B, C, A; left goes back
                     c = self.cmdr

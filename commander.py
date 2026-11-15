@@ -71,6 +71,7 @@ class Commander:
         self.colour = 0         # the ship's paint (cockpit.SHIP_COLOURS), from the Repair Shop
         self.legal = 0          # legal status, 0 clean to 255 (game.FUGITIVE and up: a fugitive)
         self.mission = 0        # how far the two missions have got: the original's TP (missions.py)
+        self.quick_con = True   # the Constrictor turns up after missions.QUICK_WAIT (else rarely, as the original)
         self.fuel = MAX_FUEL    # tenths of a light year
         self._needs = thresholds(self.level)
 
@@ -116,7 +117,8 @@ class Commander:
                 "market": self.market, "hold": self.hold, "missiles": self.missiles,
                 "laser": self.laser, "extras": self.extras, "docked_at": self.docked_at,
                 "galaxy": self.galaxy, "colour": self.colour,
-                "legal": self.legal, "mission": self.mission}
+                "legal": self.legal, "mission": self.mission,
+                "quick_con": self.quick_con}
 
     @classmethod
     def from_dict(cls, d):
@@ -148,6 +150,8 @@ class Commander:
         k = d.get("legal")
         if isinstance(k, int):
             c.legal = max(0, min(255, k))
+        if isinstance(d.get("quick_con"), bool):
+            c.quick_con = d["quick_con"]
         k = d.get("mission")
         if isinstance(k, int):
             c.mission = k & 0xFF

@@ -694,6 +694,12 @@ of a real flight, not from a harness.
    scrolls at `SCROLL_SPEED` (only the joystick on the new front board, not A / D); C
    pages down and at the end goes on; F skips. Grey bars show more above / below. The
    Constrictor sits at the top of mission 1's column and goes once scrolled near the top.
+   Then (Brian): the Constrictor turns up after `missions.QUICK_WAIT` (120 s) outside
+   Orarra's safe zone while you hunt it (`Game.con_wait`, `con_t`, reset on entering a
+   system; one at a time; the original's roll still applies too). Pause menu, only while
+   mission 1 is under way: CONSTRICTOR: 2 MIN / ORIGINAL (`Commander.quick_con`, saved,
+   default 2 MIN; ORIGINAL leaves only the roll). SHIP CONFIG (DEBUG) has NAVY ENERGY
+   UNIT: ON / OFF, which takes the place of the usual unit (and ENERGY UNIT the reverse).
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not

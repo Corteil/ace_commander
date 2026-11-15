@@ -191,7 +191,34 @@ for _ in range(60):
     g.pending = 0; g.skip = 0; g.group = []
     g._roll()
     assert "CONSTRICTOR" not in g.group, "only one"
-# and with the plans, Thargoids come
+# the quick setting: it comes after QUICK_WAIT seconds outside the safe zone
+g = game.Game(SHIPS, 1)
+g.enter(6000, "CORIOLIS", "arrive", 7)
+g.orarra = g.hunt = True
+g.con_wait = missions.QUICK_WAIT
+g.encounter_t = g.station_t = 1e9
+g.god = True
+assert not g.space.safe
+t = 0.0
+while not any(o.role == "constrictor" for o in g.objs + g.new) and t < 200:
+    g.step(DT, 0, 0, 0, False, False)
+    t += DT
+assert abs(t - missions.QUICK_WAIT) < 1.0, t
+o = [o for o in g.objs + g.new if o.role == "constrictor"][0]
+assert o.state == "attack" and o.ecm
+for _ in range(int(150 / DT)):      # only one at a time
+    g.step(DT, 0, 0, 0, False, False)
+assert sum(1 for o in g.objs + g.new if o.role == "constrictor" and not o.dead) <= 1
+# not without the setting (the roll is kept away here), nor once mission 1 is over
+for wait, hunt in ((None, True), (missions.QUICK_WAIT, False)):
+    g = game.Game(SHIPS, 1)
+    g.enter(6000, "CORIOLIS", "arrive", 7)
+    g.orarra, g.hunt, g.con_wait = True, hunt, wait
+    g.encounter_t = g.station_t = 1e9; g.god = True
+    for _ in range(int(150 / DT)):
+        g.step(DT, 0, 0, 0, False, False)
+    assert not any(o.role == "constrictor" for o in g.objs + g.new), (wait, hunt)
+
 g = game.Game(SHIPS, 1)
 g.enter(6000, "CORIOLIS", "arrive", 7)
 g.plans = True
@@ -324,6 +351,32 @@ assert c.mission == 14 and "navy" in c.extras and e.mode == "brief"
 tick(e, fresh=["F"])
 launch(e)
 assert e.game.navy and e.game.energy_unit and not e.game.plans
+# the pause menu's CONSTRICTOR setting, saved; 2 MIN to start with; shown
+# only while mission 1 is under way
+assert c.quick_con and e.game.con_wait == missions.QUICK_WAIT
+tick(e, fresh=["A"]); e.fsub = "pause"
+assert not any(t.startswith("CONSTRICTOR") for t in e._fitems()), "mission 1 is over"
+done = c.mission
+c.mission = 1
+e.fmenu = [i for i, t in enumerate(e._fitems()) if t.startswith("CONSTRICTOR")][0]
+assert e._fitems()[e.fmenu] == "CONSTRICTOR: 2 MIN"
+tick(e, fresh=["C"])
+assert not c.quick_con and e.game.con_wait is None and e._fitems()[e.fmenu] == "CONSTRICTOR: ORIGINAL"
+assert commander.load(SAVE).quick_con is False
+tick(e, fresh=["C"]); assert c.quick_con
+c.mission = done
+assert commander.Commander.from_dict({"level": 1}).quick_con, "old saves: 2 MIN"
+# SHIP CONFIG's NAVY ENERGY UNIT switch
+e.fsub = "ship"
+items = e._fitems()
+assert "NAVY ENERGY UNIT: ON" in items and "ENERGY UNIT: OFF" in items
+e.fmenu = items.index("NAVY ENERGY UNIT: ON"); tick(e, fresh=["C"])
+assert not e.game.navy and not e.game.energy_unit and "navy" not in c.extras
+e.fmenu = e._fitems().index("ENERGY UNIT: OFF"); tick(e, fresh=["C"])
+assert e.game.energy_unit and not e.game.navy and "energy" in c.extras
+e.fmenu = e._fitems().index("NAVY ENERGY UNIT: OFF"); tick(e, fresh=["C"])
+assert e.game.navy and e.game.energy_unit and "navy" in c.extras and "energy" not in c.extras
+assert "ENERGY UNIT: OFF" in e._fitems()
 os.remove(SAVE)
 print("app: briefings on docking, saved, the trail, Orarra, both missions to the end: ok")
 print("ALL MISSION TESTS PASSED")
