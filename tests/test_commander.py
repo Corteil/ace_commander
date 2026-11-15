@@ -49,7 +49,10 @@ def launch(a):
 
 
 # ---- ranks and levels -------------------------------------------------------
-assert commander.thresholds(2) == (0, 8, 16, 32, 64, 128, 512, 2560, 6400), "hardest is the original"
+assert commander.thresholds(2) == (0, 8, 16, 32, 64, 128, 512, 2560, 4000, 6400), \
+    "hardest is the original, with ACE (ours) between Deadly and Elite"
+c = commander.Commander(2); c.add_kills(3999); assert c.rank() == "DEADLY"
+assert c.next_rank() == ("ACE", 1) and c.add_kills(1) == "ACE" and c.next_rank() == ("ELITE", 2400)
 assert commander.thresholds(0)[-1] == 1280 and commander.thresholds(1)[-1] == 3200
 assert commander.thresholds(0)[5] == 26, "Competent on the easiest level"
 for level in range(3):
@@ -61,6 +64,7 @@ assert c.add_kills(1) is None and c.add_kills(1) == "MOSTLY HARMLESS"
 assert c.add_kills(0) is None
 c.add_kills(1300)
 assert c.rank() == "ELITE" and c.next_rank() is None
+assert commander.thresholds(0)[-2] == 800 and commander.thresholds(1)[-2] == 2000, "ACE"
 c = commander.Commander(2)
 assert c.add_kills(7) is None and c.add_kills(1) == "MOSTLY HARMLESS"
 assert commander.Commander(9).level == 2 and commander.Commander(-3).level == 0
@@ -155,7 +159,7 @@ assert commander.load(SAVE).kills == 0, "not written every kill"
 tick(a, fresh=["A"])
 tx = texts(a)
 assert "STATUS" in tx
-assert a._fitems() == ["RESUME", "LOCAL CHART", "STATUS", "PAUSE MENU", "DEBUG"], a._fitems()
+assert a._fitems() == ["RESUME", "LOCAL CHART", "STATUS", "SETTINGS", "QUIT TO TITLE", "DEBUG"], a._fitems()
 assert texts(a)
 fpick(a, "STATUS"); assert a.fsub == "status"
 tx = texts(a)
@@ -163,14 +167,15 @@ assert "AVERAGE" in tx and any("6 kills" in t and "EASY" in t for t in tx), tx
 assert any("more for ABOVE AVERAGE" in t for t in tx)
 assert any(t.startswith("LAVE") and "fuel 7.0 LY" in t for t in tx), tx
 tick(a, fresh=["C"]); assert a.fsub is None and a.paused
-fpick(a, "PAUSE MENU"); assert a.fsub == "pause"
+fpick(a, "SETTINGS"); assert a.fsub == "settings"
 assert a._fitems()[1] == "DOCKING: ASSISTED" and a.game.docking == "B", a._fitems()
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
 assert a._fitems()[1] == "DOCKING: AUTOMATIC" and a.game.docking == "C"
 assert commander.load(SAVE).docking == "C", "the choice is saved straight away"
 tick(a, fresh=["JOYRIGHT"]); assert a.cmdr.docking == "A" and a.game.docking == "A"
 tick(a, fresh=["JOYLEFT"]); tick(a, fresh=["JOYLEFT"]); assert a.cmdr.docking == "B"
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+assert "QUIT TO TITLE" not in a._fitems(), "settings only"
+tick(a, fresh=["F"]); fpick(a, "QUIT TO TITLE")
 assert a.mode == "menu" and commander.load(SAVE).kills == 0, "quitting to the title mid-flight saves nothing"
 assert a.cmdr.kills == 6, "but the flight carries on with CONTINUE"
 assert a.choices()[0] == "CONTINUE" and a.menu == 0
@@ -184,7 +189,7 @@ kill(a.game, 3); tick(a)
 assert a.cmdr.kills == 6 and a.cmdr.cash == practice_cash, "no kills or bounties for the commander"
 assert a.game.bounty == 3 * a.game.types["SIDEWINDER"].bounty and not a.game.msg.endswith(" Cr")
 tick(a, fresh=["A"]); assert "STATUS" not in texts(a)
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+fpick(a, "QUIT TO TITLE")
 assert a.mode == "menu" and commander.load(SAVE).kills == 0
 choose(a, "CONTINUE")
 assert a.mode == "docked" and a.cmdr.kills == 6, "practice kills aren't banked by docking"
@@ -211,7 +216,7 @@ show = a.show_ms; a.show_ms = False   # its own digits
 a.draw(CountCtx())
 cockpit_mod.number = real_number; a.show_ms = show
 assert digits == [], "no wave or score on a commander's HUD"
-tick(a, fresh=["A"]); a.fsub = "debug"; assert "NEXT WAVE" not in a._fitems(); a.fsub = None
+tick(a, fresh=["A"]); assert "NEXT WAVE" not in a._cheats("SPAWN", True)
 tick(a, fresh=["A"])
 # scooped canisters go into the commander's hold, with fuel scoops fitted
 g = a.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
@@ -277,7 +282,7 @@ need = a.cmdr.next_rank()[1]
 kill(g, need); tick(a)
 assert g.msg.startswith("RANK: ") and a.cmdr.cash == cash + rock + side * (1 + need), "a new rank shows instead"
 assert commander.load(SAVE).cash < a.cmdr.cash
-fpick(a, "PAUSE MENU"); tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"])
+fpick(a, "QUIT TO TITLE")
 assert a.mode == "menu" and commander.load(SAVE).cash < a.cmdr.cash, "quitting mid-flight saves nothing"
 choose(a, "CONTINUE"); assert a.mode == "flight"
 flight_kills = g.kills
@@ -285,13 +290,12 @@ total_kills = a.cmdr.kills
 assert total_kills == kills_before + 1 + need
 
 # a flight left part-way for the title screen carries on
-fpick(a, "PAUSE MENU"); tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"]); assert a.mode == "menu"
+fpick(a, "QUIT TO TITLE"); assert a.mode == "menu"
 choose(a, "CONTINUE"); assert a.mode == "flight" and g.kills == flight_kills and not a.docked
 
 # a new app instance (the badge restarted) finds the commander as last saved,
 # docked: the flight since is lost, as in the original
-fpick(a, "PAUSE MENU")
-tick(a, fresh=["JOYUP"]); tick(a, fresh=["C"]); assert a.mode == "menu"
+fpick(a, "QUIT TO TITLE"); assert a.mode == "menu"
 b = ace_commander.AceCommander()
 assert b.cmdr.kills == commander.load(SAVE).kills == 6 < total_kills
 assert b.cmdr.level == 0 and b.choices()[0] == "CONTINUE"
@@ -307,7 +311,7 @@ n = ace_commander.AceCommander()
 choose(n, "CONTINUE"); launch(n)
 kill(n.game, 2); tick(n); assert n.cmdr.kills == 2
 n.game.missiles = 1; n.game.bounty += 5000; tick(n)
-fpick(n, "PAUSE MENU"); tick(n, fresh=["JOYUP"]); tick(n, fresh=["C"]); assert n.mode == "menu"
+fpick(n, "QUIT TO TITLE"); assert n.mode == "menu"
 choose(n, "NEW COMMANDER"); tick(n, fresh=["C"])
 assert n.mode == "docked" and n.cmdr.kills == 0 and n.cmdr.cash == 1000
 assert n.cmdr.missiles == commander.START_MISSILES, (n.cmdr.kills, n.cmdr.cash, n.cmdr.missiles)
@@ -332,34 +336,46 @@ launch(d)
 g = d.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
 
 def debug(a, line):
-    """Open the in-flight menu, go to DEBUG and press C on this line of it."""
+    """Open the in-flight menu, go Settings > DEBUG > the line's group and
+    press C on the line, as a player would."""
     if not a.paused:
         tick(a, fresh=["A"])
-    if a.fsub != "debug":
+    group = mod.cheat_group(line)
+    if not (a.fsub == "dgroup" and a.dgroup == group):
         a.fsub = None
-        a.fmenu = a._fitems_top().index("DEBUG")
-        tick(a, fresh=["C"])
-    assert a.fsub == "debug"
+        a.fmenu = a._fitems_top().index("SETTINGS"); tick(a, fresh=["C"])
+        a.fmenu = a._fitems().index("DEBUG"); tick(a, fresh=["C"])
+        assert a.fsub == "debug"
+        a.fmenu = a._fitems().index(group); tick(a, fresh=["C"])
+    assert a.fsub == "dgroup" and a.dgroup == group
     a.fmenu = [i for i, s in enumerate(a._fitems()) if s.startswith(line)][0]
     tick(a, fresh=["C"])
 
 tick(d, fresh=["A"])
-assert texts(d)[-1] != "" and "DEBUG" in texts(d)
+assert texts(d)[-1] != "" and "SETTINGS" in texts(d)
 debug(d, "INVINCIBLE"); debug(d, "INVINCIBLE")
+assert "SHIP CONFIG" in texts(d), "the SHIP group is the ship config page"
 import json as _json
 _ver = _json.load(open(os.path.join(os.path.dirname(mod.__file__), "metadata.json")))["version"]
-assert "DEBUG - BUILD %s" % _ver in texts(d), "the DEBUG page shows the build"
+tick(d, fresh=["F"])
+tx = texts(d)
+assert "DEBUG - BUILD %s" % _ver in tx, "the DEBUG page shows the build"
+assert d._fitems() == ["SHIP", "SPAWN", "TRAVEL", "COMMANDER", "DISPLAY"], d._fitems()
 debug(d, "INVINCIBLE")
+assert "INVINCIBLE: ON" in texts(d) and g.god
+# seven lines at a time, the chosen one in the middle, going round the end of the list
+debug(d, "ADD AN ENEMY")
+d.fmenu = 0
 tx = texts(d)
 items = d._fitems()
-assert "INVINCIBLE: ON" in tx and g.god
-# seven lines at a time, the chosen one in the middle, going round the end of the list
-assert d.fmenu == 0 and len(items) > mod.DEBUG_ROWS
+assert len(items) > mod.DEBUG_ROWS, items
 shown = [t for t in tx if t in items]
 assert shown == [items[i % len(items)] for i in range(-3, 4)], shown
-assert "DOCK NOW" in shown and items[3] in shown and items[4] not in shown
+assert items[3] in shown and items[4] not in shown
 tick(d, fresh=["JOYUP"]); assert d.fmenu == len(items) - 1, "up from the top goes round"
 tick(d, fresh=["JOYDOWN"]); assert d.fmenu == 0
+g.objs[:] = [o for o in g.objs if o.kind != "ship"]
+g.new[:] = [o for o in g.new if o.kind != "ship"]
 # the frame time counter can be switched off and on
 assert d.show_ms
 debug(d, "FRAME TIME"); assert not d.show_ms and "FRAME TIME: OFF" in texts(d)
@@ -385,9 +401,10 @@ debug(d, "FUEL TO 1/4"); assert d.cmdr.fuel == 17 and g.msg == "FUEL 1.7 LY"
 cash = d.cmdr.cash
 debug(d, "+1000 CR"); assert d.cmdr.cash == cash + 10000 and d.paused
 # SHIP CONFIG: change the ship's equipment, in this flight and for the commander
-debug(d, "SHIP CONFIG"); assert d.fsub == "ship" and d.fmenu == 0
+debug(d, "INVINCIBLE"); debug(d, "INVINCIBLE")    # SHIP: its cheats, then SHIP CONFIG
+assert d.fsub == "dgroup" and d.dgroup == "SHIP"
 tx = texts(d)
-assert "SHIP CONFIG" in tx and "LASER: PULSE" in tx and "MISSILES: 4" in tx, tx
+assert "SHIP CONFIG" in tx and "LASER: PULSE" in d._fitems() and "MISSILES: 4" in d._fitems(), tx
 def ship(label):
     d.fmenu = [i for i, t in enumerate(d._fitems()) if t.startswith(label)][0]
     tick(d, fresh=["C"])
@@ -401,7 +418,16 @@ ship("CARGO BAY"); assert d.cmdr.hold == 35 and "CARGO BAY: 35T" in d._fitems()
 ship("CARGO BAY"); assert d.cmdr.hold == 20
 ship("FUEL SCOOPS"); assert g.fuel_scoops and "scoops" in d.cmdr.extras
 ship("FUEL SCOOPS"); assert not g.fuel_scoops and "scoops" not in d.cmdr.extras
-tick(d, fresh=["F"]); assert d.fsub == "debug" and d._fitems()[d.fmenu] == "SHIP CONFIG", "F goes back"
+tick(d, fresh=["F"]); assert d.fsub == "debug" and d._fitems()[d.fmenu] == "SHIP", "F goes back"
+tick(d, fresh=["F"]); assert d.fsub == "settings"
+tick(d, fresh=["F"]); assert d.fsub is None
+# DEBUG on the main menu too, and back to it
+d.fmenu = d._fitems().index("DEBUG"); tick(d, fresh=["C"]); assert d.fsub == "debug"
+tick(d, fresh=["C"]); assert d.fsub == "dgroup" and d.dgroup == "SHIP", "SHIP goes straight in"
+assert d._fitems()[:4] == ["INVINCIBLE: " + ("ON" if g.god else "OFF"), "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4"]
+assert d._fitems()[4].startswith("LASER")
+tick(d, fresh=["F"]); tick(d, fresh=["F"]); assert d.fsub is None and d._fitems()[d.fmenu] == "DEBUG"
+tick(d, fresh=["A"])
 # TO THE SUN: at the edge of the heat, heading in; flying on, the cabin heats
 # up to the scooping band and out again, and with fuel scoops the tank fills;
 # the cabin temperature, altitude and fuel gauges show
@@ -432,11 +458,13 @@ assert g.cabin == game.COOL_CABIN and "CT" not in tx and "FU" not in tx, "the ga
 tick(d, fresh=["A"])
 debug(d, "REFILL MISSILES")
 debug(d, "INVINCIBLE"); assert not g.god
-tick(d, fresh=["F"]); assert d.fsub is None and d._fitems()[d.fmenu] == "DEBUG", "F goes back"
+tick(d, fresh=["F"]); assert d.fsub == "debug" and d._fitems()[d.fmenu] == "SHIP", "F goes back"
+tick(d, fresh=["F"]); assert d.fsub == "settings" and d._fitems()[d.fmenu] == "DEBUG"
+tick(d, fresh=["F"]); assert d.fsub is None and d._fitems()[d.fmenu] == "SETTINGS"
 tick(d, fresh=["A"])
 g._hurt(5000.0); tick(d); assert g.over, "and with it off you can die again"
 mod.DEBUG_MENU = False
-assert "DEBUG" not in d._fitems_top()
+assert "DEBUG" not in d._settings(True) and "DEBUG" not in d._fitems_top()
 mod.DEBUG_MENU = True
 os.remove(SAVE)
 print("debug cheats: ok")
@@ -457,7 +485,7 @@ assert e.cmdr.system == 7 and gal.system(7).name == "LAVE" and e.cmdr.fuel == 70
 fpick(e, "LOCAL CHART")
 assert e.fsub == "chart" and e.chart.here == 7
 tx = texts(e)
-assert "LAVE" in tx and "YOU ARE HERE" in tx and "FUEL 7.0 LY   D: DATA" in tx, tx
+assert "LAVE" in tx and "YOU ARE HERE" in tx and "RANGE 7.0 LY" in tx, tx
 tick(e, fresh=["C"]); assert e.fsub == "chart" and g.jump_t == 0, "can't jump to where you are"
 reach = dict((i, dist) for dist, i in gal.in_range(7, 70))
 assert all((0 < d <= 70) == (i in reach) for _, _, i, d in e.chart.dots if i != 7)
@@ -481,7 +509,7 @@ for _ in range(400):
 assert e.chart.sel[2] == 129, e.chart.sel
 tx = texts(e)
 d129 = reach[129]
-assert "ZAONCE" in tx and ("%d.%d LY   C: JUMP" % (d129 // 10, d129 % 10)) in tx, tx
+assert "ZAONCE" in tx and ("%d.%d LY" % (d129 // 10, d129 % 10)) in tx, tx
 tick(e, fresh=["C"])
 assert not e.paused and e.fsub is None and g.jump_t > 0 and g.msg == "HYPERSPACE 5"
 kill(g, 2)
@@ -525,7 +553,7 @@ debug(e, "RELEASE CANISTER")
 cans = [o for o in e.game.objs + e.game.new if o.kind == "can"]
 assert len(cans) == n_cans + 1 and 0 < cans[-1].z <= 700 and cans[-1].m[8] < -0.99, "ahead, coming in"
 tx = texts(e)
-assert "RELEASE CANISTER" in tx and "DOCK NOW" in tx and "C: do it   F: back" in tx, tx
+assert "RELEASE CANISTER" in tx and "DEBUG: SPAWN" in tx, tx
 tick(e, fresh=["A"])
 # dying stops a countdown; quitting to the title and coming back keeps the system
 fpick(e, "LOCAL CHART")
@@ -654,7 +682,7 @@ print("launching, arriving, flying to the station, docking, refuelling: ok")
 # ---- the docked tabs, targets, and the jump line in the in-flight menu ----
 d = e.dock
 assert d.tabs == ("STATUS", "MARKET", "EQUIP SHIP", "LOCAL CHART", "GALACTIC CHART",
-                  "SYSTEM DATA")
+                  "SYSTEM DATA", "OPTIONS")
 assert d.tab == 0 and any("< > screens" in t for t in texts(e))
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "MARKET"
 # ---- the market (Lave: rich agricultural, so food is cheap and computers dear)
@@ -745,19 +773,36 @@ c.cash = 100000; c.missiles = 2
 saved_c = commander.Commander.from_dict(c.to_dict())
 assert (saved_c.hold, saved_c.laser, saved_c.missiles, "scoops" in saved_c.extras) == (35, "beam", 2, True)
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART" and d.view.verb == "TARGET"
-tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART", "the joystick moves the cursor here"
-tick(e, fresh=["B"]); assert d.name() == "GALACTIC CHART" and len(d.view.dots) == 256
+assert not d.cursor and "< LAVE >" in texts(e), "the joystick changes tab until C"
+tick(e, fresh=["C"]); assert d.cursor and d.view.active
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART", "now the joystick moves the cursor"
+tick(e, fresh=["F"]); assert d.name() == "LOCAL CHART" and not d.cursor, "F gives it back"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "GALACTIC CHART" and len(d.view.dots) == 256
+assert not d.cursor, "a new tab starts with the joystick on the tabs"
+tick(e, fresh=["E"]); tick(e, fresh=["B"]); assert d.name() == "GALACTIC CHART", "E / B still go"
 tx = texts(e)
-assert "GALAXY 1" in tx and "LAVE" in tx and "YOU ARE HERE" in tx, tx
+assert "GALAXY 1" in tx and "< LAVE >" in tx and "RANGE 7.0 LY" in tx, tx
 tick(e, fresh=["B"]); assert d.name() == "SYSTEM DATA" and d.data.name == "LAVE"
 tx = texts(e)
 assert "you are here" in tx and "Dictatorship" in tx and "Tech 5   Pop 2.5 billion" in tx, tx
 assert "Productivity 7000 M Cr" in tx and "Radius 4116 km" in tx
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "OPTIONS"
+tx = texts(e)
+before = c.docking
+assert "STEER: JOYSTICK" in tx and "DOCKING: " + mod.DOCK_NAMES[before] in tx, tx
+assert "CONSTRICTOR: 2 MIN" in tx
+tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["C"])
+after = commander.DOCKING[(commander.DOCKING.index(before) + 1) % 3]
+assert c.docking == after and "DOCKING: " + mod.DOCK_NAMES[after] in texts(e), "C changes it"
+assert commander.load(SAVE).docking == after, "saved"
+tick(e, fresh=["C"]); tick(e, fresh=["C"]); assert c.docking == before
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "STATUS", "tabs wrap round"
+tick(e, fresh=["E"]); assert d.name() == "OPTIONS"
 tick(e, fresh=["E"]); assert d.name() == "SYSTEM DATA"
 tick(e, fresh=["F"]); assert d.name() == "STATUS" and e.mode == "docked", "F goes back to Status"
 # pick Diso (147) on the galactic chart by steering to it
 d.open("GALACTIC CHART")
+tick(e, fresh=["C"])        # the joystick to the cursor
 tx_, ty_ = [(dot[0], dot[1]) for dot in d.view.dots if dot[2] == 147][0]
 for _ in range(400):
     v = d.view
@@ -781,13 +826,14 @@ d.open("LOCAL CHART"); assert d.view.sel[2] == 147, "the chart opens on the targ
 # a far system can be looked up, but not jumped to
 d.open("GALACTIC CHART")
 far = max(d.view.dots, key=lambda dot: dot[3])
+d.use_cursor(True)
 d.view.cx, d.view.cy = float(far[0]), float(far[1]); d.view._select()
-assert any("TOO FAR  C: DATA" in t for t in texts(e))
+assert any(t.endswith("TOO FAR") for t in texts(e))
 tick(e, fresh=["C"]); assert e.target == far[2] and d.name() == "SYSTEM DATA"
 assert any("too far" in t for t in texts(e))
 launch(e)
 assert not any(s.startswith("JUMP") for s in e._fitems_top()), "no jump line out of range"
-fpick(e, "PAUSE MENU"); tick(e, fresh=["JOYUP"]); tick(e, fresh=["C"])
+fpick(e, "QUIT TO TITLE")
 choose(e, "CONTINUE"); assert e.mode == "flight"   # back in the same flight
 e.target = 147
 assert e._fitems_top()[1] == "JUMP: DISO", e._fitems_top()
@@ -818,8 +864,8 @@ assert "LOCAL CHART" not in choose_p._fitems_top()
 gd = mod.game_data; mod.game_data = None
 n = ace_commander.AceCommander()
 choose(n, "CONTINUE")
-assert n.mode == "docked" and n.galaxy is None and n.dock.tabs == ("STATUS",)
-assert "COMMANDER" in texts(n) and "LAVE" not in texts(n) and "F: title screen" in texts(n)
+assert n.mode == "docked" and n.galaxy is None and n.dock.tabs == ("STATUS", "OPTIONS")
+assert "COMMANDER" in texts(n) and "LAVE" not in texts(n) and "< > screens   F: title" in texts(n)
 tick(n, fresh=["JOYRIGHT"]); tick(n, fresh=["B"]); assert n.dock.tab == 0
 launch(n)
 assert "LOCAL CHART" not in n._fitems_top()

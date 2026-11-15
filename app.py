@@ -18,7 +18,8 @@ import app
 
 # in the order they are imported: each after the ones it needs
 STEPS = ("ship_data", "game_data", "commander", "galaxy", "market", "equipment", "game",
-         "cockpit", "chart", "title", "viewer", "bench", "describe", "docked", "ace")
+         "cockpit", "chart", "title", "viewer", "bench", "describe", "missions", "briefing",
+         "docked", "ace")
 OPTIONAL = ("ship_data", "game_data")   # made from your own copy of Elite: may be missing
 GREEN = (0.3, 1, 0.4)      # the title screen's menu line
 GREY = (0.6, 0.6, 0.6)
@@ -32,6 +33,7 @@ class AceCommander(app.App):
         self.real = None        # the real app, once everything is loaded
         self.done = 0           # modules loaded so far
         self.error = None       # why loading failed, if it did
+        self.shown = True       # LOADING flashes: on, then off, at each redraw
 
     async def run(self, render_update):
         global _letters
@@ -42,6 +44,7 @@ class AceCommander(app.App):
             pass
         for name in STEPS:
             await render_update()           # show how far it has got
+            self.shown = not self.shown
             try:
                 __import__(pkg + "." + name)
             except Exception as e:
@@ -76,7 +79,8 @@ class AceCommander(app.App):
         else:
             if self.done < n:
                 _text(ctx, STEPS[self.done], 0, 28, 10, GREY)
-            _text(ctx, "LOADING", 0, 84, 13, GREEN)     # where the menu line will be
+            if self.shown:      # flashing, where the menu line will be
+                _text(ctx, "LOADING", 0, 84, 13, GREEN)
         ctx.restore()
 
 

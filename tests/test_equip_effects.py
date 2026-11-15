@@ -236,7 +236,8 @@ print("app: bomb on B, docking computer from the menu: ok")
 def debug(a, line):
     if not a.paused:
         tick(a, fresh=["A"])
-    a.fsub = "debug"
+    a.fsub = "dgroup"
+    a.dgroup = mod.cheat_group(line)
     a.fmenu = [i for i, t in enumerate(a._fitems()) if t.startswith(line)][0]
     tick(a, fresh=["C"])
 launch(e); g = e.game; g.spawn_t = g.rock_t = g.encounter_t = 1e9
@@ -377,7 +378,7 @@ e = ace_commander.AceCommander()
 choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
 assert "REPAIR SHOP" not in e.dock.tabs, "off unless switched on in DEBUG"
 launch(e); g = e.game
-tick(e, fresh=["A"]); e.fsub = "debug"
+tick(e, fresh=["A"]); e.fsub = "dgroup"; e.dgroup = "DISPLAY"
 e.fmenu = [i for i, t in enumerate(e._fitems()) if t.startswith("REPAIR SHOP")][0]
 tick(e, fresh=["C"]); assert e.repair_shop and "REPAIR SHOP: ON" in e._fitems()
 tick(e, fresh=["A"])

@@ -7,14 +7,14 @@ either to keep going). On Equip ship the joystick picks an item and C buys
 it. On the two charts C makes the selected system the hyperspace target;
 once launched, the in-flight menu offers a jump to it.
 """
-from . import chart, cockpit, commander, describe, equipment, market
+from . import chart, cockpit, commander, describe, equipment, market, missions
 try:        # the description sentence's tables, made by tools/import_galaxy.py
     from . import game_data
 except Exception:
     game_data = None
 
 TABS = ("STATUS", "MARKET", "EQUIP SHIP", "REPAIR SHOP", "LOCAL CHART", "GALACTIC CHART",
-        "SYSTEM DATA")
+        "SYSTEM DATA", "OPTIONS")
 PAINT_PRICE = 100   # tenths of a credit: a new colour at the Repair Shop costs 10.0 Cr
 SPIN = 0.8          # radians a second the Repair Shop's ship turns
 ROWS = 6            # goods shown at once on the market
@@ -36,9 +36,13 @@ def _ly(d):
 
 class Docked:
     def __init__(self, cmdr, gal, target=None, goods=None, equip=None, ship=None,
-                 repair=False):
+                 repair=False, options=None):
         """ship is your ship's blueprint, for the Repair Shop, which is shown
-        only with repair (a DEBUG switch for now)."""
+        only with repair (a DEBUG switch for now). options: (a function giving
+        the settings' lines, a function changing one: given the line and
+        whether to go back), the app's, for the Options tab; None: no tab."""
+        self.options = options
+        self.osel = 0           # the line picked on Options
         self.cmdr = cmdr
         self.ship = ship
         self.spin = 0.0         # the Repair Shop's ship, turning
@@ -46,12 +50,13 @@ class Docked:
         self.gal = gal          # None without game_data.py: then only Status
         self.equip = equip
         if gal is None:
-            self.tabs = TABS[:1]
+            self.tabs = TABS[:1] + (("OPTIONS",) if options else ())
         else:                   # an older game_data.py may not have goods or equipment
             self.tabs = tuple(t for t in TABS
                               if not (t == "MARKET" and not (goods and cmdr.market is not None))
                               and not (t == "EQUIP SHIP" and not equip)
-                              and not (t == "REPAIR SHOP" and not (repair and ship)))
+                              and not (t == "REPAIR SHOP" and not (repair and ship))
+                              and not (t == "OPTIONS" and not options))
         self.market = None
         if "MARKET" in self.tabs:
             self.market = market.Market(goods, gal.system(cmdr.system).economy, cmdr)
@@ -68,6 +73,7 @@ class Docked:
         self.target = target if gal is not None else None   # a system index, or None
         self.here = gal.system(cmdr.system) if gal is not None else None
         self.view = None        # the chart, on the chart tabs
+        self.cursor = False     # on a chart: the joystick moves the cursor (after C), not the tab
         self.chart_tab = None   # the last chart tab opened: where D on System data goes back to
         self.data = None        # the galaxy.System on the System data tab
 
@@ -86,6 +92,7 @@ class Docked:
         c = self.cmdr
         self.view = None
         self.data = None
+        self.cursor = False
         if sel is None:
             sel = self.target
         if n == "LOCAL CHART":
@@ -97,6 +104,14 @@ class Docked:
             self.chart_tab = n
         elif n == "SYSTEM DATA":
             self.data = self.gal.system(self.target if self.target is not None else c.system)
+        if self.view is not None:
+            self.view.active = False
+
+    def use_cursor(self, on):
+        """On a chart: C gives the joystick to the cursor, F gives it back to the tabs."""
+        self.cursor = on
+        if self.view is not None:
+            self.view.active = on
 
     def pick(self):
         """C on a chart: the selected system becomes the target and its data
@@ -106,6 +121,15 @@ class Docked:
             return
         self.target = None if i == self.cmdr.system else i
         self.open("SYSTEM DATA")
+
+    # ---- options --------------------------------------------------------------
+
+    def pick_option(self, step):
+        self.osel = (self.osel + step) % len(self.options[0]())
+
+    def change_option(self, back=False):
+        items = self.options[0]()
+        self.options[1](items[self.osel % len(items)], back)
 
     # ---- the market ---------------------------------------------------------
 
@@ -183,6 +207,8 @@ class Docked:
             self._draw_equip(ctx)
         elif self.name() == "REPAIR SHOP":
             self._draw_repair(ctx)
+        elif self.name() == "OPTIONS":
+            self._draw_options(ctx)
         else:
             self._draw_status(ctx)
         if len(self.tabs) > 1:      # which tab is open
@@ -232,6 +258,7 @@ class Docked:
         name = self.chart_tab if self.chart_tab in self.tabs else "LOCAL CHART"
         if name in self.tabs:
             self.go(self.tabs.index(name), self.data.index if self.data is not None else None)
+            self.use_cursor(True)       # carry on looking round
 
     def show(self, index):
         """D on a chart: open System data for system index, leaving the
@@ -246,7 +273,7 @@ class Docked:
         c = self.cmdr
         s = self.data
         d = None if s.index == c.system else self.gal.distance(c.system, s.index)
-        system_page(ctx, self.gal, s, d, c.fuel, "< >   D: chart   F: status")
+        system_page(ctx, self.gal, s, d, c.fuel, "< >   D: chart   F: status", c)
 
     def _draw_market(self, ctx):
         """The goods, ROWS at a time: name, price, stock and what is in the hold."""
@@ -282,6 +309,23 @@ class Docked:
         else:
             text(ctx, "C: buy   D: sell", 0, 75, 11, cockpit.GREY)
         text(ctx, "< > screens   F: status", 0, 91, 11, cockpit.GREY)
+
+    def _draw_options(self, ctx):
+        """The same settings as the title screen's Options and the in-flight
+        Settings."""
+        text = cockpit.text
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        text(ctx, "OPTIONS", 0, -94, 14, cockpit.GREY)
+        items = self.options[0]()
+        sel = self.osel % len(items)
+        y = -60
+        for i, label in enumerate(items):
+            if i == sel:
+                ctx.rgb(*cockpit.DIM).rectangle(-104, y - 9, 208, 18).fill()
+            text(ctx, label, 0, y, 14, cockpit.GREEN if i == sel else cockpit.GREY)
+            y += 20
+        text(ctx, "up / down: pick   C: change", 0, 66, 11, cockpit.GREY)
+        text(ctx, "< > screens   F: status", 0, 82, 11, cockpit.GREY)
 
     def _draw_repair(self, ctx):
         """Your ship turning in the chosen colour, the colours as a row of
@@ -376,10 +420,15 @@ DESC_Y = (24, 36, 48, 60, 72)
 DESC_WIDTHS = (38, 37, 35, 32, 28)
 
 
-def system_page(ctx, gal, s, dist, fuel, help_line):
+_special = [None, None]     # the last (galaxy, system, mission) given a special sentence, and it
+
+
+def system_page(ctx, gal, s, dist, fuel, help_line, cmdr=None):
     """Everything about star system s (a galaxy.System): dist is how far it
     is from you in tenths of a light year (None: you are there), fuel what
-    you have. Used by the System data tab and by D on the in-flight chart."""
+    you have. Used by the System data tab and by D on the in-flight chart.
+    cmdr: the commander, when docked; the station you are at may then say
+    something special instead of the usual sentence (the missions' RUTOK)."""
     text = cockpit.text
     ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
     text(ctx, "SYSTEM DATA", 0, -102, 10, cockpit.GREY)
@@ -399,7 +448,16 @@ def system_page(ctx, gal, s, dist, fuel, help_line):
                  "Radius %d km" % s.radius):
         text(ctx, line, 0, y, 11, cockpit.YELLOW)
         y += 13
-    words = describe.for_system(game_data, gal, s.index) if game_data is not None else None
+    words = None
+    if cmdr is not None and dist is None and game_data is not None:
+        key = (cmdr.galaxy, s.index, cmdr.mission)
+        if _special[0] != key:
+            n = missions.special_sentence(game_data, cmdr.mission, cmdr.galaxy, s.index)
+            _special[0] = key
+            _special[1] = describe.special(game_data, n, s.name) if n else None
+        words = _special[1]
+    if not words and game_data is not None:
+        words = describe.for_system(game_data, gal, s.index)
     if words:
         for line, y in zip(describe.wrap(words, DESC_WIDTHS), DESC_Y):
             text(ctx, line, 0, y, 10, cockpit.CYAN)

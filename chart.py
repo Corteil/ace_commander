@@ -44,6 +44,7 @@ class _Cursor:
         self.here = here
         self.fuel = fuel
         self.verb = verb    # what C does with a system in range: "JUMP" or "TARGET"
+        self.active = True  # the joystick moves the cursor (docked: only after C)
         self.dots = []
         self.sel = None     # the dot nearest the cursor
         self.info = None    # its galaxy.System
@@ -118,10 +119,11 @@ class _Cursor:
         ctx.rectangle(x + h, y - h, 1, 2 * h + 1).fill()
 
     def _cursor(self, ctx, gap, arm):
-        """A cross with a gap in the middle."""
+        """A cross with a gap in the middle: yellow while the joystick moves
+        it, grey while (docked) it changes tabs."""
         x = int(self.cx)
         y = int(self.cy)
-        ctx.rgb(*cockpit.YELLOW)
+        ctx.rgb(*(cockpit.YELLOW if self.active else cockpit.GREY))
         ctx.rectangle(x - gap - arm, y, arm, 1).fill()
         ctx.rectangle(x + gap + 1, y, arm, 1).fill()
         ctx.rectangle(x, y - gap - arm, 1, arm).fill()
@@ -133,21 +135,23 @@ class _Cursor:
         ctx.rectangle(x, y - arm, 1, 2 * arm + 1).fill()
 
     def _texts(self, ctx, name_y, line_y, fuel_y):
+        """The selected system and how far it is, and your range. No hints:
+        while the joystick changes tabs (docked, before C) the name has
+        arrows round it, "< LAVE >"."""
         text = cockpit.text
         s = self.sel
         if s is not None:
-            text(ctx, self.info.name, 0, name_y, 15, cockpit.WHITE)
+            name = self.info.name if self.active else "< %s >" % self.info.name
+            text(ctx, name, 0, name_y, 15, cockpit.WHITE)
             if s[2] == self.here:
                 text(ctx, "YOU ARE HERE", 0, line_y, 12, cockpit.GREEN)
             elif self.target() is not None:
-                text(ctx, "%s   C: %s" % (_ly(s[3]), self.verb), 0, line_y, 12, cockpit.GREEN)
+                text(ctx, _ly(s[3]), 0, line_y, 12, cockpit.GREEN)
             elif s[3] == 0:
                 text(ctx, "TOO CLOSE TO JUMP", 0, line_y, 12, cockpit.RED)
-            elif self.verb == "TARGET":     # docked: a far system can still be looked up
-                text(ctx, "%s  TOO FAR  C: DATA" % _ly(s[3]), 0, line_y, 11, cockpit.RED)
             else:
-                text(ctx, "%s   TOO FAR" % _ly(s[3]), 0, line_y, 12, cockpit.RED)
-        text(ctx, "FUEL %s   D: DATA" % _ly(self.fuel), 0, fuel_y, 10, cockpit.YELLOW)
+                text(ctx, "%s  TOO FAR" % _ly(s[3]), 0, line_y, 12, cockpit.RED)
+        text(ctx, "RANGE %s" % _ly(self.fuel), 0, fuel_y, 10, cockpit.YELLOW)
 
 
 class Chart(_Cursor):

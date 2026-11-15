@@ -31,6 +31,7 @@ LASERS = {
     "mining": (0.18, 15.0, 0.05),
 }
 ENERGY_UNIT = 2.0      # an energy unit makes the shields and hull recharge this much faster
+NAVY_UNIT = 3.0        # and the naval one, mission 2's reward, this much (the original's 3 against 2)
 # The rest of the equipment (phase 4). The ECM fires by itself when an enemy
 # missile comes within ECM_RANGE, destroys every enemy missile about, and
 # costs ECM_COST of the shields. The energy bomb, once, destroys every ship,
@@ -177,6 +178,17 @@ MISJUMP_ODDS = 3 / 256.0
 THARGOIDS = 4
 ALIEN_ITEMS = 16        # the good a scooped Thargon becomes (market.py's list)
 WITCH_DUST = 3          # stardust in witchspace (10 elsewhere)
+
+# The missions (missions.py; the app sets the flags from the commander). In
+# the Constrictor's system the lone bounty hunter of an encounter roll is
+# hostile whoever you are, and while the mission is on it is the Constrictor
+# instead, if there isn't one about already. Only the military laser hurts
+# the Constrictor, at a quarter of its power, and its ECM destroys your
+# missiles. Carrying mission 2's plans, each encounter tick brings a Thargoid
+# with chance PLANS_THARGOID (the original's 56 in 256).
+CONSTRICTOR = "CONSTRICTOR"
+CONSTRICTOR_LASER = 0.25
+PLANS_THARGOID = 56 / 256.0
 
 # The ships parked in a station's docking bay depend on the system: pirate
 # craft where the government is weak, traders and police where it is strong,
@@ -378,6 +390,7 @@ class Obj:
         self.dest = "station"   # a trader's: where it is making for, "station" or "planet"
         self.prey = None        # a pirate's: the trader it is after (None: you)
         self.missiles = bp.missiles
+        self.ecm = False    # an enemy ECM (the Constrictor's): destroys your missiles
         self.beam = 0.0     # > 0 while this ship's laser is drawn
         self.hit = 0.0      # > 0 while flashing from a hit
         self.dead = False
@@ -443,6 +456,13 @@ class Game:
         self.docking = "C"  # how docking works: see set_docking
         self.set_laser("pulse")
         self.energy_unit = False    # recharge ENERGY_UNIT times faster
+        self.navy = False           # the naval energy unit: NAVY_UNIT times instead
+        self.orarra = False         # in the Constrictor's system (missions.constrictor_here)
+        self.hunt = False           # and the Constrictor is there to be found
+        self.con_wait = None        # seconds outside the safe zone before it comes; None: only by the roll
+        self.con_t = 0.0            # time spent outside the safe zone towards that
+        self.plans = False          # carrying mission 2's plans: Thargoids come after you
+        self.got_constrictor = False    # set when you destroy it; the app notes it
         self.fuel_scoops = True     # without them a canister is hit, not scooped
         self.ecm = False            # fires by itself at incoming missiles
         self.pod = False            # an escape pod: being destroyed isn't the end
@@ -601,6 +621,7 @@ class Game:
         "arrive": out of hyperspace, ARRIVE_DIST from the station, with the
         planet beyond it, and in an anarchy or a feudal system as many
         pirates as can attack at once waiting (gov None: no ambush)."""
+        self.con_t = 0.0        # a new visit: the quick Constrictor's wait starts again
         bp = self.types.get(station) or self.types.get("CORIOLIS")
         r = max(4000.0, radius_km * PLANET_SCALE)
         sp = Space(bp, r, gov)
@@ -682,6 +703,26 @@ class Game:
         o.state = "attack"
         self._thargon(o)
         return o
+
+    def _make_constrictor(self, o):
+        o.role = "constrictor"
+        o.state = "attack"
+        o.ecm = True
+
+    def add_constrictor(self):
+        """The stolen Constrictor round you (a cheat, or the mission)."""
+        bp = self.types.get(CONSTRICTOR)
+        if bp is None or len(self.objs) + len(self.new) >= MAX_OBJECTS:
+            return None
+        o = self._spawn_ship(bp)
+        self._make_constrictor(o)
+        return o
+
+    def _any(self, name):
+        for o in self.objs + self.new:
+            if o.bp.name == name and not o.dead:
+                return True
+        return False
 
     def _thargon(self, parent):
         """A Thargon launched from its Thargoid mothership."""
@@ -1394,6 +1435,11 @@ class Game:
             if t is not None and not t.dead:
                 dx, dy, dz = t.x - o.x, t.y - o.y, t.z - o.z
                 dd = math.sqrt(dx * dx + dy * dy + dz * dz)
+                if t.ecm and dd < ECM_RANGE:     # its ECM destroys your missile
+                    self._boom(o.x, o.y, o.z, 8)
+                    o.dead = True
+                    self.say("ECM")
+                    return
                 if dd < t.bp.radius + 90:
                     self._boom(o.x, o.y, o.z, 8)
                     o.dead = True
@@ -1554,9 +1600,13 @@ class Game:
                     best_z = o.z
             if best is None and self.space is not None:
                 self._hit_station()
+            if best is not None and best.role == "constrictor" and self.laser != "military":
+                self._provoke(best)     # its shields shrug off anything but a military laser
+                best = None
             if best is not None:
                 self._provoke(best)
-                best.energy -= self.laser_damage
+                best.energy -= self.laser_damage * (CONSTRICTOR_LASER
+                                                    if best.role == "constrictor" else 1)
                 best.hit = 0.12
                 if best.energy <= 0:
                     self._kill(best, self.laser == "mining")
@@ -1598,6 +1648,8 @@ class Game:
         o.dead = True
         bp = o.bp
         self._boom(o.x, o.y, o.z, 8 + 2 * min(bp.explosions, 6))
+        if o.role == "constrictor":
+            self.got_constrictor = True
         if credit:
             self.bounty += bp.bounty    # tenths of a credit (the police and most traders: none)
             if o.role == "police":
@@ -1686,7 +1738,7 @@ class Game:
     def _regen(self, dt):
         self.since_hit += dt
         if self.since_hit > 3.0:
-            k = ENERGY_UNIT * dt if self.energy_unit else dt
+            k = (NAVY_UNIT if self.navy else ENERGY_UNIT) * dt if self.energy_unit else dt
             if self.shield < 100.0:
                 self.shield = min(100.0, self.shield + 4.0 * k)
             if self.hull < 100.0:
@@ -1822,6 +1874,8 @@ class Game:
             cops += 1
         if cops:
             return
+        if self.plans and random.random() < PLANS_THARGOID:
+            self.add_thargoid()     # they know you have the plans
         if hostile == 0 and self.pending == 0:
             self._roll()
 
@@ -1937,6 +1991,10 @@ class Game:
         if self.space.safe:
             self.pending = 0
             return
+        if self.hunt and self.con_wait is not None and not self._any(CONSTRICTOR):
+            self.con_t += dt
+            if self.con_t >= self.con_wait and self.add_constrictor() is not None:
+                self.con_t = 0.0
         if self.pending > 0:
             self.spawn_t -= dt
             if self.spawn_t <= 0 and count < MAX_OBJECTS:
@@ -1948,7 +2006,12 @@ class Game:
                     self.group = []
                 else:
                     self.pending -= 1
-                    if self.group_role == "hunter":
+                    if self.group_role == "constrictor":
+                        self._make_constrictor(o)
+                    elif self.group_role == "hunter" and self.orarra:
+                        o.role = "hunter"
+                        o.state = "attack"      # nasty, in the Constrictor's system
+                    elif self.group_role == "hunter":
                         o.role = "hunter"
                         # after serious offenders and fugitives; flies by the rest (TN1)
                         o.state = "attack" if self.legal >= HUNT_LEGAL else "patrol"
@@ -1976,7 +2039,10 @@ class Game:
                 return
         if random.random() < HUNTER_CHANCE:
             self.skip = 1
-            self._new_group([random.choice(HUNTERS)], "hunter")
+            if self.hunt and not self._any(CONSTRICTOR) and CONSTRICTOR in self.types:
+                self._new_group([CONSTRICTOR], "constrictor")
+            else:
+                self._new_group([random.choice(HUNTERS)], "hunter")
         else:
             n = min(random.randint(1, PACK_MOST), self.max_hostile)
             self.skip = n - 1

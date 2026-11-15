@@ -16,16 +16,22 @@ is written afresh here to behave as the original's DETOK / DETOK2 do:
     same thing. As in Ian Bell's reading of it, the carry going in is taken
     to be clear.
 
-The original also shows special sentences for a few systems during its
-missions (RUTOK); those are left out, as the missions are.
+The same tokens make the missions' texts (mission_pages) and the special
+sentences a few systems have (RUTOK, game_data.DESC_RUTOK; see missions.py
+for when they are said).
 """
 
 VOWELS = "AEIOUaeiou"
 
 
 class _Writer:
-    def __init__(self, tokens, mtin, pairs, name, s1, s2):
+    def __init__(self, tokens, mtin, pairs, name, s1, s2, cmdr="", galaxy=0):
         self.tokens = tokens
+        self.cmdr = cmdr        # the commander's name (jump 4)
+        self.galaxy = galaxy    # picks the captain's name (27) and the Constrictor's trail (28)
+        self.std = False        # printing a standard token (jump 6 to 5): in Sentence Case
+        self.pages = []         # mission texts: (text, shows the ship) for each screen
+        self.ship = False
         self.mtin = mtin
         self.pairs = pairs
         self.name = name[:1].upper() + name[1:].lower()
@@ -60,7 +66,10 @@ class _Writer:
     def letter(self, c):
         """A letter or symbol from a token, in the right case (DTS)."""
         if "A" <= c <= "Z":
-            if self.lower or (self.sentence and self.in_word):
+            if self.std:
+                if self.in_word:
+                    c = c.lower()
+            elif self.lower or (self.sentence and self.in_word):
                 c = c.lower()
             if self.cap:
                 c = c.upper()
@@ -121,6 +130,27 @@ class _Writer:
                         self.letter(c)
         elif j == 19:           # a capital for the next letter only
             self.cap = True
+        elif j == 4:            # the commander's name
+            for c in self.cmdr:
+                self.char(c)
+        elif j == 5 or j == 6:  # back to extended tokens / a standard token
+            self.std = j == 6
+        elif j == 8:            # tab: a new word
+            self.in_word = False
+        elif j == 12:           # carriage return: a new paragraph
+            self.char("\n")
+        elif j == 23 or j == 29:    # white, lower case (MT13)
+            self.lower = True
+            self.sentence = True
+        elif j == 9 or j == 24 or j == 25:  # clear screen, wait for a key, incoming message
+            self.page()
+        elif j == 22:           # the ship, and wait for a key
+            self.ship = True
+            self.page()
+        elif j == 27:           # the captain's name, one for each of the first three galaxies
+            self.token(217 + min(self.galaxy, 2), depth + 1)
+        elif j == 28:           # where the Constrictor was last seen
+            self.token(220 + min(self.galaxy, 1), depth + 1)
         # the rest (justify, left align, new line, ...) don't change the words
 
     def text(self):
@@ -128,6 +158,16 @@ class _Writer:
         while "  " in s:
             s = s.replace("  ", " ")
         return s
+
+    def page(self):
+        """End the screen so far, if anything is on it."""
+        paras = [p.strip() for p in self.text().split("\n")]
+        while paras and not paras[-1]:
+            paras.pop()
+        if paras:
+            self.pages.append(("\n".join(paras), self.ship))
+        self.out = []
+        self.ship = False
 
 
 def describe(game_data, system, seeds):
@@ -140,6 +180,33 @@ def describe(game_data, system, seeds):
                 seeds[1], seeds[2])
     w.token(5)
     return w.text()
+
+
+def special(game_data, n, name):
+    """Special system sentence n (RUTOK) for a system called name."""
+    rutok = getattr(game_data, "DESC_RUTOK", None)
+    if not rutok or n >= len(rutok):
+        return None
+    w = _Writer(game_data.DESC_TOKENS, game_data.DESC_MTIN, game_data.DESC_PAIRS, name, 0, 0)
+    w.lower = w.sentence = True     # PDESC prints it as token 176 does: lower case,
+    w.cap = True                    # a capital to start
+    for b in rutok[n]:
+        w.byte(b, 0)
+    t = w.text()
+    return t + "." if t and t[-1] not in ".!?" else t
+
+
+def mission_pages(game_data, n, cmdr, galaxy):
+    """Mission text n (an extended token, see missions.py) as a list of
+    screens: (text with paragraphs split by newlines, shows the ship).
+    cmdr: the commander's name; galaxy: 0 for the first."""
+    tokens = getattr(game_data, "DESC_TOKENS", None)
+    if not tokens or n not in tokens:
+        return []
+    w = _Writer(tokens, game_data.DESC_MTIN, game_data.DESC_PAIRS, "", 0, 0, cmdr, galaxy)
+    w.token(n)
+    w.page()
+    return w.pages
 
 
 _cache = [None, None]   # the last (galaxy, index) described, and its sentence

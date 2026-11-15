@@ -54,8 +54,8 @@ print("hit flash on LEDs, fading", seen, ": ok")
 g._hurt(10.0); tick(a); assert leds.values[5] == (255, 0, 0)
 tick(a, fresh=["A"]); tick(a)                       # paused
 assert a.paused and leds.values == RED12(0)
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])  # PAUSE MENU
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["CONFIRM"])  # QUIT TO TITLE
+tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["JOYDOWN"])
+tick(a, fresh=["CONFIRM"])                              # QUIT TO TITLE
 assert a.mode == "menu" and bus.events == ["PatternDisable", "PatternEnable"]
 tick(a); tick(a)
 assert bus.events == ["PatternDisable", "PatternEnable"]
@@ -166,6 +166,93 @@ bs.choose(a, "COMBAT PRACTICE"); tick(a)
 a.game._hurt(5.0); tick(a)
 assert bus.events == [] and leds.writes == 0 and arcs(a) == 1
 print("USE_LEDS = False keeps the ring: ok")
+
+# ---- the title screen's OPTIONS page -----------------------------------------
+bs.install()
+leds, bus = bs.install_leds()
+import ace_commander
+mod = ace_commander.ace
+save = os.path.join(HERE, "shots", "test_options.json")
+if os.path.exists(save):
+    os.remove(save)
+mod.SAVE_PATH = save
+a = ace_commander.AceCommander()
+assert "OPTIONS" in a.choices()
+bs.choose(a, "OPTIONS"); assert a.mode == "options"
+c = CountCtx(); a.draw(c)
+tx = [t[0] for t in c.texts]
+assert "OPTIONS" in tx and "STEER: JOYSTICK" in tx and "LEDS: ON" in tx
+assert "more with a commander" in tx, "no commander: no docking or Constrictor"
+for s_, (x, y), size in c.texts:
+    assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5, (s_, y)
+tick(a, fresh=["JOYRIGHT"]); assert a.use_tilt, "right changes the steering"
+tick(a, fresh=["JOYDOWN"]); assert a.omenu == 1
+tick(a, fresh=["C"]); assert not a.use_leds
+tick(a, fresh=["F"]); assert a.mode == "menu"
+# kept for next time
+b = ace_commander.AceCommander()
+assert b.use_tilt and not b.use_leds
+bs.choose(b, "COMBAT PRACTICE"); tick(b)
+b.game._hurt(5.0); tick(b)
+assert leds.writes == 0 and arcs(b) == 1, "LEDS: OFF keeps the ring on screen"
+# with a commander: docking style and the Constrictor too, saved in the commander
+b.mode = "menu"
+bs.choose(b, "NEW COMMANDER"); tick(b, fresh=["C"])
+b.dock.go(0); tick(b, fresh=["F"])
+bs.choose(b, "OPTIONS")
+items = b._settings(True)
+assert items[1].startswith("DOCKING") and items[2] == "CONSTRICTOR: 2 MIN", items
+b.omenu = 1; tick(b, fresh=["JOYLEFT"])
+assert b.cmdr.docking == "A"
+b.omenu = 2; tick(b, fresh=["C"])
+assert not b.cmdr.quick_con
+from ace_commander import commander as cm
+d = cm.load(save); assert d.docking == "A" and d.quick_con is False
+# Options > DEBUG away from a flight: only the cheats that work there, in groups
+assert b._settings(True)[-1] == "DEBUG"
+b.omenu = len(b._settings(True)) - 1; tick(b, fresh=["C"])
+assert b.mode == "odebug" and b._od_items() == ["SHIP", "COMMANDER", "DISPLAY"]
+c = CountCtx(); b.draw(c); assert any(t[0].startswith("DEBUG - BUILD") for t in c.texts)
+b.od_sel = 1; tick(b, fresh=["C"])
+assert b._od_items() == ["+10 KILLS", "+1000 CR", "LEVEL: " + cm.LEVELS[b.cmdr.level],
+                         "LEGAL: CLEAN", "MISSION: NONE"], b._od_items()
+cash = b.cmdr.cash
+b.od_sel = 1; tick(b, fresh=["C"])
+assert b.cmdr.cash == cash + 10000 and cm.load(save).cash == cash + 10000, "saved at once"
+assert b.od_msg == b.cmdr.cash_text()
+b.od_sel = 4; tick(b, fresh=["C"]); assert b.cmdr.mission == 1 and cm.load(save).mission == 1
+tick(b, fresh=["F"]); assert b.od_page is None
+b.od_sel = 0; tick(b, fresh=["C"]); assert b.od_page == "SHIP", "straight to the equipment"
+items = b._od_items()
+b.od_sel = items.index("NAVY ENERGY UNIT: OFF"); tick(b, fresh=["C"])
+assert "navy" in b.cmdr.extras and "navy" in cm.load(save).extras
+tick(b, fresh=["F"]); assert b.od_page is None
+tick(b, fresh=["F"]); assert b.mode == "options", "back where it came from"
+# and from the docked Options tab, back to it; REPAIR SHOP comes at once
+tick(b, fresh=["F"]); bs.choose(b, "CONTINUE"); assert b.mode == "docked"
+assert "REPAIR SHOP" not in b.dock.tabs
+b.dock.open("OPTIONS"); b.dock.osel = len(b._settings(True)) - 1
+tick(b, fresh=["C"]); assert b.mode == "odebug" and b.od_from == "docked"
+b.od_sel = b._od_items().index("DISPLAY"); tick(b, fresh=["C"])
+b.od_sel = [i for i, t in enumerate(b._od_items()) if t.startswith("REPAIR")][0]
+tick(b, fresh=["C"]); assert b.repair_shop and "REPAIR SHOP" in b.dock.tabs
+tick(b, fresh=["F"]); tick(b, fresh=["F"]); assert b.mode == "docked" and b.dock.name() == "OPTIONS"
+b.repair_shop = False
+b.dock.go(0); tick(b, fresh=["F"]); bs.choose(b, "OPTIONS")
+# no commander: just DISPLAY
+n_ = ace_commander.AceCommander(); n_.cmdr = None
+assert n_._cheat_groups(False) == ["DISPLAY"]
+# the in-flight Settings page has the same lines
+tick(b, fresh=["F"]); bs.choose(b, "CONTINUE")
+b.dock.go(0); tick(b, fresh=["C"])
+for _ in range(200):
+    tick(b)
+    if b.mode == "flight":
+        break
+tick(b, fresh=["A"]); b.fsub = "settings"
+assert b._fitems() == b._settings(True)
+os.remove(save)
+print("OPTIONS page: steering, LEDs, docking, Constrictor; saved: ok")
 
 # ---- firmware without the LED modules --------------------------------------
 bs.install()

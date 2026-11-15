@@ -18,7 +18,7 @@ labels = [t[0] for t in c.texts]
 assert labels == ["< NEW COMMANDER >"], labels
 for s, (x, y), size in c.texts:
     assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5, (s, y)
-tick(a, fresh=["UP"]); assert a.menu == 3, "back from the first choice wraps to the last"
+tick(a, fresh=["UP"]); assert a.menu == 4, "back from the first choice wraps to the last"
 assert a.choices()[a.menu] == "SPEED TEST"
 out = io.StringIO()
 with contextlib.redirect_stdout(out):

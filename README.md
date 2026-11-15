@@ -7,12 +7,17 @@ custom firmware.
 The title screen, with a ship tumbling under the name, offers:
 
 - **New commander** / **Continue** - fight waves of pirates, shoot rocks and scoop cargo as
-  a saved commander. Your kills count towards a rank, from Harmless up to Elite. A new commander picks
+  a saved commander. Your kills count towards a rank, from Harmless up to Elite (with Ace, our own, just
+  before it). A new commander picks
   one of three levels, which sets how many kills each rank takes and how tough the enemies
   are, and can't be changed afterwards. There is a single save slot; it is saved in
   `commander.json` in the same folder as the app each time you dock, and only then, as in the original.
 - **Combat practice** - combat training that does not affect your single-player game.
 - **Ship viewer** - view the 3D assets of the game.
+- **Options** - steering (joystick or tilt) and the badge's LEDs, kept in `options.json`
+  next to the app; with a commander also the docking style and how soon mission 1's
+  Constrictor turns up, kept in the commander's save. The same as the in-flight Settings
+  and the docked Options tab.
 - **Speed test** - times kinds of drawing on the badge.
 
 Joystick left / right changes the choice, C selects it and F leaves the app.
@@ -41,14 +46,18 @@ Written for the 2026 Spaceagon: use the joystick to steer and the buttons are fo
 
 In the in-flight menu the joystick moves up and down, C selects, F goes back and A
 resumes. It has the **Local chart** (see [Hyperspace](#hyperspace)), **Status** (your
-commander's rank, kills, star system and fuel) and a **Pause menu**, where you switch
-steering between JOYSTICK and TILT or quit to the title screen.
+commander's rank, kills, star system and fuel), **Settings** (steering JOYSTICK or TILT,
+the docking style, and how soon mission 1's Constrictor turns up; joystick left / right or
+C changes one) and **Quit to title**.
 
-The menu also has a **Debug** page of cheats for testing: invincibility, kill all enemies,
-next wave, add an enemy, refill missiles, refill fuel, +10 kills, to the station (moves
-the station 4000 units ahead of you) and dock now. Its title
-shows the build number, read from `metadata.json`. Kills made there count towards your
-commander's rank. Set `DEBUG_MENU = False` in `ace.py` to hide it.
+Settings ends with **Debug**, cheats for testing in five groups: Ship (invincibility, ship
+config, refills), Spawn (add ships of each kind, release a canister, kill all enemies),
+Travel (to the station, to the sun, dock now, mis-jump next, to the mission system),
+Commander (+10 kills, +1000 Cr, level, legal status, anger the station, mission stage) and
+Display (frame time, Repair Shop). Its title shows the build number, read from
+`metadata.json`. Kills made there count towards your commander's rank. The Options page
+and the docked Options tab have Debug too, with the cheats that work away from a flight.
+Set `DEBUG_MENU = False` in `ace.py` to hide it.
 
 With TILT, tilting the badge steers and the joystick still works. D then does two jobs: a
 tap re-zeroes the tilt and holding it for about half a second fires the missile
@@ -75,9 +84,10 @@ While docked there are four screens; the small squares at the top show which one
 - **System data** - government, economy, tech level, population, productivity and size
   of the target system (or of where you are, with no target).
 
-Joystick left / right changes screen. On the two charts the joystick moves the cursor
-instead, and E / B change screen. On a chart, C makes the selected system your hyperspace
-target and shows its data; C on your own system clears the target. A launches from any
+Joystick left / right changes screen, and so do E / B. On the two charts, C hands the
+joystick to the cursor and F hands it back; with the cursor, C makes the selected system
+your hyperspace target and shows its data (C on your own system clears the target), and
+D shows a system's data without targeting it. A launches from any
 screen, and F goes back to Status, then to the title screen.
 
 Launching flies you out along the station's hexagonal tunnel (about 2.5 seconds; C skips
@@ -143,6 +153,24 @@ Combat practice has no star system: just the endless waves of ships.
 
 Distances and times are constants near the top of `game.py` (`ARRIVE_DIST`, `SAFE_DIST`,
 `JUMP_K`, `ENCOUNTER` and the rest).
+
+## Missions
+
+The disc version's two missions are in, as the original runs them. Once your kill count
+is high enough, docking in the first or second galaxy brings an incoming message from
+Her Majesty's Space Navy: a prototype ship, the Constrictor, has been stolen. While you
+hunt it, the stations along its trail tell you where it went (on System data, docked).
+It turns up at Orarra, in the second galaxy, after two minutes outside the
+station's safe zone (or, with CONSTRICTOR: ORIGINAL in the in-flight Settings, as rarely as in
+the original). Only a military laser gets through its shields, and it has an ECM. Destroy it and dock
+for your reward. Later, with more kills, in the third galaxy, the Navy has a second job
+for you, and the Thargoids will not like it. The texts are read from your own copy of
+the Elite source into `game_data.py`, like the system descriptions. The missions call you
+by the name set in the badge's settings, or Jameson if none is set. On a message, the
+joystick scrolls the text, C pages down (and at the end goes on) and F skips it.
+
+The Debug cheats can move you through them: MISSION (the next stage; docking then starts
+the next mission), TO MISSION SYSTEM and ADD THE CONSTRICTOR; SHIP CONFIG has NAVY ENERGY UNIT.
 
 ## The screen
 
@@ -227,6 +255,8 @@ the two faces it sits between points back at the viewer.
 - `galaxy.py` - works out the 256 star systems from three seed numbers. No badge imports.
 - `chart.py` - the local and galactic charts.
 - `docked.py` - the docked screens.
+- `missions.py` - the two missions' rules. No badge imports.
+- `briefing.py` - the incoming messages that start and end them.
 - `game.py` - the flight game's rules, with no badge imports so it can be tested on a PC.
 - `cockpit.py` - draws the flight view, radar and gauges.
 - `viewer.py` - the ship viewer.
@@ -245,7 +275,7 @@ the two faces it sits between points back at the viewer.
 ## Install
 
 Copy `__init__.py app.py letters.py ace.py game.py cockpit.py viewer.py bench.py title.py commander.py
-galaxy.py chart.py docked.py market.py equipment.py describe.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
+galaxy.py chart.py docked.py market.py equipment.py describe.py missions.py briefing.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
 then restart it. On Windows, `deploy.bat all` does this.
 
 ## Credits and original material

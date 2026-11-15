@@ -1,5 +1,6 @@
 """Stand-ins for the badge firmware, for running the app on a PC."""
 import math
+import os
 import sys
 import types
 
@@ -167,6 +168,13 @@ def install(imu=True, keyboard=True, joystick=True):
             del sys.modules[name]
     bus = Bus()
     _down = set()
+    # the Options page's saved choices: each fresh start begins without them
+    here = os.path.dirname(os.path.abspath(__file__))
+    for d in (os.path.join(here, "shots"), os.path.dirname(here)):
+        try:
+            os.remove(os.path.join(d, "options.json"))
+        except OSError:
+            pass
     app = types.ModuleType("app")
     app.App = App
     inp = types.ModuleType("events.input")

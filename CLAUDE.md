@@ -18,8 +18,8 @@ fuel, docked screens as tabs, launch tunnel), and the start of phase 3 (build 26
 sun, station, compass, jump drive, automatic docking; build 27: docking by hand; build
 30: the market; 31: scooped cargo; 32: bounties, which finishes phase 3), and the start
 of phase 4 (build 33: the Equip ship screen; build 36: every item's effect). Not built
-yet: the disc version's two missions and the rest of phase 6 (see `DESIGN.md`). Phases 4
-and 5 are done, and the system description sentence (build 52).
+yet: the rest of phase 6 (see `DESIGN.md`). Phases 4 and 5 are done, the system
+description sentence (build 52) and the disc version's two missions (build 54).
 
 ## Files
 
@@ -46,7 +46,10 @@ and 5 are done, and the system description sentence (build 52).
 - `market.py` - market prices, stock, buying and selling. Rules only, no badge imports.
 - `equipment.py` - the Equip ship screen's rules: what is on sale, prices, fitting.
 - `describe.py` - the system description sentence ("goat soup"): the original's extended
-  tokens from `game_data.py`, put together as DETOK does. Rules only.
+  tokens from `game_data.py`, put together as DETOK does; also the mission texts and the
+  special system sentences. Rules only.
+- `missions.py` - the disc version's two missions (Constrictor, Thargoid plans). Rules only.
+- `briefing.py` - INCOMING MESSAGE and the mission texts, a screen at a time, on docking.
 - `ship_data.py`, `game_data.py` - generated, **gitignored** (see Licensing). 31 ships; the
   galaxy's seeds, name letter pairs, starting place, the market's 17 goods and the 14
   equipment prices. Both must be copied to the badge.
@@ -646,6 +649,103 @@ of a real flight, not from a harness.
    **Build 53 (Brian):** D on the System data tab goes back to the chart tab you came from
    (`Docked.chart_tab`, the last chart opened; the local chart if none), with the cursor on
    the system you were looking at (`Docked.go(tab, sel)`, `back_to_chart`).
+   **Build 54: the disc version's two missions** (2026-11-15), as DOENTRY, BRIEF,
+   DEBRIEF, BRIEF2, BRIEF3, DEBRIEF2, THERE, PDESC and the spawning code read from the disc
+   source. `Commander.mission` is the original's TP byte (saved as "mission"); the rules
+   are in `missions.py`, checked on every docking (`ace._mission_news`, after `_dock`
+   saves; it saves again if a mission moves on). Mission 1: docked in galaxy 1 or 2 with
+   256 kills (`KILLS_1`, divided by the level's `RANK_DIVISOR` like the ranks: EASY 51,
+   NORMAL 128, HARD 256) starts it; at Orarra (galaxy 2, 144,33) the encounter roll's lone
+   bounty hunter (`Game._roll`, `Game.hunt`) is the Constrictor (`role` "constrictor",
+   `Obj.ecm`) if none is about, and every lone hunter there attacks (`Game.orarra`). Only
+   the military laser hurts it, at `CONSTRICTOR_LASER` (1/4); its ECM destroys your
+   missiles within `ECM_RANGE`; the energy bomb kills it, as in the original. Killing it
+   sets `Game.got_constrictor`, which `_bank` turns into TP bit 1; the next docking
+   anywhere pays 5000 Cr and 256 kills (scaled). Mission 2: mission 1 done, galaxy 3,
+   1280 kills: go to Ceerdi (215,84), get the plans, take them to Birera (63,72); with the
+   plans (`Game.plans`) each encounter tick brings a Thargoid with chance
+   `PLANS_THARGOID` (56/256). Reward: 256 kills and the naval energy unit
+   (`extras` "navy", replacing "energy"; `NAVY_UNIT` 3x recharge against 2x;
+   `equipment.have` counts it as an energy unit). Orarra is a democracy, so the hunter
+   turns up rarely (as in the original): about 2% of the 20 s ticks.
+   Texts: `import_galaxy.py` also reads tokens 10, 11, 15, 216-223 and what they reach,
+   the two standard tokens they print (TOKN 117, 108, from the comments in
+   `elite-text-tokens.asm`), RUTOK and RUPLA / RUGAL into `DESC_TOKENS`, `DESC_RUTOK`,
+   `DESC_RU` (game_data.py 11.9 KB). `describe.mission_pages` handles the extra jump codes
+   (4 name, 5/6 standard token in Sentence Case, 8, 9/22/24/25 screen breaks, 12
+   paragraph, 23/29 lower case, 27 captain, 28 the Constrictor's trail) and gives screens
+   of paragraphs; `briefing.Briefing` shows INCOMING MESSAGE 2 s, then lays them out for
+   the round screen (`briefing.layout`, `_width`), the Constrictor turning above mission
+   1's briefing; C next, F skip (mode "brief"). The commander's name is the badge's
+   Name setting (`settings.get("name")`), else "Jameson" (`ace.DEFAULT_NAME`). The special
+   sentences show on the docked System data tab for the system you are at
+   (`system_page(..., cmdr)`): Teorge, Arredi, Anreer always, the rest only while
+   mission 1 is under way. Words come out as the source prints them in lower case
+   (e.g. "looked bound for arexe"): DTS capitalises only after {single cap}.
+   DEBUG: ADD THE CONSTRICTOR, MISSION: stage (the next of `missions.STAGES`, raising
+   kills to what the next mission needs; written into the save), TO MISSION SYSTEM
+   (to the stage's galaxy and system, arriving as from hyperspace). On the badge (REPL):
+   making a briefing 40-190 ms, a special sentence 13 ms. Tests: `tests/test_missions.py`.
+   Not yet played by hand.
+   Then (Brian: text too small to read; then "use the joystick to scroll the text"): the
+   message is one column of size 13 text (`briefing.SIZE`, was 10), `WIDTH` 22 characters
+   a line so every line fits anywhere in the view (`VIEW_TOP` / `VIEW_BOTTOM`, +-66),
+   with the original's screens run together (`PAGE_GAP`). Joystick up / down (held)
+   scrolls at `SCROLL_SPEED` (only the joystick on the new front board, not A / D); C
+   pages down and at the end goes on; F skips. Grey bars show more above / below. The
+   Constrictor sits at the top of mission 1's column and goes once scrolled near the top.
+   Then (Brian): the Constrictor turns up after `missions.QUICK_WAIT` (120 s) outside
+   Orarra's safe zone while you hunt it (`Game.con_wait`, `con_t`, reset on entering a
+   system; one at a time; the original's roll still applies too). Settings page:
+   CONSTRICTOR: 2 MIN / ORIGINAL (`Commander.quick_con`, saved,
+   default 2 MIN; ORIGINAL leaves only the roll). SHIP CONFIG (DEBUG) has NAVY ENERGY
+   UNIT: ON / OFF, which takes the place of the usual unit (and ENERGY UNIT the reverse).
+   Then (Brian): the in-flight PAUSE MENU is now SETTINGS (`fsub` "settings"): STEER,
+   and with a commander DOCKING and CONSTRICTOR (always shown). QUIT TO TITLE moved to the
+   top in-flight menu, after SETTINGS.
+   Then (Brian: "add an option screen"): OPTIONS on the title screen (mode "options",
+   `_update_options`, `_draw_options`, `omenu`) shows the same lines as the in-flight
+   Settings, from one list (`_settings(cmdr)`, changed by `_change(item, left)`): STEER,
+   with a commander DOCKING and CONSTRICTOR (written into the save), and LEDS: ON / OFF
+   (`use_leds`, replacing the fixed `USE_LEDS`, which is now only the default). Steering
+   and LEDs are kept in `options.json` beside the save (`options_path()`, gitignored);
+   the test stubs delete it on each `install()`.
+   Then (Brian): an OPTIONS docked tab too, the last (`docked.TABS`; `Docked(...,
+   options=(items function, change function))`, given `_settings(True)` and `_change` by
+   `_dock`; also with no game_data, after Status). Joystick up / down picks, C changes
+   (left / right still change tab, so DOCKING only goes forward there).
+   Then (Brian, option 2): DEBUG is a sub-menu of Settings / Options, no longer on the
+   top in-flight menu, in groups (`DEBUG_GROUPS`: SHIP, SPAWN, TRAVEL, COMMANDER,
+   DISPLAY). In flight: Settings > DEBUG (fsub "debug", the groups, title with the build)
+   > a group (fsub "dgroup", `dgroup`) > a cheat (`_debug` as before); SHIP CONFIG (fsub
+   "ship") goes back to the SHIP group; F goes back a level each time. Practice drops
+   `CAREER_ONLY`; a commander's flight drops NEXT WAVE. Away from a flight (title
+   Options, docked Options tab): mode "odebug" (`od_from`, `od_page`, `od_sel`), only
+   `OFF_FLIGHT` cheats (SHIP CONFIG, +10 KILLS, +1000 CR, LEVEL, LEGAL, MISSION, FRAME
+   TIME, REPAIR SHOP; the last two without a commander), each written into the save at
+   once (`_write_setting`); SHIP CONFIG there works on the commander (`_ship_items_c`,
+   `_ship_config_c`); REPAIR SHOP from the docked tab adds or removes the tab at once
+   (`_make_dock`). Lists of at most `DEBUG_ROWS` are drawn in order (`_draw_list`). The
+   in-flight Settings page no longer shows the frame / rules / world / hud timings.
+   Tests reach a cheat with `mod.cheat_group(line)`.
+   Then (Brian): a rank ACE (4000 kills in the original's count, so EASY 800, NORMAL 2000,
+   HARD 4000) between DEADLY and ELITE (`commander.RANKS`; not in the original). The
+   loading screen's LOADING flashes, on and off at each redraw (`app.AceCommander.shown`;
+   redraws come between imports, about 0.4 s apart). Docked charts: the joystick changes
+   tab as on every tab (E / B too); C hands it to the cursor (`Docked.use_cursor`,
+   `Docked.cursor`, `Chart.active`), then C picks a target and F hands it back; D shows a
+   system's data either way; D back from System data returns with the cursor on. The
+   hints: "C: MOVE CURSOR" / "< >   D: DATA", then "D: DATA  F: DONE" (the in-flight
+   chart keeps "FUEL ... D: DATA").
+   Then (Brian): no hint lines on the in-flight menu pages (PAUSED, SETTINGS, DEBUG);
+   DEBUG is on the top in-flight menu again as well as at the end of Settings (F goes
+   back to wherever it was opened from, `debug_from`). The SHIP group is SHIP CONFIG
+   itself: its cheats (INVINCIBLE, REFILL MISSILES, REFILL FUEL, FUEL TO 1/4) then the
+   equipment switches (`_is_cheat`); away from a flight SHIP opens the commander's
+   equipment directly. The charts (docked and in flight) have no hints either: the
+   distance ("3.6 LY", "... TOO FAR", "YOU ARE HERE") and "RANGE 7.0 LY"; while the
+   joystick changes tabs the name is "< LAVE >" and the cursor grey, with the cursor
+   yellow and the name plain once C hands it over (`Chart.active`).
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -656,7 +756,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 53), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 54), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
@@ -699,7 +799,7 @@ and launching and no errors in the log.
 ## Controls (Brian's choices)
 
 Joystick steers by default. C or joystick press fires, D missile, B energy bomb (not built
-yet, says so), F/E speed up/down, A in-flight menu (status, and a pause menu with steering
+yet, says so), F/E speed up/down, A in-flight menu (status, settings with steering
 and quit). Docked, on the market: joystick up / down picks a good, C buys, D sells (held
 buttons repeat); on Equip ship: joystick picks an item, C buys. In tilt steering a tap on D re-zeroes and a hold fires the missile. Hostile ships red on the radar. Hit flash on the LEDs, not a ring
 on screen. Enemy lasers run from the ship's gun to the bottom of the screen (the cockpit).
