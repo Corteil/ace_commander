@@ -890,6 +890,18 @@ of a real flight, not from a harness.
    Brian chose to keep mission 2's Vorn as the original: no ambush on arrival, only the
    in-flight encounter ticks (PLANS_THARGOID) while carrying the plans. Not on the badge
    yet (he said no for now).
+   Then (Brian: mission 2 good; the jump effect should flash the LEDs white where its
+   particles leave the screen): `ace._jump_flashes` lights the ring LED nearest where
+   each hyperspace streak (`cockpit._STREAKS`, while `Game.warp`) or, with the jump drive
+   on, each stardust speck crosses the screen's edge (`EDGE_IN` to `EDGE_OUT` px from the
+   middle), white, fading at `JUMP_FADE`; per-LED writes (`_leds_each`), below the bomb,
+   ECM, hit and laser flashes; hyperspace flashes are blue-white (`HYPER_RGB`, Brian: more
+   blue), the jump drive's white (`DUST_RGB`). `_led_at` maps a screen direction to LED 1-12 with
+   `LED_ANGLE1` (LED 1's angle, anticlockwise from 3 o'clock) and `LED_CLOCKWISE`: the
+   firmware doesn't say where the LEDs are. Checked on the badge (LEDs 1, 2, 3 lit red,
+   green, blue; Brian saw them at 0:10, 2:00 and 2:50 on a clock face): clockwise, and a
+   30-degree fit puts LED 1 at 20 degrees past 12, so LED_ANGLE1 = 70; each reading is
+   within 15 degrees (half a step) of the fit. The spacing may be uneven (pairs).
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
