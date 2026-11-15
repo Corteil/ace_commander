@@ -178,7 +178,7 @@ frame's time went.
 
 ## Tuning
 
-Near the top of `app.py`:
+Near the top of `ace.py`:
 
 - `TILT_PITCH_SIGN`, `TILT_ROLL_SIGN`, `TILT_SWAP_AXES` if tilting goes the wrong way.
 - `INVERT_PITCH = True` if you want joystick up to dive, flight-stick style.
@@ -219,7 +219,8 @@ the two faces it sits between points back at the viewer.
 
 ## Files
 
-- `app.py` - moves between the screens; input (tilt, buttons, keyboard); in-flight menu.
+- `app.py` - the loading screen the badge starts first; it loads the rest, then runs `ace.py`.
+- `ace.py` - moves between the screens; input (tilt, buttons, keyboard); in-flight menu.
 - `title.py` - the title screen: block-letter name, tumbling ship, one-line menu.
 - `commander.py` - the saved commander: level, kills, rank, star system, fuel. No badge
   imports.
@@ -243,7 +244,7 @@ the two faces it sits between points back at the viewer.
 
 ## Install
 
-Copy `__init__.py app.py game.py cockpit.py viewer.py bench.py title.py commander.py
+Copy `__init__.py app.py ace.py game.py cockpit.py viewer.py bench.py title.py commander.py
 galaxy.py chart.py docked.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
 then restart it. On Windows, `deploy.bat all` does this.
 
