@@ -486,6 +486,11 @@ of a real flight, not from a harness.
    is set, fire is ignored until C (and F / SPACE on a keyboard) is let go.
    Copying to the badge: twice on 2026-11-15 the badge rebooted part-way through copying
    `app.py`; `mpremote connect PORT resume fs cp ...` (no soft reset first) then worked.
+   **Build 40 (Brian):** your ship is shown in the launch and docking tunnels, seen from
+   behind: `Tunnel.fly(bp)` (set in `app._pick_tunnel`, a Cobra Mk III if it fits the slot)
+   and `cockpit._draw_me`, `ME_AHEAD` (2.0) tunnel units ahead of the view, `ME_LOW` below
+   the slot's middle, cyan, filled black inside. Docking ends with it in the bay between the
+   parked ships. At 1.4 ahead it looked wider than the tunnel further on.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -496,7 +501,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 39), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 40), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

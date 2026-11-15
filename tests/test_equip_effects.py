@@ -352,4 +352,16 @@ for _ in range(5):
     tick(e, held=["C"])
 assert not e.paused and g.beam <= 0, "nor from the C that chose RESUME"
 print("build 39: held C after a menu or launch doesn't fire: ok")
+
+# ---- build 40: your ship in the tunnel scenes --------------------------------
+e = ace_commander.AceCommander()
+choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
+e.dock.go(0); tick(e, fresh=["C"])
+assert e.mode == "launch" and e.tunnel.me is not None and e.tunnel.me.bp.name == "COBRA MK III"
+for f in (0.0, 0.5, 0.99):
+    e.launch_t = f * mod.LAUNCH_TIME
+    cx = CountCtx(); e.draw(cx)
+    assert e.tunnel.me.z > 0 and e.tunnel.me.x == 0.0
+e._pick_tunnel(); assert e.tunnel.me is not None, "docking too"
+print("build 40: your ship flies through the tunnel: ok")
 print("ALL EQUIPMENT EFFECT TESTS PASSED")

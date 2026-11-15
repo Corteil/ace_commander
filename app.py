@@ -858,6 +858,7 @@ class AceCommander(app.App):
         else:
             types = {e[0]: game.Blueprint(e) for e in SHIPS} if SHIPS else {}
         if types:
+            self.tunnel.fly(types.get("COBRA MK III"))      # your ship, seen from behind
             self.tunnel.park([types[n] for n in game.parked_ships(gov, tech) if n in types],
                              random)
 
