@@ -124,6 +124,12 @@ class Galaxy:
         a = self.all
         return System(index % SIZE, (a[i], a[i + 1], a[i + 2]), self.pairs)
 
+    def system_seeds(self, index):
+        """System index's three seeds (s0, s1, s2)."""
+        i = 3 * (index % SIZE)
+        a = self.all
+        return a[i], a[i + 1], a[i + 2]
+
     def distance(self, a, b):
         """Between systems a and b, in tenths of a light year. The chart is
         twice as wide as it is tall, so up and down counts half."""

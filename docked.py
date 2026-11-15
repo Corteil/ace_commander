@@ -7,7 +7,11 @@ either to keep going). On Equip ship the joystick picks an item and C buys
 it. On the two charts C makes the selected system the hyperspace target;
 once launched, the in-flight menu offers a jump to it.
 """
-from . import chart, cockpit, commander, equipment, market
+from . import chart, cockpit, commander, describe, equipment, market
+try:        # the description sentence's tables, made by tools/import_galaxy.py
+    from . import game_data
+except Exception:
+    game_data = None
 
 TABS = ("STATUS", "MARKET", "EQUIP SHIP", "REPAIR SHOP", "LOCAL CHART", "GALACTIC CHART",
         "SYSTEM DATA")
@@ -216,30 +220,20 @@ class Docked:
         else:
             text(ctx, "F: title screen", 0, 88, 11, cockpit.GREY)
 
+    def show(self, index):
+        """D on a chart: open System data for system index, leaving the
+        target as it is."""
+        if index is None:
+            return
+        self.open("SYSTEM DATA")
+        self.data = self.gal.system(index)
+
     def _draw_data(self, ctx):
         """Everything about one star system."""
-        text = cockpit.text
-        s = self.data
         c = self.cmdr
-        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "SYSTEM DATA", 0, -100, 11, cockpit.GREY)
-        text(ctx, s.name, 0, -80, 22, cockpit.WHITE)
-        if s.index == c.system:
-            text(ctx, "you are here", 0, -60, 11, cockpit.GREEN)
-        else:
-            d = self.gal.distance(c.system, s.index)
-            text(ctx, "%s away%s" % (_ly(d), "" if 0 < d <= c.fuel else ", too far"),
-                 0, -60, 11, cockpit.GREEN if 0 < d <= c.fuel else cockpit.RED)
-        ctx.rgb(*cockpit.DIM).rectangle(-90, -50, 180, 1).fill()
-        text(ctx, s.government_name(), 0, -36, 12, cockpit.station_colour(s.government))
-        y = -20
-        for line in (s.economy_name(), "Tech level %d" % s.tech,
-                     "Population %d.%d billion" % (s.population // 10, s.population % 10),
-                     "Productivity %d M Cr" % s.productivity,
-                     "Radius %d km" % s.radius):
-            text(ctx, line, 0, y, 12, cockpit.YELLOW)
-            y += 16
-        text(ctx, "< > screens   F: status", 0, 68, 11, cockpit.GREY)
+        s = self.data
+        d = None if s.index == c.system else self.gal.distance(c.system, s.index)
+        system_page(ctx, self.gal, s, d, c.fuel, "< > screens   F: status")
 
     def _draw_market(self, ctx):
         """The goods, ROWS at a time: name, price, stock and what is in the hold."""
@@ -361,3 +355,39 @@ class _Show:
         self.bp = bp
         self.x = self.y = self.z = 0.0
         self.m = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+
+
+# where the description's lines go, and how many characters fit on each (the
+# screen is round, so lower lines are shorter)
+DESC_Y = (24, 36, 48, 60, 72)
+DESC_WIDTHS = (38, 37, 35, 32, 28)
+
+
+def system_page(ctx, gal, s, dist, fuel, help_line):
+    """Everything about star system s (a galaxy.System): dist is how far it
+    is from you in tenths of a light year (None: you are there), fuel what
+    you have. Used by the System data tab and by D on the in-flight chart."""
+    text = cockpit.text
+    ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+    text(ctx, "SYSTEM DATA", 0, -102, 10, cockpit.GREY)
+    text(ctx, s.name, 0, -85, 20, cockpit.WHITE)
+    if dist is None:
+        text(ctx, "you are here", 0, -67, 11, cockpit.GREEN)
+    else:
+        ok = 0 < dist <= fuel
+        text(ctx, "%s away%s" % (_ly(dist), "" if ok else ", too far"),
+             0, -67, 11, cockpit.GREEN if ok else cockpit.RED)
+    ctx.rgb(*cockpit.DIM).rectangle(-90, -58, 180, 1).fill()
+    text(ctx, s.government_name(), 0, -47, 11, cockpit.station_colour(s.government))
+    y = -34
+    for line in (s.economy_name(),
+                 "Tech %d   Pop %d.%d billion" % (s.tech, s.population // 10, s.population % 10),
+                 "Productivity %d M Cr" % s.productivity,
+                 "Radius %d km" % s.radius):
+        text(ctx, line, 0, y, 11, cockpit.YELLOW)
+        y += 13
+    words = describe.for_system(game_data, gal, s.index) if game_data is not None else None
+    if words:
+        for line, y in zip(describe.wrap(words, DESC_WIDTHS), DESC_Y):
+            text(ctx, line, 0, y, 10, cockpit.CYAN)
+    text(ctx, help_line, 0, 90, 10, cockpit.GREY)

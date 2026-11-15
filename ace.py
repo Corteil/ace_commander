@@ -288,6 +288,7 @@ class AceCommander(app.App):
         self.eject_t = 0.0      # time since the escape pod was launched
         self.witch = None       # in witchspace: (x, y) on the chart, between systems
         self.misjump = False    # DEBUG: the next jump goes wrong
+        self.data_of = None     # the system whose data D shows from the in-flight chart
         self.fire_lock = False  # the lasers wait until C is let go (held on from a menu)
         self.repair_shop = False    # show the Repair Shop tab (a DEBUG switch for now)
         self.chart = None       # the local chart, while it is open
@@ -737,6 +738,8 @@ class AceCommander(app.App):
             if confirm:
                 d.pick()
                 self.target = d.target
+            elif (new and hit(BTN_MISSILE)) or hit("k_D"):
+                d.show(d.view.picked())     # its data; the target stays as it was
             else:
                 jx, jy = self._steer(False, STICK if new else ANY, new)
                 d.view.move(jx, jy, dt)
@@ -1424,6 +1427,10 @@ class AceCommander(app.App):
         if self.fsub == "chart":
             self._update_chart(new, cancel, confirm)
             return
+        if self.fsub == "data":     # back to the chart
+            if confirm or cancel or (new and hit(BTN_MISSILE)) or hit("k_D"):
+                self.fsub = "chart"
+            return
         items = self._fitems()
         if hit("j_up" if new else "up"):
             self.fmenu = (self.fmenu - 1) % len(items)
@@ -1509,6 +1516,11 @@ class AceCommander(app.App):
             self.chart = None
             return
         ch = self.chart
+        if (new and self.pad.hit(BTN_MISSILE)) or self.pad.hit("k_D"):
+            if ch.picked() is not None:
+                self.data_of = ch.picked()      # D: the selected system's data
+                self.fsub = "data"
+            return
         if confirm:
             to = ch.target()
             if to is not None:
@@ -1520,6 +1532,17 @@ class AceCommander(app.App):
             return
         jx, jy = self._steer(False, STICK if new else ANY, new)
         ch.move(jx, jy, self.dt)
+
+    def _draw_data(self, ctx):
+        """D on the in-flight chart: the selected system's data."""
+        c = self.cmdr
+        i = self.data_of
+        if self.witch is not None:
+            dist = self.galaxy.distance_xy(self.witch[0], self.witch[1], i)
+        else:
+            dist = None if i == c.system else self.galaxy.distance(c.system, i)
+        docked.system_page(ctx, self.galaxy, self.galaxy.system(i), dist, c.fuel,
+                           "C, D or F: back to the chart")
 
     def _fitems_top(self):
         items = ["RESUME"]
@@ -1556,6 +1579,10 @@ class AceCommander(app.App):
         elif self.mode == "flight":
             if self.paused and self.fsub == "chart":
                 self.chart.draw(ctx)
+                ctx.restore()
+                return
+            if self.paused and self.fsub == "data":
+                self._draw_data(ctx)
                 ctx.restore()
                 return
             t0 = _us()
