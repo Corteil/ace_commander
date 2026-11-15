@@ -887,6 +887,9 @@ of a real flight, not from a harness.
    `Obj.max_energy` / `leveled`; the Thargon launch and flee thresholds use max_energy).
    At NORMAL the hits to kill match Elite's (a Gnat 5 pulse / 4 military / 2 mining hits,
    the Phantom 44 military).
+   Brian chose to keep mission 2's Vorn as the original: no ambush on arrival, only the
+   in-flight encounter ticks (PLANS_THARGOID) while carrying the plans. Not on the badge
+   yet (he said no for now).
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
