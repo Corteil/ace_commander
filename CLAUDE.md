@@ -643,6 +643,9 @@ of a real flight, not from a harness.
    `ace._draw_data`; C, D or F go back). D on the docked charts opens System data for the
    selected system without changing the target (`Docked.show`). Charts say "D: DATA". On
    the badge: a description takes 11-15 ms (cached for the page). Tests: `tests/test_describe.py`.
+   **Build 53 (Brian):** D on the System data tab goes back to the chart tab you came from
+   (`Docked.chart_tab`, the last chart opened; the local chart if none), with the cursor on
+   the system you were looking at (`Docked.go(tab, sel)`, `back_to_chart`).
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
@@ -653,7 +656,7 @@ of a real flight, not from a harness.
 9. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 52), read from `metadata.json` by `app.build()`, so
+   Its title shows the build (build 53), read from `metadata.json` by `app.build()`, so
    bump `version` in `metadata.json` and `tildagon.toml` for every build.
 7. Level names (EASY / NORMAL / HARD) and their numbers are placeholders; see
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).

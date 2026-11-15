@@ -762,6 +762,8 @@ class AceCommander(app.App):
                 d.pick_paint(1)
             elif hit("C" if new else "confirm"):
                 d.buy_paint()
+        elif d.name() == "SYSTEM DATA" and ((new and hit(BTN_MISSILE)) or hit("k_D")):
+            d.back_to_chart()       # D: back to the chart you came from
         elif d.name() == "MARKET":
             # the joystick picks a good; C buys and D sells; all repeat when held
             if self._repeat("j_up" if new else "up", dt):
@@ -1542,7 +1544,7 @@ class AceCommander(app.App):
         else:
             dist = None if i == c.system else self.galaxy.distance(c.system, i)
         docked.system_page(ctx, self.galaxy, self.galaxy.system(i), dist, c.fuel,
-                           "C, D or F: back to the chart")
+                           "C, D or F: back to chart")
 
     def _fitems_top(self):
         items = ["RESUME"]

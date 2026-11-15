@@ -70,8 +70,28 @@ d.view._select()
 pick = d.view.picked()
 tick(e, fresh=["D"])
 assert d.name() == "SYSTEM DATA" and d.data.index == pick and e.target is None, "data, not a target"
-d.open("GALACTIC CHART"); tick(e, fresh=["D"])
-assert d.name() == "SYSTEM DATA"
+# D on System data goes back to the chart you came from, cursor on that system
+tick(e, fresh=["D"])
+assert d.name() == "LOCAL CHART" and d.view.picked() == pick and e.target is None
+d.open("GALACTIC CHART")
+gpick = [i for _, _, i, _ in d.view.dots if i not in (e.cmdr.system, pick)][5]
+d.view._start(gpick); assert d.view.picked() == gpick
+tick(e, fresh=["D"])
+assert d.name() == "SYSTEM DATA" and d.data.index == gpick
+tick(e, fresh=["D"])
+assert d.name() == "GALACTIC CHART" and d.view.picked() == gpick, "the galactic chart, this time"
+# C on a chart then D: back to that chart too
+tick(e, fresh=["C"]); assert d.name() == "SYSTEM DATA" and e.target == gpick
+tick(e, fresh=["D"]); assert d.name() == "GALACTIC CHART"
+# reached by moving along the tabs: back to the last chart used
+d.open("SYSTEM DATA"); tick(e, fresh=["D"]); assert d.name() == "GALACTIC CHART"
+e.target = None; d.target = None
+d2 = docked.Docked(e.cmdr, gal, None, d.market and gd.GOODS, gd.EQUIPMENT)
+d2.open("SYSTEM DATA"); d2.back_to_chart(); assert d2.name() == "LOCAL CHART", "none yet: the local chart"
+c = CountCtx(); d.open("SYSTEM DATA"); d.draw(c)
+for s_, (x, y), size in c.texts:
+    assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5
+assert any("D: chart" in t[0] for t in c.texts)
 # in flight: D on the local chart shows the page, and back
 d.go(0); tick(e, fresh=["C"])
 for _ in range(200):

@@ -68,6 +68,7 @@ class Docked:
         self.target = target if gal is not None else None   # a system index, or None
         self.here = gal.system(cmdr.system) if gal is not None else None
         self.view = None        # the chart, on the chart tabs
+        self.chart_tab = None   # the last chart tab opened: where D on System data goes back to
         self.data = None        # the galaxy.System on the System data tab
 
     def name(self):
@@ -77,18 +78,23 @@ class Docked:
         """Open the tab with this name."""
         self.go(self.tabs.index(name))
 
-    def go(self, tab):
-        """Open tab number tab (it wraps round)."""
+    def go(self, tab, sel=None):
+        """Open tab number tab (it wraps round). On a chart the cursor starts
+        on system sel, or on the target if sel is None."""
         self.tab = tab % len(self.tabs)
         n = self.name()
         c = self.cmdr
         self.view = None
         self.data = None
+        if sel is None:
+            sel = self.target
         if n == "LOCAL CHART":
-            self.view = chart.Chart(self.gal, c.system, c.fuel, self.target, "TARGET")
+            self.view = chart.Chart(self.gal, c.system, c.fuel, sel, "TARGET")
+            self.chart_tab = n
         elif n == "GALACTIC CHART":
-            self.view = chart.GalChart(self.gal, c.system, c.fuel, self.target, "TARGET",
+            self.view = chart.GalChart(self.gal, c.system, c.fuel, sel, "TARGET",
                                        c.galaxy + 1)
+            self.chart_tab = n
         elif n == "SYSTEM DATA":
             self.data = self.gal.system(self.target if self.target is not None else c.system)
 
@@ -220,6 +226,13 @@ class Docked:
         else:
             text(ctx, "F: title screen", 0, 88, 11, cockpit.GREY)
 
+    def back_to_chart(self):
+        """D on System data: back to the chart you came from (the local chart
+        if none yet), with the cursor on the system you were looking at."""
+        name = self.chart_tab if self.chart_tab in self.tabs else "LOCAL CHART"
+        if name in self.tabs:
+            self.go(self.tabs.index(name), self.data.index if self.data is not None else None)
+
     def show(self, index):
         """D on a chart: open System data for system index, leaving the
         target as it is."""
@@ -233,7 +246,7 @@ class Docked:
         c = self.cmdr
         s = self.data
         d = None if s.index == c.system else self.gal.distance(c.system, s.index)
-        system_page(ctx, self.gal, s, d, c.fuel, "< > screens   F: status")
+        system_page(ctx, self.gal, s, d, c.fuel, "< >   D: chart   F: status")
 
     def _draw_market(self, ctx):
         """The goods, ROWS at a time: name, price, stock and what is in the hold."""
