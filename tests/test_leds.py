@@ -167,6 +167,59 @@ a.game._hurt(5.0); tick(a)
 assert bus.events == [] and leds.writes == 0 and arcs(a) == 1
 print("USE_LEDS = False keeps the ring: ok")
 
+# ---- the title screen's OPTIONS page -----------------------------------------
+bs.install()
+leds, bus = bs.install_leds()
+import ace_commander
+mod = ace_commander.ace
+save = os.path.join(HERE, "shots", "test_options.json")
+if os.path.exists(save):
+    os.remove(save)
+mod.SAVE_PATH = save
+a = ace_commander.AceCommander()
+assert "OPTIONS" in a.choices()
+bs.choose(a, "OPTIONS"); assert a.mode == "options"
+c = CountCtx(); a.draw(c)
+tx = [t[0] for t in c.texts]
+assert "OPTIONS" in tx and "STEER: JOYSTICK" in tx and "LEDS: ON" in tx
+assert "more with a commander" in tx, "no commander: no docking or Constrictor"
+for s_, (x, y), size in c.texts:
+    assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5, (s_, y)
+tick(a, fresh=["JOYRIGHT"]); assert a.use_tilt, "right changes the steering"
+tick(a, fresh=["JOYDOWN"]); assert a.omenu == 1
+tick(a, fresh=["C"]); assert not a.use_leds
+tick(a, fresh=["F"]); assert a.mode == "menu"
+# kept for next time
+b = ace_commander.AceCommander()
+assert b.use_tilt and not b.use_leds
+bs.choose(b, "COMBAT PRACTICE"); tick(b)
+b.game._hurt(5.0); tick(b)
+assert leds.writes == 0 and arcs(b) == 1, "LEDS: OFF keeps the ring on screen"
+# with a commander: docking style and the Constrictor too, saved in the commander
+b.mode = "menu"
+bs.choose(b, "NEW COMMANDER"); tick(b, fresh=["C"])
+b.dock.go(0); tick(b, fresh=["F"])
+bs.choose(b, "OPTIONS")
+items = b._settings(True)
+assert items[1].startswith("DOCKING") and items[2] == "CONSTRICTOR: 2 MIN", items
+b.omenu = 1; tick(b, fresh=["JOYLEFT"])
+assert b.cmdr.docking == "A"
+b.omenu = 2; tick(b, fresh=["C"])
+assert not b.cmdr.quick_con
+from ace_commander import commander as cm
+d = cm.load(save); assert d.docking == "A" and d.quick_con is False
+# the in-flight Settings page has the same lines
+tick(b, fresh=["F"]); bs.choose(b, "CONTINUE")
+b.dock.go(0); tick(b, fresh=["C"])
+for _ in range(200):
+    tick(b)
+    if b.mode == "flight":
+        break
+tick(b, fresh=["A"]); b.fsub = "settings"
+assert b._fitems() == b._settings(True)
+os.remove(save)
+print("OPTIONS page: steering, LEDs, docking, Constrictor; saved: ok")
+
 # ---- firmware without the LED modules --------------------------------------
 bs.install()
 import ace_commander

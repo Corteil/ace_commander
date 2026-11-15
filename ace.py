@@ -136,6 +136,11 @@ try:
 except Exception:
     APP_DIR = "/apps/ace_commander"
 SAVE_PATH = APP_DIR + "/commander.json"
+def options_path():
+    """options.json, next to the save: the Options page's steering and LEDs."""
+    return SAVE_PATH.rsplit("/", 1)[0] + "/options.json"
+
+
 DEFAULT_NAME = "Jameson"    # what the missions call you if the badge has no name set
 
 
@@ -327,6 +332,9 @@ class AceCommander(app.App):
         self.zero = None                 # accelerometer reading taken as "level"
         self.ms = 0.0                    # smoothed frame time
         self.leds_on = False             # we have taken over the LEDs
+        self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
+        self.omenu = 0                   # the chosen line on the Options page
+        self._load_options()
         self.led_level = None            # (r, g, b) last written, 0-255 each
         self.glow = 0.0                  # the station's colour fading on the LEDs after launch
         # smoothed time, in ms, spent in the game rules and in drawing calls
@@ -386,7 +394,7 @@ class AceCommander(app.App):
     def _leds_rgb(self, r, g, b):
         """Set the ring of 12 LEDs to (r, g, b), 0-255 each, taking them over
         from the badge's own pattern first. Only writes when the colour changes."""
-        if tildagonos is None or not USE_LEDS:
+        if tildagonos is None or not self.use_leds:
             return
         try:
             if not self.leds_on:
@@ -558,6 +566,8 @@ class AceCommander(app.App):
                 self._dock()
         elif self.mode == "docked":
             self._update_docked(dt, cancel, confirm)
+        elif self.mode == "options":
+            self._update_options(cancel, confirm)
         elif self.mode == "brief":
             b = self.brief
             held = pad.held
@@ -608,7 +618,7 @@ class AceCommander(app.App):
 
     def choices(self):
         """The title screen's choices, in order."""
-        items = ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "SPEED TEST"]
+        items = ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS", "SPEED TEST"]
         if self.cmdr is not None:
             items.insert(0, "CONTINUE")
         return items
@@ -625,6 +635,9 @@ class AceCommander(app.App):
             self.mode = "level"
         elif item == "COMBAT PRACTICE":
             self._start_flight(False)
+        elif item == "OPTIONS":
+            self.omenu = 0
+            self.mode = "options"
         elif item == "SHIP VIEWER":
             self.zero = None
             if self.viewer is None:
@@ -1271,19 +1284,107 @@ class AceCommander(app.App):
 
     # ---- in-flight menu ---------------------------------------------------
 
+    def _settings(self, cmdr):
+        """The settings, shared by the in-flight Settings page and the title
+        screen's Options page. cmdr: include the commander's own (docking
+        style and the Constrictor)."""
+        stick = "JOYSTICK" if FB is not None else "STICK"
+        if self.tilt_ok:
+            steer = "STEER: " + ("TILT" if self.use_tilt else stick)
+        else:
+            steer = "STEER: %s (no tilt sensor)" % stick
+        items = [steer]
+        if cmdr and self.cmdr is not None:
+            items.append("DOCKING: " + DOCK_NAMES[self.cmdr.docking])
+            items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
+        if tildagonos is not None:
+            items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))
+        return items
+
+    def _change(self, item, left):
+        """Change one setting: left goes back a choice, anything else on."""
+        if item.startswith("STEER"):
+            if self.tilt_ok:
+                self.use_tilt = not self.use_tilt
+                self.zero = None
+                self._save_options()
+        elif item.startswith("CONSTRICTOR"):
+            c = self.cmdr       # how soon mission 1's Constrictor turns up at Orarra
+            c.quick_con = not c.quick_con
+            if self.game is not None and self.galaxy is not None and c.system is not None:
+                self._mission_flags()
+            self._write_setting("quick_con", c.quick_con)
+        elif item.startswith("DOCKING"):
+            c = self.cmdr       # A, B, C, A going on; left goes back
+            i = commander.DOCKING.index(c.docking) + (-1 if left else 1)
+            c.docking = commander.DOCKING[i % len(commander.DOCKING)]
+            if self.game is not None:
+                self.game.set_docking(c.docking)
+            self._write_setting("docking", c.docking)
+        elif item.startswith("LEDS"):
+            self.use_leds = not self.use_leds
+            if not self.use_leds:
+                self._leds_release()
+            self._save_options()
+
+    def _load_options(self):
+        try:
+            with open(options_path()) as f:
+                d = json.loads(f.read())
+        except Exception:
+            return
+        if isinstance(d, dict):
+            if isinstance(d.get("tilt"), bool):
+                self.use_tilt = d["tilt"] and self.tilt_ok
+            if isinstance(d.get("leds"), bool):
+                self.use_leds = d["leds"]
+
+    def _save_options(self):
+        try:
+            with open(options_path(), "w") as f:
+                f.write(json.dumps({"tilt": self.use_tilt, "leds": self.use_leds}))
+        except Exception:
+            pass
+
+    def _update_options(self, cancel, confirm):
+        """The title screen's Options page: joystick up / down picks, left /
+        right or C changes, F goes back to the title screen."""
+        hit = self.pad.hit
+        new = FB is not None
+        items = self._settings(True)
+        self.omenu %= len(items)
+        if cancel:
+            self.mode = "menu"
+        elif hit("j_up" if new else "up"):
+            self.omenu = (self.omenu - 1) % len(items)
+        elif hit("j_down" if new else "down"):
+            self.omenu = (self.omenu + 1) % len(items)
+        else:
+            left = hit("j_left" if new else "left")
+            if confirm or left or hit("j_right" if new else "right"):
+                self._change(items[self.omenu], left)
+
+    def _draw_options(self, ctx):
+        text = cockpit.text
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        text(ctx, "OPTIONS", 0, -80, 20, cockpit.WHITE)
+        items = self._settings(True)
+        y = -44
+        for i, label in enumerate(items):
+            if i == self.omenu % len(items):
+                ctx.rgb(*cockpit.DIM).rectangle(-104, y - 9, 208, 18).fill()
+            text(ctx, label, 0, y, 14, cockpit.GREEN if i == self.omenu % len(items)
+                 else cockpit.GREY)
+            y += 20
+        if self.cmdr is None:
+            text(ctx, "more with a commander", 0, y + 4, 11, cockpit.GREY)
+        text(ctx, "< > or C: change", 0, 66, 11, cockpit.GREY)
+        text(ctx, "F: back", 0, 80, 11, cockpit.GREY)
+
     def _fitems(self):
         """The lines on the current page of the in-flight menu."""
         if self.fsub == "settings":
-            stick = "JOYSTICK" if FB is not None else "STICK"
-            if self.tilt_ok:
-                steer = "STEER: " + ("TILT" if self.use_tilt else stick)
-            else:
-                steer = "STEER: %s (no tilt sensor)" % stick
-            items = [steer]
-            if self.career and self.cmdr is not None:
-                items.append("DOCKING: " + DOCK_NAMES[self.cmdr.docking])
-                items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
-            return items
+            return self._settings(self.career)
         if self.fsub == "debug":
             items = ["INVINCIBLE: " + ("ON" if self.game.god else "OFF"),
                      "LEVEL: " + commander.LEVELS[self.game.level],
@@ -1574,24 +1675,8 @@ class AceCommander(app.App):
         elif self.fsub == "settings":
             left = hit("j_left" if new else "left")
             side = left or hit("j_right" if new else "right")
-            item = items[self.fmenu]
-            if self.fmenu == 0:
-                if (confirm or side) and self.tilt_ok:
-                    self.use_tilt = not self.use_tilt
-                    self.zero = None
-            elif item.startswith("CONSTRICTOR"):
-                if confirm or side:     # how soon mission 1's Constrictor turns up at Orarra
-                    c = self.cmdr
-                    c.quick_con = not c.quick_con
-                    self._mission_flags()
-                    self._write_setting("quick_con", c.quick_con)
-            elif item.startswith("DOCKING"):
-                if confirm or side:     # C and right go A, B, C, A; left goes back
-                    c = self.cmdr
-                    i = commander.DOCKING.index(c.docking) + (-1 if left else 1)
-                    c.docking = commander.DOCKING[i % len(commander.DOCKING)]
-                    self.game.set_docking(c.docking)
-                    self._write_setting("docking", c.docking)
+            if confirm or side:
+                self._change(items[self.fmenu], left)
         elif self.fsub == "debug":
             if confirm:
                 self._debug(items[self.fmenu])
@@ -1733,6 +1818,8 @@ class AceCommander(app.App):
             self.dock.draw(ctx)
         elif self.mode == "brief":
             self.brief.draw(ctx)
+        elif self.mode == "options":
+            self._draw_options(ctx)
         elif self.mode == "launch":
             cockpit.draw_tunnel(ctx, min(1.0, self.launch_t / LAUNCH_TIME), self.launch_t,
                                 cockpit.station_colour(self._government()), False, self.tunnel)

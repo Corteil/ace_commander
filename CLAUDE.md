@@ -703,6 +703,13 @@ of a real flight, not from a harness.
    Then (Brian): the in-flight PAUSE MENU is now SETTINGS (`fsub` "settings"): STEER,
    and with a commander DOCKING and CONSTRICTOR (always shown). QUIT TO TITLE moved to the
    top in-flight menu, after SETTINGS.
+   Then (Brian: "add an option screen"): OPTIONS on the title screen (mode "options",
+   `_update_options`, `_draw_options`, `omenu`) shows the same lines as the in-flight
+   Settings, from one list (`_settings(cmdr)`, changed by `_change(item, left)`): STEER,
+   with a commander DOCKING and CONSTRICTOR (written into the save), and LEDS: ON / OFF
+   (`use_leds`, replacing the fixed `USE_LEDS`, which is now only the default). Steering
+   and LEDs are kept in `options.json` beside the save (`options_path()`, gitignored);
+   the test stubs delete it on each `install()`.
    The top in-flight menu closes up (13 px lines, no help line) when
    it has more than six lines. Tests: `tests/test_equip_effects.py`.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
