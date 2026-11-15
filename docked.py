@@ -8,10 +8,8 @@ it. On the two charts C makes the selected system the hyperspace target;
 once launched, the in-flight menu offers a jump to it.
 """
 from . import chart, cockpit, commander, describe, equipment, market, missions
-try:        # the description sentence's tables, made by tools/import_galaxy.py
-    from . import game_data
-except Exception:
-    game_data = None
+from . import content
+game_data = content.DATA     # Elite's text tables, or the game's own (content.py)
 
 TABS = ("STATUS", "MARKET", "EQUIP SHIP", "REPAIR SHOP", "LOCAL CHART", "GALACTIC CHART",
         "SYSTEM DATA", "OPTIONS")

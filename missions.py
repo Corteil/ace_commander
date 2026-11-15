@@ -32,6 +32,19 @@ except ImportError:         # imported on its own, as the PC tests do
 ORARRA = (1, 144, 33)       # (galaxy, x, y) on the chart: where the Constrictor is
 CEERDI = (2, 215, 84)       # mission 2's briefing
 BIRERA = (2, 63, 72)        # and where the plans go
+
+
+def use(data):
+    """Take the mission systems from the content in use (its MISSION_PLACES),
+    if it says; otherwise they are the original's (Elite's game_data)."""
+    global ORARRA, CEERDI, BIRERA
+    places = getattr(data, "MISSION_PLACES", None)
+    if places:
+        ORARRA = places["constrictor"]
+        CEERDI = places["briefing"]
+        BIRERA = places["base"]
+    else:
+        ORARRA, CEERDI, BIRERA = (1, 144, 33), (2, 215, 84), (2, 63, 72)
 QUICK_WAIT = 120.0          # seconds outside Orarra's safe zone before it comes (quick_con)
 KILLS_1 = 256               # the original's kill counts for each mission
 KILLS_2 = 1280

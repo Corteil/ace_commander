@@ -350,6 +350,21 @@ g = a.game
 assert g.types["COBRA MK III"].title == "KESTREL"
 for _ in range(200):
     tick(a, held=["JOYUP", "C"]); frame(a)
+# and the game's own galaxy, market and equipment (build 56)
+cont = sys.modules["ace_commander.content"]
+assert cont.OWN and cont.DATA.__name__.endswith("original_data") and mod.game_data is cont.DATA
+a.mode = "menu"
+a.cmdr = None
+mod.SAVE_PATH = os.path.join(HERE, "shots", "test_app_own.json")
+if os.path.exists(mod.SAVE_PATH):
+    os.remove(mod.SAVE_PATH)
+choose(a, "NEW COMMANDER"); tick(a, fresh=["C"])
+assert a.mode == "docked" and a.galaxy.system(a.cmdr.system).name == "DAENOR"
+assert a.dock.market.name(0) == "GRAIN" and a.dock.market.name(16) == "ALIEN RELICS"
+assert mod.EQUIP[11][0] == "GALACTIC HYPERDRIVE"
+miss = sys.modules["ace_commander.missions"]
+assert miss.ORARRA == (1, 251, 108) and miss.CEERDI == (2, 126, 43) and miss.BIRERA == (2, 250, 226)
+os.remove(mod.SAVE_PATH)
 print("ship_data.py missing: the game's own ships: ok")
 
 # ---- and original_ships.py missing too ----------------------------------------

@@ -64,38 +64,12 @@ try:
 except ImportError:
     KEYBOARD_BUTTONS = {}
 
-def _want_own_ships():
-    """The Options page's SHIPS: OWN, saved in options.json beside this file:
-    the game's own ships even when ship_data.py is there (from the next start)."""
-    try:
-        d = __file__.rsplit("/", 1)[0]
-        if not d.startswith("/") and ":" not in d:
-            d = "/" + d
-        with open(d + "/options.json") as f:
-            return bool(json.loads(f.read()).get("own_ships"))
-    except Exception:
-        return False
-
-
-ORIGINAL_SHIPS = False      # True: the game's own ships, not Elite's
-HAVE_ELITE_SHIPS = False    # ship_data.py is there (the Options page can switch)
-SHIPS = ()
-try:
-    from .ship_data import SHIPS
-    HAVE_ELITE_SHIPS = True
-except Exception:
-    pass
-if not HAVE_ELITE_SHIPS or _want_own_ships():
-    try:
-        from .original_ships import SHIPS
-        ORIGINAL_SHIPS = True
-    except Exception:
-        pass
-
-try:    # the galaxy's starting numbers, made by tools/import_galaxy.py
-    from . import game_data
-except Exception:
-    game_data = None
+from . import content     # Elite's ships and galaxy, or the game's own (content.py)
+SHIPS = content.SHIPS
+game_data = content.DATA
+ORIGINAL_SHIPS = content.OWN        # the game's own content, not Elite's
+HAVE_ELITE_SHIPS = content.HAVE_ELITE   # Elite's files are there: Options can switch
+missions.use(game_data)
 GOODS = getattr(game_data, "GOODS", None)   # the market's goods, if game_data.py has them
 EQUIP = getattr(game_data, "EQUIPMENT", None)   # and the equipment
 SAFE_GREEN = 60         # the LEDs are this green (0-255) in the safe zone round a station
@@ -388,7 +362,7 @@ class AceCommander(app.App):
         self.ms = 0.0                    # smoothed frame time
         self.leds_on = False             # we have taken over the LEDs
         self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
-        self.own_ships = ORIGINAL_SHIPS  # SHIPS: OWN / ELITE, from the next start
+        self.own_ships = ORIGINAL_SHIPS  # CONTENT: OWN / ELITE, from the next start
         self.omenu = 0                   # the chosen line on the Options page
         self.dgroup = None               # the DEBUG group open in flight (fsub "dgroup")
         self.debug_from = None           # where DEBUG was opened from in flight: None (the menu) or "settings"
@@ -1388,8 +1362,8 @@ class AceCommander(app.App):
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
         if tildagonos is not None:
             items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))
-        if HAVE_ELITE_SHIPS and self.mode != "flight":     # which ships, from the next start
-            items.append("SHIPS: " + ("OWN" if self.own_ships else "ELITE")
+        if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose content, from the next start
+            items.append("CONTENT: " + ("OWN" if self.own_ships else "ELITE")
                          + ("" if self.own_ships == ORIGINAL_SHIPS else " (RESTART)"))
         if DEBUG_MENU:
             items.append("DEBUG")
@@ -1430,7 +1404,7 @@ class AceCommander(app.App):
             if self.game is not None:
                 self.game.set_docking(c.docking)
             self._write_setting("docking", c.docking)
-        elif item.startswith("SHIPS"):
+        elif item.startswith("CONTENT"):
             self.own_ships = not self.own_ships
             self._save_options()
         elif item.startswith("LEDS"):
@@ -1450,14 +1424,15 @@ class AceCommander(app.App):
                 self.use_tilt = d["tilt"] and self.tilt_ok
             if isinstance(d.get("leds"), bool):
                 self.use_leds = d["leds"]
-            if isinstance(d.get("own_ships"), bool):
-                self.own_ships = d["own_ships"]
+            own = d.get("own", d.get("own_ships"))
+            if isinstance(own, bool):
+                self.own_ships = own
 
     def _save_options(self):
         try:
             with open(options_path(), "w") as f:
                 f.write(json.dumps({"tilt": self.use_tilt, "leds": self.use_leds,
-                                    "own_ships": self.own_ships}))
+                                    "own": self.own_ships}))
         except Exception:
             pass
 

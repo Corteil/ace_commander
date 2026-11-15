@@ -54,7 +54,14 @@ description sentence (build 52) and the disc version's two missions (build 54).
   designs, one for each role the game knows by Elite's names, with their own names
   (entry[5], `Blueprint.title`). Made by `tools/make_original_ships.py` with
   `tools/shipmaker.py` (convex hulls from corner points, explicit faces, lines on faces).
-  Used when `ship_data.py` is missing, or with Options > SHIPS: OWN.
+  Used when the Elite files are missing, or with Options > CONTENT: OWN (see `content.py`).
+- `original_data.py` - **the game's own galaxy, market and equipment** (build 56),
+  committed: seeds, letter pairs, start (Daenor), goods, equipment prices, and where the
+  missions happen (`MISSION_PLACES`, read by `missions.use`).
+- `content.py` - decides once at start-up whose content is used: Elite's
+  (`ship_data.py` + `game_data.py`) or the game's own (`original_*`). Own if either Elite
+  file is missing or options.json has "own" (old key "own_ships"). `ace.SHIPS`,
+  `ace.game_data` and `docked.game_data` come from it.
 - `ship_data.py`, `game_data.py` - generated, **gitignored** (see Licensing). 31 ships; the
   galaxy's seeds, name letter pairs, starting place, the market's 17 goods and the 14
   equipment prices. Both must be copied to the badge.
@@ -808,6 +815,23 @@ of a real flight, not from a harness.
    Tests: `tests/test_original_ships.py`; `test_app.py` runs a copy without ship_data.py.
    Next in publishing prep: our own galaxy, goods and equipment (56), our own words and
    mission texts (57), then the README, DEBUG off, level names and the app store (58).
+   **Build 56: the game's own galaxy, market and equipment** (`original_data.py`,
+   `content.py`). Seeds 0x7CBF 0x1FAB 0xE606 and our own 31 letter pairs (no TH, which
+   made "THTHKAVE"; PA, not PE, which made "PEE..."), picked for readable names and
+   checked for rude words in all eight galaxies; start at Daenor (128,141), a
+   Confederacy, rich agricultural, tech 6, 12 systems within 7 LY. Goods keep each slot's
+   job (0-7 in canisters, 3/6/10 illegal, 12 mining, 13-15 kg/g, 16 alien): GRAIN,
+   FABRICS, ISOTOPES, CONTRABAND, SPIRITS, LUXURIES, STIMS, ELECTRONICS, MACHINERY,
+   ALLOYS, WEAPONS, SILKS, ORE, GOLD, PLATINUM, GEMS, ALIEN RELICS; our own numbers, the
+   same shape of economy (compared price and stock for every economy). Equipment: the
+   same 14 in order, our own prices; GALACTIC HYPERDRIVE. Mission places: shipyard Tuelve
+   and last seen Rotuvaga (galaxy 1), the Phantom at Elnada (galaxy 2, 13 jumps from
+   where a galactic jump arrives), briefing Argatu and base Vedao (galaxy 3, 61 LY and
+   13 jumps apart, like Ceerdi and Birera). Options' SHIPS became CONTENT: ELITE / OWN,
+   saved as "own". Without our own text tables (build 57) the missions don't start and
+   System data has no sentence in OWN. On the badge: content.py and its imports 2.6 s
+   over the REPL. Brian's usual badge had SHIPS: OWN set, so it is now in our galaxy.
+   Tests: `test_app.py` starts a commander in a copy without ship_data.py.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
