@@ -870,6 +870,15 @@ of a real flight, not from a harness.
    players. Level names EASY / NORMAL / HARD kept (no longer placeholders). Tests:
    `tests/test_install.py` builds the release's file list (git ls-files less
    export-ignore), installs it as Corteil_ace_commander and starts it through app.py.
+   Then (Brian): the DEBUG menu stays in the release as an Easter egg. Dock at systems
+   whose names start with the letters of `EGG_WORD` ("DRAKE", a male duck: no name in our
+   galaxy starts with C or U, so DUCKS can't be spelled) in order, in the first galaxy;
+   one docking elsewhere between letters is forgiven (`EGG_STOPS`, to refuel: no route has
+   every step within one 7 LY tank), two start again (`AceCommander._egg`, progress
+   `egg` / `egg_miss` in options.json). Then "QUACK!" (a `Briefing` with its own
+   `pages`) and `DEBUG_MENU` is on for good ("debug": true in options.json, read by
+   `_debug_wanted`). A route from the start: Daenor, (a stop such as Idei), Reares,
+   Arorzu, Kasaxipa, Elkasoso. Not in the README on purpose.
 6. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
    (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).

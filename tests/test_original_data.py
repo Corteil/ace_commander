@@ -72,6 +72,42 @@ g1 = galaxy.Galaxy(galaxy.seeds_for(d.SEEDS, 1), d.PAIRS)
 assert g1.system(g1.find(*d.MISSION_PLACES["constrictor"][1:])).name == "ELNADA"
 print("trail clues: only while the Phantom is hunted, the rest always: ok")
 
+# ---- the Easter egg: dock at D, R, A, K, E systems in galaxy 1 ------------------------------
+mod.DEBUG_MENU = False
+egg = ace_commander.AceCommander()
+choose(egg, "NEW COMMANDER"); tick(egg, fresh=["C"])
+assert "DEBUG" not in egg._settings(True) and "DEBUG" not in egg._fitems_top()
+
+
+def dock_at(a, name):
+    a.cmdr.system = [i for i in range(256) if a.galaxy.system(i).name == name][0]
+    a._dock()
+
+
+egg.egg = 0
+for name in ("DAENOR", "IDEI", "REARES", "ARORZU"):     # Idei: a fuel stop, forgiven
+    dock_at(egg, name)
+assert egg.egg == 3 and not mod.DEBUG_MENU
+dock_at(egg, "IDEI"); dock_at(egg, "SOENI")             # two stops in a row: start again
+assert egg.egg == 0
+for name in ("DAENOR", "REARES", "ARORZU", "KASAXIPA"):
+    dock_at(egg, name)
+assert egg.egg == 4 and egg.mode == "docked"
+dock_at(egg, "ELKASOSO")
+assert mod.DEBUG_MENU and egg.mode == "brief"
+egg.brief.tick(2.1)
+assert "QUACK!" in " ".join(texts(egg))
+assert "DEBUG" in egg._settings(True)
+import json as _json
+assert _json.load(open(mod.options_path()))["debug"] is True, "kept for next time"
+# not in another galaxy
+mod.DEBUG_MENU = False
+egg.egg = 4; egg.cmdr.galaxy = 1; egg._place(); dock_at(egg, egg.galaxy.system(5).name)
+assert egg.egg == 4 and not mod.DEBUG_MENU
+mod.DEBUG_MENU = True
+os.remove(mod.options_path())
+print("Easter egg: DRAKE in the first galaxy, one fuel stop forgiven, unlocks DEBUG for good: ok")
+
 # ---- both missions, played -----------------------------------------------------------------
 e = ace_commander.AceCommander()
 choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
