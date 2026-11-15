@@ -245,7 +245,7 @@ the two faces it sits between points back at the viewer.
 ## Install
 
 Copy `__init__.py app.py ace.py game.py cockpit.py viewer.py bench.py title.py commander.py
-galaxy.py chart.py docked.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
+galaxy.py chart.py docked.py market.py equipment.py ship_data.py game_data.py tildagon.toml metadata.json` to `/apps/ace_commander/` on the badge (for example with `mpremote fs cp`),
 then restart it. On Windows, `deploy.bat all` does this.
 
 ## Credits and original material
