@@ -65,7 +65,7 @@ re-zeroes the tilt and holding it fires a missile. A USB keyboard works too: `W`
 lasers, `M` missile, `P` the menu. The number row is Elite's f0-f9: `1`-`4` front, rear,
 left and right views, `5` galactic chart, `6` local chart, `7` system data, `8` market
 prices, `9` status, `0` inventory (press it again to go back to space; docked, the same keys
-pick the screen and `1` launches). `H` hyperspace, `Ctrl`+`H` galactic jump, `J` jump drive.
+pick the screen and `1` launches). `H` hyperspace, `Shift`+`H` galactic jump, `J` jump drive.
 On a status, market or chart screen only steering, speed and lasers work (and the lasers
 can't hit anything), as in Elite.
 

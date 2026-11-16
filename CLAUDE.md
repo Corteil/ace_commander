@@ -239,7 +239,10 @@ board), so they pick menu lines, change Settings and the VIEW line, and move tab
 **The rest of the keys, Elite's scheme (Brian's choice, 2026-11-16; his written plan isn't on the
 Pi, so this is the agreed fallback):** `+` / `-` speed in every mode (`=` and `_` too, the same keys
 without shift); J holds speed up, so at full speed it is the jump drive under the usual rules; H
-hyperspace and Ctrl+H the galactic hyperdrive (Elite's key, Brian: not G). The number row is f0-f9:
+hyperspace and Shift+H the galactic hyperdrive (Brian, build 65: the Keyboard Hexpansion never sends
+Ctrl, so Elite's Ctrl+H can't work; a badge key log showed it sends Shift down, H down, Shift up, H
+up inside one frame, so `Pad` records Shift / Ctrl at key-down as hit("mod+k_H"); Ctrl+H still works
+on a keyboard that sends Ctrl; not G). `LOG_KEYS = True` prints every button event to serial. The number row is f0-f9:
 in flight 1-4 the views, 5 galactic chart, 6 local chart, 7 the target's (or here's) system data, 8
 Market Prices, 9 Commander Status, 0 Inventory. Docked (`DOCK_KEYS`): 1 launch, 2 / 3 / 8 / 0 market
 (buy, sell, prices, inventory: the hold is listed there), 4 equip ship, 5 galactic chart, 6 local

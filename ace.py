@@ -123,6 +123,7 @@ TILT_ROLL_SIGN = 1.0
 TILT_SWAP_AXES = False  # True if the badge's x axis should pitch, y roll
 
 INVERT_PITCH = False    # False: joystick up raises the nose. True: up dives.
+LOG_KEYS = False        # True: print every button / key event to serial (to see what a keyboard sends)
 SHOW_FRAME_TIME = True  # small frame time (ms) at the top of the flight screen, to start with
 DEBUG_ROWS = 7          # DEBUG page lines shown at once, the chosen one in the middle
 USE_LEDS = True         # flash the badge's LEDs red when hit (else a ring on screen)
@@ -326,7 +327,7 @@ class Pad:
         # number row is f0-f9 ("k_1" ... "k_0"), H hyperspace (Ctrl+H the galactic
         # hyperdrive, as Elite), J the jump drive, + / - speed ("=" and "_" too,
         # the same keys without shift)
-        for name in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "H", "J", "CTRL"):
+        for name in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "H", "J", "SHIFT", "CTRL"):
             key = KEYBOARD_BUTTONS.get(name)
             if key is not None:
                 table.append(("k_" + name, key))
@@ -352,16 +353,27 @@ class Pad:
 
     def _down(self, event):
         button = event.button
+        if LOG_KEYS:
+            print("KEY DOWN", repr(button))
         if self.pressed.get(button):
             return      # already down (key repeat)
         self.pressed[button] = True
         count = self.count
+        # Shift or Ctrl held at the moment this went down: the Keyboard
+        # Hexpansion sends Shift down, H down, Shift up, H up within one frame,
+        # so asking held("k_SHIFT") on the next update is too late (Brian's
+        # badge log, build 64). hit("mod+k_H") is a shifted H.
+        mod = count.get("k_SHIFT", 0) > 0 or count.get("k_CTRL", 0) > 0
         for n in self._names(button):
             count[n] = count.get(n, 0) + 1
             self.hits.add(n)
+            if mod:
+                self.hits.add("mod+" + n)
 
     def _up(self, event):
         button = event.button
+        if LOG_KEYS:
+            print("KEY UP", repr(button))
         if not self.pressed.get(button):
             return
         self.pressed[button] = False
@@ -2307,7 +2319,10 @@ class AceCommander(app.App):
             return None
 
         if hit("k_H"):
-            pick = line("GALACTIC JUMP") if self.pad.held("k_CTRL") else line("HYPERSPACE")
+            # Shift+H the galactic hyperdrive (Brian: the Keyboard Hexpansion never
+            # sends Ctrl, so Elite's Ctrl+H can't work there; Ctrl+H still does on
+            # a keyboard that sends it)
+            pick = line("GALACTIC JUMP") if hit("mod+k_H") else line("HYPERSPACE")
             if pick is None:
                 return False        # Ctrl+H is never plain hyperspace
             self._fpick(pick)

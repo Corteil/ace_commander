@@ -1,5 +1,5 @@
 """Elite's keys on a keyboard (Brian chose Elite's scheme, 2026-11-16): + / -
-speed, J the jump drive, H hyperspace, Ctrl+H the galactic hyperdrive, and the
+speed, J the jump drive, H hyperspace, Shift+H the galactic hyperdrive, and the
 number row as f0-f9 in flight and docked. Needs the galaxy data (Elite's
 game_data.py, or the game's own)."""
 import os, sys
@@ -184,19 +184,35 @@ ch.cx, ch.cy = float(dot[0]), float(dot[1]); ch._select(); tick(a, fresh=["C"])
 tick(a, fresh=["KEY_H"]); assert g.jump_t > 0 and a.fsub is None, "H jumps from the chart"
 print("chart C selects, H jumps: ok")
 
-# Ctrl+H (Elite's key, Brian) only with the galactic hyperdrive fitted, and it
-# is never plain hyperspace; G does nothing
+# Shift+H (Brian: the Keyboard Hexpansion never sends Ctrl) or Ctrl+H, only
+# with the galactic hyperdrive fitted, and never plain hyperspace; G does nothing
+for mod_key in ("KEY_SHIFT", "KEY_CTRL"):
+    a, g = flying()
+    a.target = reach[0]
+    tick(a, held=[mod_key]); tick(a, held=[mod_key], fresh=["KEY_H"])
+    assert g.jump_t <= 0 and a.fsub is None, (mod_key, "no hyperdrive: does nothing")
+    tick(a)
+    a.cmdr.extras.append("hyperdrive")
+    tick(a, fresh=["KEY_G"])
+    assert g.jump_t <= 0, "G is not the galactic hyperdrive"
+    tick(a, held=[mod_key]); tick(a, held=[mod_key], fresh=["KEY_H"])
+    assert g.jump_t > 0 and a.jump_to == ("galaxy", 0), (mod_key, "galactic hyperspace")
+
+# as the Keyboard Hexpansion sends it: Shift down, H down, Shift up, H up, all
+# before the next frame (Brian's badge log): still the galactic hyperdrive
 a, g = flying()
-a.target = reach[0]
-tick(a, held=["KEY_CTRL"]); tick(a, held=["KEY_CTRL"], fresh=["KEY_H"])
-assert g.jump_t <= 0, "no hyperdrive: Ctrl+H does nothing"
-tick(a)
 a.cmdr.extras.append("hyperdrive")
-tick(a, fresh=["KEY_G"])
-assert g.jump_t <= 0, "G is not the galactic hyperdrive"
-tick(a, held=["KEY_CTRL"]); tick(a, held=["KEY_CTRL"], fresh=["KEY_H"])
-assert g.jump_t > 0 and a.jump_to == ("galaxy", 0), "Ctrl+H: galactic hyperspace"
-print("H, Ctrl+H: ok")
+for ev, name in ((bs.ButtonDownEvent, "KEY_SHIFT"), (bs.ButtonDownEvent, "KEY_H"),
+                 (bs.ButtonUpEvent, "KEY_SHIFT"), (bs.ButtonUpEvent, "KEY_H")):
+    bs.bus.send(ev(bs.PHYSICAL[name]))
+tick(a)
+assert g.jump_t > 0 and a.jump_to == ("galaxy", 0), "Shift+H within one frame"
+# and a plain H after it is plain hyperspace again (no target: the chart)
+a, g = flying()
+a.target = None
+tick(a, fresh=["KEY_SHIFT"]); tick(a); tick(a, fresh=["KEY_H"])
+assert a.fsub == "chart", "Shift let go before H: plain H"
+print("H, Shift+H, Ctrl+H: ok")
 
 # the number row on a screen or in the menu: the screen's own key closes it,
 # 1-4 fly on looking that way, another screen's key goes straight there

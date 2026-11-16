@@ -80,8 +80,9 @@ PHYSICAL = {
 for _c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
     PHYSICAL["KEY_" + _c] = KEYS[_c]
 PHYSICAL["KEY_SPACE"] = KEYS["SPACE"]
-KEYS["CTRL"] = Button("CTRL", "Keyboard")
-PHYSICAL["KEY_CTRL"] = KEYS["CTRL"]
+for _c in ("CTRL", "SHIFT"):
+    KEYS[_c] = Button(_c, "Keyboard")
+    PHYSICAL["KEY_" + _c] = KEYS[_c]
 # the number row and the symbols, plain keys as in the firmware's events/keyboard.py
 for _c in "0123456789+=-_":
     KEYS[_c] = Button(_c, "Keyboard")
