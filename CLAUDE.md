@@ -262,7 +262,8 @@ market on the first good in the hold (Elite's Sell Cargo), 4 equip ship, 5 galac
 chart, 7 system data, 9 status, 0 Inventory (a tab since build 70, drawn by `screens.draw_inventory`), and the two screens
 Elite lacks on the keys after 0 (Brian): - (or _) Repair Shop, = (or +) Options. The joystick goes
 round the tabs in the same order (Brian, build 70; `docked.TABS`, launch left out): Status,
-Inventory, Repair Shop, Options, Market, Equip ship, Galactic chart, Local chart, System data. Tests: `tests/test_keys.py`.
+Inventory, Repair Shop, Options, Market, Equip ship, Galactic chart, Local chart, System data.
+The Repair Shop is on by default (Brian, build 71); DEBUG > DISPLAY can still turn it off. Tests: `tests/test_keys.py`.
 **In-flight screens don't pause (Brian, build 62: "as Elite"; checked against the disc source).**
 Status, Inventory, Market Prices, both charts and system data are `SCREENS`: `fsub` names one while
 `paused` is False, and it is drawn instead of the space view (`_draw_screen`; the three new ones in

@@ -66,7 +66,7 @@ lasers, `M` missile, `P` the menu. The number row is Elite's f0-f9: `1`-`4` fron
 left and right views, `5` galactic chart, `6` local chart, `7` system data, `8` market
 prices, `9` status, `0` inventory (press it again to go back to space; docked, the same keys
 pick the screen: `1` launches, `3` opens the market on what you carry, `0` the inventory, `-` the Repair
-Shop and `=` Options). `H` hyperspace, `Shift`+`H` galactic jump, `J` jump drive, `Esc` the escape pod (in flight;
+Shop (a new colour for your ship) and `=` Options). `H` hyperspace, `Shift`+`H` galactic jump, `J` jump drive, `Esc` the escape pod (in flight;
 back on menus), `Tab` or `Backspace` the energy bomb, `C` / `P` the docking computer on / off
 (`P` is the menu otherwise).
 On a status, market or chart screen only steering, speed and lasers work (and the lasers
@@ -102,8 +102,8 @@ station's safe zone.
 ## Docked
 
 Screens, shown by the squares at the top, in the number keys' order from Status: **Status**,
-**Inventory**, **Options**, **Market**, **Equip ship**, **Galactic chart**, **Local chart** and
-**System data** (and the **Repair Shop** when it is on). Joystick left / right (or E / B) goes
+**Inventory**, **Repair Shop**, **Options**, **Market**, **Equip ship**, **Galactic chart**,
+**Local chart** and **System data**. Joystick left / right (or E / B) goes
 round them; A launches from any screen, C from Status; F goes back to Status, then
 to the title.
 

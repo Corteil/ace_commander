@@ -449,7 +449,7 @@ class AceCommander(app.App):
         self.brief = None       # a mission message being shown (mode "brief")
         self.data_of = None     # the system whose data D shows from the in-flight chart
         self.fire_lock = False  # the lasers wait until C is let go (held on from a menu)
-        self.repair_shop = False    # show the Repair Shop tab (a DEBUG switch for now)
+        self.repair_shop = True     # show the Repair Shop tab (Brian: on by default; DEBUG can turn it off)
         self.chart = None       # the local chart, while it is open
         self.jump_to = None     # (system, distance) the hyperspace countdown is for
         self.dt = 0.0           # seconds since the last update

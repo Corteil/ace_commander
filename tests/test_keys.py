@@ -62,22 +62,22 @@ tick(a, fresh=["KEY_0"]); assert d.name() == "INVENTORY"
 assert "INVENTORY" in [x[0] for x in (lambda c: (a.draw(c), c)[1])(bs.CountCtx()).texts]
 tick(a, fresh=["F"]); assert d.name() == "STATUS", "F: back to Status"
 # the joystick goes round the tabs in the number keys' order, launch left out
-# (Brian): 9 Status, 0 Inventory, = Options, 2 Market, 4 Equip, 5 Galactic,
-# 6 Local, 7 System data (no Repair Shop unless it is switched on)
+# (Brian): 9 Status, 0 Inventory, - Repair Shop, = Options, 2 Market, 4 Equip,
+# 5 Galactic, 6 Local, 7 System data
 order = []
 for _ in range(len(d.tabs)):
     order.append(d.name()); tick(a, fresh=["JOYRIGHT"])
-assert order == ["STATUS", "INVENTORY", "OPTIONS", "MARKET", "EQUIP SHIP", "GALACTIC CHART",
-                 "LOCAL CHART", "SYSTEM DATA"], order
+assert order == ["STATUS", "INVENTORY", "REPAIR SHOP", "OPTIONS", "MARKET", "EQUIP SHIP",
+                 "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA"], order
 assert d.name() == "STATUS", "round again"
 # 3: Elite's Sell Cargo: the market, on the first good in the hold
 a.cmdr.cargo[5] = 2; a.cmdr.cargo[9] = 1
 tick(a, fresh=["KEY_3"]); assert d.name() == "MARKET" and d.sel == 5, d.sel
-# -: the Repair Shop, when it is on (a DEBUG switch for now)
-tick(a, fresh=["KEY_-"]); assert d.name() == "MARKET", "no Repair Shop tab: nothing"
-a.repair_shop = True; a._make_dock(); d = a.dock
+# -: the Repair Shop (on by default; DEBUG can turn it off)
 tick(a, fresh=["KEY_-"]); assert d.name() == "REPAIR SHOP", d.name()
-tick(a, fresh=["KEY__"]); assert d.name() == "REPAIR SHOP"
+tick(a, fresh=["KEY_3"]); tick(a, fresh=["KEY__"]); assert d.name() == "REPAIR SHOP"
+a.repair_shop = False; a._make_dock(); d = a.dock
+tick(a, fresh=["KEY_3"]); tick(a, fresh=["KEY_-"]); assert d.name() == "MARKET", "off: - does nothing"
 print("docked number keys, Inventory, Sell, Repair Shop, Options: ok")
 
 # ---- + / - and J ------------------------------------------------------------
