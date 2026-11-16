@@ -313,14 +313,15 @@ s = g.speed
 tick(a, held=["UP"]); assert g.speed > s
 tick(a, fresh=["LEFT"]); assert g.msg == "NO TARGET"
 tick(a, fresh=["CANCEL"]); assert a.paused
-tick(a, fresh=["DOWN"]); tick(a, fresh=["CONFIRM"]); assert a.fsub == "settings"
+tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"])   # past VIEW: FRONT
+tick(a, fresh=["CONFIRM"]); assert a.fsub == "settings"
 assert any("TILT" in t[0] for t in frame(a).texts)
 tick(a, fresh=["RIGHT"]); assert not a.use_tilt
 assert any("STICK" in t[0] for t in frame(a).texts)
 tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"]); assert not a.paused, "CANCEL backs out"
 ahead, side = rocks(mod, g)
 tick(a, held=["UP"]); assert ahead.y < 0 and g.speed == 0.0
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"])
+tick(a, fresh=["CANCEL"]); tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"])
 tick(a, fresh=["CONFIRM"]); assert a.mode == "menu", "QUIT TO TITLE"
 print("older firmware fallback: ok")
 
