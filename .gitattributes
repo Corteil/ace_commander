@@ -9,3 +9,4 @@ DESIGN.md export-ignore
 deploy.bat export-ignore
 .gitignore export-ignore
 .gitattributes export-ignore
+BUILD_NOTES.md export-ignore
