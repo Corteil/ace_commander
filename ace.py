@@ -139,7 +139,7 @@ DOCK_NAMES = {"A": "MANUAL", "B": "ASSISTED", "C": "AUTOMATIC"}
 
 # keyboard keys not in the firmware's KEYBOARD_BUTTONS, by the name a driver
 # would give them, and the control name Pad gives them
-BY_NAME = {"TAB": "k_TAB"}
+BY_NAME = {"TAB": "k_TAB", "LSHIFT": "k_LSHIFT", "RSHIFT": "k_RSHIFT"}
 
 # the in-flight screens (Elite's f4-f9 and the charts): shown instead of the
 # space view while the game runs on, not pages of the pause menu
@@ -372,7 +372,8 @@ class Pad:
         # Hexpansion sends Shift down, H down, Shift up, H up within one frame,
         # so asking held("k_SHIFT") on the next update is too late (Brian's
         # badge log, build 64). hit("mod+k_H") is a shifted H.
-        mod = count.get("k_SHIFT", 0) > 0 or count.get("k_CTRL", 0) > 0
+        mod = (count.get("k_SHIFT", 0) > 0 or count.get("k_CTRL", 0) > 0
+               or count.get("k_LSHIFT", 0) > 0 or count.get("k_RSHIFT", 0) > 0)
         for n in self._names(button):
             count[n] = count.get(n, 0) + 1
             self.hits.add(n)

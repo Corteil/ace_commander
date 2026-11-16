@@ -292,7 +292,15 @@ bs.bus.send(bs.ButtonDownEvent(lctrl)); tick(a)
 tick(a, fresh=["KEY_H"])
 bs.bus.send(bs.ButtonUpEvent(lctrl))
 assert g.jump_t > 0 and a.jump_to == ("galaxy", 0), "the driver's LCTRL + H"
-print("Tab energy bomb, the driver's LCTRL: ok")
+# the patched driver also sends a held Shift as LSHIFT / RSHIFT
+a, g = flying()
+a.cmdr.extras.append("hyperdrive")
+lshift = bs.Button("LSHIFT", "Keyboard")
+bs.bus.send(bs.ButtonDownEvent(lshift)); tick(a)
+tick(a, fresh=["KEY_H"])
+bs.bus.send(bs.ButtonUpEvent(lshift))
+assert g.jump_t > 0 and a.jump_to == ("galaxy", 0), "the driver's LSHIFT + H"
+print("Tab energy bomb, the driver's LCTRL and LSHIFT: ok")
 
 # combat practice has no charts or hyperspace: the keys do nothing
 bs.press(())
