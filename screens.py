@@ -15,7 +15,7 @@ ROWS = 8            # goods shown at a time on Market Prices and Inventory
 ROW_Y = -58         # the first row
 ROW_STEP = 16
 NAME_X = -96
-PRICE_X = 38
+PRICE_X = 30
 STOCK_X = 66
 HOLD_X = 92
 
@@ -96,21 +96,23 @@ def cargo_rows(c):
 def draw_market(ctx, m, c, here, top):
     """Elite's Market Prices in flight: the prices and stock here and what is
     in the hold, ROWS at a time from row top. Nothing can be bought or sold
-    (Brian): that is docked only."""
+    (Brian): that is docked only. Everything sits DY lower than the docked
+    market so the title fits where the circle is narrow (Brian)."""
+    DY = 10
     text = cockpit.text
     _blank(ctx)
-    text(ctx, "MARKET PRICES  " + here, 0, -100, 11, cockpit.WHITE)
+    text(ctx, "MARKET PRICES  " + here, 0, -100 + DY, 11, cockpit.WHITE)
     for label, x in (("price", PRICE_X), ("qty", STOCK_X), ("hold", HOLD_X)):
-        text(ctx, label, x, -76, 10, cockpit.GREY, 1)
+        text(ctx, label, x, -76 + DY, 10, cockpit.GREY, 1)
     rows = range(len(m.goods))
     if top > 0:
-        ctx.rgb(*cockpit.DIM).rectangle(-3, -69, 6, 2).fill()
+        ctx.rgb(*cockpit.DIM).rectangle(-43, -69 + DY, 6, 2).fill()   # clear of the price column
     for row in range(ROWS):
         k = top + row
         if k >= len(rows):
             break
         i = rows[k]
-        y = ROW_Y + row * ROW_STEP
+        y = ROW_Y + DY + row * ROW_STEP
         unit = m.unit(i)
         p = m.prices[i]
         text(ctx, m.name(i), NAME_X, y, 11, cockpit.WHITE, -1)
@@ -120,10 +122,10 @@ def draw_market(ctx, m, c, here, top):
         if c.cargo[i]:
             text(ctx, "%d%s" % (c.cargo[i], unit), HOLD_X, y, 11, cockpit.GREEN, 1)
     if top + ROWS < len(rows):
-        ctx.rgb(*cockpit.DIM).rectangle(-3, ROW_Y + ROWS * ROW_STEP - 10, 6, 2).fill()
+        ctx.rgb(*cockpit.DIM).rectangle(-43, ROW_Y + DY + ROWS * ROW_STEP - 10, 6, 2).fill()
     text(ctx, "%s   hold %d/%dt" % (c.cash_text(), market.hold_used(c.cargo), c.hold),
-         0, 76, 11, cockpit.CYAN)
-    text(ctx, "C or F: back", 0, 92, 10, cockpit.GREY)
+         0, 76 + DY, 11, cockpit.CYAN)
+    text(ctx, "C or F: back", 0, 92 + DY, 10, cockpit.GREY)
 
 
 def draw_inventory(ctx, c, goods, top):
