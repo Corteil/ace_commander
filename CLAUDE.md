@@ -970,9 +970,10 @@ per assist; `Game.rules` is standard by default and `ace.py` gives a flight `Gam
 when it starts (Options/Settings: HARDCORE: ON / OFF, saved in options.json, applies from the next
 flight). Built so far: manual ECM (`Game.fire_ecm`; E key, or both speed buttons together) and armed
 missiles (`Game.arm_missile` / `unarm_missile`; T / U keys, D arms then fires; lock builds only while
-armed). Tests: `tests/test_hardcore.py` (needs no Elite files). Docking by hand (DOCKING setting), the
-jump lock-out (safe zone and radar) and save-only-when-docked already exist, so they are not Hardcore
-flags. Not built yet: four-way views with a laser per facing, the galactic key, f0-f9 screen keys, `+` / `-` speed keys (names in `KEYBOARD_BUTTONS` unchecked), a HARDCORE marker on the HUD.
+armed). Tests: `tests/test_hardcore.py` (needs no Elite files). `mass_lock_jump` (`Game._massed`, `MASS_LOCK_K` 2 radii): the local jump drive also drops out near the
+planet or sun, "MASS LOCKED" (the sun is already covered by the heat rule). Docking by hand (DOCKING
+setting), the other jump lock-outs (safe zone, radar, heat) and save-only-when-docked already exist, so
+they are not Hardcore flags. Not built yet: four-way views with a laser per facing, the galactic key, f0-f9 screen keys, `+` / `-` speed keys (names in `KEYBOARD_BUTTONS` unchecked), a HARDCORE marker on the HUD.
 Baseline without Elite's files: 9 of 18 test files pass (the rest need ship_data.py / game_data.py).
 
 ## Licensing
