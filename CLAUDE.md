@@ -229,11 +229,16 @@ crosshair); `Commander.lasers` (save key "lasers", old saves load) with `laser` 
 (`equipment.buy(..., mount)`): D on Equip ship picks the view, a new laser refunds only that view's old one.
 SHIP CONFIG has a LASER line for each view (none is possible except at the front). A view change shows
 "REAR VIEW" etc. and a grey label while not looking ahead. Change it: top in-flight menu `VIEW: FRONT`
-(second line; picks the next view and resumes), number keys 1-4 (the keyboard plan's f0-f3: front, rear, left, right), V for the next
-(names in `KEYBOARD_BUTTONS` not checked on a real keyboard). Docking computer forces the
+(second line; C or right the next view, left back, and the menu stays open: Brian, 2026-11-16), number
+keys 1-4 (the keyboard plan's f0-f3: front, rear, left, right), V for the next. Docking computer forces the
 front view. Tests: `tests/test_views.py`. Tufty: `DUST_X` (the wider view) isn't used by `view_dust` yet.
-Not built yet: the galactic key, f0-f9 screen keys, `+` / `-` speed keys (names in `KEYBOARD_BUTTONS` unchecked), a HARDCORE marker on the HUD.
-Baseline without Elite's files: 9 of 18 test files pass (the rest need ship_data.py / game_data.py).
+**Keyboard, confirmed by Brian on the badge (2026-11-16):** Enter and Space fire the laser (the
+firmware makes Enter a CONFIRM button, so it also works menus as C does); Esc is CANCEL, so it leaves
+the pause menu. The cursor keys count as the joystick too (`Pad` gives them the `j_` names on the 2026
+board), so they pick menu lines, change Settings and the VIEW line, and move tabs and chart cursors.
+Not built yet: the galactic key, f0-f9 screen keys, `+` / `-` speed keys (in Hardcore E is the ECM, so
+no key speeds up), a HARDCORE marker on the HUD.
+All 20 test files pass with Elite's files; without them 9 of 18 did when this was started.
 
 ## Licensing
 

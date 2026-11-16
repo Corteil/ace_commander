@@ -297,6 +297,10 @@ class Pad:
             key = KEYBOARD_BUTTONS.get(name)
             if key is not None:
                 table.append(("k_" + name, key))
+                if name in ("UP", "DOWN", "LEFT", "RIGHT") and JOY is not None:
+                    # the cursor keys count as the joystick too, so every menu,
+                    # tab and chart that reads "j_up" ... takes them (Brian)
+                    table.append(("j_" + name.lower(), key))
         # the views are Elite's f0 (front), f1 (rear), f2 (left), f3 (right), on the number
         # keys 1 to 4 as the keyboard plan has it (top row 1-0 are f0-f9). The names in
         # KEYBOARD_BUTTONS are not checked on a real keyboard yet.
@@ -2195,6 +2199,12 @@ class AceCommander(app.App):
             side = left or hit("j_right" if new else "right")
             if confirm or side:
                 self._change(items[self.fmenu], left)
+        elif self.fsub is None and items[self.fmenu].startswith("VIEW: ") and (
+                confirm or hit("j_left" if new else "left") or hit("j_right" if new else "right")):
+            # the camera changes and the menu stays open (Brian): C or right
+            # goes to the next view, left back
+            step = -1 if hit("j_left" if new else "left") else 1
+            self.game.set_view((self.game.view + step) % 4)
         elif self.fsub == "debug":
             if confirm:
                 self.dgroup = items[self.fmenu]
@@ -2210,9 +2220,6 @@ class AceCommander(app.App):
         elif confirm:
             item = items[self.fmenu]
             if item == "RESUME":
-                self._resume()
-            elif item.startswith("VIEW: "):     # the next view round, and back to the flight
-                self.game.next_view()
                 self._resume()
             elif item == "STATUS":
                 self.fsub = "status"

@@ -260,16 +260,45 @@ for hardcore in (False, True):
     assert g.view == 0
 print("keys, both modes: ok")
 
-# the menu: choosing VIEW goes to the next view and back to the flight
+# the menu: VIEW changes the camera and the menu stays open (Brian); C or
+# right goes on, left back
 a, g = app_flight(False)
 tick(a, fresh=["A"])            # the in-flight menu
 assert a.paused
 a.fmenu = a._fitems_top().index("VIEW: FRONT")
 tick(a, fresh=["CONFIRM"])
-assert g.view == 1 and not a.paused, (g.view, a.paused)
-tick(a, fresh=["A"])
-assert "VIEW: REAR" in a._fitems_top()
+assert g.view == 1 and a.paused, (g.view, a.paused)
+assert a._fitems_top()[a.fmenu] == "VIEW: REAR", "the cursor stays on the line"
+tick(a, fresh=["JOYRIGHT"])
+assert g.view == 2 and a.paused
+tick(a, fresh=["JOYLEFT"]); tick(a, fresh=["JOYLEFT"])
+assert g.view == 0 and a.paused
+tick(a, fresh=["JOYLEFT"])
+assert g.view == 3, "left from the front goes round"
 print("menu: ok")
+
+# the cursor keys work the menus as the joystick does: up / down pick a line,
+# left / right change the VIEW line and Settings
+a, g = app_flight(False)
+tick(a, fresh=["A"])
+a.fmenu = 0
+tick(a, fresh=["DOWN"])
+assert a._fitems_top()[a.fmenu].startswith("VIEW: "), a.fmenu
+tick(a, fresh=["RIGHT"])
+assert g.view == 1 and a.paused
+tick(a, fresh=["LEFT"])
+assert g.view == 0
+tick(a, fresh=["UP"])
+assert a.fmenu == 0
+a.fmenu = a._fitems_top().index("SETTINGS")
+tick(a, fresh=["CONFIRM"])
+assert a.fsub == "settings"
+before = a._fitems()
+tick(a, fresh=["RIGHT"])
+assert a._fitems() != before, "right changes the setting under the cursor"
+tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"])
+assert not a.paused, "Esc backs out to the flight"
+print("cursor keys in the menu: ok")
 
 # a commander's lasers are fitted to each view at the start of a flight
 a, g = app_flight(False)
