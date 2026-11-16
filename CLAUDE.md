@@ -988,7 +988,7 @@ crosshair); `Commander.lasers` (save key "lasers", old saves load) with `laser` 
 (`equipment.buy(..., mount)`): D on Equip ship picks the view, a new laser refunds only that view's old one.
 SHIP CONFIG has a LASER line for each view (none is possible except at the front). A view change shows
 "REAR VIEW" etc. and a grey label while not looking ahead. Change it: top in-flight menu `VIEW: FRONT`
-(second line; picks the next view and resumes), number keys 0-3 (Elite's f0-f3: front, rear, left, right), V for the next
+(second line; picks the next view and resumes), number keys 1-4 (the keyboard plan's f0-f3: front, rear, left, right), V for the next
 (names in `KEYBOARD_BUTTONS` not checked on a real keyboard). Docking computer forces the
 front view. Tests: `tests/test_views.py`. Tufty: `DUST_X` (the wider view) isn't used by `view_dust` yet.
 Not built yet: the galactic key, f0-f9 screen keys, `+` / `-` speed keys (names in `KEYBOARD_BUTTONS` unchecked), a HARDCORE marker on the HUD.

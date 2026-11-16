@@ -223,8 +223,8 @@ if os.path.exists(SAVE):
     os.remove(SAVE)
 mod.SAVE_PATH = SAVE
 for n in range(4):      # the number keys (the real names are not checked yet)
-    bs.KEYS[str(n)] = bs.Button(str(n), "Keyboard")
-    bs.PHYSICAL["KEY_%d" % n] = bs.KEYS[str(n)]
+    bs.KEYS[str(n + 1)] = bs.Button(str(n + 1), "Keyboard")
+    bs.PHYSICAL["KEY_%d" % (n + 1)] = bs.KEYS[str(n + 1)]
 
 
 def app_flight(hardcore):
@@ -245,14 +245,14 @@ for hardcore in (False, True):
     a, g = app_flight(hardcore)
     g.set_laser("pulse", 1)
     assert g.view == 0
-    tick(a, fresh=["KEY_1"])
-    assert g.view == 1 and g.laser == "pulse", "1: rear"
     tick(a, fresh=["KEY_2"])
-    assert g.view == 2 and g.laser is None, "2: left"
+    assert g.view == 1 and g.laser == "pulse", "2: rear"
     tick(a, fresh=["KEY_3"])
-    assert g.view == 3, "3: right"
-    tick(a, fresh=["KEY_0"])
-    assert g.view == 0, "0: front"
+    assert g.view == 2 and g.laser is None, "3: left"
+    tick(a, fresh=["KEY_4"])
+    assert g.view == 3, "4: right"
+    tick(a, fresh=["KEY_1"])
+    assert g.view == 0, "1: front"
     tick(a, fresh=["KEY_V"])
     assert g.view == 1, "V: the next view round"
     for _ in range(3):

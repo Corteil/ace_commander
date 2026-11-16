@@ -297,11 +297,11 @@ class Pad:
             key = KEYBOARD_BUTTONS.get(name)
             if key is not None:
                 table.append(("k_" + name, key))
-        # the views, as Elite's f0 (front), f1 (rear), f2 (left), f3 (right), on the number
-        # keys 0 to 3 instead of function keys. The names in KEYBOARD_BUTTONS are not
-        # checked on a real keyboard yet.
+        # the views are Elite's f0 (front), f1 (rear), f2 (left), f3 (right), on the number
+        # keys 1 to 4 as the keyboard plan has it (top row 1-0 are f0-f9). The names in
+        # KEYBOARD_BUTTONS are not checked on a real keyboard yet.
         for n in range(4):
-            key = KEYBOARD_BUTTONS.get(str(n))
+            key = KEYBOARD_BUTTONS.get(str(n + 1))
             if key is not None:
                 table.append(("k_view%d" % n, key))
         self.table = table
