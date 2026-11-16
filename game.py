@@ -1974,6 +1974,29 @@ class Game:
             else:
                 self.say("GAME OVER", 1e9)
 
+    def eject(self):
+        """Launch the escape pod by choice (Elite's ESCAPE key, Brian): the ship
+        is lost as if destroyed and you wake up docked (ace.py does that, as
+        for a pod launched as the ship dies). Not from witchspace: there is no
+        station to reach. Returns True if it went."""
+        if self.over:
+            return False
+        if not self.pod:
+            self.say("NO ESCAPE POD", 1.0)
+            return False
+        if self.space is not None and self.space.witch:
+            self.say("NO STATION IN RANGE", 1.0)
+            return False
+        self.over = True
+        self.autodock = False
+        self.lock = None
+        self.locked = False
+        self._boom(0.0, 0.0, 150.0, 20)
+        self.pod = False
+        self.ejected = True
+        self.say("ESCAPE POD LAUNCHED", 1e9)
+        return True
+
     def _regen(self, dt):
         self.since_hit += dt
         if self.since_hit > 3.0:

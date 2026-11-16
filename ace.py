@@ -137,6 +137,10 @@ DOCK_HOLD = (1.0, 2.0)  # then the view of the bay stays this long, chosen at ra
 EJECT_TIME = 3.0        # seconds of the ESCAPE POD screen before the docking scene (C skips it)
 DOCK_NAMES = {"A": "MANUAL", "B": "ASSISTED", "C": "AUTOMATIC"}
 
+# keyboard keys not in the firmware's KEYBOARD_BUTTONS, by the name a driver
+# would give them, and the control name Pad gives them
+BY_NAME = {"TAB": "k_TAB"}
+
 # the in-flight screens (Elite's f4-f9 and the charts): shown instead of the
 # space view while the game runs on, not pages of the pause menu
 SCREENS = ("status", "inventory", "market", "chart", "data")
@@ -327,7 +331,8 @@ class Pad:
         # number row is f0-f9 ("k_1" ... "k_0"), H hyperspace (Ctrl+H the galactic
         # hyperdrive, as Elite), J the jump drive, + / - speed ("=" and "_" too,
         # the same keys without shift)
-        for name in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "H", "J", "SHIFT", "CTRL"):
+        for name in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "H", "J", "SHIFT", "CTRL",
+                     "ESCAPE"):
             key = KEYBOARD_BUTTONS.get(name)
             if key is not None:
                 table.append(("k_" + name, key))
@@ -348,6 +353,10 @@ class Pad:
         names = self.names.get(button)
         if names is None:
             names = tuple(n for n, kind in self.table if kind in button)
+            # keys the firmware's KEYBOARD_BUTTONS lacks, matched by name in case
+            # a keyboard driver sends them anyway: Tab (Elite's energy bomb)
+            if getattr(button, "name", None) in BY_NAME:
+                names += (BY_NAME[button.name],)
             self.names[button] = names
         return names
 
@@ -1551,6 +1560,10 @@ class AceCommander(app.App):
                     g.unarm_missile()
             if hit("k_M"):
                 missile = True
+            if hit("k_TAB") and g.energy_bomb() and self.career and self.cmdr is not None:
+                self._extra(self.cmdr, "bomb", False)     # Elite's TAB; used up
+            if new and hit("k_ESCAPE"):
+                g.eject()           # Elite's ESCAPE: the escape pod (Esc is still back on menus)
             for n in range(4):      # the views, on a keyboard (both modes)
                 if hit("k_view%d" % n):
                     g.set_view(n)

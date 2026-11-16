@@ -242,7 +242,12 @@ without shift); J holds speed up, so at full speed it is the jump drive under th
 hyperspace and Shift+H the galactic hyperdrive (Brian, build 65: the Keyboard Hexpansion never sends
 Ctrl, so Elite's Ctrl+H can't work; a badge key log showed it sends Shift down, H down, Shift up, H
 up inside one frame, so `Pad` records Shift / Ctrl at key-down as hit("mod+k_H"); Ctrl+H still works
-on a keyboard that sends Ctrl; not G). `LOG_KEYS = True` prints every button event to serial. The number row is f0-f9:
+on a keyboard that sends Ctrl; not G). `LOG_KEYS = True` prints every button event to serial.
+Esc is Elite's escape pod looking at space (`Game.eject`; on a screen or menu Esc is still back) and
+Tab the energy bomb (build 66). The Keyboard Hexpansion driver (github.com/sodoku/tildagon-keebdexpansion,
+on the EEPROM as app.mpy, the same source) sends only keys named in the firmware's KEYBOARD_BUTTONS,
+so it drops TAB and LCTRL; `Pad` also matches a button named TAB (`BY_NAME`), and a driver LCTRL
+with CTRL as its parent counts as Ctrl. The number row is f0-f9:
 in flight 1-4 the views, 5 galactic chart, 6 local chart, 7 the target's (or here's) system data, 8
 Market Prices, 9 Commander Status, 0 Inventory. Docked (`DOCK_KEYS`): 1 launch, 2 / 3 / 8 / 0 market
 (buy, sell, prices, inventory: the hold is listed there), 4 equip ship, 5 galactic chart, 6 local

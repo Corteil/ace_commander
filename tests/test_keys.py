@@ -247,6 +247,46 @@ tick(a, fresh=["D"]); tick(a, fresh=["B"])
 assert a.cmdr.cash == cash and a.cmdr.cargo == cargo, "nothing bought or sold"
 print("market prices: ok")
 
+# Esc is Elite's ESCAPE (Brian): the escape pod, looking at space only; on a
+# screen or in the menu Esc is still back
+a, g = flying()
+tick(a, fresh=["KEY_ESCAPE"])
+assert not g.over and g.msg == "NO ESCAPE POD", g.msg
+a.cmdr.extras.append("pod"); g.pod = True
+tick(a, fresh=["KEY_9"]); tick(a, fresh=["KEY_ESCAPE"])
+assert a.fsub is None and not g.over, "Esc on a screen: back, no pod"
+tick(a, fresh=["A"]); tick(a, fresh=["KEY_ESCAPE"])
+assert not a.paused and not g.over, "Esc in the menu: resume, no pod"
+cargo = list(a.cmdr.cargo)
+tick(a, fresh=["KEY_ESCAPE"])
+assert g.over and g.ejected and g.msg == "ESCAPE POD LAUNCHED", g.msg
+for _ in range(400):
+    tick(a)
+    if a.mode == "docked":
+        break
+assert a.mode == "docked" and "pod" not in a.cmdr.extras, "woken up docked, pod used"
+print("Esc escape pod: ok")
+
+# Tab is Elite's energy bomb (a driver's own TAB button: the firmware has none)
+a, g = flying()
+a.cmdr.extras.append("bomb"); g.bombs = 1
+rock = game.Obj(g.types["ASTEROID"], "rock", 0.0, 0.0, 800.0); g.objs.append(rock)
+tick(a, fresh=["KEY_9"]); tick(a, fresh=["KEY_TAB"])
+assert g.bombs == 1, "Tab on a screen: nothing (a secondary key)"
+tick(a, fresh=["KEY_9"])
+tick(a, fresh=["KEY_TAB"])
+assert g.bombs == 0 and "bomb" not in a.cmdr.extras, "Tab: the energy bomb, used up"
+# the patched Keyboard Hexpansion driver sends LCTRL as its own key with CTRL
+# as its parent, and TAB as a plain key: both reach the game
+lctrl = bs.Button("LCTRL", "Keyboard", bs.KEYS["CTRL"])
+a, g = flying()
+a.cmdr.extras.append("hyperdrive")
+bs.bus.send(bs.ButtonDownEvent(lctrl)); tick(a)
+tick(a, fresh=["KEY_H"])
+bs.bus.send(bs.ButtonUpEvent(lctrl))
+assert g.jump_t > 0 and a.jump_to == ("galaxy", 0), "the driver's LCTRL + H"
+print("Tab energy bomb, the driver's LCTRL: ok")
+
 # combat practice has no charts or hyperspace: the keys do nothing
 bs.press(())
 p = ace_commander.AceCommander()

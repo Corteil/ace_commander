@@ -83,6 +83,9 @@ PHYSICAL["KEY_SPACE"] = KEYS["SPACE"]
 for _c in ("CTRL", "SHIFT"):
     KEYS[_c] = Button(_c, "Keyboard")
     PHYSICAL["KEY_" + _c] = KEYS[_c]
+PHYSICAL["KEY_ESCAPE"] = KEYS["ESCAPE"]
+# Tab is not in the firmware's KEYBOARD_BUTTONS: a driver's own button named TAB
+PHYSICAL["KEY_TAB"] = Button("TAB", "Keyboard")
 # the number row and the symbols, plain keys as in the firmware's events/keyboard.py
 for _c in "0123456789+=-_":
     KEYS[_c] = Button(_c, "Keyboard")
