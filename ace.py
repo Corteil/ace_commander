@@ -146,14 +146,17 @@ BY_NAME = {"TAB": "k_TAB", "LSHIFT": "k_LSHIFT", "RSHIFT": "k_RSHIFT"}
 SCREENS = ("status", "inventory", "market", "chart", "data")
 
 # docked, the number row is Elite's f0-f9 (Brian chose Elite's scheme,
-# 2026-11-16): f0 launch, f1 / f2 buy / sell (both the market here), f3 equip
-# ship, f4 galactic chart, f5 local chart, f6 system data, f7 market prices,
-# f8 status, f9 inventory (the market tab lists the hold). A missing tab does
-# nothing.
-DOCK_KEYS = (("k_1", "LAUNCH"), ("k_2", "MARKET"), ("k_3", "MARKET"),
+# 2026-11-16): f0 launch, f1 / f2 buy / sell (the market here; sell starts on
+# the first good in the hold), f3 equip ship, f4 galactic chart, f5 local
+# chart, f6 system data, f7 market prices, f8 status, f9 inventory (the same
+# screen as in flight). A missing tab does nothing.
+DOCK_KEYS = (("k_1", "LAUNCH"), ("k_2", "MARKET"), ("k_3", "SELL"),
              ("k_4", "EQUIP SHIP"), ("k_5", "GALACTIC CHART"), ("k_6", "LOCAL CHART"),
              ("k_7", "SYSTEM DATA"), ("k_8", "MARKET"), ("k_9", "STATUS"),
-             ("k_0", "MARKET"))
+             ("k_0", "INVENTORY"),
+             # the two screens Elite didn't have, on the keys after 0 (Brian):
+             # - (or _) the Repair Shop, = (or +) Options
+             ("k_slower", "REPAIR SHOP"), ("k_faster", "OPTIONS"))
 # DEBUG, a page of cheats for testing (the in-flight menu, Settings and
 # Options): True or False, or None to show it only if a file called debug.txt
 # is in the app's folder (always on a PC, where the tests run), or once it has
@@ -437,6 +440,7 @@ class AceCommander(app.App):
         self.fsub = None        # a menu page ("settings", "debug", ...) or a screen (SCREENS)
         self.top = 0            # the first row shown on Market Prices or Inventory
         self.fmarket = None     # Market Prices' market, while it is up
+        self.dinv = False       # docked: Inventory (0) is showing over the tabs
         self.galaxy = None      # made the first time a commander flies
         self.galaxy_n = 0       # which of the 8 galaxies self.galaxy is
         self.eject_t = 0.0      # time since the escape pod was launched
@@ -992,6 +996,7 @@ class AceCommander(app.App):
         self.paused = False
         self.fsub = None
         self.chart = None
+        self.dinv = False
         self.mode = "docked"
         self._mission_news()
         self._egg()
@@ -1057,6 +1062,19 @@ class AceCommander(app.App):
         hit = self.pad.hit
         new = FB is not None
         d.tick(dt)
+        if self.dinv:           # Inventory (0), over the tabs: 0, C or F back, up / down scroll
+            if confirm or cancel or hit("k_0"):
+                self.dinv = False
+                return
+            if not any(hit(key) for key, tab in DOCK_KEYS):
+                from . import screens
+                n = len(screens.cargo_rows(self.cmdr))
+                if self._repeat("j_up" if new else "up", dt):
+                    self.top = max(0, self.top - 1)
+                elif self._repeat("j_down" if new else "down", dt):
+                    self.top = max(0, min(n - (screens.ROWS - 1), self.top + 1))
+                return
+            self.dinv = False   # another screen's key: straight there
         if cancel and d.view is not None and d.cursor:
             d.use_cursor(False)     # F: the joystick goes back to changing tabs
             return
@@ -1074,6 +1092,15 @@ class AceCommander(app.App):
             if hit(key):
                 if tab == "LAUNCH":
                     self._launch()
+                elif tab == "INVENTORY":
+                    if GOODS:
+                        self.dinv = True
+                        self.top = 0
+                elif tab == "SELL" and "MARKET" in d.tabs:
+                    d.go(d.tabs.index("MARKET"))
+                    have = [i for i, n in enumerate(self.cmdr.cargo) if n]
+                    if have:            # Elite's Sell Cargo: start on what you carry
+                        d.pick_good(have[0] - d.sel)
                 elif tab in d.tabs:
                     d.go(d.tabs.index(tab))
                 return
@@ -1278,6 +1305,7 @@ class AceCommander(app.App):
                              random)
 
     def _launch(self):
+        self.dinv = False
         self._save_docked()
         self._pick_tunnel()
         self.launch_t = 0.0
@@ -2602,7 +2630,11 @@ class AceCommander(app.App):
         elif self.mode == "level":
             self._draw_level(ctx)
         elif self.mode == "docked":
-            self.dock.draw(ctx)
+            if self.dinv:
+                from . import screens
+                screens.draw_inventory(ctx, self.cmdr, GOODS, self.top)
+            else:
+                self.dock.draw(ctx)
         elif self.mode == "brief":
             self.brief.draw(ctx)
         elif self.mode == "options":

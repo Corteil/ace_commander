@@ -39,7 +39,7 @@ KEYBG = "#e6eaee"
 title = ParagraphStyle("t", fontName="Sans-Bold", fontSize=20, leading=24, textColor=INK)
 sub = ParagraphStyle("s", fontName="Sans", fontSize=9, leading=11, textColor=colors.HexColor("#57606a"))
 head = ParagraphStyle("h", fontName="Sans-Bold", fontSize=11, leading=14, textColor=ACCENT,
-                      spaceBefore=9, spaceAfter=3)
+                      spaceBefore=7, spaceAfter=3)
 cell = ParagraphStyle("c", fontName="Sans", fontSize=8.7, leading=11, textColor=INK)
 note = ParagraphStyle("n", fontName="Sans", fontSize=8.2, leading=10.4, textColor=colors.HexColor("#424a53"),
                       spaceBefore=2)
@@ -60,7 +60,7 @@ def table(rows, widths, header=None):
     t = Table(data, colWidths=widths)
     style = [("VALIGN", (0, 0), (-1, -1), "TOP"),
              ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3),
-             ("TOPPADDING", (0, 0), (-1, -1), 2.4), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.4),
+             ("TOPPADDING", (0, 0), (-1, -1), 1.9), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.9),
              ("LINEBELOW", (0, 0), (-1, -1), 0.3, RULE)]
     if header:
         style.append(("BACKGROUND", (0, 0), (-1, 0), SHADE))
@@ -140,11 +140,12 @@ right = [
 
     section("DOCKED", table([
         [k("1"), "Launch (badge: " + k("A") + ", or " + k("C") + " on Status)"],
-        [k("2") + " " + k("3") + " " + k("8") + " " + k("0"), "Market: " + k("C") + " buys, "
-         + k("D") + " sells, joystick picks"],
+        [k("2") + " " + k("8"), "Market: " + k("C") + " buys, " + k("D") + " sells, joystick picks"],
+        [k("3"), "Market, on the first good in your hold (to sell)"],
         [k("4"), "Equip ship: " + k("C") + " buys"],
         [k("5") + " " + k("6") + " " + k("7"), "Galactic chart · local chart · system data"],
-        [k("9"), "Status"],
+        [k("9") + " / " + k("0"), "Status / Inventory"],
+        [k("−") + " / " + k("="), "Repair Shop (when on) / Options"],
         ["Joystick " + k("←", "→"), "Change screen (or " + k("E") + " / " + k("B") + ")"],
         [k("F") + " or " + k("Esc"), "Back to Status, then the title"],
     ], [W * 0.33, W * 0.67])),

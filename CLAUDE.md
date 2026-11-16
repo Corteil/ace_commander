@@ -257,9 +257,10 @@ all ask there.
 The printable key guide is `tools/make_key_guide.py` (writes key_guide.pdf, gitignored): change it
 when a key changes. The number row is f0-f9:
 in flight 1-4 the views, 5 galactic chart, 6 local chart, 7 the target's (or here's) system data, 8
-Market Prices, 9 Commander Status, 0 Inventory. Docked (`DOCK_KEYS`): 1 launch, 2 / 3 / 8 / 0 market
-(buy, sell, prices, inventory: the hold is listed there), 4 equip ship, 5 galactic chart, 6 local
-chart, 7 system data, 9 status. Tests: `tests/test_keys.py`.
+Market Prices, 9 Commander Status, 0 Inventory. Docked (`DOCK_KEYS`, build 69): 1 launch, 2 / 8 market, 3
+market on the first good in the hold (Elite's Sell Cargo), 4 equip ship, 5 galactic chart, 6 local
+chart, 7 system data, 9 status, 0 Inventory (`screens.draw_inventory` over the tabs, `dinv`), and the
+two screens Elite lacks on the keys after 0 (Brian): - (or _) Repair Shop, = (or +) Options. Tests: `tests/test_keys.py`.
 **In-flight screens don't pause (Brian, build 62: "as Elite"; checked against the disc source).**
 Status, Inventory, Market Prices, both charts and system data are `SCREENS`: `fsub` names one while
 `paused` is False, and it is drawn instead of the space view (`_draw_screen`; the three new ones in

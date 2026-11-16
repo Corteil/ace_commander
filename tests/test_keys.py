@@ -53,10 +53,25 @@ a = docked()
 d = a.dock
 for key, tab in (("KEY_2", "MARKET"), ("KEY_4", "EQUIP SHIP"), ("KEY_5", "GALACTIC CHART"),
                  ("KEY_6", "LOCAL CHART"), ("KEY_7", "SYSTEM DATA"), ("KEY_9", "STATUS"),
-                 ("KEY_0", "MARKET"), ("KEY_3", "MARKET"), ("KEY_8", "MARKET")):
+                 ("KEY_3", "MARKET"), ("KEY_8", "MARKET"), ("KEY_=", "OPTIONS"),
+                 ("KEY_+", "OPTIONS")):
     tick(a, fresh=[key])
-    assert a.mode == "docked" and d.name() == tab, (key, d.name())
-print("docked number keys: ok")
+    assert a.mode == "docked" and d.name() == tab and not a.dinv, (key, d.name())
+# 0: Inventory, the same screen as in flight, over the tabs; 0, C or F back
+tick(a, fresh=["KEY_9"]); tick(a, fresh=["KEY_0"])
+assert a.dinv and "INVENTORY" in [x[0] for x in (lambda c: (a.draw(c), c)[1])(bs.CountCtx()).texts]
+tick(a, fresh=["KEY_0"]); assert not a.dinv and d.name() == "STATUS", "0 again: back"
+tick(a, fresh=["KEY_0"]); tick(a, fresh=["F"]); assert not a.dinv and a.mode == "docked", "F: back"
+tick(a, fresh=["KEY_0"]); tick(a, fresh=["KEY_6"]); assert not a.dinv and d.name() == "LOCAL CHART"
+# 3: Elite's Sell Cargo: the market, on the first good in the hold
+a.cmdr.cargo[5] = 2; a.cmdr.cargo[9] = 1
+tick(a, fresh=["KEY_3"]); assert d.name() == "MARKET" and d.sel == 5, d.sel
+# -: the Repair Shop, when it is on (a DEBUG switch for now)
+tick(a, fresh=["KEY_-"]); assert d.name() == "MARKET", "no Repair Shop tab: nothing"
+a.repair_shop = True; a._make_dock(); d = a.dock
+tick(a, fresh=["KEY_-"]); assert d.name() == "REPAIR SHOP", d.name()
+tick(a, fresh=["KEY__"]); assert d.name() == "REPAIR SHOP"
+print("docked number keys, Inventory, Sell, Repair Shop, Options: ok")
 
 # ---- + / - and J ------------------------------------------------------------
 for hardcore in (False, True):
