@@ -144,6 +144,32 @@ tick(a, held=["KEY_CTRL"]); tick(a, held=["KEY_CTRL"], fresh=["KEY_H"])
 assert g.jump_t > 0 and a.jump_to == ("galaxy", 0), "Ctrl+H: galactic hyperspace"
 print("H, Ctrl+H and the flight screens: ok")
 
+# with a screen open the number row still works (Brian): its own key closes
+# it, 1-4 fly on looking that way, another screen's key goes straight there
+a, g = flying()
+a.target = None
+tick(a, fresh=["KEY_6"]); assert a.paused and a.fsub == "chart"
+tick(a, fresh=["KEY_6"]); assert not a.paused, "6 again: back to the flight"
+tick(a, fresh=["KEY_5"]); assert type(a.chart).__name__ == "GalChart"
+tick(a, fresh=["KEY_5"]); assert not a.paused, "5 again"
+tick(a, fresh=["KEY_9"]); assert a.fsub == "status"
+tick(a, fresh=["KEY_0"]); assert not a.paused, "0 closes status too"
+tick(a, fresh=["KEY_7"]); assert a.fsub == "data"
+tick(a, fresh=["KEY_7"]); assert not a.paused, "7 again"
+tick(a, fresh=["KEY_6"])
+tick(a, fresh=["KEY_5"]); assert a.paused and type(a.chart).__name__ == "GalChart", "6 then 5"
+tick(a, fresh=["KEY_9"]); assert a.paused and a.fsub == "status", "5 then 9"
+tick(a, fresh=["KEY_7"]); assert a.paused and a.fsub == "data", "9 then 7"
+tick(a, fresh=["KEY_2"]); assert not a.paused and g.view == 1, "2: fly on, looking back"
+tick(a, fresh=["KEY_9"])
+tick(a, fresh=["KEY_1"]); assert not a.paused and g.view == 0, "1: fly on, looking ahead"
+tick(a, fresh=["A"]); assert a.paused and a.fsub is None    # the menu itself
+tick(a, fresh=["KEY_3"]); assert not a.paused and g.view == 2, "3 from the menu"
+tick(a, fresh=["A"]); a.fmenu = a._fitems_top().index("SETTINGS"); tick(a, fresh=["C"])
+tick(a, fresh=["KEY_6"]); assert a.fsub == "chart", "6 from Settings"
+tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"]); assert not a.paused
+print("number keys with a screen open: ok")
+
 # combat practice has no charts or hyperspace: the keys do nothing
 bs.press(())
 p = ace_commander.AceCommander()
@@ -151,5 +177,7 @@ choose(p, "COMBAT PRACTICE")
 for key in ("KEY_5", "KEY_6", "KEY_7", "KEY_H"):
     tick(p, fresh=[key])
     assert not p.paused, key
+tick(p, fresh=["A"]); p.fmenu = p._fitems_top().index("SETTINGS"); tick(p, fresh=["C"])
+tick(p, fresh=["KEY_6"]); assert p.paused and p.fsub == "settings", "no chart there: Settings stays"
 print("combat practice: ok")
 print("ALL KEY TESTS PASSED")

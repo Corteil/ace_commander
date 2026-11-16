@@ -1443,7 +1443,8 @@ class AceCommander(app.App):
                 g.step(dt, 0.0, 0.0, 0.0, False, False)   # let the wreckage drift
             return False
         if self.paused:
-            self._update_fmenu(new, menu, cancel, confirm)
+            if not self._paused_keys():
+                self._update_fmenu(new, menu, cancel, confirm)
             return False
         if menu:
             self.paused = True
@@ -2313,6 +2314,39 @@ class AceCommander(app.App):
         self.fsub = None
         self.d_t = None
         self._fpick(pick)
+        return True
+
+    def _paused_keys(self):
+        """The number row while the menu or a screen is open (Brian): 1-4 go
+        back to the flight looking that way, the key of the screen that is
+        open closes it, and another screen's key (or H / Ctrl+H) goes straight
+        there. True if a key did something."""
+        hit = self.pad.hit
+        g = self.game
+        for n in range(4):
+            if hit("k_view%d" % n):
+                self._resume()
+                g.set_view(n)
+                return True
+        open_key = None
+        if self.fsub == "chart" and self.chart is not None:
+            open_key = ("k_5",) if type(self.chart).__name__ == "GalChart" else ("k_6",)
+        elif self.fsub == "data":
+            open_key = ("k_7",)
+        elif self.fsub == "status":
+            open_key = ("k_9", "k_0")
+        if open_key is not None and any(hit(k) for k in open_key):
+            self._resume()
+            return True
+        if not any(hit(k) for k in ("k_5", "k_6", "k_7", "k_9", "k_0", "k_H")):
+            return False
+        was = (self.fsub, self.chart, self.fmenu)
+        self.paused = False     # as if flying: the key then opens its own screen
+        self.fsub = None
+        self.chart = None
+        if not self._flight_keys():     # that screen isn't on offer here: stay put
+            self.paused = True
+            self.fsub, self.chart, self.fmenu = was
         return True
 
     def _fpick(self, item):

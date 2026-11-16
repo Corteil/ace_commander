@@ -245,7 +245,9 @@ galactic chart, 6 local chart, 7 the target's (or here's) system data, 9 and 0 s
 when `_fitems_top()` offers it (so nothing in combat practice or during a countdown; Ctrl+H only with the
 hyperdrive, and never plain hyperspace). Docked (`DOCK_KEYS`): 1 launch, 2 / 3 / 8 / 0 market (buy, sell, prices, inventory: the
 hold is listed there), 4 equip ship, 5 galactic chart, 6 local chart, 7 system data, 9 status. Tests:
-`tests/test_keys.py`. Not checked on a real keyboard yet.
+`tests/test_keys.py`. With the menu or a screen open the number row still works (Brian, build 61):
+1-4 fly on looking that way, the open screen's own key closes it, another screen's key goes there
+(`_paused_keys`). Keys checked on a real keyboard: the number row opens the screens (build 60).
 Not built yet: a HARDCORE marker on the HUD.
 All 20 test files pass with Elite's files; without them 9 of 18 did when this was started.
 
