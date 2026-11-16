@@ -11,14 +11,14 @@ and Hardcore Mode turns them all on. Each flag can be set by hand for testing or
                           the sights, then fired (M); U disarms (standard: lock builds up by itself
                           and D fires)
     four_way_views        front, rear, left and right views, a laser for each facing     [not built]
-    manual_docking        no docking computer assist: slot roll-matching by hand          [not built]
-    mass_lock_jump        the in-system jump drive drops out near a mass                   [not built]
     galactic_hyperspace   the galactic hyperdrive from a key rather than a menu            [not built]
-    save_only_on_dock     saved only when docked (the game already does this since build 35)
+
+Already in the game, so not Hardcore flags: docking by hand (the DOCKING setting: AUTHENTIC /
+ASSISTED / AUTOMATIC, build 27), the jump drive's lock-out (it needs the safe zone left behind and
+no ship or missile in radar range, build 26), and saving only when docked (build 35).
 """
 
-FLAGS = ("manual_ecm", "missile_lock_required", "four_way_views", "manual_docking",
-         "mass_lock_jump", "galactic_hyperspace", "save_only_on_dock")
+FLAGS = ("manual_ecm", "missile_lock_required", "four_way_views", "galactic_hyperspace")
 
 
 class GameRules:
