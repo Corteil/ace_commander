@@ -95,7 +95,7 @@ PULL_TURN = 0.8            # B: how fast it turns its slot to face you, radians 
 STATION_HIT = 15.0         # a crash does this much damage, plus 1.5 for each unit of speed
 BOUNCE = 300.0             # and leaves you this much further out than where you touched
 STATION_SPIN = 0.25        # radians per second, about the station's nose
-MASS_LOCK_K = 2.0          # Hardcore: the jump drive drops out within this many radii of the planet's or sun's centre
+MASS_LOCK_K = 2.0          # the jump drive drops out within this many radii of the planet's or sun's centre
 JUMP_K = 8                 # the jump drive moves you this many times faster
 # Who turns up in a star system, as in the original (read from the main game
 # loop, parts 3 and 4): every ENCOUNTER_EVERY seconds outside the safe zone,
@@ -840,8 +840,10 @@ class Game:
         return False
 
     def _massed(self, sp):
-        """True within MASS_LOCK_K radii of the planet's or the sun's centre (Hardcore's mass
-        lock: the jump drive won't run near a big mass). Squares only."""
+        """True within MASS_LOCK_K radii of the planet's or the sun's centre (the mass lock: the
+        jump drive won't run near a big mass; the station's mass is its safe zone). Squares only."""
+        if sp is None:
+            return False
         for x, y, z, r in ((sp.px, sp.py, sp.pz, sp.pr), (sp.sx, sp.sy, sp.sz, sp.sr)):
             k = r * MASS_LOCK_K
             if x * x + y * y + z * z < k * k:
@@ -1214,8 +1216,8 @@ class Game:
                         and self.speed >= PLAYER_MAX and not sp.safe and self.jump_t <= 0
                         and self.cabin <= COOL_CABIN    # not near the sun
                         and not self._near()
-                        and not (self.rules.mass_lock_jump and self._massed(sp)))
-        if (self.rules.mass_lock_jump and sp is not None and not sp.witch and not self.over
+                        and not self._massed(sp))
+        if (sp is not None and not sp.witch and not self.over
                 and throttle > 0 and self.speed >= PLAYER_MAX and self.msg_t <= 0
                 and not self.jumping and self._massed(sp)):
             self.say("MASS LOCKED", 1.0)

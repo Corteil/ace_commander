@@ -112,7 +112,7 @@ g3.missiles = 0
 assert not g3.arm_missile() and g3.msg == "NO MISSILES"
 print("hardcore arm / lock / fire / unarm: ok")
 
-# ---- hardcore mass lock: the jump drive drops out near the planet or the sun
+# ---- mass lock (standard and hardcore): the jump drive drops out near the planet or the sun
 def jump_flight(hardcore):
     g = flight(hardcore)
     g.enter(6000, "CORIOLIS", "launch", 3)
@@ -139,19 +139,18 @@ def jumping_at(g, sp, dist):
 for hc in (False, True):
     g, sp = jump_flight(hc)
     assert jumping_at(g, sp, sp.pr * 6), "far from everything: the jump drive runs"
-    near = jumping_at(g, sp, sp.pr * 1.5)
-    assert near == (not hc), (hc, near)
+    assert not jumping_at(g, sp, sp.pr * 1.5), "mass locked near the planet, in either mode"
+    assert g.msg == "MASS LOCKED", g.msg
+    assert not jumping_at(g, sp, sp.pr * 1.9), "inside 2 radii"
+    assert jumping_at(g, sp, sp.pr * 2.2), "outside 2 radii"
     if hc:
-        assert g.msg == "MASS LOCKED", g.msg
-        assert not jumping_at(g, sp, sp.pr * 1.9), "inside 2 radii"
-        assert jumping_at(g, sp, sp.pr * 2.2), "outside 2 radii"
         g.space.px = 1e8
         sp.sx, sp.sy, sp.sz = 0.0, 0.0, sp.sr * 1.5     # the sun counts too
         g.speed = game.PLAYER_MAX
         g.cabin = game.COOL_CABIN
         g.step(DT, 0, 0, 1.0, False, False)
         assert not g.jumping, "no jump drive near the sun"
-print("hardcore mass lock (planet and sun): ok")
+print("mass lock (planet and sun, both modes): ok")
 
 # ---- a new flight starts disarmed
 g = flight(True)
