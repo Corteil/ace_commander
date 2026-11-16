@@ -260,12 +260,19 @@ assert not a.paused and not g.over, "Esc in the menu: resume, no pod"
 cargo = list(a.cmdr.cargo)
 tick(a, fresh=["KEY_ESCAPE"])
 assert g.over and g.ejected and g.msg == "ESCAPE POD LAUNCHED", g.msg
+seen = None
 for _ in range(400):
     tick(a)
+    if a.mode == "docking" and seen is None:
+        seen = a.tunnel.me.bp.name if a.tunnel.me is not None else None
     if a.mode == "docked":
         break
+assert seen == "ESCAPE POD", ("the docking scene shows the pod coming in (Brian)", seen)
 assert a.mode == "docked" and "pod" not in a.cmdr.extras, "woken up docked, pod used"
-print("Esc escape pod: ok")
+# a normal launch shows the ship you fly
+a.dock.go(0); tick(a, fresh=["KEY_1"])
+assert a.mode == "launch" and a.tunnel.me.bp.name == a._ship_name() == "COBRA MK III"
+print("Esc escape pod, the pod in the docking scene: ok")
 
 # Tab is Elite's energy bomb (a driver's own TAB button: the firmware has none)
 a, g = flying()

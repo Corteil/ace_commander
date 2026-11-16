@@ -868,7 +868,7 @@ class _Me:
 def _my_ship(g):
     global _me
     if _me is None or _me[1] is not g:
-        bp = g.types.get("COBRA MK III")
+        bp = g.types.get(getattr(g, "ship_name", "COBRA MK III"))   # the ship you fly
         if bp is None:
             return None
         _me = [_Me(bp), g, 0.0, 0.0]

@@ -497,6 +497,7 @@ class Game:
         self.god = False    # a cheat: hits flash but do no damage
         self.docking = "C"  # how docking works: see set_docking
         self.view = 0               # 0 front, 1 rear, 2 left, 3 right (Elite's VIEW)
+        self.ship_name = "COBRA MK III"     # the ship you fly (ace.py's _ship_name), for the chase view
         self.looking = True         # a space view is showing (Elite's QQ11 = 0); False on a
                                     # status, market or chart screen: lasers fire but can't hit
         self.lasers = [None, None, None, None]  # the laser on each view (a key of LASERS), or None

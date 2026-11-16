@@ -1179,6 +1179,7 @@ class AceCommander(app.App):
         g.fuel_scoops = "scoops" in c.extras
         g.ecm = "ecm" in c.extras
         g.pod = "pod" in c.extras
+        g.ship_name = self._ship_name()
         g.bombs = 1 if "bomb" in c.extras else 0
         g.computer = "docking" in c.extras
         g.ship_rgb = cockpit.ship_rgb(c.colour)     # for the view from behind your ship
@@ -1243,9 +1244,11 @@ class AceCommander(app.App):
         self.target = None
         self.jump_to = None
 
-    def _pick_tunnel(self):
+    def _pick_tunnel(self, pod=False):
         """This station's tunnel: its slot's shape and its own ring spacing, from its
-        system, with ships parked in the bay that suit the system."""
+        system, with ships parked in the bay that suit the system. Flying through
+        it: the ship you fly, or with pod the escape pod (Brian: after the pod
+        is used, the docking scene shows the pod coming in)."""
         c = self.cmdr
         seed = 0
         station = "CORIOLIS"
@@ -1264,8 +1267,11 @@ class AceCommander(app.App):
         else:
             types = {e[0]: game.Blueprint(e) for e in SHIPS} if SHIPS else {}
         if types:
-            self.tunnel.fly(types.get("COBRA MK III"),      # your ship, seen from behind
-                            cockpit.ship_rgb(c.colour if c is not None else 0))
+            if pod:
+                self.tunnel.fly(types.get("ESCAPE POD"), cockpit.ME_RGB)
+            else:
+                self.tunnel.fly(types.get(self._ship_name()),      # your ship, seen from behind
+                                cockpit.ship_rgb(c.colour if c is not None else 0))
             self.tunnel.park([types[n] for n in game.parked_ships(gov, tech) if n in types],
                              random)
 
@@ -1441,7 +1447,7 @@ class AceCommander(app.App):
             self.eject_t += dt
             if self.career and (confirm or self.eject_t >= EJECT_TIME):
                 g.ejected = False
-                self._fly_in()      # the pod is taken in: the docking tunnel, then docked
+                self._fly_in(True)  # the pod is taken in: the docking tunnel, then docked
             elif not self.career and confirm:   # practice has no station: fly again
                 g.reset()
                 self.banked = 0
@@ -1610,22 +1616,30 @@ class AceCommander(app.App):
                 return True
         return False
 
+    def _ship_name(self):
+        """The ship you fly, by Elite's name (the game's own design for that role
+        with DATA: OWN). Always the Cobra Mk III until ship types are built
+        (DESIGN.md phase 6): the scenes and the Repair Shop all ask here."""
+        return "COBRA MK III"
+
     def _ship_bp(self):
-        """Your ship's blueprint (a Cobra Mk III), or None without ship data."""
+        """Your ship's blueprint, or None without ship data."""
+        name = self._ship_name()
         if self.game is not None:
-            return self.game.types.get("COBRA MK III")
+            return self.game.types.get(name)
         for e in SHIPS or ():
-            if e[0] == "COBRA MK III":
+            if e[0] == name:
                 return game.Blueprint(e)
         return None
 
-    def _fly_in(self):
+    def _fly_in(self, pod=False):
         """The docking scene: in through the station's tunnel, a while in the
-        bay, then the docked screens (see update, mode "docking")."""
+        bay, then the docked screens (see update, mode "docking"). pod: it is
+        the escape pod coming in."""
         self._bank()
         self.dock_t = 0.0
         self.dock_hold = random.uniform(*DOCK_HOLD)
-        self._pick_tunnel()
+        self._pick_tunnel(pod)
         self.mode = "docking"
 
     # ---- in-flight menu ---------------------------------------------------
