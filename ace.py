@@ -835,6 +835,7 @@ class AceCommander(app.App):
             fresh = False
         if fresh:
             g.rules = rules.GameRules(self.hardcore)    # the rules for this flight
+            g.set_docking(g.docking)        # Hardcore: by hand, whatever the setting
         self.career = career
         g.again = "C: back to last save" if career else "C: fly again"
         g.scoop = self._scoop if career and self.cmdr is not None else None
@@ -1095,6 +1096,13 @@ class AceCommander(app.App):
             return True
         self.held_t[name] = t
         return False
+
+    def _manual_docking(self):
+        """Hardcore: docking is by hand only. In a flight, the rules it started with;
+        elsewhere the HARDCORE setting (which a flight takes up when it starts)."""
+        if self.game is not None and self.mode == "flight":
+            return self.game.rules.manual_docking
+        return self.hardcore
 
     def _fit(self, g):
         """A fresh career flight: the commander's ship as equipped."""
@@ -1541,7 +1549,8 @@ class AceCommander(app.App):
             steer = "STEER: %s (no tilt sensor)" % stick
         items = [steer]
         if cmdr and self.cmdr is not None:
-            items.append("DOCKING: " + DOCK_NAMES[self.cmdr.docking])
+            items.append("DOCKING: AUTHENTIC (HARDCORE)" if self._manual_docking()
+                         else "DOCKING: " + DOCK_NAMES[self.cmdr.docking])
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
         if tildagonos is not None:
             items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))
@@ -1586,6 +1595,8 @@ class AceCommander(app.App):
                 self._mission_flags()
             self._write_setting("quick_con", c.quick_con)
         elif item.startswith("DOCKING"):
+            if self._manual_docking():
+                return          # Hardcore: only by hand (or a docking computer)
             c = self.cmdr       # A, B, C, A going on; left goes back
             i = commander.DOCKING.index(c.docking) + (-1 if left else 1)
             c.docking = commander.DOCKING[i % len(commander.DOCKING)]

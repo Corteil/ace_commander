@@ -538,8 +538,9 @@ class Game:
         self.reset()
 
     def set_docking(self, style):
-        """"A" authentic, "B" assisted or "C" automatic (commander.DOCKING)."""
-        self.docking = style if style in ("A", "B", "C") else "C"
+        """"A" authentic, "B" assisted or "C" automatic (commander.DOCKING).
+        Hardcore Mode is always "A": by hand, or with a docking computer."""
+        self.docking = "A" if self.rules.manual_docking else (style if style in ("A", "B", "C") else "C")
         self.tractor = False
 
     def set_laser(self, kind, view=0):

@@ -972,8 +972,9 @@ flight). Built so far: manual ECM (`Game.fire_ecm`; E key, or both speed buttons
 missiles (`Game.arm_missile` / `unarm_missile`; T / U keys, D arms then fires; lock builds only while
 armed). Tests: `tests/test_hardcore.py` (needs no Elite files). Mass lock (all modes, `Game._massed`, `MASS_LOCK_K` 2 radii): the local jump drive drops out near the
 planet or sun, "MASS LOCKED"; the station's mass is its safe zone, which is kept (the planet's sphere
-does not cover it: the station is 3 radii out). The sun is also covered by the heat rule. Docking by
-hand (DOCKING setting), the other jump lock-outs and save-only-when-docked already exist, so they are
+does not cover it: the station is 3 radii out). The sun is also covered by the heat rule. Docking: the DOCKING setting exists in every mode, and Hardcore's flag `manual_docking` forces AUTHENTIC (by hand;
+the saved style is untouched and the Settings line says "AUTHENTIC (HARDCORE)"); the only help is a docking computer you
+have bought (`Game.computer`). The other jump lock-outs and save-only-when-docked already exist, so they are
 not Hardcore flags.
 **Four views, in every mode (not a Hardcore flag: Brian, 2026-11-16; checked against the disc source's
 VIEW, LOOK1, PU1, PU2, LASER, SIGHT).** `Game.view` 0 front, 1 rear, 2 left, 3 right (`VIEW_NAMES`); the

@@ -226,6 +226,28 @@ tick(a, fresh=["D"])
 assert g.missiles == 3 and not g.armed, "hardcore: the next D fires"
 print("hardcore badge buttons (E+F, D): ok")
 
+# ---- docking is by hand only in Hardcore; the DOCKING setting is left as it was
+for style in "ABC":
+    g = flight(False)
+    g.set_docking(style)
+    assert g.docking == style, "standard: the setting decides"
+    g = flight(True)
+    g.set_docking(style)
+    assert g.docking == "A", "hardcore: always by hand"
+a, g = app_flight(True)
+a.cmdr = ace_commander.commander.Commander(1)
+a.cmdr.docking = "C"
+assert "DOCKING: AUTHENTIC (HARDCORE)" in a._settings(True)
+a._change("DOCKING: AUTHENTIC (HARDCORE)", False)
+assert a.cmdr.docking == "C", "the saved style isn't changed in Hardcore"
+assert "DOCKING: AUTHENTIC (HARDCORE)" in a._settings(True), "a Hardcore flight stays so until it ends"
+a.mode = "menu"
+a.hardcore = False
+assert "DOCKING: AUTOMATIC" in a._settings(True)
+g.computer = False
+assert g.start_autodock() == "NO DOCKING COMPUTER", "only a bought docking computer flies you in"
+print("hardcore docking: ok")
+
 # ---- the setting is saved
 a, g = app_flight(False)
 a._change("HARDCORE: OFF", False)
