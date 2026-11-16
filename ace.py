@@ -311,7 +311,8 @@ class Pad:
                 table.append(("j_" + name.lower(), JOY[name]))
             for name in "ABCDEF":
                 table.append((name, FB[name]))
-        for name in ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "T", "U", "V", "SPACE",
+        for name in ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "T", "U", "V", "C", "SPACE",
+                     "BACKSPACE",
                      "UP", "DOWN", "LEFT", "RIGHT"):
             key = KEYBOARD_BUTTONS.get(name)
             if key is not None:
@@ -1427,8 +1428,17 @@ class AceCommander(app.App):
         g = self.game
         new = FB is not None    # joystick and lettered buttons are told apart
         menu = hit(BTN_MENU) if new else cancel
+        # Elite's docking computer keys (Brian): C on, P off. P is the pause menu
+        # otherwise. Read in any view, as Elite's main loop reads them.
         if hit("k_P"):
-            menu = True
+            if g.autodock and not self.paused:
+                g.stop_autodock()
+            else:
+                menu = True
+        if hit("k_C") and not g.over and not g.autodock and not self.paused:
+            why = g.start_autodock()
+            if why:
+                g.say(why, 1.0)
 
         if g.over and g.ejected:
             # the escape pod: the ship and its cargo are lost, the pod is used
@@ -1567,8 +1577,11 @@ class AceCommander(app.App):
                     g.unarm_missile()
             if hit("k_M"):
                 missile = True
-            if hit("k_TAB") and g.energy_bomb() and self.career and self.cmdr is not None:
-                self._extra(self.cmdr, "bomb", False)     # Elite's TAB; used up
+            # Elite's TAB; Backspace too, which an unpatched Keyboard Hexpansion
+            # sends where it drops Tab (Brian)
+            if ((hit("k_TAB") or hit("k_BACKSPACE")) and g.energy_bomb() and self.career
+                    and self.cmdr is not None):
+                self._extra(self.cmdr, "bomb", False)     # used up
             if new and hit("k_ESCAPE"):
                 g.eject()           # Elite's ESCAPE: the escape pod (Esc is still back on menus)
             for n in range(4):      # the views, on a keyboard (both modes)

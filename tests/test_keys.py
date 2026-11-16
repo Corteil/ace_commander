@@ -302,6 +302,28 @@ bs.bus.send(bs.ButtonUpEvent(lshift))
 assert g.jump_t > 0 and a.jump_to == ("galaxy", 0), "the driver's LSHIFT + H"
 print("Tab energy bomb, the driver's LCTRL and LSHIFT: ok")
 
+# Elite's docking computer keys (Brian): C on, P off; P is the menu otherwise
+a, g = flying()
+assert g.space.safe, "just launched: in the safe zone"
+tick(a, fresh=["KEY_C"])
+assert not g.autodock and g.msg == "NO DOCKING COMPUTER", g.msg
+a.cmdr.extras.append("docking"); g.computer = True
+tick(a, fresh=["KEY_C"]); assert g.autodock, "C: the docking computer on"
+tick(a, fresh=["KEY_P"]); assert not g.autodock and not a.paused, "P: off, no menu"
+tick(a, fresh=["KEY_P"]); assert a.paused, "P with it off: the menu"
+tick(a, fresh=["KEY_C"]); assert not g.autodock, "C in the menu does nothing"
+tick(a, fresh=["KEY_P"]); assert not a.paused
+g.space.safe = False
+tick(a, fresh=["KEY_C"]); assert not g.autodock and g.msg == "STATION TOO FAR", g.msg
+print("C / P docking computer: ok")
+
+# Backspace sets off the energy bomb too (an unpatched keyboard drops Tab)
+a, g = flying()
+a.cmdr.extras.append("bomb"); g.bombs = 1
+tick(a, fresh=["KEY_BACKSPACE"])
+assert g.bombs == 0 and "bomb" not in a.cmdr.extras, "Backspace: the energy bomb"
+print("Backspace energy bomb: ok")
+
 # combat practice has no charts or hyperspace: the keys do nothing
 bs.press(())
 p = ace_commander.AceCommander()

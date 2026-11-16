@@ -244,7 +244,9 @@ Ctrl, so Elite's Ctrl+H can't work; a badge key log showed it sends Shift down, 
 up inside one frame, so `Pad` records Shift / Ctrl at key-down as hit("mod+k_H"); Ctrl+H still works
 on a keyboard that sends Ctrl; not G). `LOG_KEYS = True` prints every button event to serial.
 Esc is Elite's escape pod looking at space (`Game.eject`; on a screen or menu Esc is still back) and
-Tab the energy bomb (build 66). The Keyboard Hexpansion driver (github.com/sodoku/tildagon-keebdexpansion,
+Tab the energy bomb (build 66); Backspace too (build 68), since an unpatched driver drops Tab. C
+switches the docking computer on and P off, as Elite (P is the pause menu when it is off; both read
+in any view, not while paused). Ctrl+H needs the patched driver; Shift+H works with either. The Keyboard Hexpansion driver (github.com/sodoku/tildagon-keebdexpansion,
 on the EEPROM as app.mpy, the same source) sends only keys named in the firmware's KEYBOARD_BUTTONS,
 so it drops TAB and LCTRL; `Pad` also matches a button named TAB (`BY_NAME`), and a driver LCTRL
 with CTRL as its parent counts as Ctrl.
