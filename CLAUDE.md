@@ -253,7 +253,9 @@ with CTRL as its parent counts as Ctrl.
 After the escape pod (crash or Esc) the docking scene flies the ESCAPE POD in, to scale (Brian, build
 67: `_fly_in(pod=True)` / `_pick_tunnel(pod)`). The ship you fly is `_ship_name()` (always the Cobra
 Mk III until ship types are built): the tunnels, the Repair Shop and the chase view (`Game.ship_name`)
-all ask there. The number row is f0-f9:
+all ask there.
+The printable key guide is `tools/make_key_guide.py` (writes key_guide.pdf, gitignored): change it
+when a key changes. The number row is f0-f9:
 in flight 1-4 the views, 5 galactic chart, 6 local chart, 7 the target's (or here's) system data, 8
 Market Prices, 9 Commander Status, 0 Inventory. Docked (`DOCK_KEYS`): 1 launch, 2 / 3 / 8 / 0 market
 (buy, sell, prices, inventory: the hold is listed there), 4 equip ship, 5 galactic chart, 6 local
