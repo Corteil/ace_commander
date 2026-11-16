@@ -9,6 +9,7 @@ text is kept for messages that only show now and then.
 import math
 
 FOCAL = 208.0    # pixels; gives a field of view of about 60 degrees
+VIEW_NAMES = ("FRONT", "REAR", "LEFT", "RIGHT")   # as game.VIEW_NAMES; this module imports no game
 NEAR = 30.0      # nothing closer than this is drawn
 TAU = 2 * math.pi
 WIRE_MIN = 8.0   # ships that look smaller than this (pixels) are drawn as a marker
@@ -895,6 +896,17 @@ def draw_world(ctx, g):
             finally:
                 _chase_shift(g, CHASE_UP, -CHASE_BACK)
             return
+    if g.view:      # rear, left or right: the world turned into that view (Game.enter_view)
+        dust = g.dust
+        g.dust = g.view_dust()
+        g.enter_view()
+        try:
+            _draw_world(ctx, g)
+        finally:
+            g.leave_view()
+            g.dust = dust
+        text(ctx, VIEW_NAMES[g.view] + " VIEW", 0, -96, 11, GREY)
+        return
     _draw_world(ctx, g)
 
 
@@ -1174,7 +1186,7 @@ def draw_hud(ctx, g, ms=None, ring=True):
     """Crosshair, gauges, radar and numbers. ring: flash a red ring when hit
     (for badges where the LEDs can't be used for that)."""
     # crosshair (not in the docking computer's view from behind your ship)
-    if not getattr(g, "autodock", False):
+    if not getattr(g, "autodock", False) and g.laser is not None:      # as Elite: only with a laser here
         ctx.rgb(*GREEN)
         ctx.rectangle(6, -0.75, 8, 1.5).fill()
         ctx.rectangle(-14, -0.75, 8, 1.5).fill()

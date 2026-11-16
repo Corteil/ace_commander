@@ -148,7 +148,7 @@ tick(a, fresh=["A"]); tick(a, fresh=["F"]); assert not a.paused, "and so does F"
 tick(a, fresh=["A"])
 tick(a, fresh=["D"]); tick(a, fresh=["B"]); assert a.fmenu == 0, "lettered buttons don't move the menu"
 tick(a, fresh=["JOYDOWN"]); assert a.fmenu == 1
-tick(a, fresh=["C"]); assert a.fsub == "settings" and a.fmenu == 0
+a.fmenu = a._fitems_top().index("SETTINGS"); tick(a, fresh=["C"]); assert a.fsub == "settings" and a.fmenu == 0
 tx = texts(a)
 assert "SETTINGS" in tx and "STEER: JOYSTICK" in tx and "QUIT TO TITLE" not in tx
 tick(a, fresh=["JOYRIGHT"]); assert a.use_tilt, "joystick left/right switches to tilt"
@@ -156,7 +156,7 @@ assert "STEER: TILT" in texts(a)
 tick(a, fresh=["B"]); tick(a, fresh=["E"]); assert a.use_tilt, "B and E don't switch it"
 tick(a, fresh=["C"]); assert not a.use_tilt, "C switches it too"
 tick(a, fresh=["C"]); assert a.use_tilt
-tick(a, fresh=["F"]); assert a.paused and a.fsub is None and a.fmenu == 1, "F goes back a page"
+tick(a, fresh=["F"]); assert a.paused and a.fsub is None and a._fitems()[a.fmenu] == "SETTINGS", "F goes back a page"
 tick(a, fresh=["A"]); assert not a.paused
 
 # tilt steering, with the joystick still working and D to re-zero
@@ -191,9 +191,9 @@ tick(a)
 assert a.zero == z, "and letting go after a hold doesn't re-zero"
 Imu.reading = [0.0, 0.0, G]
 tick(a, fresh=["D"]); assert a.zero == (0.0, 0.0)
-tick(a, fresh=["A"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+tick(a, fresh=["A"]); a.fmenu = a._fitems_top().index("SETTINGS"); tick(a, fresh=["C"])
 tick(a, fresh=["JOYLEFT"]); assert not a.use_tilt
-tick(a, fresh=["F"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+tick(a, fresh=["F"]); a.fmenu = a._fitems_top().index("QUIT TO TITLE"); tick(a, fresh=["C"])
 assert a.mode == "menu" and not a.paused, "QUIT TO TITLE"
 choose(a, "COMBAT PRACTICE"); assert a.mode == "flight" and a.game is g, "the fight carries on"
 print("in-flight menu on A, steering switch, tilt with D tap and hold, quit and carry on: ok")
@@ -289,7 +289,7 @@ a.use_tilt = True
 Imu.fail = True
 tick(a)
 assert not a.tilt_ok and not a.use_tilt
-tick(a, fresh=["A"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+tick(a, fresh=["A"]); a.fmenu = a._fitems_top().index("SETTINGS"); tick(a, fresh=["C"])
 tick(a, fresh=["JOYLEFT"]); tick(a, fresh=["C"]); assert not a.use_tilt
 assert any("no tilt sensor" in t[0] for t in frame(a).texts)
 print("tilt sensor failure: ok")

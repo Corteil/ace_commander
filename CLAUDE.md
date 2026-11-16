@@ -974,7 +974,24 @@ armed). Tests: `tests/test_hardcore.py` (needs no Elite files). Mass lock (all m
 planet or sun, "MASS LOCKED"; the station's mass is its safe zone, which is kept (the planet's sphere
 does not cover it: the station is 3 radii out). The sun is also covered by the heat rule. Docking by
 hand (DOCKING setting), the other jump lock-outs and save-only-when-docked already exist, so they are
-not Hardcore flags. Not built yet: four-way views with a laser per facing, the galactic key, f0-f9 screen keys, `+` / `-` speed keys (names in `KEYBOARD_BUTTONS` unchecked), a HARDCORE marker on the HUD.
+not Hardcore flags.
+**Four views, in every mode (not a Hardcore flag: Brian, 2026-11-16; checked against the disc source's
+VIEW, LOOK1, PU1, PU2, LASER, SIGHT).** `Game.view` 0 front, 1 rear, 2 left, 3 right (`VIEW_NAMES`); the
+dashboard, radar and controls don't change. The world stays in the front frame; `Game.enter_view()` /
+`leave_view()` flip or swap it as Elite's PU1 / PU2 do (rear: -x, -z; left: (z, -x); right: (-z, x); objects,
+their axes, explosion dots, planet, sun, station, `Game.new`) to draw it (`cockpit.draw_world`) and to aim
+(`Game._weapons` runs inside it, and the missile is made after leaving it: it always goes straight ahead, as
+in Elite; lock follows the view's crosshair). Whole-number exact. Stardust is a copy per view
+(`Game.view_dust`, `DUST_MID`): from the rear it rushes away, from the sides it streams past. A laser per
+view (`Game.lasers`, `set_laser(kind, view)`; `Game.laser` is the current view's, None if none: "NO LASER", no
+crosshair); `Commander.lasers` (save key "lasers", old saves load) with `laser` still the front one. The shop
+(`equipment.buy(..., mount)`): D on Equip ship picks the view, a new laser refunds only that view's old one.
+SHIP CONFIG has a LASER line for each view (none is possible except at the front). A view change shows
+"REAR VIEW" etc. and a grey label while not looking ahead. Change it: top in-flight menu `VIEW: FRONT`
+(second line; picks the next view and resumes), keyboard F0-F3 (Elite's f0-f3) or 1-4, V for the next
+(names in `KEYBOARD_BUTTONS` not checked on a real keyboard: `Pad` tries both). Docking computer forces the
+front view. Tests: `tests/test_views.py`. Tufty: `DUST_X` (the wider view) isn't used by `view_dust` yet.
+Not built yet: the galactic key, f0-f9 screen keys, `+` / `-` speed keys (names in `KEYBOARD_BUTTONS` unchecked), a HARDCORE marker on the HUD.
 Baseline without Elite's files: 9 of 18 test files pass (the rest need ship_data.py / game_data.py).
 
 ## Licensing

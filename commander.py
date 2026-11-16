@@ -64,7 +64,7 @@ class Commander:
         self.hold = HOLD        # tonnes the hold takes
         self.market = None      # the market where they are (market.new), or None
         self.missiles = START_MISSILES
-        self.laser = "pulse"    # the front laser (LASERS)
+        self.lasers = ["pulse", "", "", ""]     # the laser on each view (LASERS): front, rear, left, right; "" none
         self.extras = []        # other items fitted, by name (equipment.EXTRAS)
         self.docked_at = None   # the last system docked at: where they start again if destroyed
         self.docking = "B"
@@ -111,6 +111,15 @@ class Commander:
             return self.rank()
         return None
 
+    @property
+    def laser(self):
+        """The front laser, which a commander always has."""
+        return self.lasers[0]
+
+    @laser.setter
+    def laser(self, kind):
+        self.lasers[0] = kind
+
     # ---- saving -----------------------------------------------------------
 
     def to_dict(self):
@@ -118,7 +127,7 @@ class Commander:
                 "credits": self.credits, "docking": self.docking,
                 "system": self.system, "fuel": self.fuel, "cargo": self.cargo,
                 "market": self.market, "hold": self.hold, "missiles": self.missiles,
-                "laser": self.laser, "extras": self.extras, "docked_at": self.docked_at,
+                "laser": self.laser, "lasers": self.lasers, "extras": self.extras, "docked_at": self.docked_at,
                 "galaxy": self.galaxy, "colour": self.colour,
                 "legal": self.legal, "mission": self.mission,
                 "quick_con": self.quick_con, "data": self.data}
@@ -132,6 +141,12 @@ class Commander:
         c.missiles = max(0, min(4, int(d.get("missiles", START_MISSILES))))
         if d.get("laser") in LASERS:
             c.laser = d["laser"]
+        mounted = d.get("lasers")
+        if isinstance(mounted, list) and len(mounted) == 4:     # one a view, "" for none
+            front = c.laser
+            c.lasers = [k if k in LASERS else "" for k in mounted]
+            if not c.lasers[0]:
+                c.lasers[0] = front     # the front laser can't be taken away
         extras = d.get("extras")
         if isinstance(extras, list):
             c.extras = [x for x in extras if isinstance(x, str)]

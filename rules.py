@@ -10,15 +10,15 @@ and Hardcore Mode turns them all on. Each flag can be set by hand for testing or
     missile_lock_required missiles must be armed first (T), then locked by keeping the target in
                           the sights, then fired (M); U disarms (standard: lock builds up by itself
                           and D fires)
-    four_way_views        front, rear, left and right views, a laser for each facing     [not built]
     galactic_hyperspace   the galactic hyperdrive from a key rather than a menu            [not built]
 
-Already in the game, so not Hardcore flags: docking by hand (the DOCKING setting: AUTHENTIC /
+Already in the game, so not Hardcore flags: the four views (front, rear, left, right: in every mode,
+changed from the in-flight menu or by keyboard, with a laser fitted to each) and docking by hand (the DOCKING setting: AUTHENTIC /
 ASSISTED / AUTOMATIC, build 27), the jump drive's lock-outs (the safe zone round the station, the planet's and sun's
 mass lock, no ship or missile in radar range, no cabin heat), and saving only when docked (build 35).
 """
 
-FLAGS = ("manual_ecm", "missile_lock_required", "four_way_views", "galactic_hyperspace")
+FLAGS = ("manual_ecm", "missile_lock_required", "galactic_hyperspace")
 
 
 class GameRules:

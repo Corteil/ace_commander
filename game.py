@@ -95,6 +95,9 @@ PULL_TURN = 0.8            # B: how fast it turns its slot to face you, radians 
 STATION_HIT = 15.0         # a crash does this much damage, plus 1.5 for each unit of speed
 BOUNCE = 300.0             # and leaves you this much further out than where you touched
 STATION_SPIN = 0.25        # radians per second, about the station's nose
+VIEW_NAMES = ("FRONT", "REAR", "LEFT", "RIGHT")     # the four space views (Elite's VIEW 0-3)
+DUST_MID = 800          # the stardust field's middle, for the views to the side and back (see Game.view_dust)
+
 MASS_LOCK_K = 2.0          # the jump drive drops out within this many radii of the planet's or sun's centre
 JUMP_K = 8                 # the jump drive moves you this many times faster
 # Who turns up in a star system, as in the original (read from the main game
@@ -387,6 +390,22 @@ class Blueprint:
         self.radius = math.sqrt(self.area)
 
 
+def _view_xz(view, x, z):
+    """Elite's PU1 / PU2 for one point (see Game.enter_view)."""
+    if view == 1:
+        return -x, -z
+    if view == 2:
+        return z, -x
+    return -z, x
+
+
+def _view_obj(o, view):
+    o.x, o.z = _view_xz(view, o.x, o.z)
+    m = o.m
+    for i in (0, 3, 6):     # side, roof and nose: their x and z
+        m[i], m[i + 2] = _view_xz(view, m[i], m[i + 2])
+
+
 class Obj:
     """A ship, missile, rock or cargo canister."""
     count = 0
@@ -477,6 +496,9 @@ class Game:
         self.set_level(level)
         self.god = False    # a cheat: hits flash but do no damage
         self.docking = "C"  # how docking works: see set_docking
+        self.view = 0               # 0 front, 1 rear, 2 left, 3 right (Elite's VIEW)
+        self.lasers = [None, None, None, None]  # the laser on each view (a key of LASERS), or None
+        self.laser = None           # the laser on the current view
         self.set_laser("pulse")
         self.energy_unit = False    # recharge ENERGY_UNIT times faster
         self.navy = False           # the naval energy unit: NAVY_UNIT times instead
@@ -520,10 +542,85 @@ class Game:
         self.docking = style if style in ("A", "B", "C") else "C"
         self.tractor = False
 
-    def set_laser(self, kind):
-        """The front laser: a key of LASERS."""
-        self.laser = kind if kind in LASERS else "pulse"
-        self.laser_period, self.laser_damage, self.laser_heat = LASERS[self.laser]
+    def set_laser(self, kind, view=0):
+        """The laser on a view (0 front, 1 rear, 2 left, 3 right): a key of
+        LASERS, or None for none. Elite has one laser a view, as this does."""
+        self.lasers[view] = None if kind is None else (kind if kind in LASERS else "pulse")
+        self._aim_laser()
+
+    def _aim_laser(self):
+        """self.laser and its numbers are the current view's laser."""
+        self.laser = self.lasers[self.view]
+        if self.laser is not None:
+            self.laser_period, self.laser_damage, self.laser_heat = LASERS[self.laser]
+
+    def set_view(self, view):
+        """Look front (0), rear (1), left (2) or right (3), as Elite's
+        f0-f3 do. Not while the docking computer flies. Returns True if it
+        changed."""
+        if view == self.view or not 0 <= view < 4 or self.autodock:
+            return False
+        self.view = view
+        self._aim_laser()
+        self.beam = 0.0
+        self.lock = None
+        self.lock_t = 0.0
+        self.locked = False
+        self.say(VIEW_NAMES[view] + " VIEW", 1.0)
+        return True
+
+    def next_view(self):
+        """The next view round (the menu's and one key's way of changing it)."""
+        self.set_view((self.view + 1) % 4)
+
+    # Elite's PU1 / PU2: the world is kept as seen from the front, and flipped
+    # or swapped into the view you are looking through only to draw it and to
+    # aim at it. Rear: x and z change sign. Left: the new x is z and the new z
+    # is minus x. Right: the new x is minus z and the new z is x. Whole-number
+    # exact, so going there and back changes nothing.
+    def enter_view(self):
+        """Everything from the front frame into the current view's."""
+        if self.view:
+            self._into_view(self.view)
+
+    def leave_view(self):
+        """Everything from the current view's frame back to the front's."""
+        if self.view:
+            self._into_view(self.view, True)
+
+    def _into_view(self, view, back=False):
+        if back and view >= 2:
+            view = 5 - view         # left undoes right and right undoes left
+        sp = self.space
+        for o in self.objs:
+            _view_obj(o, view)
+        for o in self.new:
+            _view_obj(o, view)
+        for boom in self.booms:
+            for p in boom.parts:
+                p[0], p[2] = _view_xz(view, p[0], p[2])
+        if sp is not None:
+            sp.px, sp.pz = _view_xz(view, sp.px, sp.pz)
+            sp.sx, sp.sz = _view_xz(view, sp.sx, sp.sz)
+            if sp.station is not None:
+                _view_obj(sp.station, view)
+
+    def view_dust(self):
+        """The stardust as the current view sees it: a copy, since the dust
+        is kept in front of you. From the rear it rushes away, from the
+        sides it streams past (Elite has its own stardust for each view)."""
+        v = self.view
+        if v == 0:
+            return self.dust
+        out = []
+        for x, y, z in self.dust:
+            if v == 1:
+                out.append([-x, y, 2 * DUST_MID - z])
+            elif v == 2:
+                out.append([z - DUST_MID, y, DUST_MID - x])
+            else:
+                out.append([DUST_MID - z, y, DUST_MID + x])
+        return out
 
     def set_level(self, level):
         """0 easiest to 2 hardest. Takes effect straight away."""
@@ -531,6 +628,8 @@ class Game:
         self.max_hostile, self.aim_k, self.damage_k, self.energy_k = LEVELS[self.level]
 
     def reset(self):
+        self.view = 0       # a flight starts looking ahead
+        self._aim_laser()
         self.objs = []
         self.new = []      # objects created during a step, added at its end
         self.booms = []
@@ -1009,6 +1108,7 @@ class Game:
             return "STATION TOO FAR"
         if sp.hostile:      # it would only fly you in to a refused docking
             return "STATION HOSTILE"
+        self.set_view(0)        # it flies by the chase view, looking ahead
         self.autodock = True
         self.auto_phase = 0     # 0: round to the front, 1: out in front of the slot, 2: in
         self.auto_far = False
@@ -1656,6 +1756,22 @@ class Game:
         return best
 
     def _weapons(self, dt, fire, missile):
+        """Aim and fire through the current view: the world is turned into it
+        for the picking and the shots, and back again before anything is
+        added that is in the front's frame (the missile)."""
+        self.enter_view()
+        try:
+            launch = self._weapons_view(dt, fire, missile)
+        finally:
+            self.leave_view()
+        if launch is not None:
+            o = Obj(self.missile_bp, "pmissile", 0.0, -40.0, 80.0)     # straight ahead, whichever view
+            o.target = launch
+            o.t = 8.0
+            self.new.append(o)
+            self.say("MISSILE AWAY", 1.0)
+
+    def _weapons_view(self, dt, fire, missile):
         self.heat -= LASER_COOL * dt
         if self.heat < 0:
             self.heat = 0.0
@@ -1672,6 +1788,10 @@ class Game:
             if self.lock_t >= LOCK_TIME:
                 self.locked = True
 
+        if fire and self.laser is None:
+            if self.msg_t <= 0:
+                self.say("NO LASER", 1.0)
+            fire = False
         if fire and not self.hot and self.laser in CONTINUOUS:
             self.beam = max(self.beam, 0.1)     # a steady beam while fire is held
         if fire and not self.hot and self.cool <= 0:
@@ -1718,11 +1838,8 @@ class Game:
             else:
                 self.missiles -= 1
                 self.armed = False      # each missile is armed afresh (Hardcore)
-                o = Obj(self.missile_bp, "pmissile", 0.0, -40.0, 80.0)
-                o.target = t
-                o.t = 8.0
-                self.new.append(o)
-                self.say("MISSILE AWAY", 1.0)
+                return t                # the caller launches it
+        return None
 
     def release_canister(self, dist=700.0):
         """A cheat: a cargo canister just ahead, a little below the

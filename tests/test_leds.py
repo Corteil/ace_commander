@@ -115,7 +115,7 @@ print("jump: white LED flashes round the ring where the streaks leave: ok")
 g._hurt(10.0); tick(a); assert leds.values[5] == (255, 0, 0)
 tick(a, fresh=["A"]); tick(a)                       # paused
 assert a.paused and leds.values == RED12(0)
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["JOYDOWN"])
+a.fmenu = a._fitems_top().index("QUIT TO TITLE")      # (picked by name: lines come and go)
 tick(a, fresh=["CONFIRM"])                              # QUIT TO TITLE
 assert a.mode == "menu" and bus.events == ["PatternDisable", "PatternEnable"]
 tick(a); tick(a)

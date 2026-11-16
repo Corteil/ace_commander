@@ -60,6 +60,7 @@ class Docked:
             self.market = market.Market(goods, gal.system(cmdr.system).economy, cmdr)
         self.sel = 0            # the good picked on the market
         self.top = 0            # the first good shown
+        self.mount = 0          # the view a laser bought on Equip ship goes to
         self.esel = 0           # the item picked on Equip ship
         self.etop = 0
         self.for_sale = 0       # how many items this station sells
@@ -149,9 +150,13 @@ class Docked:
         elif self.esel >= self.etop + ROWS:
             self.etop = self.esel - ROWS + 1
 
+    def next_mount(self):
+        """The next view round (front, rear, left, right) for lasers."""
+        self.mount = (self.mount + 1) % 4
+
     def buy_item(self):
         """Buy the highlighted item. Returns True if it happened."""
-        why = equipment.buy(self.equip, self.esel, self.cmdr)
+        why = equipment.buy(self.equip, self.esel, self.cmdr, self.mount)
         self.msg = why
         self.msg_t = SAY_TIME if why else 0.0
         return why is None
@@ -388,7 +393,7 @@ class Docked:
             else:
                 p = equipment.price(e, i, c)
                 text(ctx, "%d.%d" % (p // 10, p % 10), EPRICE_X, y, 11, cockpit.YELLOW, 1)
-            h = equipment.have(i, c)
+            h = equipment.have(i, c, self.mount)
             if h:
                 text(ctx, h, HOLD_X, y, 11, cockpit.GREEN, 1)
         if self.etop + ROWS < self.for_sale:
@@ -397,7 +402,7 @@ class Docked:
         if self.msg:
             text(ctx, self.msg, 0, 75, 12, cockpit.RED)
         else:
-            text(ctx, "C: buy", 0, 75, 11, cockpit.GREY)
+            text(ctx, "C: buy   D: laser " + equipment.MOUNT_NAMES[self.mount], 0, 75, 11, cockpit.GREY)
         text(ctx, "< > screens   F: status", 0, 91, 11, cockpit.GREY)
 
 

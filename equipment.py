@@ -12,7 +12,9 @@ rules are written here afresh to behave as the original does:
   - fuel is 2 Cr a light year and always fills the tank
   - at most 4 missiles; one of each other item, and buying one you have
     says so and costs nothing
-  - a new laser replaces the old one, whose price is refunded
+  - a laser is fitted to one of the four views (front, rear, left, right), as
+    in the original; a new one replaces the old one on that view, whose price
+    is refunded
 """
 try:
     from . import commander as _commander
@@ -59,8 +61,12 @@ def price(equip, i, cmdr):
     return equip[i][1]
 
 
-def have(i, cmdr):
-    """What the commander has of item i, for the screen, or "" for nothing."""
+MOUNT_NAMES = ("FRONT", "REAR", "LEFT", "RIGHT")
+
+
+def have(i, cmdr, mount=0):
+    """What the commander has of item i, for the screen, or "" for nothing.
+    mount: the view a laser would be fitted to."""
     c = cmdr
     if i == FUEL:
         return "%d.%dLY" % (c.fuel // 10, c.fuel % 10)
@@ -69,14 +75,15 @@ def have(i, cmdr):
     if i == CARGO_BAY:
         return "fitted" if c.hold >= BIG_HOLD else ""
     if i in LASERS:
-        return "fitted" if c.laser == LASERS[i] else ""
+        return "fitted" if c.lasers[mount] == LASERS[i] else ""
     if i == ENERGY and "navy" in c.extras:     # mission 2's naval energy unit is better
         return "fitted"
     return "fitted" if EXTRAS[i] in c.extras else ""
 
 
-def buy(equip, i, cmdr):
-    """Buy item i for the commander. Returns None, or why not."""
+def buy(equip, i, cmdr, mount=0):
+    """Buy item i for the commander (a laser for the view mount). Returns
+    None, or why not."""
     c = cmdr
     if i in SOON:
         return "COMING SOON"
@@ -84,10 +91,11 @@ def buy(equip, i, cmdr):
         return "TANK FULL"
     if i == MISSILE and c.missiles >= MAX_MISSILES:
         return "MISSILES FULL"
-    if have(i, c) == "fitted":
+    if have(i, c, mount) == "fitted":
         return "ALREADY FITTED"
     cost = price(equip, i, c)
-    refund = equip[_laser_item(c.laser)][1] if i in LASERS else 0
+    old = c.lasers[mount] if i in LASERS else ""
+    refund = equip[_laser_item(old)][1] if old else 0
     if c.cash + refund < cost:
         return "NOT ENOUGH CASH"
     c.cash += refund - cost
@@ -98,7 +106,7 @@ def buy(equip, i, cmdr):
     elif i == CARGO_BAY:
         c.hold = BIG_HOLD
     elif i in LASERS:
-        c.laser = LASERS[i]
+        c.lasers[mount] = LASERS[i]
     else:
         c.extras.append(EXTRAS[i])
     return None

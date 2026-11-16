@@ -292,11 +292,19 @@ class Pad:
                 table.append(("j_" + name.lower(), JOY[name]))
             for name in "ABCDEF":
                 table.append((name, FB[name]))
-        for name in ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "T", "U", "SPACE",
+        for name in ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "T", "U", "V", "SPACE",
                      "UP", "DOWN", "LEFT", "RIGHT"):
             key = KEYBOARD_BUTTONS.get(name)
             if key is not None:
                 table.append(("k_" + name, key))
+        # the views, as Elite's f0 (front), f1 (rear), f2 (left), f3 (right): the
+        # function keys if the keyboard has them, else the number keys 1 to 4.
+        # The names in KEYBOARD_BUTTONS are not checked on a real keyboard yet.
+        for n in range(4):
+            for name in ("F%d" % n, str(n + 1)):
+                key = KEYBOARD_BUTTONS.get(name)
+                if key is not None:
+                    table.append(("k_view%d" % n, key))
         self.table = table
         self.names = {}      # button -> the control names it counts as
         self.pressed = {}    # button -> True while it is down
@@ -1039,6 +1047,8 @@ class AceCommander(app.App):
                 d.pick_item(1)
             elif hit("C" if new else "confirm"):
                 d.buy_item()
+            elif (new and hit(BTN_MISSILE)) or hit("k_D"):
+                d.next_mount()      # which view a laser is fitted to
         elif d.name() == "REPAIR SHOP":
             if hit("j_up" if new else "up"):
                 d.pick_paint(-1)
@@ -1093,7 +1103,8 @@ class AceCommander(app.App):
         if c is None:
             return
         g.missiles = c.missiles if g.missile_bp else 0
-        g.set_laser(c.laser)
+        for view in range(4):
+            g.set_laser(c.lasers[view] or None, view)
         g.energy_unit = "energy" in c.extras or "navy" in c.extras
         g.navy = "navy" in c.extras
         g.fuel_scoops = "scoops" in c.extras
@@ -1457,6 +1468,11 @@ class AceCommander(app.App):
                 g.unarm_missile()
         if hit("k_M"):
             missile = True
+        for n in range(4):      # the views, on a keyboard (both modes)
+            if hit("k_view%d" % n):
+                g.set_view(n)
+        if hit("k_V"):
+            g.next_view()
         fire = held("confirm") or held("k_F") or held("k_SPACE")
         if self.fire_lock:      # held on from a menu or the launch: fire once it is let go
             if fire:
@@ -1858,7 +1874,11 @@ class AceCommander(app.App):
         c = self.cmdr
         onoff = lambda b: "ON" if b else "OFF"
         e = c.extras
-        return ["LASER: " + c.laser.upper(), "MISSILES: %d" % c.missiles,
+        return ["LASER: " + c.lasers[0].upper(),
+                "REAR LASER: " + (c.lasers[1] or "none").upper(),
+                "LEFT LASER: " + (c.lasers[2] or "none").upper(),
+                "RIGHT LASER: " + (c.lasers[3] or "none").upper(),
+                "MISSILES: %d" % c.missiles,
                 "ENERGY UNIT: " + onoff("energy" in e), "NAVY ENERGY UNIT: " + onoff("navy" in e),
                 "CARGO BAY: %dT" % c.hold, "FUEL SCOOPS: " + onoff("scoops" in e),
                 "ECM: " + onoff("ecm" in e), "ESCAPE POD: " + onoff("pod" in e),
@@ -1871,10 +1891,12 @@ class AceCommander(app.App):
                   "ECM": "ecm", "ESCAPE POD": "pod", "ENERGY BOMB": "bomb",
                   "DOCK COMPUTER": "docking", "GAL. HYPERDRIVE": "hyperdrive"}
         key = item.split(":")[0]
-        if key == "LASER":
-            kinds = list(commander.LASERS)
-            c.laser = kinds[(kinds.index(c.laser) + 1) % len(kinds)]
-            self._write_setting("laser", c.laser)
+        mount = self.MOUNTS.get(key)
+        if mount is not None:
+            kinds = list(commander.LASERS) + ([] if mount == 0 else [""])
+            now = c.lasers[mount]
+            c.lasers[mount] = kinds[(kinds.index(now) + 1) % len(kinds)] if now in kinds else kinds[0]
+            self._write_setting("lasers", list(c.lasers))
             return
         if key == "MISSILES":
             c.missiles = (c.missiles + 1) % (game.MAX_MISSILES + 1)
@@ -1894,12 +1916,18 @@ class AceCommander(app.App):
             self._extra(c, "navy" if name == "energy" else "energy", False)
         self._write_setting("extras", list(c.extras))
 
+    MOUNTS = {"LASER": 0, "REAR LASER": 1, "LEFT LASER": 2, "RIGHT LASER": 3}
+
     def _ship_items(self):
         """The SHIP CONFIG page (a DEBUG page): the ship's equipment, changed
         straight away in this flight and, with a commander, for good."""
         g = self.game
         onoff = lambda b: "ON" if b else "OFF"
-        items = ["LASER: " + g.laser.upper(), "MISSILES: %d" % g.missiles,
+        items = ["LASER: " + g.lasers[0].upper(),
+                 "REAR LASER: " + (g.lasers[1] or "none").upper(),
+                 "LEFT LASER: " + (g.lasers[2] or "none").upper(),
+                 "RIGHT LASER: " + (g.lasers[3] or "none").upper(),
+                 "MISSILES: %d" % g.missiles,
                  "ENERGY UNIT: " + onoff(g.energy_unit and not g.navy),
                  "NAVY ENERGY UNIT: " + onoff(g.navy)]
         if self.career and self.cmdr is not None:
@@ -1915,11 +1943,14 @@ class AceCommander(app.App):
         """Change one thing on the SHIP CONFIG page (C goes to the next setting)."""
         g = self.game
         c = self.cmdr if self.career else None
-        if item.startswith("LASER"):
-            kinds = list(game.LASERS)
-            g.set_laser(kinds[(kinds.index(g.laser) + 1) % len(kinds)])
+        mount = self.MOUNTS.get(item.split(":")[0])
+        if mount is not None:      # C goes round: the lasers, then none (the front always has one)
+            kinds = list(game.LASERS) + ([] if mount == 0 else [None])
+            now = g.lasers[mount]
+            nxt = kinds[(kinds.index(now) + 1) % len(kinds)] if now in kinds else kinds[0]
+            g.set_laser(nxt, mount)
             if c is not None:
-                c.laser = g.laser
+                c.lasers[mount] = nxt or ""
         elif item.startswith("MISSILES"):
             if g.missile_bp:
                 g.missiles = (g.missiles + 1) % (game.MAX_MISSILES + 1)
@@ -2171,6 +2202,9 @@ class AceCommander(app.App):
             item = items[self.fmenu]
             if item == "RESUME":
                 self._resume()
+            elif item.startswith("VIEW: "):     # the next view round, and back to the flight
+                self.game.next_view()
+                self._resume()
             elif item == "STATUS":
                 self.fsub = "status"
             elif item == "LOCAL CHART" or item == "HYPERSPACE":   # no target: pick one
@@ -2247,6 +2281,8 @@ class AceCommander(app.App):
 
     def _fitems_top(self):
         items = ["RESUME"]
+        if self.game is not None:
+            items.append("VIEW: " + game.VIEW_NAMES[self.game.view])
         if self.career:
             # always there, unless a countdown is on: with a target in range it
             # jumps, without one it opens the local chart to pick one
