@@ -297,14 +297,13 @@ class Pad:
             key = KEYBOARD_BUTTONS.get(name)
             if key is not None:
                 table.append(("k_" + name, key))
-        # the views, as Elite's f0 (front), f1 (rear), f2 (left), f3 (right): the
-        # function keys if the keyboard has them, else the number keys 1 to 4.
-        # The names in KEYBOARD_BUTTONS are not checked on a real keyboard yet.
+        # the views, as Elite's f0 (front), f1 (rear), f2 (left), f3 (right), on the number
+        # keys 0 to 3 instead of function keys. The names in KEYBOARD_BUTTONS are not
+        # checked on a real keyboard yet.
         for n in range(4):
-            for name in ("F%d" % n, str(n + 1)):
-                key = KEYBOARD_BUTTONS.get(name)
-                if key is not None:
-                    table.append(("k_view%d" % n, key))
+            key = KEYBOARD_BUTTONS.get(str(n))
+            if key is not None:
+                table.append(("k_view%d" % n, key))
         self.table = table
         self.names = {}      # button -> the control names it counts as
         self.pressed = {}    # button -> True while it is down

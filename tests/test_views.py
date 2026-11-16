@@ -222,9 +222,9 @@ os.makedirs(os.path.dirname(SAVE), exist_ok=True)
 if os.path.exists(SAVE):
     os.remove(SAVE)
 mod.SAVE_PATH = SAVE
-for n in range(4):      # a keyboard with function keys (the real names are not checked yet)
-    bs.KEYS["F%d" % n] = bs.Button("F%d" % n, "Keyboard")
-    bs.PHYSICAL["KEY_F%d" % n] = bs.KEYS["F%d" % n]
+for n in range(4):      # the number keys (the real names are not checked yet)
+    bs.KEYS[str(n)] = bs.Button(str(n), "Keyboard")
+    bs.PHYSICAL["KEY_%d" % n] = bs.KEYS[str(n)]
 
 
 def app_flight(hardcore):
@@ -245,14 +245,14 @@ for hardcore in (False, True):
     a, g = app_flight(hardcore)
     g.set_laser("pulse", 1)
     assert g.view == 0
-    tick(a, fresh=["KEY_F1"])
-    assert g.view == 1 and g.laser == "pulse", "F1: rear"
-    tick(a, fresh=["KEY_F2"])
-    assert g.view == 2 and g.laser is None, "F2: left"
-    tick(a, fresh=["KEY_F3"])
-    assert g.view == 3, "F3: right"
-    tick(a, fresh=["KEY_F0"])
-    assert g.view == 0, "F0: front"
+    tick(a, fresh=["KEY_1"])
+    assert g.view == 1 and g.laser == "pulse", "1: rear"
+    tick(a, fresh=["KEY_2"])
+    assert g.view == 2 and g.laser is None, "2: left"
+    tick(a, fresh=["KEY_3"])
+    assert g.view == 3, "3: right"
+    tick(a, fresh=["KEY_0"])
+    assert g.view == 0, "0: front"
     tick(a, fresh=["KEY_V"])
     assert g.view == 1, "V: the next view round"
     for _ in range(3):
