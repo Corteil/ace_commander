@@ -135,6 +135,16 @@ DOCK_TIME = 3.0         # seconds of flying in through the station's tunnel on d
 DOCK_HOLD = (1.0, 2.0)  # then the view of the bay stays this long, chosen at random
 EJECT_TIME = 3.0        # seconds of the ESCAPE POD screen before the docking scene (C skips it)
 DOCK_NAMES = {"A": "MANUAL", "B": "ASSISTED", "C": "AUTOMATIC"}
+
+# docked, the number row is Elite's f0-f9 (Brian chose Elite's scheme,
+# 2026-11-16): f0 launch, f1 / f2 buy / sell (both the market here), f3 equip
+# ship, f4 galactic chart, f5 local chart, f6 system data, f7 market prices,
+# f8 status, f9 inventory (the market tab lists the hold). A missing tab does
+# nothing.
+DOCK_KEYS = (("k_1", "LAUNCH"), ("k_2", "MARKET"), ("k_3", "MARKET"),
+             ("k_4", "EQUIP SHIP"), ("k_5", "GALACTIC CHART"), ("k_6", "LOCAL CHART"),
+             ("k_7", "SYSTEM DATA"), ("k_8", "MARKET"), ("k_9", "STATUS"),
+             ("k_0", "MARKET"))
 # DEBUG, a page of cheats for testing (the in-flight menu, Settings and
 # Options): True or False, or None to show it only if a file called debug.txt
 # is in the app's folder (always on a PC, where the tests run), or once it has
@@ -308,6 +318,18 @@ class Pad:
             key = KEYBOARD_BUTTONS.get(str(n + 1))
             if key is not None:
                 table.append(("k_view%d" % n, key))
+        # the rest of Elite's keys (Brian chose Elite's scheme, 2026-11-16): the
+        # number row is f0-f9 ("k_1" ... "k_0"), G / H / J the hyperdrives and the
+        # jump drive, + / - speed ("=" and "_" too, the same keys without shift)
+        for name in "0123456789GHJ":
+            key = KEYBOARD_BUTTONS.get(name)
+            if key is not None:
+                table.append(("k_" + name, key))
+        for name, control in (("+", "k_faster"), ("=", "k_faster"),
+                              ("-", "k_slower"), ("_", "k_slower")):
+            key = KEYBOARD_BUTTONS.get(name)
+            if key is not None:
+                table.append((control, key))
         self.table = table
         self.names = {}      # button -> the control names it counts as
         self.pressed = {}    # button -> True while it is down
@@ -1017,6 +1039,13 @@ class AceCommander(app.App):
         if new and hit(BTN_MENU):
             self._launch()
             return
+        for key, tab in DOCK_KEYS:      # Elite's f0-f9 on the number row
+            if hit(key):
+                if tab == "LAUNCH":
+                    self._launch()
+                elif tab in d.tabs:
+                    d.go(d.tabs.index(tab))
+                return
         if new and hit(BTN_SPEED_DOWN):
             d.go(d.tab - 1)
             return
@@ -1421,6 +1450,8 @@ class AceCommander(app.App):
             self.fsub = None
             self.d_t = None
             return False
+        if self._flight_keys():
+            return False
 
         tilt = self.use_tilt and self.tilt_ok
         throttle = 0.0
@@ -1471,6 +1502,12 @@ class AceCommander(app.App):
         elif held("k_E"):
             throttle += 1.0
         if held("k_Q"):
+            throttle -= 1.0
+        # + / - in every mode (in Hardcore E is the ECM); J holds speed up, which
+        # at full speed with no ships about is the jump drive (Elite's J)
+        if held("k_faster") or held("k_J"):
+            throttle += 1.0
+        if held("k_slower"):
             throttle -= 1.0
         if g.rules.missile_lock_required:       # Hardcore: T arms and locks, U disarms
             if hit("k_T"):
@@ -2218,45 +2255,104 @@ class AceCommander(app.App):
                 else:
                     self._debug(item)
         elif confirm:
-            item = items[self.fmenu]
-            if item == "RESUME":
-                self._resume()
-            elif item == "STATUS":
-                self.fsub = "status"
-            elif item == "LOCAL CHART" or item == "HYPERSPACE":   # no target: pick one
+            self._fpick(items[self.fmenu])
+
+    def _flight_keys(self):
+        """Elite's keys in flight (Brian chose Elite's scheme, 2026-11-16): 5 the
+        galactic chart (f4), 6 the local chart (f5), 7 the target's system data
+        (f6), 9 and 0 status (f8, f9: the hold is on it), H hyperspace, G the
+        galactic hyperdrive. Each opens the menu and does what its line does,
+        and only when the menu has that line (so not in combat practice, not
+        during a countdown, G only with the hyperdrive fitted). 8 (f7, market
+        prices) is docked only. True if a key did something."""
+        hit = self.pad.hit
+        items = self._fitems_top()
+
+        def line(start):
+            for item in items:
+                if item.startswith(start):
+                    return item
+            return None
+
+        pick = None
+        if hit("k_H"):
+            pick = line("HYPERSPACE")
+        elif hit("k_G"):
+            pick = line("GALACTIC JUMP")
+        elif hit("k_6"):
+            pick = line("LOCAL CHART")
+        elif hit("k_9") or hit("k_0"):
+            pick = line("STATUS")
+        elif hit("k_8"):
+            self.game.say("MARKET: DOCKED ONLY", 1.0)
+            return False
+        elif hit("k_5") or hit("k_7"):
+            chart_line = line("LOCAL CHART")
+            if chart_line is None:
+                return False
+            self.paused = True
+            self.fmenu = items.index(chart_line)
+            self.d_t = None
+            self._fpick(chart_line)     # the local chart, which F goes back from
+            if hit("k_5") and self.witch is None:
                 from . import chart
-                self.chart = chart.Chart(self.galaxy, self.cmdr.system, self.cmdr.fuel,
-                                         self.target, at=self.witch)
-                self.fsub = "chart"
-            elif item.startswith("HYPERSPACE: "):
-                to = self._jump_ok()
-                if to is not None:
-                    self.jump_to = to
-                    self.game.start_jump()
-                self._resume()
-            elif item == "DOCKING COMPUTER":
-                why = self.game.start_autodock()
-                if why:
-                    self.game.say(why)
-                self._resume()
-            elif item == "DOCK COMPUTER OFF":
-                self.game.stop_autodock()
-                self._resume()
-            elif item == "GALACTIC JUMP":
-                self.jump_to = ("galaxy", 0)
-                self.game.stop_autodock()
+                c = self.cmdr
+                self.chart = chart.GalChart(self.galaxy, c.system, c.fuel, self.target,
+                                            "JUMP", c.galaxy + 1)
+            elif hit("k_7"):            # the target's data, or here's; D or F back to the chart
+                self.data_of = self.target if self.target is not None else self.cmdr.system
+                self.fsub = "data"
+            return True
+        if pick is None:
+            return False
+        self.paused = True
+        self.fmenu = items.index(pick)
+        self.fsub = None
+        self.d_t = None
+        self._fpick(pick)
+        return True
+
+    def _fpick(self, item):
+        """Do what choosing line item of the in-flight menu does (C on it, or
+        its key: see _flight_keys)."""
+        if item == "RESUME":
+            self._resume()
+        elif item == "STATUS":
+            self.fsub = "status"
+        elif item == "LOCAL CHART" or item == "HYPERSPACE":   # no target: pick one
+            from . import chart
+            self.chart = chart.Chart(self.galaxy, self.cmdr.system, self.cmdr.fuel,
+                                     self.target, at=self.witch)
+            self.fsub = "chart"
+        elif item.startswith("HYPERSPACE: "):
+            to = self._jump_ok()
+            if to is not None:
+                self.jump_to = to
                 self.game.start_jump()
-                self.game.say("GALACTIC HYPERSPACE", 1.5)
-                self._resume()
-            elif item == "QUIT TO TITLE":
-                self._to_title()
-            elif item == "DEBUG":
-                self.fsub = "debug"
-                self.debug_from = None
-                self.fmenu = 0
-            else:
-                self.fsub = "settings"
-                self.fmenu = 0
+            self._resume()
+        elif item == "DOCKING COMPUTER":
+            why = self.game.start_autodock()
+            if why:
+                self.game.say(why)
+            self._resume()
+        elif item == "DOCK COMPUTER OFF":
+            self.game.stop_autodock()
+            self._resume()
+        elif item == "GALACTIC JUMP":
+            self.jump_to = ("galaxy", 0)
+            self.game.stop_autodock()
+            self.game.start_jump()
+            self.game.say("GALACTIC HYPERSPACE", 1.5)
+            self._resume()
+        elif item == "QUIT TO TITLE":
+            self._to_title()
+        elif item == "DEBUG":
+            self.fsub = "debug"
+            self.debug_from = None
+            self.fmenu = 0
+        else:
+            self.fsub = "settings"
+            self.fmenu = 0
 
     def _update_chart(self, new, cancel, confirm):
         """The local chart: the joystick moves the cursor, C jumps to the

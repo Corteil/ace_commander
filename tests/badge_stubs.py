@@ -80,6 +80,10 @@ PHYSICAL = {
 for _c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
     PHYSICAL["KEY_" + _c] = KEYS[_c]
 PHYSICAL["KEY_SPACE"] = KEYS["SPACE"]
+# the number row and the symbols, plain keys as in the firmware's events/keyboard.py
+for _c in "0123456789+=-_":
+    KEYS[_c] = Button(_c, "Keyboard")
+    PHYSICAL["KEY_" + _c] = KEYS[_c]
 
 
 class ButtonDownEvent:

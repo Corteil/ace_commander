@@ -236,8 +236,17 @@ front view. Tests: `tests/test_views.py`. Tufty: `DUST_X` (the wider view) isn't
 firmware makes Enter a CONFIRM button, so it also works menus as C does); Esc is CANCEL, so it leaves
 the pause menu. The cursor keys count as the joystick too (`Pad` gives them the `j_` names on the 2026
 board), so they pick menu lines, change Settings and the VIEW line, and move tabs and chart cursors.
-Not built yet: the galactic key, f0-f9 screen keys, `+` / `-` speed keys (in Hardcore E is the ECM, so
-no key speeds up), a HARDCORE marker on the HUD.
+**The rest of the keys, Elite's scheme (Brian's choice, 2026-11-16; his written plan isn't on the
+Pi, so this is the agreed fallback):** `+` / `-` speed in every mode (`=` and `_` too, the same keys
+without shift); J holds speed up, so at full speed it is the jump drive under the usual rules; H
+hyperspace and G the galactic hyperdrive. The number row is f0-f9. In flight 1-4 are the views, 5
+galactic chart, 6 local chart, 7 the target's (or here's) system data, 9 and 0 status, 8 says
+"MARKET: DOCKED ONLY". The flight keys run the in-flight menu's own line through `_fpick`, and only
+when `_fitems_top()` offers it (so nothing in combat practice or during a countdown; G only with the
+hyperdrive). Docked (`DOCK_KEYS`): 1 launch, 2 / 3 / 8 / 0 market (buy, sell, prices, inventory: the
+hold is listed there), 4 equip ship, 5 galactic chart, 6 local chart, 7 system data, 9 status. Tests:
+`tests/test_keys.py`. Not checked on a real keyboard yet.
+Not built yet: a HARDCORE marker on the HUD.
 All 20 test files pass with Elite's files; without them 9 of 18 did when this was started.
 
 ## Licensing
