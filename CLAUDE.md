@@ -276,7 +276,7 @@ of a real flight, not from a harness.
    or two collections per 60 frames as before, no errors.
    **Build 27: docking by hand** (2026-11-14). `Game.docking` ("A" / "B" / "C", from
    `Commander.docking` via `Game.set_docking` in `app._enter_space`; `Game()` defaults to C
-   so old tests keep working). The pause page has DOCKING: AUTHENTIC / ASSISTED / AUTOMATIC
+   so old tests keep working). The pause page has DOCKING: MANUAL / ASSISTED / AUTOMATIC
    (C or right goes on, left back; saved straight away). `Game._approach` runs within
    `CAPTURE_DIST` for A and B: you touch the station at `bp.front + PLAYER_R` from its
    centre (`Blueprint.front` is the slot face: 160 Coriolis, 196 Dodo). A docks if you are
@@ -972,8 +972,8 @@ flight). Built so far: manual ECM (`Game.fire_ecm`; E key, or both speed buttons
 missiles (`Game.arm_missile` / `unarm_missile`; T / U keys, D arms then fires; lock builds only while
 armed). Tests: `tests/test_hardcore.py` (needs no Elite files). Mass lock (all modes, `Game._massed`, `MASS_LOCK_K` 2 radii): the local jump drive drops out near the
 planet or sun, "MASS LOCKED"; the station's mass is its safe zone, which is kept (the planet's sphere
-does not cover it: the station is 3 radii out). The sun is also covered by the heat rule. Docking: the DOCKING setting exists in every mode, and Hardcore's flag `manual_docking` forces AUTHENTIC (by hand;
-the saved style is untouched and the Settings line says "AUTHENTIC (HARDCORE)"); the only help is a docking computer you
+does not cover it: the station is 3 radii out). The sun is also covered by the heat rule. Docking: the DOCKING setting exists in every mode, and Hardcore's flag `manual_docking` forces MANUAL (by hand;
+the saved style is untouched and the Settings line says "MANUAL"); the only help is a docking computer you
 have bought (`Game.computer`). The other jump lock-outs and save-only-when-docked already exist, so they are
 not Hardcore flags.
 **Four views, in every mode (not a Hardcore flag: Brian, 2026-11-16; checked against the disc source's

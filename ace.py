@@ -134,7 +134,7 @@ LAUNCH_TIME = 2.5       # seconds of launch tunnel (C skips it)
 DOCK_TIME = 3.0         # seconds of flying in through the station's tunnel on docking (C skips it)
 DOCK_HOLD = (1.0, 2.0)  # then the view of the bay stays this long, chosen at random
 EJECT_TIME = 3.0        # seconds of the ESCAPE POD screen before the docking scene (C skips it)
-DOCK_NAMES = {"A": "AUTHENTIC", "B": "ASSISTED", "C": "AUTOMATIC"}
+DOCK_NAMES = {"A": "MANUAL", "B": "ASSISTED", "C": "AUTOMATIC"}
 # DEBUG, a page of cheats for testing (the in-flight menu, Settings and
 # Options): True or False, or None to show it only if a file called debug.txt
 # is in the app's folder (always on a PC, where the tests run), or once it has
@@ -1549,8 +1549,7 @@ class AceCommander(app.App):
             steer = "STEER: %s (no tilt sensor)" % stick
         items = [steer]
         if cmdr and self.cmdr is not None:
-            items.append("DOCKING: AUTHENTIC (HARDCORE)" if self._manual_docking()
-                         else "DOCKING: " + DOCK_NAMES[self.cmdr.docking])
+            items.append("DOCKING: " + DOCK_NAMES["A" if self._manual_docking() else self.cmdr.docking])
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
         if tildagonos is not None:
             items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))

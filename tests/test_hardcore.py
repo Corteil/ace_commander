@@ -237,10 +237,10 @@ for style in "ABC":
 a, g = app_flight(True)
 a.cmdr = ace_commander.commander.Commander(1)
 a.cmdr.docking = "C"
-assert "DOCKING: AUTHENTIC (HARDCORE)" in a._settings(True)
-a._change("DOCKING: AUTHENTIC (HARDCORE)", False)
+assert "DOCKING: MANUAL" in a._settings(True)
+a._change("DOCKING: MANUAL", False)
 assert a.cmdr.docking == "C", "the saved style isn't changed in Hardcore"
-assert "DOCKING: AUTHENTIC (HARDCORE)" in a._settings(True), "a Hardcore flight stays so until it ends"
+assert "DOCKING: MANUAL" in a._settings(True), "a Hardcore flight stays so until it ends"
 a.mode = "menu"
 a.hardcore = False
 assert "DOCKING: AUTOMATIC" in a._settings(True)
