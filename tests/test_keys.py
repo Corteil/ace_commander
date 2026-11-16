@@ -56,13 +56,20 @@ for key, tab in (("KEY_2", "MARKET"), ("KEY_4", "EQUIP SHIP"), ("KEY_5", "GALACT
                  ("KEY_3", "MARKET"), ("KEY_8", "MARKET"), ("KEY_=", "OPTIONS"),
                  ("KEY_+", "OPTIONS")):
     tick(a, fresh=[key])
-    assert a.mode == "docked" and d.name() == tab and not a.dinv, (key, d.name())
-# 0: Inventory, the same screen as in flight, over the tabs; 0, C or F back
-tick(a, fresh=["KEY_9"]); tick(a, fresh=["KEY_0"])
-assert a.dinv and "INVENTORY" in [x[0] for x in (lambda c: (a.draw(c), c)[1])(bs.CountCtx()).texts]
-tick(a, fresh=["KEY_0"]); assert not a.dinv and d.name() == "STATUS", "0 again: back"
-tick(a, fresh=["KEY_0"]); tick(a, fresh=["F"]); assert not a.dinv and a.mode == "docked", "F: back"
-tick(a, fresh=["KEY_0"]); tick(a, fresh=["KEY_6"]); assert not a.dinv and d.name() == "LOCAL CHART"
+    assert a.mode == "docked" and d.name() == tab, (key, d.name())
+# 0: Inventory, the same screen as in flight, as a tab
+tick(a, fresh=["KEY_0"]); assert d.name() == "INVENTORY"
+assert "INVENTORY" in [x[0] for x in (lambda c: (a.draw(c), c)[1])(bs.CountCtx()).texts]
+tick(a, fresh=["F"]); assert d.name() == "STATUS", "F: back to Status"
+# the joystick goes round the tabs in the number keys' order, launch left out
+# (Brian): 9 Status, 0 Inventory, = Options, 2 Market, 4 Equip, 5 Galactic,
+# 6 Local, 7 System data (no Repair Shop unless it is switched on)
+order = []
+for _ in range(len(d.tabs)):
+    order.append(d.name()); tick(a, fresh=["JOYRIGHT"])
+assert order == ["STATUS", "INVENTORY", "OPTIONS", "MARKET", "EQUIP SHIP", "GALACTIC CHART",
+                 "LOCAL CHART", "SYSTEM DATA"], order
+assert d.name() == "STATUS", "round again"
 # 3: Elite's Sell Cargo: the market, on the first good in the hold
 a.cmdr.cargo[5] = 2; a.cmdr.cargo[9] = 1
 tick(a, fresh=["KEY_3"]); assert d.name() == "MARKET" and d.sel == 5, d.sel

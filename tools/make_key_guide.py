@@ -146,7 +146,7 @@ right = [
         [k("5") + " " + k("6") + " " + k("7"), "Galactic chart · local chart · system data"],
         [k("9") + " / " + k("0"), "Status / Inventory"],
         [k("−") + " / " + k("="), "Repair Shop (when on) / Options"],
-        ["Joystick " + k("←", "→"), "Change screen (or " + k("E") + " / " + k("B") + ")"],
+        ["Joystick " + k("←", "→"), "Next / previous screen, in the keys' order (or " + k("E") + " / " + k("B") + ")"],
         [k("F") + " or " + k("Esc"), "Back to Status, then the title"],
     ], [W * 0.33, W * 0.67])),
 

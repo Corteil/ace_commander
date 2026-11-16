@@ -149,7 +149,8 @@ SCREENS = ("status", "inventory", "market", "chart", "data")
 # 2026-11-16): f0 launch, f1 / f2 buy / sell (the market here; sell starts on
 # the first good in the hold), f3 equip ship, f4 galactic chart, f5 local
 # chart, f6 system data, f7 market prices, f8 status, f9 inventory (the same
-# screen as in flight). A missing tab does nothing.
+# screen as in flight, as a tab). A missing tab does nothing. The joystick goes
+# round the tabs in the same order (docked.TABS).
 DOCK_KEYS = (("k_1", "LAUNCH"), ("k_2", "MARKET"), ("k_3", "SELL"),
              ("k_4", "EQUIP SHIP"), ("k_5", "GALACTIC CHART"), ("k_6", "LOCAL CHART"),
              ("k_7", "SYSTEM DATA"), ("k_8", "MARKET"), ("k_9", "STATUS"),
@@ -440,7 +441,6 @@ class AceCommander(app.App):
         self.fsub = None        # a menu page ("settings", "debug", ...) or a screen (SCREENS)
         self.top = 0            # the first row shown on Market Prices or Inventory
         self.fmarket = None     # Market Prices' market, while it is up
-        self.dinv = False       # docked: Inventory (0) is showing over the tabs
         self.galaxy = None      # made the first time a commander flies
         self.galaxy_n = 0       # which of the 8 galaxies self.galaxy is
         self.eject_t = 0.0      # time since the escape pod was launched
@@ -996,7 +996,6 @@ class AceCommander(app.App):
         self.paused = False
         self.fsub = None
         self.chart = None
-        self.dinv = False
         self.mode = "docked"
         self._mission_news()
         self._egg()
@@ -1062,19 +1061,6 @@ class AceCommander(app.App):
         hit = self.pad.hit
         new = FB is not None
         d.tick(dt)
-        if self.dinv:           # Inventory (0), over the tabs: 0, C or F back, up / down scroll
-            if confirm or cancel or hit("k_0"):
-                self.dinv = False
-                return
-            if not any(hit(key) for key, tab in DOCK_KEYS):
-                from . import screens
-                n = len(screens.cargo_rows(self.cmdr))
-                if self._repeat("j_up" if new else "up", dt):
-                    self.top = max(0, self.top - 1)
-                elif self._repeat("j_down" if new else "down", dt):
-                    self.top = max(0, min(n - (screens.ROWS - 1), self.top + 1))
-                return
-            self.dinv = False   # another screen's key: straight there
         if cancel and d.view is not None and d.cursor:
             d.use_cursor(False)     # F: the joystick goes back to changing tabs
             return
@@ -1092,10 +1078,6 @@ class AceCommander(app.App):
             if hit(key):
                 if tab == "LAUNCH":
                     self._launch()
-                elif tab == "INVENTORY":
-                    if GOODS:
-                        self.dinv = True
-                        self.top = 0
                 elif tab == "SELL" and "MARKET" in d.tabs:
                     d.go(d.tabs.index("MARKET"))
                     have = [i for i, n in enumerate(self.cmdr.cargo) if n]
@@ -1156,6 +1138,11 @@ class AceCommander(app.App):
                 d.change_option()
         elif d.name() == "SYSTEM DATA" and ((new and hit(BTN_MISSILE)) or hit("k_D")):
             d.back_to_chart()       # D: back to the chart you came from
+        elif d.name() == "INVENTORY":
+            if self._repeat("j_up" if new else "up", dt):
+                d.scroll_inventory(-1)
+            elif self._repeat("j_down" if new else "down", dt):
+                d.scroll_inventory(1)
         elif d.name() == "MARKET":
             # the joystick picks a good; C buys and D sells; all repeat when held
             if self._repeat("j_up" if new else "up", dt):
@@ -1305,7 +1292,6 @@ class AceCommander(app.App):
                              random)
 
     def _launch(self):
-        self.dinv = False
         self._save_docked()
         self._pick_tunnel()
         self.launch_t = 0.0
@@ -2630,11 +2616,7 @@ class AceCommander(app.App):
         elif self.mode == "level":
             self._draw_level(ctx)
         elif self.mode == "docked":
-            if self.dinv:
-                from . import screens
-                screens.draw_inventory(ctx, self.cmdr, GOODS, self.top)
-            else:
-                self.dock.draw(ctx)
+            self.dock.draw(ctx)
         elif self.mode == "brief":
             self.brief.draw(ctx)
         elif self.mode == "options":

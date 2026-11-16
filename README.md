@@ -101,9 +101,10 @@ station's safe zone.
 
 ## Docked
 
-Screens, shown by the squares at the top: **Status**, **Market**, **Equip ship**, **Local
-chart**, **Galactic chart**, **System data** and **Options**. Joystick left / right (or E /
-B) changes screen; A launches from any screen, C from Status; F goes back to Status, then
+Screens, shown by the squares at the top, in the number keys' order from Status: **Status**,
+**Inventory**, **Options**, **Market**, **Equip ship**, **Galactic chart**, **Local chart** and
+**System data** (and the **Repair Shop** when it is on). Joystick left / right (or E / B) goes
+round them; A launches from any screen, C from Status; F goes back to Status, then
 to the title.
 
 - **Market**: joystick up / down picks a good, C buys, D sells. Prices depend on the

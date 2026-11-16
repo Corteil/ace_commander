@@ -128,8 +128,9 @@ def draw_market(ctx, m, c, here, top):
     text(ctx, "C or F: back", 0, 92 + DY, 10, cockpit.GREY)
 
 
-def draw_inventory(ctx, c, goods, top):
-    """Elite's Inventory: fuel, cash and what is in the hold."""
+def draw_inventory(ctx, c, goods, top, foot="C or F: back"):
+    """Elite's Inventory: fuel, cash and what is in the hold. foot: the hint
+    at the bottom (docked it is one of the tabs)."""
     text = cockpit.text
     _blank(ctx)
     text(ctx, "INVENTORY", 0, -100, 12, cockpit.WHITE)
@@ -152,4 +153,4 @@ def draw_inventory(ctx, c, goods, top):
              cockpit.GREEN, 1)
     if top + ROWS - 1 < len(rows):
         ctx.rgb(*cockpit.DIM).rectangle(-3, ROW_Y + 16 + (ROWS - 1) * ROW_STEP - 10, 6, 2).fill()
-    text(ctx, "C or F: back", 0, 92, 10, cockpit.GREY)
+    text(ctx, foot, 0, 92, 10, cockpit.GREY)

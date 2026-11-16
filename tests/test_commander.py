@@ -694,9 +694,12 @@ print("launching, arriving, flying to the station, docking, refuelling: ok")
 
 # ---- the docked tabs, targets, and the jump line in the in-flight menu ----
 d = e.dock
-assert d.tabs == ("STATUS", "MARKET", "EQUIP SHIP", "LOCAL CHART", "GALACTIC CHART",
-                  "SYSTEM DATA", "OPTIONS")
+# in the number keys' order from Status (9 0 - = 2 4 5 6 7; no Repair Shop unless on)
+assert d.tabs == ("STATUS", "INVENTORY", "OPTIONS", "MARKET", "EQUIP SHIP", "GALACTIC CHART",
+                  "LOCAL CHART", "SYSTEM DATA")
 assert d.tab == 0 and any("< > screens" in t for t in texts(e))
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "INVENTORY"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "OPTIONS"
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "MARKET"
 # ---- the market (Lave: rich agricultural, so food is cheap and computers dear)
 m = d.market; c = e.cmdr
@@ -745,7 +748,9 @@ assert saved.cargo == bought and saved.cash == 1234 and saved.market == c.market
 choose(e, "CONTINUE"); assert e.mode == "docked"
 d = e.dock
 assert d.market.stock == saved.market["stock"] and e.cmdr.cargo == bought, "the same market again"
-tick(e, fresh=["JOYRIGHT"]); assert d.name() == "MARKET"
+for _ in range(3):
+    tick(e, fresh=["JOYRIGHT"])
+assert d.name() == "MARKET"
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "EQUIP SHIP"
 # ---- Equip ship (Lave, tech level 5: the first 7 items)
 eq = mod.EQUIP
@@ -785,21 +790,23 @@ tick(e, fresh=["C"]); assert d.msg == "NOT ENOUGH CASH" and c.missiles == 0
 c.cash = 100000; c.missiles = 2
 saved_c = commander.Commander.from_dict(c.to_dict())
 assert (saved_c.hold, saved_c.laser, saved_c.missiles, "scoops" in saved_c.extras) == (35, "beam", 2, True)
-tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART" and d.view.verb == "TARGET"
-assert not d.cursor and "< LAVE >" in texts(e), "the joystick changes tab until C"
-tick(e, fresh=["C"]); assert d.cursor and d.view.active
-tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART", "now the joystick moves the cursor"
-tick(e, fresh=["F"]); assert d.name() == "LOCAL CHART" and not d.cursor, "F gives it back"
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "GALACTIC CHART" and len(d.view.dots) == 256
-assert not d.cursor, "a new tab starts with the joystick on the tabs"
-tick(e, fresh=["E"]); tick(e, fresh=["B"]); assert d.name() == "GALACTIC CHART", "E / B still go"
+assert d.view.verb == "TARGET"
 tx = texts(e)
 assert "GALAXY 1" in tx and "< LAVE >" in tx and "RANGE 7.0 LY" in tx, tx
+assert not d.cursor, "the joystick changes tab until C"
+tick(e, fresh=["C"]); assert d.cursor and d.view.active
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "GALACTIC CHART", "now the joystick moves the cursor"
+tick(e, fresh=["F"]); assert d.name() == "GALACTIC CHART" and not d.cursor, "F gives it back"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART" and d.view.verb == "TARGET"
+assert not d.cursor and "< LAVE >" in texts(e), "a new tab starts with the joystick on the tabs"
+tick(e, fresh=["E"]); tick(e, fresh=["B"]); assert d.name() == "LOCAL CHART", "E / B still go"
 tick(e, fresh=["B"]); assert d.name() == "SYSTEM DATA" and d.data.name == "LAVE"
 tx = texts(e)
 assert "you are here" in tx and "Dictatorship" in tx and "Tech 5   Pop 2.5 billion" in tx, tx
 assert "Productivity 7000 M Cr" in tx and "Radius 4116 km" in tx
-tick(e, fresh=["JOYRIGHT"]); assert d.name() == "OPTIONS"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "STATUS", "tabs wrap round"
+tick(e, fresh=["JOYRIGHT"]); tick(e, fresh=["JOYRIGHT"]); assert d.name() == "OPTIONS"
 tx = texts(e)
 before = c.docking
 assert "STEER: JOYSTICK" in tx and "DOCKING: " + mod.DOCK_NAMES[before] in tx, tx
@@ -809,9 +816,9 @@ after = commander.DOCKING[(commander.DOCKING.index(before) + 1) % 3]
 assert c.docking == after and "DOCKING: " + mod.DOCK_NAMES[after] in texts(e), "C changes it"
 assert commander.load(SAVE).docking == after, "saved"
 tick(e, fresh=["C"]); tick(e, fresh=["C"]); assert c.docking == before
-tick(e, fresh=["JOYRIGHT"]); assert d.name() == "STATUS", "tabs wrap round"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "MARKET"
 tick(e, fresh=["E"]); assert d.name() == "OPTIONS"
-tick(e, fresh=["E"]); assert d.name() == "SYSTEM DATA"
+tick(e, fresh=["E"]); assert d.name() == "INVENTORY"
 tick(e, fresh=["F"]); assert d.name() == "STATUS" and e.mode == "docked", "F goes back to Status"
 # pick Diso (147) on the galactic chart by steering to it
 d.open("GALACTIC CHART")
