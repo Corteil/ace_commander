@@ -56,7 +56,8 @@ The in-flight menu: **Hyperspace** (to your target, or open the local chart to p
 or **Galactic jump** when you have them. Joystick up / down picks, C chooses, F goes back,
 A resumes. **Status** and the charts don't pause: as in Elite they replace the view of space
 while the game runs on, so you can still be shot. The joystick and buttons work the screen,
-and C or F goes back to space.
+and C or F goes back to space. On a chart C makes the system your target; jump with
+**Hyperspace** (or `H`).
 
 With tilt steering, tilting the badge steers and the joystick still works; a tap on D
 re-zeroes the tilt and holding it fires a missile. A USB keyboard works too: `W` / `S` and

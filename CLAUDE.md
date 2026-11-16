@@ -257,7 +257,9 @@ energy bomb) do nothing (Elite's DK2 only reads them in a space view); lasers fi
 energy but can't hit, and missile lock stops (`Game.looking` False: Elite skips laser and missile
 locking off a space view, MA15). Market Prices works out the system's market on first use and keeps
 it with the commander, so docking shows the same prices; nothing can be bought or sold in flight. A
-jump closes any screen. `Game.condition()` is Elite's GREEN / YELLOW / RED for Status. The fire lock
+jump closes any screen. On the in-flight charts C only selects (Brian, build 64): the system becomes
+the target (C on where you are clears it) and the chart stays, its distance line saying "TARGET";
+H or the menu's HYPERSPACE line jumps, as Elite. `Game.condition()` is Elite's GREEN / YELLOW / RED for Status. The fire lock
 (the C that chose something isn't a shot) applies to C / Enter only, so Space held through closing
 a screen keeps firing.
 Not built yet: a HARDCORE marker on the HUD.

@@ -2322,6 +2322,7 @@ class AceCommander(app.App):
                 c = self.cmdr
                 self.chart = chart.GalChart(self.galaxy, c.system, c.fuel, self.target,
                                             "JUMP", c.galaxy + 1)
+                self.chart.marked = self.target
         elif hit("k_7") and charts:     # the target's data, or here's; D or F back to the chart
             self._fpick("LOCAL CHART")
             self.data_of = self.target if self.target is not None else self.cmdr.system
@@ -2392,6 +2393,7 @@ class AceCommander(app.App):
             from . import chart
             self.chart = chart.Chart(self.galaxy, self.cmdr.system, self.cmdr.fuel,
                                      self.target, at=self.witch)
+            self.chart.marked = self.target
             self._open("chart")
         elif item.startswith("HYPERSPACE: "):
             to = self._jump_ok()
@@ -2424,8 +2426,10 @@ class AceCommander(app.App):
             self.fmenu = 0
 
     def _update_chart(self, new, cancel, confirm):
-        """The local chart: the joystick moves the cursor, C jumps to the
-        selected system if the fuel will reach it, F goes back."""
+        """The in-flight charts: the joystick moves the cursor, C makes the
+        selected system the target (Brian: only that; H or the menu's
+        HYPERSPACE line jumps, as Elite), C on where you are clears it, D
+        shows its data, F goes back."""
         if cancel:
             self._resume()
             self.chart = None
@@ -2437,13 +2441,10 @@ class AceCommander(app.App):
                 self.fsub = "data"
             return
         if confirm:
-            to = ch.target()
-            if to is not None:
-                self.jump_to = to
-                self.target = to[0]
-                self.game.start_jump()
-                self.chart = None
-                self._resume()
+            i = ch.picked()
+            if i is not None:
+                self.target = None if i == ch.here else i
+                ch.marked = self.target
             return
         jx, jy = self._steer(False, STICK if new else ANY, new, False)   # W A S D fly the ship
         ch.move(jx, jy, self.dt)

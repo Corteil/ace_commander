@@ -519,7 +519,10 @@ assert e.chart.sel[2] == 129, e.chart.sel
 tx = texts(e)
 d129 = reach[129]
 assert "ZAONCE" in tx and ("%d.%d LY" % (d129 // 10, d129 % 10)) in tx, tx
-tick(e, fresh=["C"])
+tick(e, fresh=["C"])     # C only selects it (Brian): the chart stays, no countdown
+assert e.target == 129 and e.fsub == "chart" and g.jump_t <= 0, (e.target, e.fsub, g.jump_t)
+assert ("TARGET  %d.%d LY" % (d129 // 10, d129 % 10)) in texts(e)
+tick(e, fresh=["KEY_H"])                    # H jumps, as Elite
 assert not e.paused and e.fsub is None and g.jump_t > 0 and g.msg == "HYPERSPACE 5"
 kill(g, 2)
 o = game.Obj(g.types["SIDEWINDER"], "ship", 0.0, 0.0, 3000.0); g.objs.append(o)
@@ -567,7 +570,8 @@ tick(e, fresh=["A"])
 # dying stops a countdown; quitting to the title and coming back keeps the system
 fpick(e, "LOCAL CHART")
 e.chart.cx, e.chart.cy = [(float(px), float(py)) for px, py, i, d in e.chart.dots if i == 7][0]
-e.chart._select(); tick(e, fresh=["C"]); assert g.jump_t > 0
+e.chart._select(); tick(e, fresh=["C"]); assert g.jump_t <= 0, "C only targets"
+tick(e, fresh=["KEY_H"]); assert g.jump_t > 0
 # destroyed at Zaonce, never having docked there: back to the last save, at
 # Lave, as it was then (the jump's fuel too)
 assert e.cmdr.docked_at == 7
@@ -646,7 +650,7 @@ assert sp.pr == max(4000.0, lave.radius * game.PLANET_SCALE)
 assert sp.station.bp.name == ("DODO" if lave.tech >= game.DODO_TECH else "CORIOLIS")
 fpick(e, "LOCAL CHART")
 e.chart.cx, e.chart.cy = [(float(px), float(py)) for px, py, i, d in e.chart.dots if i == 7][0]
-e.chart._select(); tick(e, fresh=["C"])
+e.chart._select(); tick(e, fresh=["C"]); tick(e, fresh=["KEY_H"])    # target, then jump
 for _ in range(200):
     tick(e)
     if e.cmdr.system == 7:

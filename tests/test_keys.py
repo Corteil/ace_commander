@@ -168,6 +168,22 @@ assert not a.paused and g.jump_t > 0 and a.jump_to[0] == reach[0], "H: hyperspac
 tick(a, fresh=["KEY_H"])
 assert g.jump_t > 0 and a.fsub is None, "H again during the countdown does nothing"
 
+# on a chart C only selects (Brian): the target is set, no countdown; C on
+# where you are clears it; H then jumps
+a, g = flying()
+a.target = None
+tick(a, fresh=["KEY_6"]); ch = a.chart
+dot = [d for d in ch.dots if d[2] == reach[0]][0]
+ch.cx, ch.cy = float(dot[0]), float(dot[1]); ch._select()
+tick(a, fresh=["C"])
+assert a.target == reach[0] and a.fsub == "chart" and g.jump_t <= 0, "C selects only"
+assert any(t.startswith("TARGET") for t in [x[0] for x in (lambda c: (a.draw(c), c)[1])(bs.CountCtx()).texts])
+ch.cx, ch.cy = 0.0, 0.0; ch._select()
+tick(a, fresh=["C"]); assert a.target is None, "C on where you are clears it"
+ch.cx, ch.cy = float(dot[0]), float(dot[1]); ch._select(); tick(a, fresh=["C"])
+tick(a, fresh=["KEY_H"]); assert g.jump_t > 0 and a.fsub is None, "H jumps from the chart"
+print("chart C selects, H jumps: ok")
+
 # Ctrl+H (Elite's key, Brian) only with the galactic hyperdrive fitted, and it
 # is never plain hyperspace; G does nothing
 a, g = flying()
