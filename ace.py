@@ -136,6 +136,10 @@ DOCK_HOLD = (1.0, 2.0)  # then the view of the bay stays this long, chosen at ra
 EJECT_TIME = 3.0        # seconds of the ESCAPE POD screen before the docking scene (C skips it)
 DOCK_NAMES = {"A": "MANUAL", "B": "ASSISTED", "C": "AUTOMATIC"}
 
+# the in-flight screens (Elite's f4-f9 and the charts): shown instead of the
+# space view while the game runs on, not pages of the pause menu
+SCREENS = ("status", "inventory", "market", "chart", "data")
+
 # docked, the number row is Elite's f0-f9 (Brian chose Elite's scheme,
 # 2026-11-16): f0 launch, f1 / f2 buy / sell (both the market here), f3 equip
 # ship, f4 galactic chart, f5 local chart, f6 system data, f7 market prices,
@@ -407,7 +411,9 @@ class AceCommander(app.App):
         self.banked_cash = 0    # and its bounties (tenths of a credit)
         self.saved_over = False
         self.fmenu = 0          # which in-flight menu line is highlighted
-        self.fsub = None        # None, "status", "chart", "settings" or "debug": the menu page
+        self.fsub = None        # a menu page ("settings", "debug", ...) or a screen (SCREENS)
+        self.top = 0            # the first row shown on Market Prices or Inventory
+        self.fmarket = None     # Market Prices' market, while it is up
         self.galaxy = None      # made the first time a commander flies
         self.galaxy_n = 0       # which of the 8 galaxies self.galaxy is
         self.eject_t = 0.0      # time since the escape pod was launched
@@ -664,7 +670,7 @@ class AceCommander(app.App):
 
     # ---- steering ---------------------------------------------------------
 
-    def _steer(self, tilt, dirs, arrows):
+    def _steer(self, tilt, dirs, arrows, wasd=True):
         """(roll, pitch) as -1..1 each, from tilt, the four direction controls
         named in dirs, and the keyboard. Pitch is negative for up."""
         held = self.pad.held
@@ -704,14 +710,15 @@ class AceCommander(app.App):
                 jx -= 1.0
             if held("k_RIGHT"):
                 jx += 1.0
-        if held("k_W"):
-            jy -= 1.0
-        if held("k_S"):
-            jy += 1.0
-        if held("k_A"):
-            jx -= 1.0
-        if held("k_D"):
-            jx += 1.0
+        if wasd:
+            if held("k_W"):
+                jy -= 1.0
+            if held("k_S"):
+                jy += 1.0
+            if held("k_A"):
+                jx -= 1.0
+            if held("k_D"):
+                jx += 1.0
         return max(-1.0, min(1.0, jx)), max(-1.0, min(1.0, jy))
 
     # ---- update -----------------------------------------------------------
@@ -1265,6 +1272,8 @@ class AceCommander(app.App):
         Not saved: as in the original, only docking saves."""
         g = self.game
         g.jumped = False
+        if self.fsub in SCREENS:    # out of hyperspace looking at space, as Elite
+            self._resume()
         to = self.jump_to
         self.jump_to = None
         c = self.cmdr
@@ -1443,22 +1452,33 @@ class AceCommander(app.App):
                 g.step(dt, 0.0, 0.0, 0.0, False, False)   # let the wreckage drift
             return False
         if self.paused:
-            if not self._paused_keys():
+            if not self._screen_keys():
                 self._update_fmenu(new, menu, cancel, confirm)
             return False
         if menu:
             self.paused = True
             self.fmenu = 0
             self.fsub = None
+            self.chart = None
             self.d_t = None
+            g.looking = True
             return False
-        if self._flight_keys():
-            return False
+        self._screen_keys()
+        # a screen up (status, market, a chart...): the game runs on, as Elite's
+        # does, but the joystick and buttons work the screen and only Elite's
+        # primary flight controls (steer, speed, fire) still fly, from the
+        # keyboard or by tilting; lasers fire but can't hit (Game.looking)
+        busy = self.fsub in SCREENS
+        if busy:
+            self._update_screen(new, cancel, confirm)
+        g.looking = self.fsub not in SCREENS
 
         tilt = self.use_tilt and self.tilt_ok
         throttle = 0.0
         missile = False
-        if new:                 # joystick steers; lettered buttons do the rest
+        if busy:                # the keyboard's W / A / S / D, or tilt
+            roll, jy = self._steer(tilt, None, False)
+        elif new:               # joystick steers; lettered buttons do the rest
             if held(BTN_SPEED_UP):
                 throttle += 1.0
             if held(BTN_SPEED_DOWN):
@@ -1498,8 +1518,8 @@ class AceCommander(app.App):
         else:
             roll, jy = self._steer(False, ANY, False)
         if g.rules.manual_ecm:      # Hardcore: E is the ECM (or both speed buttons together)
-            if hit("k_E") or (new and ((hit(BTN_SPEED_UP) and held(BTN_SPEED_DOWN))
-                                       or (hit(BTN_SPEED_DOWN) and held(BTN_SPEED_UP)))):
+            if not busy and (hit("k_E") or (new and ((hit(BTN_SPEED_UP) and held(BTN_SPEED_DOWN))
+                                                     or (hit(BTN_SPEED_DOWN) and held(BTN_SPEED_UP))))):
                 g.fire_ecm()
         elif held("k_E"):
             throttle += 1.0
@@ -1507,29 +1527,33 @@ class AceCommander(app.App):
             throttle -= 1.0
         # + / - in every mode (in Hardcore E is the ECM); J holds speed up, which
         # at full speed with no ships about is the jump drive (Elite's J)
-        if held("k_faster") or held("k_J"):
+        if held("k_faster") or (held("k_J") and not busy):
             throttle += 1.0
         if held("k_slower"):
             throttle -= 1.0
-        if g.rules.missile_lock_required:       # Hardcore: T arms and locks, U disarms
-            if hit("k_T"):
-                g.arm_missile()
-            if hit("k_U"):
-                g.unarm_missile()
-        if hit("k_M"):
-            missile = True
-        for n in range(4):      # the views, on a keyboard (both modes)
-            if hit("k_view%d" % n):
-                g.set_view(n)
-        if hit("k_V"):
-            g.next_view()
-        fire = held("confirm") or held("k_F") or held("k_SPACE")
-        if self.fire_lock:      # held on from a menu or the launch: fire once it is let go
+        if not busy:            # Elite's secondary keys: only looking at space
+            if g.rules.missile_lock_required:       # Hardcore: T arms and locks, U disarms
+                if hit("k_T"):
+                    g.arm_missile()
+                if hit("k_U"):
+                    g.unarm_missile()
+            if hit("k_M"):
+                missile = True
+            for n in range(4):      # the views, on a keyboard (both modes)
+                if hit("k_view%d" % n):
+                    g.set_view(n)
+            if hit("k_V"):
+                g.next_view()
+        fire = held("confirm") and not busy
+        if self.fire_lock:      # the C held on from a menu or the launch: fire once it is let go
             if fire:
                 fire = False
             else:
                 self.fire_lock = False
-        if g.autodock and self._took_controls(new):
+        # Space and F fire too (not locked: they never choose anything, so
+        # one held through closing a screen keeps firing)
+        fire = fire or held("k_F") or held("k_SPACE")
+        if g.autodock and not busy and self._took_controls(new):
             g.stop_autodock()       # taking the controls switches the docking computer off
         pitch = jy if INVERT_PITCH else -jy
         t0 = _us()
@@ -2201,17 +2225,6 @@ class AceCommander(app.App):
         if menu and new:        # A closes the menu from any page
             self._resume()
             return
-        if self.fsub == "status":
-            if confirm or cancel:
-                self.fsub = None
-            return
-        if self.fsub == "chart":
-            self._update_chart(new, cancel, confirm)
-            return
-        if self.fsub == "data":     # back to the chart
-            if confirm or cancel or (new and hit(BTN_MISSILE)) or hit("k_D"):
-                self.fsub = "chart"
-            return
         items = self._fitems()
         if hit("j_up" if new else "up"):
             self.fmenu = (self.fmenu - 1) % len(items)
@@ -2259,15 +2272,32 @@ class AceCommander(app.App):
         elif confirm:
             self._fpick(items[self.fmenu])
 
-    def _flight_keys(self):
-        """Elite's keys in flight (Brian chose Elite's scheme, 2026-11-16): 5 the
-        galactic chart (f4), 6 the local chart (f5), 7 the target's system data
-        (f6), 9 and 0 status (f8, f9: the hold is on it), H hyperspace, Ctrl+H
-        the galactic hyperdrive (Elite's key, Brian). Each opens the menu and does what its line does,
-        and only when the menu has that line (so not in combat practice, not
-        during a countdown, Ctrl+H only with the hyperdrive fitted). 8 (f7, market
-        prices) is docked only. True if a key did something."""
+    def _screen_keys(self):
+        """Elite's keys for the screens (Brian chose Elite's scheme, 2026-11-16),
+        flying, on a screen or in the menu: 5 galactic chart (f4), 6 local chart
+        (f5), 7 the target's system data (f6), 8 market prices (f7), 9 status
+        (f8), 0 inventory (f9); H hyperspace, Ctrl+H the galactic hyperdrive.
+        On a screen or in the menu 1-4 fly on looking that way, and the open
+        screen's own key closes it. None of it pauses the game. Each is there
+        only when the in-flight menu has its line (so not in combat practice,
+        not during a countdown, Ctrl+H only with the hyperdrive). True if a
+        key did something."""
         hit = self.pad.hit
+        g = self.game
+        on = self.fsub in SCREENS
+        if self.paused or on:
+            for n in range(4):
+                if hit("k_view%d" % n):
+                    self._resume()
+                    g.set_view(n)
+                    return True
+        if on:
+            own = {"status": "k_9", "inventory": "k_0", "market": "k_8", "data": "k_7"}.get(self.fsub)
+            if self.fsub == "chart":
+                own = "k_5" if type(self.chart).__name__ == "GalChart" else "k_6"
+            if own is not None and hit(own):
+                self._resume()
+                return True
         items = self._fitems_top()
 
         def line(start):
@@ -2276,91 +2306,93 @@ class AceCommander(app.App):
                     return item
             return None
 
-        pick = None
-        if hit("k_H") and self.pad.held("k_CTRL"):
-            pick = line("GALACTIC JUMP")
+        if hit("k_H"):
+            pick = line("GALACTIC JUMP") if self.pad.held("k_CTRL") else line("HYPERSPACE")
             if pick is None:
                 return False        # Ctrl+H is never plain hyperspace
-        elif hit("k_H"):
-            pick = line("HYPERSPACE")
-        elif hit("k_6"):
-            pick = line("LOCAL CHART")
-        elif hit("k_9") or hit("k_0"):
-            pick = line("STATUS")
-        elif hit("k_8"):
-            self.game.say("MARKET: DOCKED ONLY", 1.0)
-            return False
-        elif hit("k_5") or hit("k_7"):
-            chart_line = line("LOCAL CHART")
-            if chart_line is None:
-                return False
-            self.paused = True
-            self.fmenu = items.index(chart_line)
-            self.d_t = None
-            self._fpick(chart_line)     # the local chart, which F goes back from
-            if hit("k_5") and self.witch is None:
+            self._fpick(pick)
+            return True
+        charts = line("LOCAL CHART") is not None
+        if hit("k_6") and charts:
+            self._fpick("LOCAL CHART")
+        elif hit("k_5") and charts:
+            self._fpick("LOCAL CHART")
+            if self.witch is None:
                 from . import chart
                 c = self.cmdr
                 self.chart = chart.GalChart(self.galaxy, c.system, c.fuel, self.target,
                                             "JUMP", c.galaxy + 1)
-            elif hit("k_7"):            # the target's data, or here's; D or F back to the chart
-                self.data_of = self.target if self.target is not None else self.cmdr.system
-                self.fsub = "data"
-            return True
-        if pick is None:
+        elif hit("k_7") and charts:     # the target's data, or here's; D or F back to the chart
+            self._fpick("LOCAL CHART")
+            self.data_of = self.target if self.target is not None else self.cmdr.system
+            self.fsub = "data"
+        elif hit("k_8") and line("STATUS") is not None and GOODS and self.witch is None:
+            self._open_market()
+        elif hit("k_9") and line("STATUS") is not None:
+            self._open("status")
+        elif hit("k_0") and line("STATUS") is not None:
+            self._open("inventory")
+        else:
             return False
-        self.paused = True
-        self.fmenu = items.index(pick)
-        self.fsub = None
-        self.d_t = None
-        self._fpick(pick)
         return True
 
-    def _paused_keys(self):
-        """The number row while the menu or a screen is open (Brian): 1-4 go
-        back to the flight looking that way, the key of the screen that is
-        open closes it, and another screen's key (or H / Ctrl+H) goes straight
-        there. True if a key did something."""
+    def _open(self, screen):
+        """Show one of the in-flight screens (SCREENS); the game runs on."""
+        self.paused = False
+        self.fsub = screen
+        self.top = 0
+        self.d_t = None
+
+    def _open_market(self):
+        """Market Prices in flight. A system's market is worked out the first
+        time it is needed here, as docking would, and kept with the commander,
+        so the station has the same prices when you dock."""
+        from . import market
+        c = self.cmdr
+        if c.market is None or c.market["system"] != c.system:
+            c.market = market.new(GOODS, c.system, self.galaxy.system(c.system).economy,
+                                  random.randint(0, 255))
+        self.fmarket = market.Market(GOODS, self.galaxy.system(c.system).economy, c)
+        self._open("market")
+
+    def _update_screen(self, new, cancel, confirm):
+        """A screen's own controls: the joystick and buttons (and the cursor
+        keys, Enter and Esc). C or F goes back to the flight."""
+        s = self.fsub
         hit = self.pad.hit
-        g = self.game
-        for n in range(4):
-            if hit("k_view%d" % n):
-                self._resume()
-                g.set_view(n)
-                return True
-        open_key = None
-        if self.fsub == "chart" and self.chart is not None:
-            open_key = ("k_5",) if type(self.chart).__name__ == "GalChart" else ("k_6",)
-        elif self.fsub == "data":
-            open_key = ("k_7",)
-        elif self.fsub == "status":
-            open_key = ("k_9", "k_0")
-        if open_key is not None and any(hit(k) for k in open_key):
+        if s == "chart":
+            self._update_chart(new, cancel, confirm)
+            return
+        if s == "data":         # back to the chart
+            if confirm or cancel or (new and hit(BTN_MISSILE)) or hit("k_D"):
+                self.fsub = "chart"
+            return
+        if confirm or cancel:
             self._resume()
-            return True
-        if not any(hit(k) for k in ("k_5", "k_6", "k_7", "k_9", "k_0", "k_H")):
-            return False
-        was = (self.fsub, self.chart, self.fmenu)
-        self.paused = False     # as if flying: the key then opens its own screen
-        self.fsub = None
-        self.chart = None
-        if not self._flight_keys():     # that screen isn't on offer here: stay put
-            self.paused = True
-            self.fsub, self.chart, self.fmenu = was
-        return True
+            return
+        if s == "market" or s == "inventory":
+            from . import screens
+            if s == "market":
+                n, shown = len(GOODS), screens.ROWS
+            else:
+                n, shown = len(screens.cargo_rows(self.cmdr)), screens.ROWS - 1
+            if self._repeat("j_up" if new else "up", self.dt):
+                self.top = max(0, self.top - 1)
+            elif self._repeat("j_down" if new else "down", self.dt):
+                self.top = max(0, min(n - shown, self.top + 1))
 
     def _fpick(self, item):
         """Do what choosing line item of the in-flight menu does (C on it, or
-        its key: see _flight_keys)."""
+        its key: see _screen_keys)."""
         if item == "RESUME":
             self._resume()
         elif item == "STATUS":
-            self.fsub = "status"
+            self._open("status")
         elif item == "LOCAL CHART" or item == "HYPERSPACE":   # no target: pick one
             from . import chart
             self.chart = chart.Chart(self.galaxy, self.cmdr.system, self.cmdr.fuel,
                                      self.target, at=self.witch)
-            self.fsub = "chart"
+            self._open("chart")
         elif item.startswith("HYPERSPACE: "):
             to = self._jump_ok()
             if to is not None:
@@ -2395,8 +2427,7 @@ class AceCommander(app.App):
         """The local chart: the joystick moves the cursor, C jumps to the
         selected system if the fuel will reach it, F goes back."""
         if cancel:
-            self.fmenu = self._fitems_top().index("LOCAL CHART")
-            self.fsub = None
+            self._resume()
             self.chart = None
             return
         ch = self.chart
@@ -2414,8 +2445,35 @@ class AceCommander(app.App):
                 self.chart = None
                 self._resume()
             return
-        jx, jy = self._steer(False, STICK if new else ANY, new)
+        jx, jy = self._steer(False, STICK if new else ANY, new, False)   # W A S D fly the ship
         ch.move(jx, jy, self.dt)
+
+    def _draw_screen(self, ctx):
+        """The in-flight screen that is up (SCREENS)."""
+        s = self.fsub
+        if s == "chart":
+            self.chart.draw(ctx)
+            return
+        if s == "data":
+            self._draw_data(ctx)
+            return
+        from . import screens
+        c = self.cmdr
+        gal = self.galaxy
+        if s == "market":
+            screens.draw_market(ctx, self.fmarket, c, gal.system(c.system).name, self.top)
+        elif s == "inventory":
+            screens.draw_inventory(ctx, c, GOODS, self.top)
+        else:
+            here = ("WITCHSPACE" if self.witch is not None
+                    else gal.system(c.system).name if gal is not None and c.system is not None
+                    else None)
+            target = dist = None
+            if gal is not None and self.target is not None and c.system is not None:
+                target = gal.system(self.target).name
+                dist = gal.distance(c.system, self.target)
+            screens.draw_status(ctx, c, here, target, dist, self.game.condition(),
+                                game.legal_name(c.legal))
 
     def _draw_data(self, ctx):
         """D on the in-flight chart: the selected system's data."""
@@ -2467,12 +2525,8 @@ class AceCommander(app.App):
         elif self.mode == "bench":
             self.bench.draw(ctx)
         elif self.mode == "flight":
-            if self.paused and self.fsub == "chart":
-                self.chart.draw(ctx)
-                ctx.restore()
-                return
-            if self.paused and self.fsub == "data":
-                self._draw_data(ctx)
+            if self.fsub in SCREENS and not self.paused:   # instead of the space view
+                self._draw_screen(ctx)
                 ctx.restore()
                 return
             t0 = _us()
@@ -2539,26 +2593,6 @@ class AceCommander(app.App):
     def _draw_fmenu(self, ctx):
         text = cockpit.text
         ctx.rgba(0, 0, 0, 0.85).rectangle(-100, -80, 200, 142).fill()
-        if self.fsub == "status":
-            c = self.cmdr
-            text(ctx, "COMMANDER", 0, -60, 18, cockpit.WHITE)
-            text(ctx, c.rank(), 0, -34, 16, cockpit.GREEN)
-            text(ctx, "%d kills  %s  %s" % (c.kills, commander.LEVELS[c.level],
-                                            game.legal_name(c.legal)),
-                 0, -12, 12, cockpit.YELLOW)
-            nxt = c.next_rank()
-            if nxt:
-                text(ctx, "%d more for %s" % (nxt[1], nxt[0]), 0, 6, 12, cockpit.YELLOW)
-            if self.galaxy is not None:
-                text(ctx, "%s   fuel %d.%d LY" % (
-                    "WITCHSPACE" if self.witch is not None else self.galaxy.system(c.system).name,
-                    c.fuel // 10, c.fuel % 10),
-                    0, 23, 12, cockpit.CYAN)
-            from . import market
-            text(ctx, "hold %d/%dt   %s" % (market.hold_used(c.cargo), c.hold, c.cash_text()),
-                 0, 38, 11, cockpit.GREY)
-            text(ctx, "C or F: back", 0, 53, 11, cockpit.GREY)
-            return
         if self.fsub in ("debug", "dgroup"):
             self._draw_list(ctx, self._debug_title(self.fsub, self.dgroup), self._fitems(),
                             self.fmenu, None)

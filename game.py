@@ -497,6 +497,8 @@ class Game:
         self.god = False    # a cheat: hits flash but do no damage
         self.docking = "C"  # how docking works: see set_docking
         self.view = 0               # 0 front, 1 rear, 2 left, 3 right (Elite's VIEW)
+        self.looking = True         # a space view is showing (Elite's QQ11 = 0); False on a
+                                    # status, market or chart screen: lasers fire but can't hit
         self.lasers = [None, None, None, None]  # the laser on each view (a key of LASERS), or None
         self.laser = None           # the laser on the current view
         self.set_laser("pulse")
@@ -630,6 +632,7 @@ class Game:
 
     def reset(self):
         self.view = 0       # a flight starts looking ahead
+        self.looking = True
         self._aim_laser()
         self.objs = []
         self.new = []      # objects created during a step, added at its end
@@ -938,6 +941,24 @@ class Game:
                     and -r < o.y < r and -r < o.z < r):
                 return True
         return False
+
+    def condition(self):
+        """Elite's condition, for the status screen: "RED" with a missile or a
+        hostile ship in radar range, or the shields low; "YELLOW" with any
+        other ship about; else "GREEN"."""
+        r = RADAR_RANGE
+        near = False
+        for o in self.objs:
+            if o.dead or (o.kind != "ship" and o.kind != "missile"):
+                continue
+            if not (-r < o.x < r and -r < o.y < r and -r < o.z < r):
+                continue
+            if o.kind == "missile" or o.role == "pirate" or o.state in ("attack", "break"):
+                return "RED"
+            near = True
+        if self.shield < 50:
+            return "RED"
+        return "YELLOW" if near else "GREEN"
 
     def _massed(self, sp):
         """True within MASS_LOCK_K radii of the planet's or the sun's centre (the mass lock: the
@@ -1779,15 +1800,16 @@ class Game:
         if self.hot and self.heat < 0.5:
             self.hot = False
         self.cool -= dt
-        t = self._pick(0.35) if (self.armed or not self.rules.missile_lock_required) else None
-        if t is None or t is not self.lock:    # a new ship, or none: start again
-            self.lock = t
-            self.lock_t = 0.0
-            self.locked = False
-        elif not self.locked:
-            self.lock_t += dt
-            if self.lock_t >= LOCK_TIME:
-                self.locked = True
+        if self.looking:        # Elite skips missile and laser locking off a space view (MA15)
+            t = self._pick(0.35) if (self.armed or not self.rules.missile_lock_required) else None
+            if t is None or t is not self.lock:    # a new ship, or none: start again
+                self.lock = t
+                self.lock_t = 0.0
+                self.locked = False
+            elif not self.locked:
+                self.lock_t += dt
+                if self.lock_t >= LOCK_TIME:
+                    self.locked = True
 
         if fire and self.laser is None:
             if self.msg_t <= 0:
@@ -1805,7 +1827,7 @@ class Game:
                 self.say("LASER OVERHEAT")
             best = None
             best_z = LASER_RANGE
-            for o in self.objs:
+            for o in (self.objs if self.looking else ()):   # off a space view: no hits
                 if o.dead or o.kind == "pmissile" or o.z <= 30 or o.z >= best_z:
                     continue
                 lim = o.z * AIM_ASSIST
@@ -1815,7 +1837,7 @@ class Game:
                 if o.x * o.x + o.y * o.y < lim:
                     best = o
                     best_z = o.z
-            if best is None and self.space is not None:
+            if best is None and self.space is not None and self.looking:
                 self._hit_station()
             if best is not None and best.role == "constrictor" and self.laser != "military":
                 self._provoke(best)     # its shields shrug off anything but a military laser

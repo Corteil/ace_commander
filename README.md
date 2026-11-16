@@ -19,7 +19,8 @@ By hand: copy the files below to `/apps/ace_commander/` on the badge (for exampl
 ```
 __init__.py app.py ace.py bench.py briefing.py chart.py cockpit.py commander.py content.py
 describe.py docked.py equipment.py galaxy.py game.py letters.py market.py missions.py
-original_data.py original_ships.py title.py viewer.py tildagon.toml metadata.json
+original_data.py original_ships.py rules.py screens.py title.py viewer.py tildagon.toml
+metadata.json
 ```
 
 The game shows a loading screen for a few seconds while it starts.
@@ -53,12 +54,19 @@ A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves 
 The in-flight menu: **Hyperspace** (to your target, or open the local chart to pick one),
 **Local chart**, **Status**, **Settings** and **Quit to title**, plus **Docking computer**
 or **Galactic jump** when you have them. Joystick up / down picks, C chooses, F goes back,
-A resumes.
+A resumes. **Status** and the charts don't pause: as in Elite they replace the view of space
+while the game runs on, so you can still be shot. The joystick and buttons work the screen,
+and C or F goes back to space.
 
 With tilt steering, tilting the badge steers and the joystick still works; a tap on D
 re-zeroes the tilt and holding it fires a missile. A USB keyboard works too: `W` / `S` and
-`A` / `D` (or the arrows) steer, `E` / `Q` speed up / down, `F` or space lasers, `M`
-missile, `P` the menu.
+`A` / `D` (or the arrows) steer, `E` / `Q` or `+` / `-` speed up / down, `F` or space
+lasers, `M` missile, `P` the menu. The number row is Elite's f0-f9: `1`-`4` front, rear,
+left and right views, `5` galactic chart, `6` local chart, `7` system data, `8` market
+prices, `9` status, `0` inventory (press it again to go back to space; docked, the same keys
+pick the screen and `1` launches). `H` hyperspace, `Ctrl`+`H` galactic jump, `J` jump drive.
+On a status, market or chart screen only steering, speed and lasers work (and the lasers
+can't hit anything), as in Elite.
 
 The badge's LEDs: red when you are hit, your laser's colour as you fire (pulse magenta,
 beam blue, military green, mining yellow), white for the energy bomb, violet for the ECM,

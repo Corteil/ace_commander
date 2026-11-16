@@ -129,9 +129,11 @@ def fpick(label):
 tick(a, fresh=["A"])
 tick(a)
 shot(a, "4_menu.png")
-fpick("STATUS")
+fpick("STATUS")                 # a screen now: the game runs on, the menu is closed
 shot(a, "4b_status.png")
-a.fsub = None; tick(a)
+a._open("inventory"); shot(a, "4b_inventory.png")
+a._open_market(); shot(a, "4b_market.png")
+tick(a, fresh=["CONFIRM"]); tick(a, fresh=["A"]); tick(a)
 shot(a, "4_menu_jump.png")
 fpick("SETTINGS")
 shot(a, "4c_pause_menu.png")

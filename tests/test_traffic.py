@@ -357,11 +357,11 @@ for _ in range(400):
     if g.warp > 0:
         break
 assert g.legal == 20 and c.legal == 20, (g.legal, c.legal)
-# the status pages show it
-tick(e, fresh=["A"]); e.fsub = "status"
+# the status screens show it (in flight a screen, the game running on)
+e._open("status")
 cx = CountCtx(); e.draw(cx)
 assert any("OFFENDER" in t[0] for t in cx.texts)
-tick(e, fresh=["A"])
+tick(e, fresh=["F"]); assert e.fsub is None
 # the escape pod clears your record
 c.extras.append("pod"); g.pod = True
 g._hurt(1e6); tick(e)

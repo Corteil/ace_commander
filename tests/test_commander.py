@@ -170,12 +170,12 @@ assert "STATUS" in tx
 assert a._fitems() == ["RESUME", "VIEW: FRONT", "HYPERSPACE", "LOCAL CHART", "STATUS", "SETTINGS", "QUIT TO TITLE",
                        "DEBUG"], a._fitems()
 assert texts(a)
-fpick(a, "STATUS"); assert a.fsub == "status"
+fpick(a, "STATUS"); assert a.fsub == "status" and not a.paused, "a screen: the game runs on"
 tx = texts(a)
-assert "AVERAGE" in tx and any("6 kills" in t and "EASY" in t for t in tx), tx
-assert any("more for ABOVE AVERAGE" in t for t in tx)
-assert any(t.startswith("LAVE") and "fuel 7.0 LY" in t for t in tx), tx
-tick(a, fresh=["C"]); assert a.fsub is None and a.paused
+assert "AVERAGE" in tx and "6, 7 more" in tx, tx
+assert "LAVE" in tx and "7.0 LY" in tx and "CLEAN" in tx and "GREEN" in tx, tx
+tick(a, fresh=["C"]); assert a.fsub is None and not a.paused, "C: back to the flight"
+tick(a, fresh=["A"])
 fpick(a, "SETTINGS"); assert a.fsub == "settings"
 assert a._fitems()[1] == "DOCKING: ASSISTED" and a.game.docking == "B", a._fitems()
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
@@ -251,7 +251,7 @@ scoop_one(a)
 assert sum(a.cmdr.cargo) == 1 and sum(a.cmdr.cargo[:game.SCOOP_GOODS]) == 1
 i = a.cmdr.cargo.index(1)
 assert g.msg == mod.GOODS[i][0], (g.msg, i)
-fpick(a, "STATUS"); assert any("hold 1/20t" in t for t in texts(a)); tick(a, fresh=["C"]); tick(a, fresh=["A"])
+a._open("inventory"); assert any("hold 1/20t" in t for t in texts(a)); tick(a, fresh=["C"])
 a.cmdr.cargo[12] = 19                   # 19 t of minerals: room for one more
 scoop_one(a); assert market_mod.hold_used(a.cmdr.cargo) == 20
 scoop_one(a); assert market_mod.hold_used(a.cmdr.cargo) == 20 and g.msg == "HOLD FULL"
@@ -285,8 +285,8 @@ assert a.cmdr.cash == cash + side and g.msg == a.cmdr.cash_text(), (a.cmdr.cash,
 g._kill(game.Obj(g.types["ASTEROID"], "rock", 0.0, 0.0, 3000.0)); tick(a)
 assert a.cmdr.cash == cash + side + rock, "rocks have small bounties too"
 tick(a); assert a.cmdr.cash == cash + side + rock, "paid once"
-fpick(a, "STATUS"); assert any(t.endswith(a.cmdr.cash_text()) and t.startswith("hold") for t in texts(a))
-tick(a, fresh=["C"]); tick(a, fresh=["A"])
+a._open("inventory"); assert any(t.endswith(a.cmdr.cash_text()) for t in texts(a))
+tick(a, fresh=["C"])
 need = a.cmdr.next_rank()[1]
 kill(g, need); tick(a)
 assert g.msg.startswith("RANK: ") and a.cmdr.cash == cash + rock + side * (1 + need), "a new rank shows instead"

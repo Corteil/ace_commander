@@ -239,17 +239,29 @@ board), so they pick menu lines, change Settings and the VIEW line, and move tab
 **The rest of the keys, Elite's scheme (Brian's choice, 2026-11-16; his written plan isn't on the
 Pi, so this is the agreed fallback):** `+` / `-` speed in every mode (`=` and `_` too, the same keys
 without shift); J holds speed up, so at full speed it is the jump drive under the usual rules; H
-hyperspace and Ctrl+H the galactic hyperdrive (Elite's key, Brian: not G). The number row is f0-f9. In flight 1-4 are the views, 5
-galactic chart, 6 local chart, 7 the target's (or here's) system data, 9 and 0 status, 8 says
-"MARKET: DOCKED ONLY". The flight keys run the in-flight menu's own line through `_fpick`, and only
-when `_fitems_top()` offers it (so nothing in combat practice or during a countdown; Ctrl+H only with the
-hyperdrive, and never plain hyperspace). Docked (`DOCK_KEYS`): 1 launch, 2 / 3 / 8 / 0 market (buy, sell, prices, inventory: the
-hold is listed there), 4 equip ship, 5 galactic chart, 6 local chart, 7 system data, 9 status. Tests:
-`tests/test_keys.py`. With the menu or a screen open the number row still works (Brian, build 61):
-1-4 fly on looking that way, the open screen's own key closes it, another screen's key goes there
-(`_paused_keys`). Keys checked on a real keyboard: the number row opens the screens (build 60).
+hyperspace and Ctrl+H the galactic hyperdrive (Elite's key, Brian: not G). The number row is f0-f9:
+in flight 1-4 the views, 5 galactic chart, 6 local chart, 7 the target's (or here's) system data, 8
+Market Prices, 9 Commander Status, 0 Inventory. Docked (`DOCK_KEYS`): 1 launch, 2 / 3 / 8 / 0 market
+(buy, sell, prices, inventory: the hold is listed there), 4 equip ship, 5 galactic chart, 6 local
+chart, 7 system data, 9 status. Tests: `tests/test_keys.py`.
+**In-flight screens don't pause (Brian, build 62: "as Elite"; checked against the disc source).**
+Status, Inventory, Market Prices, both charts and system data are `SCREENS`: `fsub` names one while
+`paused` is False, and it is drawn instead of the space view (`_draw_screen`; the three new ones in
+`screens.py`, imported on first use). The menu's STATUS / LOCAL CHART / HYPERSPACE lines open them
+too, and resume. `_screen_keys` (flying, on a screen or in the menu) opens, switches and closes them:
+the open screen's own key closes it, 1-4 fly on looking that way; each only when `_fitems_top()` has
+its line (nothing in combat practice or during a countdown). On a screen, as Elite: the joystick,
+buttons, cursor keys, Enter and Esc work the screen (C or F back); only the primary flight controls
+fly (W/A/S/D or tilt, speed keys, Space / F fire); the secondary keys (M, T, U, E as ECM, J, V, the
+energy bomb) do nothing (Elite's DK2 only reads them in a space view); lasers fire, heat and cost
+energy but can't hit, and missile lock stops (`Game.looking` False: Elite skips laser and missile
+locking off a space view, MA15). Market Prices works out the system's market on first use and keeps
+it with the commander, so docking shows the same prices; nothing can be bought or sold in flight. A
+jump closes any screen. `Game.condition()` is Elite's GREEN / YELLOW / RED for Status. The fire lock
+(the C that chose something isn't a shot) applies to C / Enter only, so Space held through closing
+a screen keeps firing.
 Not built yet: a HARDCORE marker on the HUD.
-All 20 test files pass with Elite's files; without them 9 of 18 did when this was started.
+All 21 test files pass with Elite's files; without them 9 of 18 did when this was started.
 
 ## Licensing
 

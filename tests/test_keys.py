@@ -12,7 +12,7 @@ import badge_stubs as bs
 
 bs.install()
 import ace_commander
-from ace_commander import game
+from ace_commander import game, screens
 mod = ace_commander.ace
 tick, choose = bs.tick, bs.choose
 SAVE = os.path.join(HERE, "shots", "test_keys.json")
@@ -91,84 +91,129 @@ tick(a)
 assert not g.jumping, "let go, and it stops"
 print("J jump drive: ok")
 
-# ---- in flight: H, G and the screens ----------------------------------------
+# ---- in flight: the screens, which don't pause (Brian: as Elite) -----------
 a, g = flying()
-tick(a, fresh=["KEY_6"])
-assert a.paused and a.fsub == "chart", "6: the local chart"
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"])
-assert not a.paused
-
-tick(a, fresh=["KEY_5"])
-assert a.paused and a.fsub == "chart" and type(a.chart).__name__ == "GalChart", "5: galactic"
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"])
-
-tick(a, fresh=["KEY_7"])
-assert a.paused and a.fsub == "data" and a.data_of == a.cmdr.system, "7: here, no target"
-tick(a, fresh=["CANCEL"])
-assert a.fsub == "chart", "back to the chart"
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"])
-
-for key in ("KEY_9", "KEY_0"):
+a.target = None
+for key, screen in (("KEY_6", "chart"), ("KEY_5", "chart"), ("KEY_7", "data"),
+                    ("KEY_8", "market"), ("KEY_9", "status"), ("KEY_0", "inventory")):
     tick(a, fresh=[key])
-    assert a.paused and a.fsub == "status", key
-    tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"])
-    assert not a.paused
+    assert a.fsub == screen and not a.paused, (key, a.fsub, a.paused)
+    texts = bs.CountCtx(); a.draw(texts); assert texts.texts, key
+    tick(a, fresh=["CANCEL"])
+    if screen == "data":
+        tick(a, fresh=["CANCEL"])       # data goes back to its chart first
+    assert a.fsub is None and not a.paused, key
+tick(a, fresh=["KEY_5"]); assert type(a.chart).__name__ == "GalChart", "5: galactic"
+tick(a, fresh=["CANCEL"])
+tick(a, fresh=["KEY_7"]); assert a.data_of == a.cmdr.system, "7: here, with no target"
+tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"])
 
-tick(a, fresh=["KEY_8"])
-assert not a.paused and g.msg == "MARKET: DOCKED ONLY", g.msg
+# the game runs on with a screen up; Elite's primary keys still fly
+t0 = g.t if hasattr(g, "t") else None
+tick(a, fresh=["KEY_9"])
+g.speed = 10.0
+z = [o.z for o in g.objs]
+tick(a, held=["KEY_+"]); assert g.speed > 10.0, "+ on a screen"
+s = g.speed
+tick(a, held=["KEY_-"]); assert g.speed < s, "- on a screen"
+pitch0 = g.frame
+tick(a)
+assert g.frame > pitch0, "the game steps with a screen up"
+# the joystick and buttons are the screen's: up / down don't steer, F closes
+tick(a, held=["JOYUP"]); tick(a, fresh=["F"]); assert a.fsub is None
+print("flight screens, game running: ok")
 
-# H with no target opens the local chart, as the menu's HYPERSPACE does
+# Elite's secondary keys do nothing on a screen; lasers fire but can't hit
+a, g = flying()
+g.missiles = 4
+tick(a, fresh=["KEY_9"])
+tick(a, fresh=["KEY_M"]); assert g.missiles == 4, "M: no missile on a screen"
+g.speed = game.PLAYER_MAX
+g.space.safe = False
+g._massed = lambda space: False
+g.cabin = 0
+tick(a, held=["KEY_J"]); assert not g.jumping, "J: no jump drive on a screen"
+g.speed = 0.0           # stopped, so it doesn't fly into the target
+ship = game.Obj(g.types["COBRA MK III"], "ship", 0.0, 0.0, 600.0)
+ship.role = "pirate"
+g.objs.append(ship)
+tick(a)                 # the level scales a new ship's energy on its first step
+e = ship.energy
+heat = g.heat
+def ahead():
+    ship.x = ship.y = 0.0       # kept in the sights: this is about the laser, not the AI
+    ship.z = 600.0
+
+
+for _ in range(10):
+    ahead(); tick(a, held=["KEY_SPACE"])
+assert ship.energy == e and g.heat > heat, "the laser fires (heat) but can't hit"
+assert g.condition() == "RED", "a pirate in range"
+tick(a, fresh=["KEY_9"]); assert a.fsub is None and g.looking
+for _ in range(10):
+    ahead(); tick(a, held=["KEY_SPACE"])
+assert ship.energy < e or ship.dead, "looking at space it hits"
+print("secondary keys and lasers on a screen: ok")
+
+# H with no target opens the local chart; with a target in range it jumps
+a, g = flying()
 a.target = None
 tick(a, fresh=["KEY_H"])
-assert a.paused and a.fsub == "chart", "H, no target: pick one"
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"])
-# with a target in range H starts the countdown
+assert a.fsub == "chart" and not a.paused, "H, no target: pick one"
+tick(a, fresh=["CANCEL"])
 reach = [i for dist, i in a.galaxy.in_range(a.cmdr.system, a.cmdr.fuel)]
 a.target = reach[0]
 tick(a, fresh=["KEY_H"])
 assert not a.paused and g.jump_t > 0 and a.jump_to[0] == reach[0], "H: hyperspace"
 tick(a, fresh=["KEY_H"])
-assert g.jump_t > 0 and not a.paused, "H again during the countdown does nothing"
+assert g.jump_t > 0 and a.fsub is None, "H again during the countdown does nothing"
 
 # Ctrl+H (Elite's key, Brian) only with the galactic hyperdrive fitted, and it
 # is never plain hyperspace; G does nothing
 a, g = flying()
 a.target = reach[0]
 tick(a, held=["KEY_CTRL"]); tick(a, held=["KEY_CTRL"], fresh=["KEY_H"])
-assert not a.paused and g.jump_t <= 0, "no hyperdrive: Ctrl+H does nothing"
+assert g.jump_t <= 0, "no hyperdrive: Ctrl+H does nothing"
 tick(a)
 a.cmdr.extras.append("hyperdrive")
 tick(a, fresh=["KEY_G"])
 assert g.jump_t <= 0, "G is not the galactic hyperdrive"
 tick(a, held=["KEY_CTRL"]); tick(a, held=["KEY_CTRL"], fresh=["KEY_H"])
 assert g.jump_t > 0 and a.jump_to == ("galaxy", 0), "Ctrl+H: galactic hyperspace"
-print("H, Ctrl+H and the flight screens: ok")
+print("H, Ctrl+H: ok")
 
-# with a screen open the number row still works (Brian): its own key closes
-# it, 1-4 fly on looking that way, another screen's key goes straight there
+# the number row on a screen or in the menu: the screen's own key closes it,
+# 1-4 fly on looking that way, another screen's key goes straight there
 a, g = flying()
 a.target = None
-tick(a, fresh=["KEY_6"]); assert a.paused and a.fsub == "chart"
-tick(a, fresh=["KEY_6"]); assert not a.paused, "6 again: back to the flight"
-tick(a, fresh=["KEY_5"]); assert type(a.chart).__name__ == "GalChart"
-tick(a, fresh=["KEY_5"]); assert not a.paused, "5 again"
-tick(a, fresh=["KEY_9"]); assert a.fsub == "status"
-tick(a, fresh=["KEY_0"]); assert not a.paused, "0 closes status too"
-tick(a, fresh=["KEY_7"]); assert a.fsub == "data"
-tick(a, fresh=["KEY_7"]); assert not a.paused, "7 again"
-tick(a, fresh=["KEY_6"])
-tick(a, fresh=["KEY_5"]); assert a.paused and type(a.chart).__name__ == "GalChart", "6 then 5"
-tick(a, fresh=["KEY_9"]); assert a.paused and a.fsub == "status", "5 then 9"
-tick(a, fresh=["KEY_7"]); assert a.paused and a.fsub == "data", "9 then 7"
-tick(a, fresh=["KEY_2"]); assert not a.paused and g.view == 1, "2: fly on, looking back"
-tick(a, fresh=["KEY_9"])
-tick(a, fresh=["KEY_1"]); assert not a.paused and g.view == 0, "1: fly on, looking ahead"
-tick(a, fresh=["A"]); assert a.paused and a.fsub is None    # the menu itself
+tick(a, fresh=["KEY_6"]); tick(a, fresh=["KEY_6"]); assert a.fsub is None, "6 again"
+tick(a, fresh=["KEY_8"]); tick(a, fresh=["KEY_8"]); assert a.fsub is None, "8 again"
+tick(a, fresh=["KEY_9"]); tick(a, fresh=["KEY_0"]); assert a.fsub == "inventory", "9 then 0"
+tick(a, fresh=["KEY_0"]); assert a.fsub is None, "0 again"
+tick(a, fresh=["KEY_6"]); tick(a, fresh=["KEY_5"])
+assert type(a.chart).__name__ == "GalChart", "6 then 5"
+tick(a, fresh=["KEY_8"]); assert a.fsub == "market", "5 then 8"
+tick(a, fresh=["KEY_2"]); assert a.fsub is None and g.view == 1, "2: fly on, looking back"
+tick(a, fresh=["KEY_9"]); tick(a, fresh=["KEY_1"]); assert a.fsub is None and g.view == 0
+tick(a, fresh=["A"]); assert a.paused                          # the menu still pauses
+tick(a, fresh=["KEY_9"]); assert a.fsub == "status" and not a.paused, "9 from the menu"
+tick(a, fresh=["A"]); assert a.paused and a.fsub is None, "A on a screen: the menu"
 tick(a, fresh=["KEY_3"]); assert not a.paused and g.view == 2, "3 from the menu"
-tick(a, fresh=["A"]); a.fmenu = a._fitems_top().index("SETTINGS"); tick(a, fresh=["C"])
-tick(a, fresh=["KEY_6"]); assert a.fsub == "chart", "6 from Settings"
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"]); assert not a.paused
-print("number keys with a screen open: ok")
+print("number keys on a screen: ok")
+
+# Market Prices: every good, scrolls, buys nothing; same prices docked
+a, g = flying()
+cash, cargo = a.cmdr.cash, list(a.cmdr.cargo)
+tick(a, fresh=["KEY_8"])
+prices = list(a.fmarket.prices)
+for _ in range(20):
+    tick(a, fresh=["JOYDOWN"])
+assert a.top == len(a.fmarket.goods) - screens.ROWS, a.top
+tick(a, fresh=["DOWN"]); assert a.top == len(a.fmarket.goods) - screens.ROWS
+tick(a, fresh=["UP"]); assert a.top == len(a.fmarket.goods) - screens.ROWS - 1, "cursor keys scroll"
+tick(a, fresh=["D"]); tick(a, fresh=["B"])
+assert a.cmdr.cash == cash and a.cmdr.cargo == cargo, "nothing bought or sold"
+print("market prices: ok")
 
 # combat practice has no charts or hyperspace: the keys do nothing
 bs.press(())
