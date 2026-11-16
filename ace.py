@@ -53,7 +53,7 @@ import app
 from events.input import BUTTON_TYPES, ButtonDownEvent, ButtonUpEvent
 from system.eventbus import eventbus
 
-from . import bench, briefing, cockpit, commander, docked, game, missions, title, viewer
+from . import bench, briefing, cockpit, commander, docked, game, missions, rules, title, viewer
 
 try:
     import imu
@@ -292,7 +292,7 @@ class Pad:
                 table.append(("j_" + name.lower(), JOY[name]))
             for name in "ABCDEF":
                 table.append((name, FB[name]))
-        for name in ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "SPACE",
+        for name in ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "T", "U", "SPACE",
                      "UP", "DOWN", "LEFT", "RIGHT"):
             key = KEYBOARD_BUTTONS.get(name)
             if key is not None:
@@ -409,6 +409,7 @@ class AceCommander(app.App):
         self.jump_lit = False            # the last write was a jump flash
         self.jump_rgb = DUST_RGB         # their colour at full brightness
         self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
+        self.hardcore = False            # HARDCORE: ON / OFF, from the next flight (rules.py)
         self.own_ships = ORIGINAL_SHIPS  # DATA: OWN / ELITE, from the next start
         self.omenu = 0                   # the chosen line on the Options page
         self.egg = 0                     # letters of EGG_WORD docked at so far
@@ -825,6 +826,8 @@ class AceCommander(app.App):
             self.banked_cash = 0
         else:
             fresh = False
+        if fresh:
+            g.rules = rules.GameRules(self.hardcore)    # the rules for this flight
         self.career = career
         g.again = "C: back to last save" if career else "C: fly again"
         g.scoop = self._scoop if career and self.cmdr is not None else None
@@ -1408,7 +1411,10 @@ class AceCommander(app.App):
             if not tilt:
                 self.d_t = None
                 if hit(BTN_MISSILE):
-                    missile = True
+                    if g.rules.missile_lock_required and not g.armed:
+                        g.arm_missile()         # Hardcore: D arms first, then fires
+                    else:
+                        missile = True
             else:               # a tap on D re-zeroes the tilt, holding it fires
                 if hit(BTN_MISSILE):
                     self.d_t = 0.0
@@ -1436,10 +1442,19 @@ class AceCommander(app.App):
             roll, jy = self._steer(True, None, False)
         else:
             roll, jy = self._steer(False, ANY, False)
-        if held("k_E"):
+        if g.rules.manual_ecm:      # Hardcore: E is the ECM (or both speed buttons together)
+            if hit("k_E") or (new and ((hit(BTN_SPEED_UP) and held(BTN_SPEED_DOWN))
+                                       or (hit(BTN_SPEED_DOWN) and held(BTN_SPEED_UP)))):
+                g.fire_ecm()
+        elif held("k_E"):
             throttle += 1.0
         if held("k_Q"):
             throttle -= 1.0
+        if g.rules.missile_lock_required:       # Hardcore: T arms and locks, U disarms
+            if hit("k_T"):
+                g.arm_missile()
+            if hit("k_U"):
+                g.unarm_missile()
         if hit("k_M"):
             missile = True
         fire = held("confirm") or held("k_F") or held("k_SPACE")
@@ -1515,6 +1530,8 @@ class AceCommander(app.App):
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
         if tildagonos is not None:
             items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))
+        items.append("HARDCORE: " + ("ON" if self.hardcore else "OFF")
+                     + (" (NEXT FLIGHT)" if self.mode == "flight" else ""))
         if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose data, from the next start
             items.append("DATA: " + ("OWN" if self.own_ships else "ELITE")
                          + ("" if self.own_ships == ORIGINAL_SHIPS else " (RESTART)"))
@@ -1544,6 +1561,9 @@ class AceCommander(app.App):
                 self.use_tilt = not self.use_tilt
                 self.zero = None
                 self._save_options()
+        elif item.startswith("HARDCORE"):
+            self.hardcore = not self.hardcore       # the next flight uses the new rules
+            self._save_options()
         elif item.startswith("CONSTRICTOR"):
             c = self.cmdr       # how soon mission 1's Constrictor turns up at Orarra
             c.quick_con = not c.quick_con
@@ -1577,6 +1597,8 @@ class AceCommander(app.App):
                 self.use_tilt = d["tilt"] and self.tilt_ok
             if isinstance(d.get("leds"), bool):
                 self.use_leds = d["leds"]
+            if isinstance(d.get("hardcore"), bool):
+                self.hardcore = d["hardcore"]
             if isinstance(d.get("egg"), int) and isinstance(d.get("egg_miss"), int):
                 self.egg, self.egg_miss = d["egg"], d["egg_miss"]
             own = d.get("own", d.get("own_ships"))
@@ -1587,7 +1609,7 @@ class AceCommander(app.App):
         try:
             with open(options_path(), "w") as f:
                 f.write(json.dumps({"tilt": self.use_tilt, "leds": self.use_leds,
-                                    "own": self.own_ships, "egg": self.egg,
+                                    "hardcore": self.hardcore, "own": self.own_ships, "egg": self.egg,
                                     "egg_miss": self.egg_miss, "debug": DEBUG_MENU}))
         except Exception:
             pass

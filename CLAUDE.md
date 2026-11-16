@@ -961,6 +961,20 @@ and quit). Docked, on the market: joystick up / down picks a good, C buys, D sel
 buttons repeat); on Equip ship: joystick picks an item, C buys. In tilt steering a tap on D re-zeroes and a hold fires the missile. Hostile ships red on the radar. Hit flash on the LEDs, not a ring
 on screen. Enemy lasers run from the ship's gun to the bottom of the screen (the cockpit).
 
+## Hardcore Mode (branch `hardcore-mode`, started 2026-11-16, not merged)
+
+Brian's plan ("Ace Commander: Hardcore Mode & Keyboard Support"): switch the assists to manual and
+control them from the keyboard (Tildagon Keyboard Hexpansion, and the Tufty's Keebdeck). Standard mode
+must not change. `rules.py` (`GameRules`, no badge imports, shared with the Tufty port) holds one flag
+per assist; `Game.rules` is standard by default and `ace.py` gives a flight `GameRules(self.hardcore)`
+when it starts (Options/Settings: HARDCORE: ON / OFF, saved in options.json, applies from the next
+flight). Built so far: manual ECM (`Game.fire_ecm`; E key, or both speed buttons together) and armed
+missiles (`Game.arm_missile` / `unarm_missile`; T / U keys, D arms then fires; lock builds only while
+armed). Tests: `tests/test_hardcore.py` (needs no Elite files). Not built yet: four-way views with a
+laser per facing, manual docking without the computer, mass-lock jump, the galactic key, f0-f9 screen
+keys, `+` / `-` speed keys (names in `KEYBOARD_BUTTONS` unchecked), a HARDCORE marker on the HUD.
+Baseline without Elite's files: 9 of 18 test files pass (the rest need ship_data.py / game_data.py).
+
 ## Licensing
 
 `ship_data.py` and `game_data.py` are derived from Elite (c) Acornsoft 1984, via

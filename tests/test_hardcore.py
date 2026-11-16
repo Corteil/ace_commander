@@ -1,0 +1,197 @@
+"""Hardcore Mode rules (manual ECM, armed missiles), using the game's own ship data so it runs
+without Elite's files. Standard mode must behave as before."""
+import math, os, random, sys
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(HERE)
+PARENT = os.path.dirname(REPO)
+sys.path.insert(0, HERE)
+sys.path.insert(0, PARENT)
+import badge_stubs as bs
+
+bs.install()
+import ace_commander
+from ace_commander import game, rules
+mod = ace_commander.ace
+SHIPS = mod.SHIPS
+DT = 0.04
+
+
+def flight(hardcore, seed=1):
+    random.seed(seed)
+    g = game.Game(SHIPS)
+    g.rules = rules.GameRules(hardcore)
+    g.rock_t = g.encounter_t = g.spawn_t = 1e9
+    g.objs[:] = []
+    return g
+
+
+def put(g, name, kind, x, y, z):
+    o = game.Obj(g.types[name], kind, float(x), float(y), float(z))
+    g.objs.append(o)
+    return o
+
+
+def target(g, z=4000):
+    """A ship held still in the sights (as tests/test_game.py does)."""
+    name = next(n for n in g.types if g.types[n].energy and n not in ("MISSILE",))
+    o = put(g, name, "ship", 300, 100, z)
+    d = math.sqrt(300 * 300 + 100 * 100 + z * z)
+    game._look(o.m, -300 / d, -100 / d, -z / d)
+    o.state = "break"; o.t = 99; o.aim = [1.0, 0.0, 0.0]
+    o.pin = (300.0, 100.0, float(z))
+    return o
+
+
+def run(g, secs, fire=False, missile=False):
+    for _ in range(int(secs / DT)):
+        for o in g.objs:
+            if hasattr(o, "pin"):           # held in the sights
+                o.x, o.y, o.z = o.pin
+        g.step(DT, 0, 0, 0, fire, missile)
+
+
+# ---- the rules object
+assert rules.GameRules().active() == []
+assert set(rules.GameRules(True).active()) == set(rules.FLAGS)
+print("rules flags: ok")
+
+# ---- standard mode: ECM fires by itself, missiles lock without arming (as before)
+g = flight(False)
+g.ecm = True
+m = put(g, "MISSILE", "missile", 0, 0, 2000)
+m.t = 8.0
+run(g, 0.2)
+assert m.dead and g.ecm_t > 0, "standard ECM should fire by itself"
+g = flight(False)
+t = target(g)
+run(g, game.LOCK_TIME + 0.5)
+assert g.locked, "standard missiles lock without arming"
+g.step(DT, 0, 0, 0, False, True)
+assert any(o.kind == "pmissile" for o in g.new + g.objs), "standard D fires"
+print("standard mode unchanged: ok")
+
+# ---- hardcore ECM: nothing happens until the key
+g = flight(True)
+g.ecm = True
+m = put(g, "MISSILE", "missile", 0, 0, 2000)
+m.t = 8.0
+shield = g.shield
+run(g, 0.2)
+assert not m.dead and g.ecm_t <= 0, "hardcore ECM must not fire by itself"
+assert g.fire_ecm() and m.dead and g.ecm_t > 0 and g.shield == shield - game.ECM_COST
+assert not g.fire_ecm(), "no second pulse while pulsing"
+g2 = flight(True)
+assert not g2.fire_ecm() and g2.msg == "NO ECM", g2.msg
+print("hardcore manual ECM: ok")
+
+# ---- hardcore missiles: arm, lock, fire; unarm; not armed = no launch
+g = flight(True)
+t = target(g)
+run(g, game.LOCK_TIME + 1.0)
+assert not g.locked and g.lock is None, "no lock while not armed"
+g.step(DT, 0, 0, 0, False, True)
+assert g.msg == "MISSILE NOT ARMED" and not any(o.kind == "pmissile" for o in g.new + g.objs)
+n = g.missiles
+assert g.arm_missile() and g.armed
+run(g, game.LOCK_TIME * 0.5)
+g.step(DT, 0, 0, 0, False, True)
+assert g.msg == "NO LOCK" and g.missiles == n, g.msg      # armed but not locked yet
+run(g, game.LOCK_TIME)
+assert g.locked
+g.unarm_missile()
+assert not g.armed and not g.locked and g.lock is None
+g.step(DT, 0, 0, 0, False, True)
+assert g.missiles == n, "unarmed must not fire"
+g.arm_missile()
+run(g, game.LOCK_TIME + 0.5)
+g.step(DT, 0, 0, 0, False, True)
+assert g.missiles == n - 1 and not g.armed, "fired once; each missile is armed afresh"
+assert any(o.kind == "pmissile" for o in g.new + g.objs)
+g3 = flight(True)
+g3.missiles = 0
+assert not g3.arm_missile() and g3.msg == "NO MISSILES"
+print("hardcore arm / lock / fire / unarm: ok")
+
+# ---- a new flight starts disarmed
+g = flight(True)
+g.arm_missile()
+g.reset()
+assert not g.armed
+
+# ---- through the app: the setting, the keyboard, and the badge's own buttons
+from badge_stubs import tick, choose
+SAVE = os.path.join(HERE, "shots", "test_hardcore.json")
+os.makedirs(os.path.dirname(SAVE), exist_ok=True)
+if os.path.exists(SAVE):
+    os.remove(SAVE)
+mod.SAVE_PATH = SAVE
+
+
+def app_flight(hardcore):
+    bs.press(())
+    a = ace_commander.AceCommander()
+    a.hardcore = hardcore
+    tick(a)
+    choose(a, "COMBAT PRACTICE")
+    g = a.game
+    g.spawn_t = g.rock_t = g.encounter_t = 1e9
+    g.objs[:] = []
+    g.speed = 10.0
+    tick(a)
+    return a, g
+
+
+a, g = app_flight(False)
+assert not g.rules.hardcore and "HARDCORE: OFF (NEXT FLIGHT)" in a._settings(False)
+s0 = g.speed
+for _ in range(10):
+    tick(a, held=["KEY_E"])
+assert g.speed > s0, "standard: the E key is still speed up"
+print("standard keys unchanged: ok")
+
+a, g = app_flight(True)
+assert g.rules.hardcore and "HARDCORE: ON (NEXT FLIGHT)" in a._settings(False)
+g.ecm = True
+m = put(g, "MISSILE", "missile", 0, 0, 2000)
+m.t = 8.0
+s0 = g.speed
+tick(a, fresh=["KEY_E"])
+assert m.dead and g.ecm_t > 0, "hardcore: the E key pulses the ECM"
+for _ in range(8):
+    tick(a, held=["KEY_E"])
+assert g.speed <= s0 + 0.01, "hardcore: the E key no longer changes speed"
+t = target(g)
+tick(a, fresh=["KEY_T"])
+assert g.armed, "hardcore: T arms"
+tick(a, fresh=["KEY_U"])
+assert not g.armed, "hardcore: U disarms"
+print("hardcore keys (E, T, U): ok")
+
+a, g = app_flight(True)       # the badge alone: both speed buttons pulse the ECM, D arms then fires
+g.ecm = True
+m = put(g, "MISSILE", "missile", 0, 0, 2000)
+m.t = 8.0
+tick(a, held=["F"], fresh=["E"])
+assert m.dead and g.ecm_t > 0, "hardcore: E with F held pulses the ECM"
+t = target(g)
+tick(a, fresh=["D"])
+assert g.armed and g.missiles == 4, "hardcore: the first D arms"
+for _ in range(int(game.LOCK_TIME / DT) + 2):
+    for o in g.objs:
+        if hasattr(o, "pin"):
+            o.x, o.y, o.z = o.pin
+    tick(a)
+assert g.locked
+tick(a, fresh=["D"])
+assert g.missiles == 3 and not g.armed, "hardcore: the next D fires"
+print("hardcore badge buttons (E+F, D): ok")
+
+# ---- the setting is saved
+a, g = app_flight(False)
+a._change("HARDCORE: OFF", False)
+assert a.hardcore
+b = ace_commander.AceCommander()
+assert b.hardcore, "HARDCORE is kept in options.json"
+b._change("HARDCORE: ON", False)
+assert not b.hardcore
+print("ALL HARDCORE TESTS PASSED")

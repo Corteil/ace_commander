@@ -11,6 +11,11 @@ held in a flat list m, so a ship vertex (vx, vy, vz) is at
 import math
 import random
 
+try:
+    from .rules import GameRules
+except ImportError:        # run by a test as a top-level module
+    from rules import GameRules
+
 SPEED_K = 25.0         # world units per second for one Elite speed unit
 PLAYER_MAX = 40.0      # top speed, in Elite speed units
 THROTTLE_RATE = 25.0   # speed units gained per second at full throttle
@@ -481,7 +486,9 @@ class Game:
         self.plans = False          # carrying mission 2's plans: Thargoids come after you
         self.got_constrictor = False    # set when you destroy it; the app notes it
         self.fuel_scoops = True     # without them a canister is hit, not scooped
-        self.ecm = False            # fires by itself at incoming missiles
+        self.ecm = False            # fires by itself at incoming missiles (or by its key: see rules)
+        self.rules = GameRules()    # standard mode; Hardcore Mode swaps in GameRules(True)
+        self.armed = False          # Hardcore: a missile is armed (see arm_missile)
         self.pod = False            # an escape pod: being destroyed isn't the end
         self.bombs = 0              # energy bombs (one at most, used once)
         self.computer = False       # a docking computer
@@ -556,6 +563,7 @@ class Game:
         self.lock = None       # the ship in the missile sights
         self.lock_t = 0.0      # how long it has been there
         self.locked = False    # long enough: a missile can be fired at it
+        self.armed = False     # Hardcore: a missile is armed (see arm_missile)
         self.jump_t = 0.0      # > 0 while the hyperspace countdown runs
         self.warp = 0.0        # > 0 while the streaks of a jump are drawn
         self.jumped = False    # set when a jump happens; whoever started it clears it
@@ -617,6 +625,7 @@ class Game:
         self.lock = None
         self.lock_t = 0.0
         self.locked = False
+        self.armed = False
         self.beam = 0.0
         self.warp = WARP_TIME
         self.jumped = True
@@ -1084,6 +1093,51 @@ class Game:
             self.shield = max(0.0, self.shield - ECM_COST)
             self.say("ECM")
 
+    def fire_ecm(self):
+        """The ECM key (Hardcore: the only way the ECM fires). A pulse destroys every enemy
+        missile about and costs ECM_COST shield whether or not there was one. Returns True if
+        it pulsed."""
+        if self.over:
+            return False
+        if not self.ecm:
+            self.say("NO ECM", 1.0)
+            return False
+        if self.ecm_t > 0:      # still pulsing
+            return False
+        for o in self.objs:
+            if o.kind == "missile" and not o.dead:
+                o.dead = True
+                self._boom(o.x, o.y, o.z, 8)
+        self.ecm_t = 0.5
+        self.shield = max(0.0, self.shield - ECM_COST)
+        self.say("ECM")
+        return True
+
+    def arm_missile(self):
+        """Hardcore: arm a missile (T). The target then locks in the usual LOCK_TIME in the
+        sights, and a fire (M or D) launches it. Returns True if armed."""
+        if self.over:
+            return False
+        if self.missiles <= 0:
+            self.say("NO MISSILES", 1.0)
+            return False
+        if not self.armed:
+            self.armed = True
+            self.lock = None
+            self.lock_t = 0.0
+            self.locked = False
+            self.say("MISSILE ARMED", 1.0)
+        return True
+
+    def unarm_missile(self):
+        """Hardcore: disarm the missile (U). The lock is lost."""
+        if self.armed:
+            self.armed = False
+            self.lock = None
+            self.lock_t = 0.0
+            self.locked = False
+            self.say("MISSILE SAFE", 1.0)
+
     def energy_bomb(self):
         """Set off the energy bomb, if there is one: every ship, missile and
         rock within BOMB_RANGE is destroyed. Returns True if it went off."""
@@ -1436,7 +1490,7 @@ class Game:
             o.speed += (want - o.speed) * min(1.0, 2.0 * dt)
             v = o.speed * SPEED_K * dt / THINK_EVERY    # this frame's share
         elif kind == "missile":
-            if self.ecm and d < ECM_RANGE and not self.over:
+            if self.ecm and d < ECM_RANGE and not self.over and not self.rules.manual_ecm:
                 self._ecm()
                 return
             o.t -= dt
@@ -1591,7 +1645,7 @@ class Game:
         if self.hot and self.heat < 0.5:
             self.hot = False
         self.cool -= dt
-        t = self._pick(0.35)
+        t = self._pick(0.35) if (self.armed or not self.rules.missile_lock_required) else None
         if t is None or t is not self.lock:    # a new ship, or none: start again
             self.lock = t
             self.lock_t = 0.0
@@ -1638,12 +1692,15 @@ class Game:
 
         if missile and self.missiles > 0:
             t = self.lock
-            if t is None or t.dead:
+            if self.rules.missile_lock_required and not self.armed:
+                self.say("MISSILE NOT ARMED", 1.0)
+            elif t is None or t.dead:
                 self.say("NO TARGET", 1.0)
             elif not self.locked:
                 self.say("NO LOCK", 1.0)
             else:
                 self.missiles -= 1
+                self.armed = False      # each missile is armed afresh (Hardcore)
                 o = Obj(self.missile_bp, "pmissile", 0.0, -40.0, 80.0)
                 o.target = t
                 o.t = 8.0
