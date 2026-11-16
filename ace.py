@@ -319,9 +319,10 @@ class Pad:
             if key is not None:
                 table.append(("k_view%d" % n, key))
         # the rest of Elite's keys (Brian chose Elite's scheme, 2026-11-16): the
-        # number row is f0-f9 ("k_1" ... "k_0"), G / H / J the hyperdrives and the
-        # jump drive, + / - speed ("=" and "_" too, the same keys without shift)
-        for name in "0123456789GHJ":
+        # number row is f0-f9 ("k_1" ... "k_0"), H hyperspace (Ctrl+H the galactic
+        # hyperdrive, as Elite), J the jump drive, + / - speed ("=" and "_" too,
+        # the same keys without shift)
+        for name in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "H", "J", "CTRL"):
             key = KEYBOARD_BUTTONS.get(name)
             if key is not None:
                 table.append(("k_" + name, key))
@@ -2260,10 +2261,10 @@ class AceCommander(app.App):
     def _flight_keys(self):
         """Elite's keys in flight (Brian chose Elite's scheme, 2026-11-16): 5 the
         galactic chart (f4), 6 the local chart (f5), 7 the target's system data
-        (f6), 9 and 0 status (f8, f9: the hold is on it), H hyperspace, G the
-        galactic hyperdrive. Each opens the menu and does what its line does,
+        (f6), 9 and 0 status (f8, f9: the hold is on it), H hyperspace, Ctrl+H
+        the galactic hyperdrive (Elite's key, Brian). Each opens the menu and does what its line does,
         and only when the menu has that line (so not in combat practice, not
-        during a countdown, G only with the hyperdrive fitted). 8 (f7, market
+        during a countdown, Ctrl+H only with the hyperdrive fitted). 8 (f7, market
         prices) is docked only. True if a key did something."""
         hit = self.pad.hit
         items = self._fitems_top()
@@ -2275,10 +2276,12 @@ class AceCommander(app.App):
             return None
 
         pick = None
-        if hit("k_H"):
-            pick = line("HYPERSPACE")
-        elif hit("k_G"):
+        if hit("k_H") and self.pad.held("k_CTRL"):
             pick = line("GALACTIC JUMP")
+            if pick is None:
+                return False        # Ctrl+H is never plain hyperspace
+        elif hit("k_H"):
+            pick = line("HYPERSPACE")
         elif hit("k_6"):
             pick = line("LOCAL CHART")
         elif hit("k_9") or hit("k_0"):

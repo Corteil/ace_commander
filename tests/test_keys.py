@@ -1,5 +1,5 @@
 """Elite's keys on a keyboard (Brian chose Elite's scheme, 2026-11-16): + / -
-speed, J the jump drive, H hyperspace, G the galactic hyperdrive, and the
+speed, J the jump drive, H hyperspace, Ctrl+H the galactic hyperdrive, and the
 number row as f0-f9 in flight and docked. Needs the galaxy data (Elite's
 game_data.py, or the game's own)."""
 import os, sys
@@ -130,20 +130,25 @@ assert not a.paused and g.jump_t > 0 and a.jump_to[0] == reach[0], "H: hyperspac
 tick(a, fresh=["KEY_H"])
 assert g.jump_t > 0 and not a.paused, "H again during the countdown does nothing"
 
-# G only with the galactic hyperdrive fitted
+# Ctrl+H (Elite's key, Brian) only with the galactic hyperdrive fitted, and it
+# is never plain hyperspace; G does nothing
 a, g = flying()
-tick(a, fresh=["KEY_G"])
-assert not a.paused and g.jump_t <= 0, "no hyperdrive: G does nothing"
+a.target = reach[0]
+tick(a, held=["KEY_CTRL"]); tick(a, held=["KEY_CTRL"], fresh=["KEY_H"])
+assert not a.paused and g.jump_t <= 0, "no hyperdrive: Ctrl+H does nothing"
+tick(a)
 a.cmdr.extras.append("hyperdrive")
 tick(a, fresh=["KEY_G"])
-assert g.jump_t > 0 and a.jump_to == ("galaxy", 0), "G: galactic hyperspace"
-print("H, G and the flight screens: ok")
+assert g.jump_t <= 0, "G is not the galactic hyperdrive"
+tick(a, held=["KEY_CTRL"]); tick(a, held=["KEY_CTRL"], fresh=["KEY_H"])
+assert g.jump_t > 0 and a.jump_to == ("galaxy", 0), "Ctrl+H: galactic hyperspace"
+print("H, Ctrl+H and the flight screens: ok")
 
 # combat practice has no charts or hyperspace: the keys do nothing
 bs.press(())
 p = ace_commander.AceCommander()
 choose(p, "COMBAT PRACTICE")
-for key in ("KEY_5", "KEY_6", "KEY_7", "KEY_H", "KEY_G"):
+for key in ("KEY_5", "KEY_6", "KEY_7", "KEY_H"):
     tick(p, fresh=[key])
     assert not p.paused, key
 print("combat practice: ok")

@@ -239,11 +239,11 @@ board), so they pick menu lines, change Settings and the VIEW line, and move tab
 **The rest of the keys, Elite's scheme (Brian's choice, 2026-11-16; his written plan isn't on the
 Pi, so this is the agreed fallback):** `+` / `-` speed in every mode (`=` and `_` too, the same keys
 without shift); J holds speed up, so at full speed it is the jump drive under the usual rules; H
-hyperspace and G the galactic hyperdrive. The number row is f0-f9. In flight 1-4 are the views, 5
+hyperspace and Ctrl+H the galactic hyperdrive (Elite's key, Brian: not G). The number row is f0-f9. In flight 1-4 are the views, 5
 galactic chart, 6 local chart, 7 the target's (or here's) system data, 9 and 0 status, 8 says
 "MARKET: DOCKED ONLY". The flight keys run the in-flight menu's own line through `_fpick`, and only
-when `_fitems_top()` offers it (so nothing in combat practice or during a countdown; G only with the
-hyperdrive). Docked (`DOCK_KEYS`): 1 launch, 2 / 3 / 8 / 0 market (buy, sell, prices, inventory: the
+when `_fitems_top()` offers it (so nothing in combat practice or during a countdown; Ctrl+H only with the
+hyperdrive, and never plain hyperspace). Docked (`DOCK_KEYS`): 1 launch, 2 / 3 / 8 / 0 market (buy, sell, prices, inventory: the
 hold is listed there), 4 equip ship, 5 galactic chart, 6 local chart, 7 system data, 9 status. Tests:
 `tests/test_keys.py`. Not checked on a real keyboard yet.
 Not built yet: a HARDCORE marker on the HUD.
