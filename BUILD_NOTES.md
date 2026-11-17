@@ -787,3 +787,10 @@ what is now `ace.py` (renamed in build 50).
    main. The store lists it within about 15 minutes at apps.badge.emfcamp.org; problems
    at apps.badge.emfcamp.org/errors/. A new version: bump `version` in tildagon.toml
    and metadata.json, merge to main, make a release.
+   **Build 72** (2026-11-17, Brian): SPEED TEST kept but moved off the title screen to
+   DEBUG > DISPLAY (title Options or docked Options, with DEBUG on); F from the test goes
+   back to that page. Combat practice has its own page before the flight: LEVEL (saved as
+   options.json "practice_level", default NORMAL) and HARDCORE (the shared setting). The
+   practice flight uses that level's `game.LEVELS` row; a part-way practice fight is
+   restarted if HARDCORE changed (before, it kept the old rules). Practice has no ECM, so
+   Hardcore there means armed and locked missiles.

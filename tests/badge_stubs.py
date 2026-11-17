@@ -151,6 +151,8 @@ def choose(a, label):
     assert a.mode == "menu", a.mode
     a.menu = a.choices().index(label)
     tick(a, fresh=["CONFIRM"])
+    if label == "COMBAT PRACTICE" and a.mode == "practice":
+        tick(a, fresh=["CONFIRM"])      # its page: fly at the level and HARDCORE showing
 
 
 def tick(a, held=(), fresh=(), ms=40):

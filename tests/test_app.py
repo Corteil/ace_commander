@@ -48,14 +48,14 @@ pkg, mod = load()
 a = pkg.AceCommander()
 assert a.overlays == [] and len(mod.SHIPS) == 31
 assert not a.use_tilt, "joystick steering is the default"
-assert a.cmdr is None and a.choices() == ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS", "SPEED TEST"]
+assert a.cmdr is None and a.choices() == ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS"]
 c = frame(a); fits(c)
 assert [t[0] for t in c.texts] == ["< NEW COMMANDER >"], "one piece of text on the title screen"
 assert c.calls.get("line_to", 0) > 5, "and a ship"
 tick(a, fresh=["JOYRIGHT"]); assert a.menu == 1
 assert [t[0] for t in frame(a).texts] == ["< COMBAT PRACTICE >"]
 tick(a, fresh=["JOYLEFT"]); assert a.menu == 0
-tick(a, fresh=["JOYLEFT"]); assert a.menu == 4, "wraps round"
+tick(a, fresh=["JOYLEFT"]); assert a.menu == 3, "wraps round"
 tick(a, fresh=["JOYRIGHT"]); assert a.menu == 0
 tick(a, fresh=["JOYDOWN"]); assert a.menu == 1    # up and down work as well
 tick(a, fresh=["JOYUP"]); assert a.menu == 0
@@ -306,6 +306,7 @@ assert mod.JOY is None and mod.FB is None
 a = pkg.AceCommander()
 assert a.use_tilt, "tilt is the default there"
 tick(a, fresh=["RIGHT"]); assert a.menu == 1
+tick(a, fresh=["CONFIRM"]); assert a.mode == "practice"
 tick(a, fresh=["CONFIRM"]); assert a.mode == "flight" and not a.career
 g = a.game; g.spawn_t = g.rock_t = 1e9
 tick(a)

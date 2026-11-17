@@ -34,7 +34,7 @@ description sentence (build 52) and the disc version's two missions (build 54).
 - `game.py` - game rules, including the star system (`Space`, `Game.enter`). No badge
   imports, so it runs on a PC.
 - `cockpit.py` - flight view, HUD, radar. Built from rectangles (see Speed).
-- `viewer.py` - ship viewer. `bench.py` - the title screen's "Speed test".
+- `viewer.py` - ship viewer. `bench.py` - the speed test (DEBUG > DISPLAY > SPEED TEST since build 72).
 - `title.py` - title screen: block-letter name from rectangles, tumbling ship, one menu line.
 - `commander.py` - the saved commander (level, kills, rank, star system, fuel). Rules only,
   no badge imports. Saved to `commander.json` next to the app (gitignored).
@@ -143,8 +143,6 @@ the relevant build there before changing a feature.
 ## Next steps
 
 **For the next build (Brian, 2026-11-15, after the v59 release):**
-- Remove the title screen's SPEED TEST (`bench.py`, its title-menu choice, the loader
-  step, the README line and `tests/test_bench.py`).
 - Be able to change the ship you fly: the "Ship types" phase 6 extra in DESIGN.md (buy
   another hull; its speed, turn rate, hold, pylons, lasers, shields and price; the
   tunnel/chase-view model, `Game` constants, `commander.HOLD`, `Commander.ship`). Ask
@@ -282,6 +280,11 @@ the target (C on where you are clears it) and the chart stays, its distance line
 H or the menu's HYPERSPACE line jumps, as Elite. `Game.condition()` is Elite's GREEN / YELLOW / RED for Status. The fire lock
 (the C that chose something isn't a shot) applies to C / Enter only, so Space held through closing
 a screen keeps firing.
+**Combat practice's page (build 72, Brian):** COMBAT PRACTICE opens `mode == "practice"` first: LEVEL
+(`AceCommander.p_level`, options.json "practice_level") and HARDCORE (the same setting as Options); up /
+down picks the line, left / right changes it, C flies, F back. A part-way practice fight carries on only
+if level and HARDCORE are unchanged. SPEED TEST left the title screen (Brian: keep it, hidden) for
+DEBUG > DISPLAY (off flight only; F returns to that page).
 Not built yet: a HARDCORE marker on the HUD.
 All 21 test files pass with Elite's files; without them 9 of 18 did when this was started.
 

@@ -256,4 +256,39 @@ b = ace_commander.AceCommander()
 assert b.hardcore, "HARDCORE is kept in options.json"
 b._change("HARDCORE: ON", False)
 assert not b.hardcore
+
+# ---- combat practice's page: LEVEL and HARDCORE before the flight ------------
+p = ace_commander.AceCommander()
+tick(p)
+p.menu = p.choices().index("COMBAT PRACTICE")
+tick(p, fresh=["CONFIRM"])
+assert p.mode == "practice" and p.p_sel == 0 and p.p_level == 1
+c = bs.CountCtx(); p.draw(c)
+shown = [t[0] for t in c.texts]
+assert "COMBAT PRACTICE" in shown and "< NORMAL >" in shown and "< OFF >" in shown, shown
+for t, (x, y), size in c.texts:
+    assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5, (t, y)
+tick(p, fresh=["JOYRIGHT"]); assert p.p_level == 2, "right: the next level"
+tick(p, fresh=["JOYDOWN"]); assert p.p_sel == 1
+tick(p, fresh=["JOYRIGHT"]); assert p.hardcore, "the HARDCORE line"
+tick(p, fresh=["CONFIRM"])
+g = p.game
+assert p.mode == "flight" and not p.career and g.level == 2 and g.rules.hardcore
+assert not g.armed and g.rules.missile_lock_required
+q = ace_commander.AceCommander()
+assert q.p_level == 2 and q.hardcore, "both kept in options.json"
+# back to the title part-way: the same settings carry the fight on, new ones start afresh
+p.mode = "menu"
+g.score = 7
+choose(p, "COMBAT PRACTICE"); assert p.game is g and g.score == 7, "the fight carries on"
+p.mode = "menu"
+p.menu = p.choices().index("COMBAT PRACTICE")
+tick(p, fresh=["CONFIRM"]); tick(p, fresh=["JOYDOWN"]); tick(p, fresh=["JOYLEFT"])
+assert not p.hardcore
+tick(p, fresh=["CONFIRM"])
+assert p.mode == "flight" and not p.game.rules.hardcore and p.game.score == 0, "HARDCORE off: a new flight"
+p.mode = "menu"
+p.menu = p.choices().index("COMBAT PRACTICE")
+tick(p, fresh=["CONFIRM"]); tick(p, fresh=["CANCEL"]); assert p.mode == "menu", "F: back"
+print("combat practice page: ok")
 print("ALL HARDCORE TESTS PASSED")

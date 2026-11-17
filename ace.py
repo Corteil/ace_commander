@@ -216,15 +216,15 @@ DEBUG_GROUPS = (
     ("TRAVEL", ("TO THE STATION", "TO THE SUN", "DOCK NOW", "MIS-JUMP NEXT",
                 "TO MISSION SYSTEM")),
     ("COMMANDER", ("+10 KILLS", "+1000 CR", "LEVEL", "LEGAL", "ANGER STATION", "MISSION")),
-    ("DISPLAY", ("FRAME TIME", "REPAIR SHOP")),
+    ("DISPLAY", ("FRAME TIME", "REPAIR SHOP", "SPEED TEST")),
 )
 CAREER_ONLY = ("+1000 CR", "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION",
                "MIS-JUMP NEXT", "LEGAL", "FUEL TO 1/4", "TO MISSION SYSTEM", "MISSION")
 # the cheats that work away from a flight (title screen Options, docked Options tab);
 # all but the last two need a commander, as does SHIP (the equipment) there
 OFF_FLIGHT = ("+10 KILLS", "+1000 CR", "LEVEL", "LEGAL", "MISSION",
-              "FRAME TIME", "REPAIR SHOP")
-NO_COMMANDER = ("FRAME TIME", "REPAIR SHOP")
+              "FRAME TIME", "REPAIR SHOP", "SPEED TEST")
+NO_COMMANDER = ("FRAME TIME", "REPAIR SHOP", "SPEED TEST")
 MSG_TIME = 1.5          # seconds a DEBUG message stays on the Options' DEBUG page
 
 
@@ -431,6 +431,8 @@ class AceCommander(app.App):
         # the commander as last saved, as JSON: being destroyed goes back to it
         self.saved = json.dumps(self.cmdr.to_dict()) if self.cmdr is not None else None
         self.level = 1          # the level showing on the new-commander screen
+        self.p_level = 1        # combat practice's level (options.json)
+        self.p_sel = 0          # the combat practice page's line: 0 LEVEL, 1 HARDCORE
         self.game = None
         self.career = False     # the current game counts towards the commander
         self.docked = True      # the commander is at a station, not out in a flight
@@ -777,6 +779,8 @@ class AceCommander(app.App):
                 elif confirm:
                     self._choose(items[self.menu])
                 self.title.step(dt)
+        elif self.mode == "practice":
+            self._update_practice(cancel, confirm)
         elif self.mode == "level":
             if cancel:
                 self.mode = "menu"
@@ -830,7 +834,7 @@ class AceCommander(app.App):
             self._update_viewer(dt, cancel, confirm)
         elif self.mode == "bench":
             if cancel:
-                self.mode = "menu"
+                self.mode = "odebug"    # back to DEBUG > DISPLAY, where it was started
                 self.bench = None
             else:
                 self.bench.step(delta)
@@ -846,7 +850,7 @@ class AceCommander(app.App):
 
     def choices(self):
         """The title screen's choices, in order."""
-        items = ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS", "SPEED TEST"]
+        items = ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS"]
         if self.cmdr is not None:
             items.insert(0, "CONTINUE")
         return items
@@ -862,7 +866,8 @@ class AceCommander(app.App):
             self.level = 1
             self.mode = "level"
         elif item == "COMBAT PRACTICE":
-            self._start_flight(False)
+            self.p_sel = 0
+            self.mode = "practice"      # its level and HARDCORE first
         elif item == "OPTIONS":
             self.omenu = 0
             self.mode = "options"
@@ -871,14 +876,48 @@ class AceCommander(app.App):
             if self.viewer is None:
                 self.viewer = viewer.Viewer(SHIPS)
             self.mode = "viewer"
-        else:
-            self.bench = bench.Bench()
-            self.mode = "bench"
+
+    def _update_practice(self, cancel, confirm):
+        """Combat practice's page: up / down picks LEVEL or HARDCORE, left /
+        right changes it, C flies, F goes back to the title screen. HARDCORE
+        is the same setting as on the Options page."""
+        hit = self.pad.hit
+        if cancel:
+            self.mode = "menu"
+        elif hit("up") or hit("down"):
+            self.p_sel = 1 - self.p_sel
+        elif hit("left") or hit("right"):
+            if self.p_sel == 0:
+                n = len(commander.LEVELS)
+                self.p_level = (self.p_level + (-1 if hit("left") else 1)) % n
+            else:
+                self.hardcore = not self.hardcore
+            self._save_options()
+        elif confirm:
+            self._start_flight(False)
+
+    def _draw_practice(self, ctx):
+        text = cockpit.text
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        text(ctx, "COMBAT PRACTICE", 0, -70, 18, cockpit.WHITE)
+        rows = ("LEVEL", "< %s >" % commander.LEVELS[self.p_level], LEVEL_NOTE[self.p_level]), \
+               ("HARDCORE", "< %s >" % ("ON" if self.hardcore else "OFF"),
+                "arm and lock missiles" if self.hardcore else "the game's usual help")
+        for i, (name, value, note) in enumerate(rows):
+            y = -42 + i * 56
+            on = i == self.p_sel
+            text(ctx, name, 0, y, 12, cockpit.GREY)
+            if on:
+                ctx.rgb(*cockpit.DIM).rectangle(-80, y + 6, 160, 24).fill()
+            text(ctx, value, 0, y + 18, 17, cockpit.GREEN if on else cockpit.GREY)
+            if on:
+                text(ctx, note, 0, y + 38, 11, cockpit.YELLOW)
+        text(ctx, "C: fly   F: back", 0, 80, 12, cockpit.GREY)
 
     def _start_flight(self, career):
         """Go into flight: as the commander, or for practice. A game that was
         left part-way carries on if it is the same kind."""
-        level = self.cmdr.level if career else 1
+        level = self.cmdr.level if career else self.p_level
         if not career:
             self.glow = 0.0
         g = self.game
@@ -887,7 +926,8 @@ class AceCommander(app.App):
             self.game = g = game.Game(SHIPS, level)
             self.banked = 0
             self.banked_cash = 0
-        elif g.over or career != self.career or g.level != level:
+        elif g.over or career != self.career or g.level != level \
+                or (not career and g.rules.hardcore != self.hardcore):   # practice: HARDCORE changed
             g.set_level(level)
             g.reset()
             self.banked = 0
@@ -1758,6 +1798,9 @@ class AceCommander(app.App):
                 self.use_leds = d["leds"]
             if isinstance(d.get("hardcore"), bool):
                 self.hardcore = d["hardcore"]
+            p = d.get("practice_level")
+            if isinstance(p, int) and not isinstance(p, bool) and 0 <= p < len(commander.LEVELS):
+                self.p_level = p
             if isinstance(d.get("egg"), int) and isinstance(d.get("egg_miss"), int):
                 self.egg, self.egg_miss = d["egg"], d["egg_miss"]
             own = d.get("own", d.get("own_ships"))
@@ -1768,7 +1811,8 @@ class AceCommander(app.App):
         try:
             with open(options_path(), "w") as f:
                 f.write(json.dumps({"tilt": self.use_tilt, "leds": self.use_leds,
-                                    "hardcore": self.hardcore, "own": self.own_ships, "egg": self.egg,
+                                    "hardcore": self.hardcore, "practice_level": self.p_level,
+                                    "own": self.own_ships, "egg": self.egg,
                                     "egg_miss": self.egg_miss, "debug": DEBUG_MENU}))
         except Exception:
             pass
@@ -1975,6 +2019,10 @@ class AceCommander(app.App):
         if item.startswith("FRAME TIME"):
             self.show_ms = not self.show_ms
             return "FRAME TIME " + ("ON" if self.show_ms else "OFF")
+        if item == "SPEED TEST":
+            self.bench = bench.Bench()      # F comes back to this page
+            self.mode = "bench"
+            return None
         if item.startswith("REPAIR SHOP"):
             self.repair_shop = not self.repair_shop
             if self.od_from == "docked" and self.dock is not None:
@@ -2615,6 +2663,8 @@ class AceCommander(app.App):
                 self.p_draw += world + hud
         elif self.mode == "level":
             self._draw_level(ctx)
+        elif self.mode == "practice":
+            self._draw_practice(ctx)
         elif self.mode == "docked":
             self.dock.draw(ctx)
         elif self.mode == "brief":
