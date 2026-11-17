@@ -204,9 +204,11 @@ on screen. Enemy lasers run from the ship's gun to the bottom of the screen (the
 Brian's plan ("Ace Commander: Hardcore Mode & Keyboard Support"): switch the assists to manual and
 control them from the keyboard (Tildagon Keyboard Hexpansion, and the Tufty's Keebdeck). Standard mode
 must not change. `rules.py` (`GameRules`, no badge imports, shared with the Tufty port) holds one flag
-per assist; `Game.rules` is standard by default and `ace.py` gives a flight `GameRules(self.hardcore)`
-when it starts (Options/Settings: HARDCORE: ON / OFF, saved in options.json, applies from the next
-flight). Built so far: manual ECM (`Game.fire_ecm`; E key, or both speed buttons together) and armed
+per assist; `Game.rules` is standard by default and `ace.py` gives a flight `GameRules(...)` when it
+starts. **Build 74 (Brian): HARDCORE and LEVEL are picked on the NEW COMMANDER page and then fixed;
+only DEBUG > COMMANDER (LEVEL, HARDCORE; in flight at once) changes them.** `Commander.hardcore` is in
+the save (`ace._hardcore()`); a save from before has None and takes options.json's old "hardcore"
+(`old_hardcore`). No HARDCORE line in Options/Settings any more. Practice's own is `p_hardcore`. Built so far: manual ECM (`Game.fire_ecm`; E key, or both speed buttons together) and armed
 missiles (`Game.arm_missile` / `unarm_missile`; T / U keys, D arms then fires; lock builds only while
 armed). Tests: `tests/test_hardcore.py` (needs no Elite files). Mass lock (all modes, `Game._massed`, `MASS_LOCK_K` 2 radii): the local jump drive drops out near the
 planet or sun, "MASS LOCKED"; the station's mass is its safe zone, which is kept (the planet's sphere

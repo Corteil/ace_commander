@@ -33,7 +33,7 @@ def docked():
 
 def flying(hardcore=False):
     a = docked()
-    a.hardcore = hardcore
+    a.cmdr.hardcore = hardcore
     a.dock.go(0)
     tick(a, fresh=["KEY_1"])            # f0: launch
     assert a.mode == "launch", a.mode

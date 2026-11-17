@@ -106,7 +106,8 @@ left = [
         ["Fire the E.C.M.", k("E") + " + " + k("F") + " together", k("E")],
         ["Arm / disarm a missile", k("D") + " arms, " + k("D") + " again fires", k("T") + " / " + k("U")],
     ], [A, B, C], ["Action", "Badge", "Keyboard"])),
-    Paragraph("Turn it on with HARDCORE: ON in Options or Settings (from the next flight). "
+    Paragraph("Pick HARDCORE: ON when you make a new commander (it stays for that commander), "
+              "or on the Combat practice page. "
               "In Hardcore " + k("E") + " is the E.C.M., so use " + k("+") + " to speed up; "
               "missiles lock only while armed; docking is by hand only, unless you have "
               "bought a docking computer.", note),

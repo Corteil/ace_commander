@@ -284,13 +284,13 @@ b.omenu = len(b._settings(True)) - 1; tick(b, fresh=["C"])
 assert b.mode == "odebug" and b._od_items() == ["SHIP", "COMMANDER", "DISPLAY"]
 c = CountCtx(); b.draw(c); assert any(t[0].startswith("DEBUG - BUILD") for t in c.texts)
 b.od_sel = 1; tick(b, fresh=["C"])
-assert b._od_items() == ["+10 KILLS", "+1000 CR", "LEVEL: " + cm.LEVELS[b.cmdr.level],
+assert b._od_items() == ["+10 KILLS", "+1000 CR", "LEVEL: " + cm.LEVELS[b.cmdr.level], "HARDCORE: OFF",
                          "LEGAL: CLEAN", "MISSION: NONE"], b._od_items()
 cash = b.cmdr.cash
 b.od_sel = 1; tick(b, fresh=["C"])
 assert b.cmdr.cash == cash + 10000 and cm.load(save).cash == cash + 10000, "saved at once"
 assert b.od_msg == b.cmdr.cash_text()
-b.od_sel = 4; tick(b, fresh=["C"]); assert b.cmdr.mission == 1 and cm.load(save).mission == 1
+b.od_sel = 5; tick(b, fresh=["C"]); assert b.cmdr.mission == 1 and cm.load(save).mission == 1
 tick(b, fresh=["F"]); assert b.od_page is None
 b.od_sel = 0; tick(b, fresh=["C"]); assert b.od_page == "SHIP", "straight to the equipment"
 items = b._od_items()

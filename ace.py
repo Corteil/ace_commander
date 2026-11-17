@@ -215,14 +215,14 @@ DEBUG_GROUPS = (
                "ADD THE CONSTRICTOR", "RELEASE CANISTER", "KILL ALL ENEMIES", "NEXT WAVE")),
     ("TRAVEL", ("TO THE STATION", "TO THE SUN", "DOCK NOW", "MIS-JUMP NEXT",
                 "TO MISSION SYSTEM")),
-    ("COMMANDER", ("+10 KILLS", "+1000 CR", "LEVEL", "LEGAL", "ANGER STATION", "MISSION")),
+    ("COMMANDER", ("+10 KILLS", "+1000 CR", "LEVEL", "HARDCORE", "LEGAL", "ANGER STATION", "MISSION")),
     ("DISPLAY", ("FRAME TIME", "REPAIR SHOP", "SPEED TEST")),
 )
-CAREER_ONLY = ("+1000 CR", "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION",
+CAREER_ONLY = ("+1000 CR", "HARDCORE", "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION",
                "MIS-JUMP NEXT", "LEGAL", "FUEL TO 1/4", "TO MISSION SYSTEM", "MISSION")
 # the cheats that work away from a flight (title screen Options, docked Options tab);
 # all but the last two need a commander, as does SHIP (the equipment) there
-OFF_FLIGHT = ("+10 KILLS", "+1000 CR", "LEVEL", "LEGAL", "MISSION",
+OFF_FLIGHT = ("+10 KILLS", "+1000 CR", "LEVEL", "HARDCORE", "LEGAL", "MISSION",
               "FRAME TIME", "REPAIR SHOP", "SPEED TEST")
 NO_COMMANDER = ("FRAME TIME", "REPAIR SHOP", "SPEED TEST")
 MSG_TIME = 1.5          # seconds a DEBUG message stays on the Options' DEBUG page
@@ -434,6 +434,8 @@ class AceCommander(app.App):
         self.p_level = 1        # combat practice's level (options.json)
         self.p_hardcore = False # combat practice's own HARDCORE, apart from the commander's
         self.p_sel = 0          # the combat practice page's line: 0 LEVEL, 1 HARDCORE
+        self.n_hardcore = False # the new-commander page's HARDCORE
+        self.n_sel = 0          # and its line: 0 LEVEL, 1 HARDCORE
         self.game = None
         self.career = False     # the current game counts towards the commander
         self.docked = True      # the commander is at a station, not out in a flight
@@ -479,7 +481,7 @@ class AceCommander(app.App):
         self.jump_lit = False            # the last write was a jump flash
         self.jump_rgb = DUST_RGB         # their colour at full brightness
         self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
-        self.hardcore = False            # HARDCORE: ON / OFF, from the next flight (rules.py)
+        self.old_hardcore = False        # options.json's HARDCORE from before build 74
         self.own_ships = ORIGINAL_SHIPS  # DATA: OWN / ELITE, from the next start
         self.omenu = 0                   # the chosen line on the Options page
         self.egg = 0                     # letters of EGG_WORD docked at so far
@@ -492,6 +494,10 @@ class AceCommander(app.App):
         self.od_msg = None               # and what the last cheat did
         self.od_msg_t = 0.0
         self._load_options()
+        c = self.cmdr
+        if c is not None and c.hardcore is None:    # a save from before build 74:
+            c.hardcore = self.old_hardcore          # HARDCORE was an option then
+            self.saved = json.dumps(c.to_dict())
         self.led_level = None            # (r, g, b) last written, 0-255 each
         self.glow = 0.0                  # the station's colour fading on the LEDs after launch
         # smoothed time, in ms, spent in the game rules and in drawing calls
@@ -785,12 +791,17 @@ class AceCommander(app.App):
         elif self.mode == "level":
             if cancel:
                 self.mode = "menu"
-            elif hit("left") or hit("up"):
-                self.level = (self.level - 1) % len(commander.LEVELS)
-            elif hit("right") or hit("down"):
-                self.level = (self.level + 1) % len(commander.LEVELS)
+            elif hit("up") or hit("down"):
+                self.n_sel = 1 - self.n_sel
+            elif hit("left") or hit("right"):
+                if self.n_sel == 0:
+                    n = len(commander.LEVELS)
+                    self.level = (self.level + (-1 if hit("left") else 1)) % n
+                else:
+                    self.n_hardcore = not self.n_hardcore
             elif confirm:
                 self.cmdr = commander.Commander(self.level)
+                self.cmdr.hardcore = self.n_hardcore    # fixed from now on (DEBUG can change it)
                 self.career = False     # an old commander's flight banks nothing into it
                 self._write()
                 self.menu = 0       # CONTINUE is now the first choice
@@ -865,6 +876,8 @@ class AceCommander(app.App):
                 self._start_flight(True)
         elif item == "NEW COMMANDER":
             self.level = 1
+            self.n_hardcore = False
+            self.n_sel = 0
             self.mode = "level"
         elif item == "COMBAT PRACTICE":
             self.p_sel = 0
@@ -881,7 +894,7 @@ class AceCommander(app.App):
     def _update_practice(self, cancel, confirm):
         """Combat practice's page: up / down picks LEVEL or HARDCORE, left /
         right changes it, C flies, F goes back to the title screen. Its
-        HARDCORE is its own, apart from the commander's on the Options page."""
+        HARDCORE is its own, apart from the commander's."""
         hit = self.pad.hit
         if cancel:
             self.mode = "menu"
@@ -898,22 +911,26 @@ class AceCommander(app.App):
             self._start_flight(False)
 
     def _draw_practice(self, ctx):
-        text = cockpit.text
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "COMBAT PRACTICE", 0, -70, 18, cockpit.WHITE)
-        rows = ("LEVEL", "< %s >" % commander.LEVELS[self.p_level], LEVEL_NOTE[self.p_level]), \
-               ("HARDCORE", "< %s >" % ("ON" if self.p_hardcore else "OFF"),
-                "ECM by hand, armed missiles" if self.p_hardcore else "the game's usual help")
+        cockpit.text(ctx, "COMBAT PRACTICE", 0, -70, 18, cockpit.WHITE)
+        self._draw_rows(ctx, self.p_level, self.p_hardcore, self.p_sel, -42, 56)
+        cockpit.text(ctx, "C: fly   F: back", 0, 80, 12, cockpit.GREY)
+
+    def _draw_rows(self, ctx, level, hardcore, sel, top, step):
+        """The LEVEL and HARDCORE lines of the practice and new-commander pages."""
+        text = cockpit.text
+        rows = ("LEVEL", "< %s >" % commander.LEVELS[level], LEVEL_NOTE[level]), \
+               ("HARDCORE", "< %s >" % ("ON" if hardcore else "OFF"),
+                "ECM by hand, armed missiles" if hardcore else "the game's usual help")
         for i, (name, value, note) in enumerate(rows):
-            y = -42 + i * 56
-            on = i == self.p_sel
+            y = top + i * step
+            on = i == sel
             text(ctx, name, 0, y, 12, cockpit.GREY)
             if on:
                 ctx.rgb(*cockpit.DIM).rectangle(-80, y + 6, 160, 24).fill()
             text(ctx, value, 0, y + 18, 17, cockpit.GREEN if on else cockpit.GREY)
             if on:
                 text(ctx, note, 0, y + 38, 11, cockpit.YELLOW)
-        text(ctx, "C: fly   F: back", 0, 80, 12, cockpit.GREY)
 
     def _start_flight(self, career):
         """Go into flight: as the commander, or for practice. A game that was
@@ -936,7 +953,7 @@ class AceCommander(app.App):
         else:
             fresh = False
         if fresh:
-            g.rules = rules.GameRules(self.hardcore if career else self.p_hardcore)
+            g.rules = rules.GameRules(self._hardcore() if career else self.p_hardcore)
             if not career:
                 g.ecm = True    # practice flies with an ECM (by hand in Hardcore)
             g.set_docking(g.docking)        # Hardcore: by hand, whatever the setting
@@ -1218,19 +1235,16 @@ class AceCommander(app.App):
         self.held_t[name] = t
         return False
 
-    def _practising(self):
-        """In a combat practice flight: its Settings HARDCORE line is practice's own."""
-        return self.mode == "flight" and not self.career
-
-    def _hardcore_shown(self):
-        return self.p_hardcore if self._practising() else self.hardcore
+    def _hardcore(self):
+        """The commander's HARDCORE (picked with them, fixed but for DEBUG)."""
+        return self.cmdr is not None and bool(self.cmdr.hardcore)
 
     def _manual_docking(self):
         """Hardcore: docking is by hand only. In a flight, the rules it started with;
-        elsewhere the HARDCORE setting (which a flight takes up when it starts)."""
+        elsewhere the commander's HARDCORE (which a flight takes up when it starts)."""
         if self.game is not None and self.mode == "flight":
             return self.game.rules.manual_docking
-        return self.hardcore
+        return self._hardcore()
 
     def _fit(self, g):
         """A fresh career flight: the commander's ship as equipped."""
@@ -1737,8 +1751,6 @@ class AceCommander(app.App):
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
         if tildagonos is not None:
             items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))
-        items.append("HARDCORE: " + ("ON" if self._hardcore_shown() else "OFF")
-                     + (" (NEXT FLIGHT)" if self.mode == "flight" else ""))
         if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose data, from the next start
             items.append("DATA: " + ("OWN" if self.own_ships else "ELITE")
                          + ("" if self.own_ships == ORIGINAL_SHIPS else " (RESTART)"))
@@ -1768,12 +1780,6 @@ class AceCommander(app.App):
                 self.use_tilt = not self.use_tilt
                 self.zero = None
                 self._save_options()
-        elif item.startswith("HARDCORE"):
-            if self._practising():      # the next flight uses the new rules
-                self.p_hardcore = not self.p_hardcore
-            else:
-                self.hardcore = not self.hardcore
-            self._save_options()
         elif item.startswith("CONSTRICTOR"):
             c = self.cmdr       # how soon mission 1's Constrictor turns up at Orarra
             c.quick_con = not c.quick_con
@@ -1810,7 +1816,7 @@ class AceCommander(app.App):
             if isinstance(d.get("leds"), bool):
                 self.use_leds = d["leds"]
             if isinstance(d.get("hardcore"), bool):
-                self.hardcore = d["hardcore"]
+                self.old_hardcore = d["hardcore"]
             if isinstance(d.get("practice_hardcore"), bool):
                 self.p_hardcore = d["practice_hardcore"]
             p = d.get("practice_level")
@@ -1826,7 +1832,7 @@ class AceCommander(app.App):
         try:
             with open(options_path(), "w") as f:
                 f.write(json.dumps({"tilt": self.use_tilt, "leds": self.use_leds,
-                                    "hardcore": self.hardcore, "practice_level": self.p_level,
+                                    "practice_level": self.p_level,
                                     "practice_hardcore": self.p_hardcore,
                                     "own": self.own_ships, "egg": self.egg,
                                     "egg_miss": self.egg_miss, "debug": DEBUG_MENU}))
@@ -1902,6 +1908,8 @@ class AceCommander(app.App):
             return "INVINCIBLE: " + onoff(g.god)
         if key == "LEVEL":
             return "LEVEL: " + commander.LEVELS[g.level if flying else c.level]
+        if key == "HARDCORE":
+            return "HARDCORE: " + onoff(self._hardcore())
         if key == "FRAME TIME":
             return "FRAME TIME: " + onoff(self.show_ms)
         if key == "MIS-JUMP NEXT":
@@ -2061,6 +2069,10 @@ class AceCommander(app.App):
             c._needs = commander.thresholds(c.level)
             self._write_setting("level", c.level)
             return "LEVEL: " + commander.LEVELS[c.level]
+        if item.startswith("HARDCORE"):
+            c.hardcore = not c.hardcore
+            self._write_setting("hardcore", c.hardcore)
+            return "HARDCORE " + ("ON" if c.hardcore else "OFF")
         if item.startswith("LEGAL"):
             c.legal = 20 if c.legal == 0 else (game.FUGITIVE if c.legal < game.FUGITIVE else 0)
             self._write_setting("legal", c.legal)
@@ -2217,6 +2229,16 @@ class AceCommander(app.App):
         if item.startswith("REPAIR SHOP"):
             self.repair_shop = not self.repair_shop     # shown from the next docking
             g.say("REPAIR SHOP " + ("ON" if self.repair_shop else "OFF"))
+            return
+        if item.startswith("HARDCORE"):
+            # the commander's Hardcore, at once: this flight's rules too
+            c = self.cmdr
+            c.hardcore = not c.hardcore
+            g.rules = rules.GameRules(c.hardcore)
+            g.armed = False
+            g.set_docking(c.docking)
+            self._write_setting("hardcore", c.hardcore)     # kept even if this flight ends in death
+            g.say("HARDCORE " + ("ON" if c.hardcore else "OFF"))
             return
         if item.startswith("LEVEL"):
             # the next level, at once: the enemies, and with a commander the ranks too
@@ -2716,16 +2738,13 @@ class AceCommander(app.App):
     def _draw_level(self, ctx):
         text = cockpit.text
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "NEW COMMANDER", 0, -70, 18, cockpit.WHITE)
-        text(ctx, "LEVEL", 0, -34, 13, cockpit.GREY)
-        ctx.rgb(*cockpit.DIM).rectangle(-80, -24, 160, 30).fill()
-        text(ctx, "< %s >" % commander.LEVELS[self.level], 0, -9, 20, cockpit.GREEN)
-        text(ctx, LEVEL_NOTE[self.level], 0, 20, 12, cockpit.YELLOW)
+        text(ctx, "NEW COMMANDER", 0, -80, 18, cockpit.WHITE)
+        self._draw_rows(ctx, self.level, self.n_hardcore, self.n_sel, -58, 54)
         top = commander.thresholds(self.level)[-1]
-        text(ctx, "top rank at %d kills" % top, 0, 36, 12, cockpit.YELLOW)
+        text(ctx, "top rank at %d kills" % top, 0, 54, 11, cockpit.GREY)
         if self.cmdr is not None:
-            text(ctx, "replaces your saved commander", 0, 58, 11, cockpit.RED)
-        text(ctx, "C: start   F: back", 0, 80, 12, cockpit.GREY)
+            text(ctx, "replaces your saved commander", 0, 69, 11, cockpit.RED)
+        text(ctx, "C: start   F: back", 0, 86, 12, cockpit.GREY)
 
     def _draw_fmenu(self, ctx):
         text = cockpit.text

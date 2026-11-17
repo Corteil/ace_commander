@@ -31,7 +31,8 @@ A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves 
 
 - **New commander** / **Continue**: the game. Pick a level (EASY, NORMAL or HARD) for a new
   commander: it sets how many kills each rank takes, how many enemies attack at once, and
-  how many hits they take. Your
+  how many hits they take. Also pick HARDCORE (ON: the E.C.M. fires only on its key,
+  missiles must be armed, docking by hand). Both stay as chosen for that commander. Your
   commander is saved each time you dock, and only then. Being destroyed takes you back to
   your last save, unless you have an escape pod.
 - **Combat practice**: endless waves of ships, with nothing kept. Pick the level

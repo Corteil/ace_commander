@@ -167,10 +167,17 @@ if os.path.exists(SAVE):
 mod.SAVE_PATH = SAVE
 
 
+def bs_texts(a):
+    c = bs.CountCtx(); a.draw(c)
+    for t, (x, y), size in c.texts:
+        assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5, (t, y)
+    return c.texts
+
+
 def app_flight(hardcore):
     bs.press(())
     a = ace_commander.AceCommander()
-    a.hardcore = a.p_hardcore = hardcore
+    a.p_hardcore = hardcore
     tick(a)
     choose(a, "COMBAT PRACTICE")
     g = a.game
@@ -182,7 +189,8 @@ def app_flight(hardcore):
 
 
 a, g = app_flight(False)
-assert not g.rules.hardcore and "HARDCORE: OFF (NEXT FLIGHT)" in a._settings(False)
+assert not g.rules.hardcore and not any(s.startswith("HARDCORE") for s in a._settings(False)), \
+    "HARDCORE isn't a setting: practice's page or a new commander picks it"
 s0 = g.speed
 for _ in range(10):
     tick(a, held=["KEY_E"])
@@ -190,7 +198,7 @@ assert g.speed > s0, "standard: the E key is still speed up"
 print("standard keys unchanged: ok")
 
 a, g = app_flight(True)
-assert g.rules.hardcore and "HARDCORE: ON (NEXT FLIGHT)" in a._settings(False)
+assert g.rules.hardcore
 g.ecm = True
 m = put(g, "MISSILE", "missile", 0, 0, 2000)
 m.t = 8.0
@@ -236,32 +244,58 @@ for style in "ABC":
     assert g.docking == "A", "hardcore: always by hand"
 a, g = app_flight(True)
 a.cmdr = ace_commander.commander.Commander(1)
+a.cmdr.hardcore = True
 a.cmdr.docking = "C"
 assert "DOCKING: MANUAL" in a._settings(True)
 a._change("DOCKING: MANUAL", False)
 assert a.cmdr.docking == "C", "the saved style isn't changed in Hardcore"
 assert "DOCKING: MANUAL" in a._settings(True), "a Hardcore flight stays so until it ends"
 a.mode = "menu"
-a.hardcore = False
+a.cmdr.hardcore = False
 assert "DOCKING: AUTOMATIC" in a._settings(True)
 g.computer = False
 assert g.start_autodock() == "NO DOCKING COMPUTER", "only a bought docking computer flies you in"
 print("hardcore docking: ok")
 
-# ---- the setting is saved
-a, g = app_flight(False)
-a._change("HARDCORE: OFF", False)
-assert a.p_hardcore and not a.hardcore, "in practice, Settings changes practice's own HARDCORE"
-assert "HARDCORE: ON (NEXT FLIGHT)" in a._settings(False)
-a.mode = "menu"
-a._change("HARDCORE: OFF", False)
-assert a.hardcore and a.p_hardcore
+# ---- the commander's HARDCORE: picked with the commander, fixed but for DEBUG
+cm = ace_commander.commander
+c = cm.Commander(1)
+assert c.hardcore is False and cm.Commander.from_dict(c.to_dict()).hardcore is False
+c.hardcore = True
+assert cm.Commander.from_dict(c.to_dict()).hardcore is True, "kept in the save"
+d = c.to_dict(); del d["hardcore"]
+assert cm.Commander.from_dict(d).hardcore is None, "an old save: not known yet"
+# an old save takes options.json's old HARDCORE
+import json as _json
+with open(mod.options_path(), "w") as f:
+    f.write(_json.dumps({"hardcore": True}))
+with open(SAVE, "w") as f:
+    f.write(_json.dumps(d))
 b = ace_commander.AceCommander()
-assert b.hardcore and b.p_hardcore, "both HARDCOREs are kept in options.json"
-b._change("HARDCORE: ON", False)
-assert not b.hardcore and b.p_hardcore, "the commander's alone"
-b.p_hardcore = False
-b._save_options()
+assert b.cmdr.hardcore is True and _json.loads(b.saved)["hardcore"] is True, "old option carried over"
+os.remove(SAVE); os.remove(mod.options_path())
+
+n = ace_commander.AceCommander()
+tick(n)
+choose(n, "NEW COMMANDER")
+assert n.mode == "level" and n.n_sel == 0 and not n.n_hardcore
+tx = [t[0] for t in bs_texts(n)]
+assert "< NORMAL >" in tx and "< OFF >" in tx and "top rank at 3200 kills" in tx, tx
+tick(n, fresh=["JOYDOWN"]); tick(n, fresh=["JOYRIGHT"])
+assert n.n_hardcore and n.level == 1
+tick(n, fresh=["JOYUP"]); tick(n, fresh=["JOYRIGHT"]); assert n.level == 2
+tick(n, fresh=["C"])
+assert n.mode == "docked" and n.cmdr.hardcore and n.cmdr.level == 2
+assert _json.load(open(SAVE))["hardcore"] is True
+assert not any(s.startswith("HARDCORE") for s in n._settings(True)), "not an option any more"
+assert "DOCKING: MANUAL" in n._settings(True)
+# DEBUG > COMMANDER > HARDCORE: the only way to change it
+n.od_from = "docked"
+assert "HARDCORE: ON" in n._cheats("COMMANDER", False)
+assert n._odebug("HARDCORE: ON") == "HARDCORE OFF" and not n.cmdr.hardcore
+assert _json.load(open(SAVE))["hardcore"] is False
+n._odebug("HARDCORE: OFF"); assert n.cmdr.hardcore
+print("commander HARDCORE: picked when made, DEBUG changes it: ok")
 
 # ---- combat practice's page: LEVEL and HARDCORE before the flight ------------
 p = ace_commander.AceCommander()
@@ -276,7 +310,8 @@ for t, (x, y), size in c.texts:
     assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5, (t, y)
 tick(p, fresh=["JOYRIGHT"]); assert p.p_level == 2, "right: the next level"
 tick(p, fresh=["JOYDOWN"]); assert p.p_sel == 1
-tick(p, fresh=["JOYRIGHT"]); assert p.p_hardcore and not p.hardcore, "practice's own HARDCORE"
+before = p._hardcore()
+tick(p, fresh=["JOYRIGHT"]); assert p.p_hardcore and p._hardcore() == before, "practice's own HARDCORE"
 tick(p, fresh=["CONFIRM"])
 g = p.game
 assert p.mode == "flight" and not p.career and g.level == 2 and g.rules.hardcore
@@ -289,7 +324,7 @@ assert not m.dead, "Hardcore: the ECM waits for its key"
 tick(p, fresh=["KEY_E"])
 assert m.dead and g.ecm_t > 0, "and fires on it"
 q = ace_commander.AceCommander()
-assert q.p_level == 2 and q.p_hardcore and not q.hardcore, "both kept in options.json"
+assert q.p_level == 2 and q.p_hardcore, "both kept in options.json"
 # back to the title part-way: the same settings carry the fight on, new ones start afresh
 p.mode = "menu"
 g.score = 7

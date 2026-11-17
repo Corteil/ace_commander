@@ -800,3 +800,10 @@ what is now `ace.py` (renamed in build 50).
    it fires by itself, or on its key in Hardcore). The commander's LEVEL is still only
    chosen at NEW COMMANDER or by DEBUG > COMMANDER > LEVEL (asked Brian whether Options
    should have it).
+   **Build 74** (2026-11-17, Brian: "hardcore and level can only be selected when new
+   commander is created. only debug can override this"): the NEW COMMANDER page has LEVEL
+   and HARDCORE lines (shared `_draw_rows` with the practice page; up / down picks, left /
+   right changes). `Commander.hardcore` is saved with the commander; HARDCORE left the
+   Options page, docked Options tab and in-flight Settings. DEBUG > COMMANDER > HARDCORE
+   toggles it (off flight: written to the save; in flight: this flight's rules and
+   docking style at once, and the save). Old saves take options.json's old HARDCORE once.

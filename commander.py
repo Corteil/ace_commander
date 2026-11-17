@@ -73,6 +73,7 @@ class Commander:
         self.colour = 0         # the ship's paint (cockpit.SHIP_COLOURS), from the Repair Shop
         self.legal = 0          # legal status, 0 clean to 255 (game.FUGITIVE and up: a fugitive)
         self.mission = 0        # how far the two missions have got: the original's TP (missions.py)
+        self.hardcore = False   # Hardcore Mode (rules.py): picked with the level, then fixed
         self.quick_con = True   # the Constrictor turns up after missions.QUICK_WAIT (else rarely, as the original)
         self.data = ""          # the data set the commander belongs to: "elite" or "own" ("" unknown)
         self.fuel = MAX_FUEL    # tenths of a light year
@@ -130,7 +131,7 @@ class Commander:
                 "laser": self.laser, "lasers": self.lasers, "extras": self.extras, "docked_at": self.docked_at,
                 "galaxy": self.galaxy, "colour": self.colour,
                 "legal": self.legal, "mission": self.mission,
-                "quick_con": self.quick_con, "data": self.data}
+                "quick_con": self.quick_con, "data": self.data, "hardcore": self.hardcore}
 
     @classmethod
     def from_dict(cls, d):
@@ -172,6 +173,8 @@ class Commander:
             c.data = d["data"]
         if isinstance(d.get("quick_con"), bool):
             c.quick_con = d["quick_con"]
+        # None: a save from before build 74 (ace.py then takes options.json's old HARDCORE)
+        c.hardcore = d["hardcore"] if isinstance(d.get("hardcore"), bool) else None
         k = d.get("mission")
         if isinstance(k, int):
             c.mission = k & 0xFF
