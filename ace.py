@@ -432,6 +432,7 @@ class AceCommander(app.App):
         self.saved = json.dumps(self.cmdr.to_dict()) if self.cmdr is not None else None
         self.level = 1          # the level showing on the new-commander screen
         self.p_level = 1        # combat practice's level (options.json)
+        self.p_hardcore = False # combat practice's own HARDCORE, apart from the commander's
         self.p_sel = 0          # the combat practice page's line: 0 LEVEL, 1 HARDCORE
         self.game = None
         self.career = False     # the current game counts towards the commander
@@ -879,8 +880,8 @@ class AceCommander(app.App):
 
     def _update_practice(self, cancel, confirm):
         """Combat practice's page: up / down picks LEVEL or HARDCORE, left /
-        right changes it, C flies, F goes back to the title screen. HARDCORE
-        is the same setting as on the Options page."""
+        right changes it, C flies, F goes back to the title screen. Its
+        HARDCORE is its own, apart from the commander's on the Options page."""
         hit = self.pad.hit
         if cancel:
             self.mode = "menu"
@@ -891,7 +892,7 @@ class AceCommander(app.App):
                 n = len(commander.LEVELS)
                 self.p_level = (self.p_level + (-1 if hit("left") else 1)) % n
             else:
-                self.hardcore = not self.hardcore
+                self.p_hardcore = not self.p_hardcore
             self._save_options()
         elif confirm:
             self._start_flight(False)
@@ -901,8 +902,8 @@ class AceCommander(app.App):
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
         text(ctx, "COMBAT PRACTICE", 0, -70, 18, cockpit.WHITE)
         rows = ("LEVEL", "< %s >" % commander.LEVELS[self.p_level], LEVEL_NOTE[self.p_level]), \
-               ("HARDCORE", "< %s >" % ("ON" if self.hardcore else "OFF"),
-                "arm and lock missiles" if self.hardcore else "the game's usual help")
+               ("HARDCORE", "< %s >" % ("ON" if self.p_hardcore else "OFF"),
+                "ECM by hand, armed missiles" if self.p_hardcore else "the game's usual help")
         for i, (name, value, note) in enumerate(rows):
             y = -42 + i * 56
             on = i == self.p_sel
@@ -927,7 +928,7 @@ class AceCommander(app.App):
             self.banked = 0
             self.banked_cash = 0
         elif g.over or career != self.career or g.level != level \
-                or (not career and g.rules.hardcore != self.hardcore):   # practice: HARDCORE changed
+                or (not career and g.rules.hardcore != self.p_hardcore):   # practice: HARDCORE changed
             g.set_level(level)
             g.reset()
             self.banked = 0
@@ -935,7 +936,9 @@ class AceCommander(app.App):
         else:
             fresh = False
         if fresh:
-            g.rules = rules.GameRules(self.hardcore)    # the rules for this flight
+            g.rules = rules.GameRules(self.hardcore if career else self.p_hardcore)
+            if not career:
+                g.ecm = True    # practice flies with an ECM (by hand in Hardcore)
             g.set_docking(g.docking)        # Hardcore: by hand, whatever the setting
         self.career = career
         g.again = "C: back to last save" if career else "C: fly again"
@@ -1214,6 +1217,13 @@ class AceCommander(app.App):
             return True
         self.held_t[name] = t
         return False
+
+    def _practising(self):
+        """In a combat practice flight: its Settings HARDCORE line is practice's own."""
+        return self.mode == "flight" and not self.career
+
+    def _hardcore_shown(self):
+        return self.p_hardcore if self._practising() else self.hardcore
 
     def _manual_docking(self):
         """Hardcore: docking is by hand only. In a flight, the rules it started with;
@@ -1727,7 +1737,7 @@ class AceCommander(app.App):
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
         if tildagonos is not None:
             items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))
-        items.append("HARDCORE: " + ("ON" if self.hardcore else "OFF")
+        items.append("HARDCORE: " + ("ON" if self._hardcore_shown() else "OFF")
                      + (" (NEXT FLIGHT)" if self.mode == "flight" else ""))
         if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose data, from the next start
             items.append("DATA: " + ("OWN" if self.own_ships else "ELITE")
@@ -1759,7 +1769,10 @@ class AceCommander(app.App):
                 self.zero = None
                 self._save_options()
         elif item.startswith("HARDCORE"):
-            self.hardcore = not self.hardcore       # the next flight uses the new rules
+            if self._practising():      # the next flight uses the new rules
+                self.p_hardcore = not self.p_hardcore
+            else:
+                self.hardcore = not self.hardcore
             self._save_options()
         elif item.startswith("CONSTRICTOR"):
             c = self.cmdr       # how soon mission 1's Constrictor turns up at Orarra
@@ -1798,6 +1811,8 @@ class AceCommander(app.App):
                 self.use_leds = d["leds"]
             if isinstance(d.get("hardcore"), bool):
                 self.hardcore = d["hardcore"]
+            if isinstance(d.get("practice_hardcore"), bool):
+                self.p_hardcore = d["practice_hardcore"]
             p = d.get("practice_level")
             if isinstance(p, int) and not isinstance(p, bool) and 0 <= p < len(commander.LEVELS):
                 self.p_level = p
@@ -1812,6 +1827,7 @@ class AceCommander(app.App):
             with open(options_path(), "w") as f:
                 f.write(json.dumps({"tilt": self.use_tilt, "leds": self.use_leds,
                                     "hardcore": self.hardcore, "practice_level": self.p_level,
+                                    "practice_hardcore": self.p_hardcore,
                                     "own": self.own_ships, "egg": self.egg,
                                     "egg_miss": self.egg_miss, "debug": DEBUG_MENU}))
         except Exception:

@@ -230,7 +230,7 @@ for n in range(4):      # the number keys (the real names are not checked yet)
 def app_flight(hardcore):
     bs.press(())
     a = ace_commander.AceCommander()
-    a.hardcore = hardcore
+    a.hardcore = a.p_hardcore = hardcore
     tick(a)
     choose(a, "COMBAT PRACTICE")
     g = a.game

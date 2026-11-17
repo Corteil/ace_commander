@@ -281,8 +281,10 @@ H or the menu's HYPERSPACE line jumps, as Elite. `Game.condition()` is Elite's G
 (the C that chose something isn't a shot) applies to C / Enter only, so Space held through closing
 a screen keeps firing.
 **Combat practice's page (build 72, Brian):** COMBAT PRACTICE opens `mode == "practice"` first: LEVEL
-(`AceCommander.p_level`, options.json "practice_level") and HARDCORE (the same setting as Options); up /
-down picks the line, left / right changes it, C flies, F back. A part-way practice fight carries on only
+(`AceCommander.p_level`, options.json "practice_level") and HARDCORE (build 73: its own,
+`p_hardcore`, "practice_hardcore", apart from the commander's; the in-flight Settings line in a practice
+flight is practice's, `_practising()`); up / down picks the line, left / right changes it, C flies, F
+back. Practice flies with an ECM (build 73; automatic, or by hand in Hardcore). A part-way practice fight carries on only
 if level and HARDCORE are unchanged. SPEED TEST left the title screen (Brian: keep it, hidden) for
 DEBUG > DISPLAY (off flight only; F returns to that page).
 Not built yet: a HARDCORE marker on the HUD.

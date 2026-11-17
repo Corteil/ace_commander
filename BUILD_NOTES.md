@@ -794,3 +794,9 @@ what is now `ace.py` (renamed in build 50).
    practice flight uses that level's `game.LEVELS` row; a part-way practice fight is
    restarted if HARDCORE changed (before, it kept the old rules). Practice has no ECM, so
    Hardcore there means armed and locked missiles.
+   **Build 73** (2026-11-17, Brian): practice's HARDCORE is independent of the commander's
+   (`p_hardcore`, options.json "practice_hardcore"; Settings in a practice flight changes
+   practice's), and the practice ship has an ECM (`g.ecm` set on a fresh practice flight:
+   it fires by itself, or on its key in Hardcore). The commander's LEVEL is still only
+   chosen at NEW COMMANDER or by DEBUG > COMMANDER > LEVEL (asked Brian whether Options
+   should have it).

@@ -170,7 +170,7 @@ mod.SAVE_PATH = SAVE
 def app_flight(hardcore):
     bs.press(())
     a = ace_commander.AceCommander()
-    a.hardcore = hardcore
+    a.hardcore = a.p_hardcore = hardcore
     tick(a)
     choose(a, "COMBAT PRACTICE")
     g = a.game
@@ -251,11 +251,17 @@ print("hardcore docking: ok")
 # ---- the setting is saved
 a, g = app_flight(False)
 a._change("HARDCORE: OFF", False)
-assert a.hardcore
+assert a.p_hardcore and not a.hardcore, "in practice, Settings changes practice's own HARDCORE"
+assert "HARDCORE: ON (NEXT FLIGHT)" in a._settings(False)
+a.mode = "menu"
+a._change("HARDCORE: OFF", False)
+assert a.hardcore and a.p_hardcore
 b = ace_commander.AceCommander()
-assert b.hardcore, "HARDCORE is kept in options.json"
+assert b.hardcore and b.p_hardcore, "both HARDCOREs are kept in options.json"
 b._change("HARDCORE: ON", False)
-assert not b.hardcore
+assert not b.hardcore and b.p_hardcore, "the commander's alone"
+b.p_hardcore = False
+b._save_options()
 
 # ---- combat practice's page: LEVEL and HARDCORE before the flight ------------
 p = ace_commander.AceCommander()
@@ -270,13 +276,20 @@ for t, (x, y), size in c.texts:
     assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5, (t, y)
 tick(p, fresh=["JOYRIGHT"]); assert p.p_level == 2, "right: the next level"
 tick(p, fresh=["JOYDOWN"]); assert p.p_sel == 1
-tick(p, fresh=["JOYRIGHT"]); assert p.hardcore, "the HARDCORE line"
+tick(p, fresh=["JOYRIGHT"]); assert p.p_hardcore and not p.hardcore, "practice's own HARDCORE"
 tick(p, fresh=["CONFIRM"])
 g = p.game
 assert p.mode == "flight" and not p.career and g.level == 2 and g.rules.hardcore
-assert not g.armed and g.rules.missile_lock_required
+assert not g.armed and g.rules.missile_lock_required and g.rules.manual_ecm
+assert g.ecm, "practice flies with an ECM"
+m = put(g, "MISSILE", "missile", 0, 0, 2000)
+m.t = 8.0
+tick(p)
+assert not m.dead, "Hardcore: the ECM waits for its key"
+tick(p, fresh=["KEY_E"])
+assert m.dead and g.ecm_t > 0, "and fires on it"
 q = ace_commander.AceCommander()
-assert q.p_level == 2 and q.hardcore, "both kept in options.json"
+assert q.p_level == 2 and q.p_hardcore and not q.hardcore, "both kept in options.json"
 # back to the title part-way: the same settings carry the fight on, new ones start afresh
 p.mode = "menu"
 g.score = 7
@@ -284,9 +297,18 @@ choose(p, "COMBAT PRACTICE"); assert p.game is g and g.score == 7, "the fight ca
 p.mode = "menu"
 p.menu = p.choices().index("COMBAT PRACTICE")
 tick(p, fresh=["CONFIRM"]); tick(p, fresh=["JOYDOWN"]); tick(p, fresh=["JOYLEFT"])
-assert not p.hardcore
+assert not p.p_hardcore
 tick(p, fresh=["CONFIRM"])
-assert p.mode == "flight" and not p.game.rules.hardcore and p.game.score == 0, "HARDCORE off: a new flight"
+g = p.game
+assert p.mode == "flight" and not g.rules.hardcore and g.score == 0, "HARDCORE off: a new flight"
+assert g.ecm
+g.spawn_t = g.rock_t = g.encounter_t = 1e9
+g.objs[:] = []
+m = put(g, "MISSILE", "missile", 0, 0, 300)
+m.t = 8.0
+for _ in range(5):
+    tick(p)
+assert m.dead and g.ecm_t > 0, "standard: practice's ECM fires by itself at a missile close by"
 p.mode = "menu"
 p.menu = p.choices().index("COMBAT PRACTICE")
 tick(p, fresh=["CONFIRM"]); tick(p, fresh=["CANCEL"]); assert p.mode == "menu", "F: back"

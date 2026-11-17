@@ -35,7 +35,8 @@ A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves 
   commander is saved each time you dock, and only then. Being destroyed takes you back to
   your last save, unless you have an escape pod.
 - **Combat practice**: endless waves of ships, with nothing kept. Pick the level
-  (EASY, NORMAL, HARD) and HARDCORE on its page before you fly.
+  (EASY, NORMAL, HARD) and HARDCORE on its page before you fly; practice's HARDCORE is
+  its own, apart from your commander's. The practice ship has an E.C.M.
 - **Ship viewer**: every ship in the game, turning.
 - **Options**: steering (joystick or tilt), the docking style, how soon mission 1's target
   turns up, and the badge's LEDs.
