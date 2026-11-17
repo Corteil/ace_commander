@@ -1871,8 +1871,8 @@ class AceCommander(app.App):
             y += 20
         if self.cmdr is None:
             text(ctx, "more with a commander", 0, y + 4, 11, cockpit.GREY)
-        text(ctx, "< > or C: change", 0, 66, 11, cockpit.GREY)
-        text(ctx, "F: back", 0, 80, 11, cockpit.GREY)
+        text(ctx, "< > or C: change", 0, 82, 11, cockpit.GREY)     # below six lines
+        text(ctx, "F: back", 0, 96, 11, cockpit.GREY)
 
     def _fitems(self):
         """The lines on the current page of the in-flight menu."""
