@@ -167,15 +167,15 @@ assert commander.load(SAVE).kills == 0, "not written every kill"
 tick(a, fresh=["A"])
 tx = texts(a)
 assert "STATUS" in tx
-assert a._fitems() == ["RESUME", "HYPERSPACE", "LOCAL CHART", "STATUS", "SETTINGS", "QUIT TO TITLE",
+assert a._fitems() == ["RESUME", "VIEW: FRONT", "HYPERSPACE", "LOCAL CHART", "STATUS", "SETTINGS", "QUIT TO TITLE",
                        "DEBUG"], a._fitems()
 assert texts(a)
-fpick(a, "STATUS"); assert a.fsub == "status"
+fpick(a, "STATUS"); assert a.fsub == "status" and not a.paused, "a screen: the game runs on"
 tx = texts(a)
-assert "AVERAGE" in tx and any("6 kills" in t and "EASY" in t for t in tx), tx
-assert any("more for ABOVE AVERAGE" in t for t in tx)
-assert any(t.startswith("LAVE") and "fuel 7.0 LY" in t for t in tx), tx
-tick(a, fresh=["C"]); assert a.fsub is None and a.paused
+assert "AVERAGE" in tx and "6, 7 more" in tx, tx
+assert "LAVE" in tx and "7.0 LY" in tx and "CLEAN" in tx and "GREEN" in tx, tx
+tick(a, fresh=["C"]); assert a.fsub is None and not a.paused, "C: back to the flight"
+tick(a, fresh=["A"])
 fpick(a, "SETTINGS"); assert a.fsub == "settings"
 assert a._fitems()[1] == "DOCKING: ASSISTED" and a.game.docking == "B", a._fitems()
 tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
@@ -251,7 +251,7 @@ scoop_one(a)
 assert sum(a.cmdr.cargo) == 1 and sum(a.cmdr.cargo[:game.SCOOP_GOODS]) == 1
 i = a.cmdr.cargo.index(1)
 assert g.msg == mod.GOODS[i][0], (g.msg, i)
-fpick(a, "STATUS"); assert any("hold 1/20t" in t for t in texts(a)); tick(a, fresh=["C"]); tick(a, fresh=["A"])
+a._open("inventory"); assert any("hold 1/20t" in t for t in texts(a)); tick(a, fresh=["C"])
 a.cmdr.cargo[12] = 19                   # 19 t of minerals: room for one more
 scoop_one(a); assert market_mod.hold_used(a.cmdr.cargo) == 20
 scoop_one(a); assert market_mod.hold_used(a.cmdr.cargo) == 20 and g.msg == "HOLD FULL"
@@ -285,8 +285,8 @@ assert a.cmdr.cash == cash + side and g.msg == a.cmdr.cash_text(), (a.cmdr.cash,
 g._kill(game.Obj(g.types["ASTEROID"], "rock", 0.0, 0.0, 3000.0)); tick(a)
 assert a.cmdr.cash == cash + side + rock, "rocks have small bounties too"
 tick(a); assert a.cmdr.cash == cash + side + rock, "paid once"
-fpick(a, "STATUS"); assert any(t.endswith(a.cmdr.cash_text()) and t.startswith("hold") for t in texts(a))
-tick(a, fresh=["C"]); tick(a, fresh=["A"])
+a._open("inventory"); assert any(t.endswith(a.cmdr.cash_text()) for t in texts(a))
+tick(a, fresh=["C"])
 need = a.cmdr.next_rank()[1]
 kill(g, need); tick(a)
 assert g.msg.startswith("RANK: ") and a.cmdr.cash == cash + rock + side * (1 + need), "a new rank shows instead"
@@ -519,7 +519,10 @@ assert e.chart.sel[2] == 129, e.chart.sel
 tx = texts(e)
 d129 = reach[129]
 assert "ZAONCE" in tx and ("%d.%d LY" % (d129 // 10, d129 % 10)) in tx, tx
-tick(e, fresh=["C"])
+tick(e, fresh=["C"])     # C only selects it (Brian): the chart stays, no countdown
+assert e.target == 129 and e.fsub == "chart" and g.jump_t <= 0, (e.target, e.fsub, g.jump_t)
+assert ("TARGET  %d.%d LY" % (d129 // 10, d129 % 10)) in texts(e)
+tick(e, fresh=["KEY_H"])                    # H jumps, as Elite
 assert not e.paused and e.fsub is None and g.jump_t > 0 and g.msg == "HYPERSPACE 5"
 kill(g, 2)
 o = game.Obj(g.types["SIDEWINDER"], "ship", 0.0, 0.0, 3000.0); g.objs.append(o)
@@ -567,7 +570,8 @@ tick(e, fresh=["A"])
 # dying stops a countdown; quitting to the title and coming back keeps the system
 fpick(e, "LOCAL CHART")
 e.chart.cx, e.chart.cy = [(float(px), float(py)) for px, py, i, d in e.chart.dots if i == 7][0]
-e.chart._select(); tick(e, fresh=["C"]); assert g.jump_t > 0
+e.chart._select(); tick(e, fresh=["C"]); assert g.jump_t <= 0, "C only targets"
+tick(e, fresh=["KEY_H"]); assert g.jump_t > 0
 # destroyed at Zaonce, never having docked there: back to the last save, at
 # Lave, as it was then (the jump's fuel too)
 assert e.cmdr.docked_at == 7
@@ -646,7 +650,7 @@ assert sp.pr == max(4000.0, lave.radius * game.PLANET_SCALE)
 assert sp.station.bp.name == ("DODO" if lave.tech >= game.DODO_TECH else "CORIOLIS")
 fpick(e, "LOCAL CHART")
 e.chart.cx, e.chart.cy = [(float(px), float(py)) for px, py, i, d in e.chart.dots if i == 7][0]
-e.chart._select(); tick(e, fresh=["C"])
+e.chart._select(); tick(e, fresh=["C"]); tick(e, fresh=["KEY_H"])    # target, then jump
 for _ in range(200):
     tick(e)
     if e.cmdr.system == 7:
@@ -690,9 +694,13 @@ print("launching, arriving, flying to the station, docking, refuelling: ok")
 
 # ---- the docked tabs, targets, and the jump line in the in-flight menu ----
 d = e.dock
-assert d.tabs == ("STATUS", "MARKET", "EQUIP SHIP", "LOCAL CHART", "GALACTIC CHART",
-                  "SYSTEM DATA", "OPTIONS")
+# in the number keys' order from Status (9 0 - = 2 4 5 6 7); the Repair Shop is on by default
+assert d.tabs == ("STATUS", "INVENTORY", "REPAIR SHOP", "OPTIONS", "MARKET", "EQUIP SHIP",
+                  "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA")
 assert d.tab == 0 and any("< > screens" in t for t in texts(e))
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "INVENTORY"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "REPAIR SHOP"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "OPTIONS"
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "MARKET"
 # ---- the market (Lave: rich agricultural, so food is cheap and computers dear)
 m = d.market; c = e.cmdr
@@ -741,7 +749,9 @@ assert saved.cargo == bought and saved.cash == 1234 and saved.market == c.market
 choose(e, "CONTINUE"); assert e.mode == "docked"
 d = e.dock
 assert d.market.stock == saved.market["stock"] and e.cmdr.cargo == bought, "the same market again"
-tick(e, fresh=["JOYRIGHT"]); assert d.name() == "MARKET"
+for _ in range(4):
+    tick(e, fresh=["JOYRIGHT"])
+assert d.name() == "MARKET"
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "EQUIP SHIP"
 # ---- Equip ship (Lave, tech level 5: the first 7 items)
 eq = mod.EQUIP
@@ -781,21 +791,25 @@ tick(e, fresh=["C"]); assert d.msg == "NOT ENOUGH CASH" and c.missiles == 0
 c.cash = 100000; c.missiles = 2
 saved_c = commander.Commander.from_dict(c.to_dict())
 assert (saved_c.hold, saved_c.laser, saved_c.missiles, "scoops" in saved_c.extras) == (35, "beam", 2, True)
-tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART" and d.view.verb == "TARGET"
-assert not d.cursor and "< LAVE >" in texts(e), "the joystick changes tab until C"
-tick(e, fresh=["C"]); assert d.cursor and d.view.active
-tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART", "now the joystick moves the cursor"
-tick(e, fresh=["F"]); assert d.name() == "LOCAL CHART" and not d.cursor, "F gives it back"
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "GALACTIC CHART" and len(d.view.dots) == 256
-assert not d.cursor, "a new tab starts with the joystick on the tabs"
-tick(e, fresh=["E"]); tick(e, fresh=["B"]); assert d.name() == "GALACTIC CHART", "E / B still go"
+assert d.view.verb == "TARGET"
 tx = texts(e)
 assert "GALAXY 1" in tx and "< LAVE >" in tx and "RANGE 7.0 LY" in tx, tx
+assert not d.cursor, "the joystick changes tab until C"
+tick(e, fresh=["C"]); assert d.cursor and d.view.active
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "GALACTIC CHART", "now the joystick moves the cursor"
+tick(e, fresh=["F"]); assert d.name() == "GALACTIC CHART" and not d.cursor, "F gives it back"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "LOCAL CHART" and d.view.verb == "TARGET"
+assert not d.cursor and "< LAVE >" in texts(e), "a new tab starts with the joystick on the tabs"
+tick(e, fresh=["E"]); tick(e, fresh=["B"]); assert d.name() == "LOCAL CHART", "E / B still go"
 tick(e, fresh=["B"]); assert d.name() == "SYSTEM DATA" and d.data.name == "LAVE"
 tx = texts(e)
 assert "you are here" in tx and "Dictatorship" in tx and "Tech 5   Pop 2.5 billion" in tx, tx
 assert "Productivity 7000 M Cr" in tx and "Radius 4116 km" in tx
-tick(e, fresh=["JOYRIGHT"]); assert d.name() == "OPTIONS"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "STATUS", "tabs wrap round"
+for _ in range(3):
+    tick(e, fresh=["JOYRIGHT"])
+assert d.name() == "OPTIONS"
 tx = texts(e)
 before = c.docking
 assert "STEER: JOYSTICK" in tx and "DOCKING: " + mod.DOCK_NAMES[before] in tx, tx
@@ -805,9 +819,9 @@ after = commander.DOCKING[(commander.DOCKING.index(before) + 1) % 3]
 assert c.docking == after and "DOCKING: " + mod.DOCK_NAMES[after] in texts(e), "C changes it"
 assert commander.load(SAVE).docking == after, "saved"
 tick(e, fresh=["C"]); tick(e, fresh=["C"]); assert c.docking == before
-tick(e, fresh=["JOYRIGHT"]); assert d.name() == "STATUS", "tabs wrap round"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "MARKET"
 tick(e, fresh=["E"]); assert d.name() == "OPTIONS"
-tick(e, fresh=["E"]); assert d.name() == "SYSTEM DATA"
+tick(e, fresh=["E"]); assert d.name() == "REPAIR SHOP"
 tick(e, fresh=["F"]); assert d.name() == "STATUS" and e.mode == "docked", "F goes back to Status"
 # pick Diso (147) on the galactic chart by steering to it
 d.open("GALACTIC CHART")
@@ -848,7 +862,7 @@ tick(e, fresh=["F"]); tick(e, fresh=["A"])
 fpick(e, "QUIT TO TITLE")
 choose(e, "CONTINUE"); assert e.mode == "flight"   # back in the same flight
 e.target = 147
-assert e._fitems_top()[1] == "HYPERSPACE: DISO", e._fitems_top()
+assert e._fitems_top()[2] == "HYPERSPACE: DISO", e._fitems_top()
 assert texts(e) is not None
 g = e.game; g.spawn_t = g.rock_t = 1e9; g.objs[:] = []
 fpick(e, "HYPERSPACE: DISO")

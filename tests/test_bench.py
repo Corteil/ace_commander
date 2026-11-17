@@ -18,8 +18,15 @@ labels = [t[0] for t in c.texts]
 assert labels == ["< NEW COMMANDER >"], labels
 for s, (x, y), size in c.texts:
     assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5, (s, y)
-tick(a, fresh=["UP"]); assert a.menu == 4, "back from the first choice wraps to the last"
-assert a.choices()[a.menu] == "SPEED TEST"
+assert "SPEED TEST" not in a.choices(), "not on the title screen: DEBUG > DISPLAY"
+mod.DEBUG_MENU = True
+bs.choose(a, "OPTIONS"); assert a.mode == "options"
+a.omenu = a._settings(True).index("DEBUG")
+tick(a, fresh=["CONFIRM"]); assert a.mode == "odebug" and a.od_page is None
+a.od_sel = a._od_items().index("DISPLAY")
+tick(a, fresh=["CONFIRM"]); assert a.od_page == "DISPLAY"
+assert a._od_items()[-1] == "SPEED TEST", a._od_items()
+a.od_sel = len(a._od_items()) - 1
 out = io.StringIO()
 with contextlib.redirect_stdout(out):
     tick(a, fresh=["CONFIRM"])
@@ -45,5 +52,7 @@ for i, (name, avg, drawn) in enumerate(a.bench.results):
 assert abs(frames - n * (mod.bench.FRAMES + mod.bench.SKIP)) <= 1, frames
 print("\n".join(lines[1:4]), "...")
 print("frames:", frames, " distinct kinds of frame drawn:", len(kinds))
-tick(a, fresh=["CANCEL"]); assert a.mode == "menu" and a.bench is None
+tick(a, fresh=["CANCEL"]); assert a.mode == "odebug" and a.od_page == "DISPLAY" and a.bench is None
+tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"])
+assert a.mode == "menu"
 print("SPEED TEST: ok")

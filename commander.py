@@ -64,7 +64,7 @@ class Commander:
         self.hold = HOLD        # tonnes the hold takes
         self.market = None      # the market where they are (market.new), or None
         self.missiles = START_MISSILES
-        self.laser = "pulse"    # the front laser (LASERS)
+        self.lasers = ["pulse", "", "", ""]     # the laser on each view (LASERS): front, rear, left, right; "" none
         self.extras = []        # other items fitted, by name (equipment.EXTRAS)
         self.docked_at = None   # the last system docked at: where they start again if destroyed
         self.docking = "B"
@@ -73,6 +73,7 @@ class Commander:
         self.colour = 0         # the ship's paint (cockpit.SHIP_COLOURS), from the Repair Shop
         self.legal = 0          # legal status, 0 clean to 255 (game.FUGITIVE and up: a fugitive)
         self.mission = 0        # how far the two missions have got: the original's TP (missions.py)
+        self.hardcore = False   # Hardcore Mode (rules.py): picked with the level, then fixed
         self.quick_con = True   # the Constrictor turns up after missions.QUICK_WAIT (else rarely, as the original)
         self.data = ""          # the data set the commander belongs to: "elite" or "own" ("" unknown)
         self.fuel = MAX_FUEL    # tenths of a light year
@@ -111,6 +112,15 @@ class Commander:
             return self.rank()
         return None
 
+    @property
+    def laser(self):
+        """The front laser, which a commander always has."""
+        return self.lasers[0]
+
+    @laser.setter
+    def laser(self, kind):
+        self.lasers[0] = kind
+
     # ---- saving -----------------------------------------------------------
 
     def to_dict(self):
@@ -118,10 +128,10 @@ class Commander:
                 "credits": self.credits, "docking": self.docking,
                 "system": self.system, "fuel": self.fuel, "cargo": self.cargo,
                 "market": self.market, "hold": self.hold, "missiles": self.missiles,
-                "laser": self.laser, "extras": self.extras, "docked_at": self.docked_at,
+                "laser": self.laser, "lasers": self.lasers, "extras": self.extras, "docked_at": self.docked_at,
                 "galaxy": self.galaxy, "colour": self.colour,
                 "legal": self.legal, "mission": self.mission,
-                "quick_con": self.quick_con, "data": self.data}
+                "quick_con": self.quick_con, "data": self.data, "hardcore": self.hardcore}
 
     @classmethod
     def from_dict(cls, d):
@@ -132,6 +142,12 @@ class Commander:
         c.missiles = max(0, min(4, int(d.get("missiles", START_MISSILES))))
         if d.get("laser") in LASERS:
             c.laser = d["laser"]
+        mounted = d.get("lasers")
+        if isinstance(mounted, list) and len(mounted) == 4:     # one a view, "" for none
+            front = c.laser
+            c.lasers = [k if k in LASERS else "" for k in mounted]
+            if not c.lasers[0]:
+                c.lasers[0] = front     # the front laser can't be taken away
         extras = d.get("extras")
         if isinstance(extras, list):
             c.extras = [x for x in extras if isinstance(x, str)]
@@ -157,6 +173,8 @@ class Commander:
             c.data = d["data"]
         if isinstance(d.get("quick_con"), bool):
             c.quick_con = d["quick_con"]
+        # None: a save from before build 74 (ace.py then takes options.json's old HARDCORE)
+        c.hardcore = d["hardcore"] if isinstance(d.get("hardcore"), bool) else None
         k = d.get("mission")
         if isinstance(k, int):
             c.mission = k & 0xFF

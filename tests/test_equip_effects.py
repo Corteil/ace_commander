@@ -376,7 +376,9 @@ assert commander.Commander.from_dict({}).colour == 0
 assert cockpit.ship_rgb(5) == cockpit.SHIP_COLOURS[5][1] and cockpit.ship_rgb(99) == cockpit.ME_RGB
 e = ace_commander.AceCommander()
 choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
-assert "REPAIR SHOP" not in e.dock.tabs, "off unless switched on in DEBUG"
+assert "REPAIR SHOP" in e.dock.tabs, "on by default (Brian)"
+e.repair_shop = False; e._make_dock()     # DEBUG can turn it off; here it goes back on
+assert "REPAIR SHOP" not in e.dock.tabs
 launch(e); g = e.game
 tick(e, fresh=["A"]); e.fsub = "dgroup"; e.dgroup = "DISPLAY"
 e.fmenu = [i for i, t in enumerate(e._fitems()) if t.startswith("REPAIR SHOP")][0]

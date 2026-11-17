@@ -11,8 +11,12 @@ from . import chart, cockpit, commander, describe, equipment, market, missions
 from . import content
 game_data = content.DATA     # Elite's text tables, or the game's own (content.py)
 
-TABS = ("STATUS", "MARKET", "EQUIP SHIP", "REPAIR SHOP", "LOCAL CHART", "GALACTIC CHART",
-        "SYSTEM DATA", "OPTIONS")
+# in the number keys' order (Brian: the joystick goes round them as the keys
+# are laid out, launch left out), starting from Status: 9 Status, 0 Inventory,
+# - Repair Shop, = Options, 2 Market, 4 Equip ship, 5 Galactic chart, 6 Local
+# chart, 7 System data. Status stays first: you arrive there and F goes back.
+TABS = ("STATUS", "INVENTORY", "REPAIR SHOP", "OPTIONS", "MARKET", "EQUIP SHIP",
+        "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA")
 PAINT_PRICE = 100   # tenths of a credit: a new colour at the Repair Shop costs 10.0 Cr
 SPIN = 0.8          # radians a second the Repair Shop's ship turns
 ROWS = 6            # goods shown at once on the market
@@ -52,14 +56,18 @@ class Docked:
         else:                   # an older game_data.py may not have goods or equipment
             self.tabs = tuple(t for t in TABS
                               if not (t == "MARKET" and not (goods and cmdr.market is not None))
+                              and not (t == "INVENTORY" and not goods)
                               and not (t == "EQUIP SHIP" and not equip)
                               and not (t == "REPAIR SHOP" and not (repair and ship))
                               and not (t == "OPTIONS" and not options))
+        self.goods = goods
+        self.itop = 0           # the first good shown on Inventory
         self.market = None
         if "MARKET" in self.tabs:
             self.market = market.Market(goods, gal.system(cmdr.system).economy, cmdr)
         self.sel = 0            # the good picked on the market
         self.top = 0            # the first good shown
+        self.mount = 0          # the view a laser bought on Equip ship goes to
         self.esel = 0           # the item picked on Equip ship
         self.etop = 0
         self.for_sale = 0       # how many items this station sells
@@ -131,6 +139,12 @@ class Docked:
 
     # ---- the market ---------------------------------------------------------
 
+    def scroll_inventory(self, step):
+        """Inventory's list up (-1) or down (1), if there is more that way."""
+        from . import screens
+        n = len(screens.cargo_rows(self.cmdr))
+        self.itop = max(0, min(n - (screens.ROWS - 1), self.itop + step))
+
     def pick_good(self, step):
         """Move the market's highlight up (-1) or down (1), scrolling the list."""
         n = len(self.market.goods)
@@ -149,9 +163,13 @@ class Docked:
         elif self.esel >= self.etop + ROWS:
             self.etop = self.esel - ROWS + 1
 
+    def next_mount(self):
+        """The next view round (front, rear, left, right) for lasers."""
+        self.mount = (self.mount + 1) % 4
+
     def buy_item(self):
         """Buy the highlighted item. Returns True if it happened."""
-        why = equipment.buy(self.equip, self.esel, self.cmdr)
+        why = equipment.buy(self.equip, self.esel, self.cmdr, self.mount)
         self.msg = why
         self.msg_t = SAY_TIME if why else 0.0
         return why is None
@@ -207,6 +225,9 @@ class Docked:
             self._draw_repair(ctx)
         elif self.name() == "OPTIONS":
             self._draw_options(ctx)
+        elif self.name() == "INVENTORY":     # the same screen as in flight
+            from . import screens
+            screens.draw_inventory(ctx, self.cmdr, self.goods, self.itop, "< > screens   F: status")
         else:
             self._draw_status(ctx)
         if len(self.tabs) > 1:      # which tab is open
@@ -388,7 +409,7 @@ class Docked:
             else:
                 p = equipment.price(e, i, c)
                 text(ctx, "%d.%d" % (p // 10, p % 10), EPRICE_X, y, 11, cockpit.YELLOW, 1)
-            h = equipment.have(i, c)
+            h = equipment.have(i, c, self.mount)
             if h:
                 text(ctx, h, HOLD_X, y, 11, cockpit.GREEN, 1)
         if self.etop + ROWS < self.for_sale:
@@ -397,7 +418,7 @@ class Docked:
         if self.msg:
             text(ctx, self.msg, 0, 75, 12, cockpit.RED)
         else:
-            text(ctx, "C: buy", 0, 75, 11, cockpit.GREY)
+            text(ctx, "C: buy   D: laser " + equipment.MOUNT_NAMES[self.mount], 0, 75, 11, cockpit.GREY)
         text(ctx, "< > screens   F: status", 0, 91, 11, cockpit.GREY)
 
 

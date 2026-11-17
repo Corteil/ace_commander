@@ -44,6 +44,7 @@ class _Cursor:
         self.here = here
         self.fuel = fuel
         self.verb = verb    # what C does with a system in range: "JUMP" or "TARGET"
+        self.marked = None  # in flight: the target, labelled TARGET when selected
         self.active = True  # the joystick moves the cursor (docked: only after C)
         self.dots = []
         self.sel = None     # the dot nearest the cursor
@@ -143,12 +144,15 @@ class _Cursor:
         if s is not None:
             name = self.info.name if self.active else "< %s >" % self.info.name
             text(ctx, name, 0, name_y, 15, cockpit.WHITE)
+            mark = "TARGET  " if s[2] == self.marked and s[2] != self.here else ""
             if s[2] == self.here:
                 text(ctx, "YOU ARE HERE", 0, line_y, 12, cockpit.GREEN)
             elif self.target() is not None:
-                text(ctx, _ly(s[3]), 0, line_y, 12, cockpit.GREEN)
+                text(ctx, mark + _ly(s[3]), 0, line_y, 12, cockpit.GREEN)
             elif s[3] == 0:
                 text(ctx, "TOO CLOSE TO JUMP", 0, line_y, 12, cockpit.RED)
+            elif mark:          # the longest line: smaller, to fit low on the local chart
+                text(ctx, "TARGET %s TOO FAR" % _ly(s[3]), 0, line_y, 10, cockpit.RED)
             else:
                 text(ctx, "%s  TOO FAR" % _ly(s[3]), 0, line_y, 12, cockpit.RED)
         text(ctx, "RANGE %s" % _ly(self.fuel), 0, fuel_y, 10, cockpit.YELLOW)

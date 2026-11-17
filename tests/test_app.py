@@ -48,14 +48,14 @@ pkg, mod = load()
 a = pkg.AceCommander()
 assert a.overlays == [] and len(mod.SHIPS) == 31
 assert not a.use_tilt, "joystick steering is the default"
-assert a.cmdr is None and a.choices() == ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS", "SPEED TEST"]
+assert a.cmdr is None and a.choices() == ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS"]
 c = frame(a); fits(c)
 assert [t[0] for t in c.texts] == ["< NEW COMMANDER >"], "one piece of text on the title screen"
 assert c.calls.get("line_to", 0) > 5, "and a ship"
 tick(a, fresh=["JOYRIGHT"]); assert a.menu == 1
 assert [t[0] for t in frame(a).texts] == ["< COMBAT PRACTICE >"]
 tick(a, fresh=["JOYLEFT"]); assert a.menu == 0
-tick(a, fresh=["JOYLEFT"]); assert a.menu == 4, "wraps round"
+tick(a, fresh=["JOYLEFT"]); assert a.menu == 3, "wraps round"
 tick(a, fresh=["JOYRIGHT"]); assert a.menu == 0
 tick(a, fresh=["JOYDOWN"]); assert a.menu == 1    # up and down work as well
 tick(a, fresh=["JOYUP"]); assert a.menu == 0
@@ -148,7 +148,7 @@ tick(a, fresh=["A"]); tick(a, fresh=["F"]); assert not a.paused, "and so does F"
 tick(a, fresh=["A"])
 tick(a, fresh=["D"]); tick(a, fresh=["B"]); assert a.fmenu == 0, "lettered buttons don't move the menu"
 tick(a, fresh=["JOYDOWN"]); assert a.fmenu == 1
-tick(a, fresh=["C"]); assert a.fsub == "settings" and a.fmenu == 0
+a.fmenu = a._fitems_top().index("SETTINGS"); tick(a, fresh=["C"]); assert a.fsub == "settings" and a.fmenu == 0
 tx = texts(a)
 assert "SETTINGS" in tx and "STEER: JOYSTICK" in tx and "QUIT TO TITLE" not in tx
 tick(a, fresh=["JOYRIGHT"]); assert a.use_tilt, "joystick left/right switches to tilt"
@@ -156,7 +156,7 @@ assert "STEER: TILT" in texts(a)
 tick(a, fresh=["B"]); tick(a, fresh=["E"]); assert a.use_tilt, "B and E don't switch it"
 tick(a, fresh=["C"]); assert not a.use_tilt, "C switches it too"
 tick(a, fresh=["C"]); assert a.use_tilt
-tick(a, fresh=["F"]); assert a.paused and a.fsub is None and a.fmenu == 1, "F goes back a page"
+tick(a, fresh=["F"]); assert a.paused and a.fsub is None and a._fitems()[a.fmenu] == "SETTINGS", "F goes back a page"
 tick(a, fresh=["A"]); assert not a.paused
 
 # tilt steering, with the joystick still working and D to re-zero
@@ -191,9 +191,9 @@ tick(a)
 assert a.zero == z, "and letting go after a hold doesn't re-zero"
 Imu.reading = [0.0, 0.0, G]
 tick(a, fresh=["D"]); assert a.zero == (0.0, 0.0)
-tick(a, fresh=["A"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+tick(a, fresh=["A"]); a.fmenu = a._fitems_top().index("SETTINGS"); tick(a, fresh=["C"])
 tick(a, fresh=["JOYLEFT"]); assert not a.use_tilt
-tick(a, fresh=["F"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+tick(a, fresh=["F"]); a.fmenu = a._fitems_top().index("QUIT TO TITLE"); tick(a, fresh=["C"])
 assert a.mode == "menu" and not a.paused, "QUIT TO TITLE"
 choose(a, "COMBAT PRACTICE"); assert a.mode == "flight" and a.game is g, "the fight carries on"
 print("in-flight menu on A, steering switch, tilt with D tap and hold, quit and carry on: ok")
@@ -289,7 +289,7 @@ a.use_tilt = True
 Imu.fail = True
 tick(a)
 assert not a.tilt_ok and not a.use_tilt
-tick(a, fresh=["A"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+tick(a, fresh=["A"]); a.fmenu = a._fitems_top().index("SETTINGS"); tick(a, fresh=["C"])
 tick(a, fresh=["JOYLEFT"]); tick(a, fresh=["C"]); assert not a.use_tilt
 assert any("no tilt sensor" in t[0] for t in frame(a).texts)
 print("tilt sensor failure: ok")
@@ -306,6 +306,7 @@ assert mod.JOY is None and mod.FB is None
 a = pkg.AceCommander()
 assert a.use_tilt, "tilt is the default there"
 tick(a, fresh=["RIGHT"]); assert a.menu == 1
+tick(a, fresh=["CONFIRM"]); assert a.mode == "practice"
 tick(a, fresh=["CONFIRM"]); assert a.mode == "flight" and not a.career
 g = a.game; g.spawn_t = g.rock_t = 1e9
 tick(a)
@@ -313,14 +314,15 @@ s = g.speed
 tick(a, held=["UP"]); assert g.speed > s
 tick(a, fresh=["LEFT"]); assert g.msg == "NO TARGET"
 tick(a, fresh=["CANCEL"]); assert a.paused
-tick(a, fresh=["DOWN"]); tick(a, fresh=["CONFIRM"]); assert a.fsub == "settings"
+tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"])   # past VIEW: FRONT
+tick(a, fresh=["CONFIRM"]); assert a.fsub == "settings"
 assert any("TILT" in t[0] for t in frame(a).texts)
 tick(a, fresh=["RIGHT"]); assert not a.use_tilt
 assert any("STICK" in t[0] for t in frame(a).texts)
 tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"]); assert not a.paused, "CANCEL backs out"
 ahead, side = rocks(mod, g)
 tick(a, held=["UP"]); assert ahead.y < 0 and g.speed == 0.0
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"])
+tick(a, fresh=["CANCEL"]); tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"])
 tick(a, fresh=["CONFIRM"]); assert a.mode == "menu", "QUIT TO TITLE"
 print("older firmware fallback: ok")
 

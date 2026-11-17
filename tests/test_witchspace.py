@@ -141,15 +141,15 @@ for _ in range(400):
 assert e.witch == (gal.xs[to[1]], gal.ys[to[1]] ^ 31) and not e.misjump
 assert g.space.witch and c.system == home and c.fuel == fuel - to[0]
 assert g.legal == 20, "no halving: you never arrived"
-tick(e, fresh=["A"]); e.fsub = "status"
+e._open("status")
 assert "WITCHSPACE" in " ".join(texts(e))
-e.fsub = None
+tick(e, fresh=["F"]); assert e.fsub is None
+tick(e, fresh=["A"])
 assert "LOCAL CHART" in e._fitems()
 e.fmenu = e._fitems().index("LOCAL CHART"); tick(e, fresh=["C"])
-assert e.chart.here is None
+assert e.chart.here is None and not e.paused, "the chart is a screen: the game runs on"
 texts(e)
-tick(e, fresh=["F"])
-tick(e, fresh=["A"])
+tick(e, fresh=["F"]); assert e.fsub is None and not e.paused
 # jumping out: from where you are, to anywhere the fuel reaches
 c.fuel = 70
 reach = [(gal.distance_xy(e.witch[0], e.witch[1], i), i) for i in range(256)]

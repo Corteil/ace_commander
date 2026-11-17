@@ -80,6 +80,18 @@ PHYSICAL = {
 for _c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
     PHYSICAL["KEY_" + _c] = KEYS[_c]
 PHYSICAL["KEY_SPACE"] = KEYS["SPACE"]
+for _c in ("CTRL", "SHIFT"):
+    KEYS[_c] = Button(_c, "Keyboard")
+    PHYSICAL["KEY_" + _c] = KEYS[_c]
+PHYSICAL["KEY_ESCAPE"] = KEYS["ESCAPE"]
+KEYS["BACKSPACE"] = Button("BACKSPACE", "Keyboard")
+PHYSICAL["KEY_BACKSPACE"] = KEYS["BACKSPACE"]
+# Tab is not in the firmware's KEYBOARD_BUTTONS: a driver's own button named TAB
+PHYSICAL["KEY_TAB"] = Button("TAB", "Keyboard")
+# the number row and the symbols, plain keys as in the firmware's events/keyboard.py
+for _c in "0123456789+=-_":
+    KEYS[_c] = Button(_c, "Keyboard")
+    PHYSICAL["KEY_" + _c] = KEYS[_c]
 
 
 class ButtonDownEvent:
@@ -139,6 +151,8 @@ def choose(a, label):
     assert a.mode == "menu", a.mode
     a.menu = a.choices().index(label)
     tick(a, fresh=["CONFIRM"])
+    if label == "COMBAT PRACTICE" and a.mode == "practice":
+        tick(a, fresh=["CONFIRM"])      # its page: fly at the level and HARDCORE showing
 
 
 def tick(a, held=(), fresh=(), ms=40):
