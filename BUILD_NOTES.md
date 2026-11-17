@@ -809,3 +809,8 @@ what is now `ace.py` (renamed in build 50).
    docking style at once, and the save). Old saves take options.json's old HARDCORE once.
    **Build 75** (2026-11-17, Brian): the title Options page hints moved down (y 82 / 96) so
    they clear a sixth line (LEDS shows on the badge, not in PC renders).
+   **v0.2.0: released** (2026-11-17, Brian: "release it as a version, v0.2.0"): builds 60-75
+   (Hardcore Mode, keyboard keys, four views, unpaused screens, practice and new-commander
+   pages). Version string "0.2.0" in tildagon.toml and metadata.json. The firmware store
+   compares versions as text lists (app_store.py compare_version), so badges with "59" are
+   not offered it as an update (Brian chose 0.2.0 anyway; they must reinstall).
