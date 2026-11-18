@@ -7,16 +7,17 @@ either to keep going). On Equip ship the joystick picks an item and C buys
 it. On the two charts C makes the selected system the hyperspace target;
 once launched, the in-flight menu offers a jump to it.
 """
-from . import chart, cockpit, commander, describe, equipment, market, missions
+from . import chart, cockpit, commander, describe, equipment, market, missions, ships
 from . import content
 game_data = content.DATA     # Elite's text tables, or the game's own (content.py)
 
 # the order the joystick goes round them, starting from Status (you arrive
 # there, as Elite's BAY shows f8, and F goes back): Status, Inventory, Market,
-# Equip ship, then the Repair Shop after it (Brian, build 77), Galactic chart,
+# Equip ship, then the Repair Shop after it (Brian, build 77), the Shipyard and
+# the Hangar (build 79), Galactic chart,
 # Local chart, System data. Options is not a tab: C on Status opens it, and F
 # goes back to Status (Brian: A launches, so C is free).
-TABS = ("STATUS", "INVENTORY", "MARKET", "EQUIP SHIP", "REPAIR SHOP",
+TABS = ("STATUS", "INVENTORY", "MARKET", "EQUIP SHIP", "REPAIR SHOP", "SHIPYARD", "HANGAR",
         "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA")
 PAINT_PRICE = 100   # tenths of a credit: a new colour at the Repair Shop costs 10.0 Cr
 SPIN = 0.8          # radians a second the Repair Shop's ship turns
@@ -39,11 +40,14 @@ def _ly(d):
 
 class Docked:
     def __init__(self, cmdr, gal, target=None, goods=None, equip=None, ship=None,
-                 repair=False, options=None):
+                 repair=False, options=None, bps=None):
         """ship is your ship's blueprint, for the Repair Shop, which is shown
         only with repair (a DEBUG switch for now). options: (a function giving
         the settings' lines, a function changing one: given the line and
-        whether to go back), the app's, for Options (C on Status); None: no Options."""
+        whether to go back), the app's, for Options (C on Status); None: no Options.
+        bps: a function giving a ship type's blueprint (or None), for the
+        Shipyard and Hangar (build 79), which are shown only with it."""
+        self.bps = bps
         self.options = options
         self.osel = 0           # the line picked on Options
         self.cmdr = cmdr
@@ -59,7 +63,8 @@ class Docked:
                               if not (t == "MARKET" and not (goods and cmdr.market is not None))
                               and not (t == "INVENTORY" and not goods)
                               and not (t == "EQUIP SHIP" and not equip)
-                              and not (t == "REPAIR SHOP" and not (repair and ship)))
+                              and not (t == "REPAIR SHOP" and not (repair and ship))
+                              and not (t in ("SHIPYARD", "HANGAR") and not (bps and equip)))
         self.goods = goods
         self.itop = 0           # the first good shown on Inventory
         self.market = None
@@ -73,6 +78,12 @@ class Docked:
         self.for_sale = 0       # how many items this station sells
         if "EQUIP SHIP" in self.tabs:
             self.for_sale = equipment.on_sale(gal.system(cmdr.system).tech)
+        self.yard = []          # the Shipyard's stock: (name, price, stolen) each
+        if "SHIPYARD" in self.tabs:
+            h = gal.system(cmdr.system)
+            self.yard = ships.for_sale(cmdr.galaxy, cmdr.system, h.tech, h.government)
+        self.ysel = 0           # the ship picked at the Shipyard
+        self.hsel = 0           # and in the Hangar (0: the one you fly)
         self.msg = None         # why the last trade didn't happen
         self.msg_t = 0.0
         self.sold = False       # the message says what Inventory's sell all made
@@ -176,8 +187,9 @@ class Docked:
             self.etop = self.esel - ROWS + 1
 
     def next_mount(self):
-        """The next view round (front, rear, left, right) for lasers."""
-        self.mount = (self.mount + 1) % 4
+        """The next view round (front, rear, left, right) for lasers: only the
+        views your ship has a laser mount on (ships.mounts)."""
+        self.mount = (self.mount + 1) % ships.mounts(self.cmdr.ship)
 
     def buy_item(self):
         """Buy the highlighted item. Returns True if it happened."""
@@ -240,6 +252,135 @@ class Docked:
         self.msg_t = SAY_TIME if why else 0.0
         return why is None
 
+    # ---- the shipyard and the hangar (build 79) ----------------------------------
+
+    def _kept_at(self):
+        """Where a ship you leave here is kept: this station in Hardcore Mode,
+        else None (the hangar goes with you)."""
+        c = self.cmdr
+        return (c.galaxy, c.system) if c.hardcore else None
+
+    def _say(self, msg, good=False):
+        self.msg = msg
+        self.msg_t = SAY_TIME
+        self.sold = good        # green, not a refusal
+
+    def _sell_off(self, cargo):
+        """Sell what is left in a ship being parted with at this station's
+        prices (lost if there is no market here)."""
+        m = self.market
+        for i, n in enumerate(cargo):
+            if n and m is not None:
+                self.cmdr.cash += n * m.prices[i]
+                m.stock[i] += n
+            cargo[i] = 0
+
+    def _now_flying(self):
+        """The ship changed: the Repair Shop and the lasers' mounts follow."""
+        c = self.cmdr
+        self.ship = self.bps(c.ship)
+        self.paint = c.colour if 0 <= c.colour < len(cockpit.SHIP_COLOURS) else 0
+        self.mount = 0
+
+    def pick_ship(self, step):
+        """The Shipyard's next (1) or previous (-1) ship."""
+        if self.yard:
+            self.ysel = (self.ysel + step) % len(self.yard)
+            self.msg = None
+
+    def trade_in_value(self):
+        """What the ship you fly fetches in trade, cargo not counted."""
+        return ships.value(ships.pack(self.cmdr), self.equip)
+
+    def buy_ship(self, trade):
+        """Buy the picked ship. trade: trade in the one you fly (its value
+        comes off the price; what of its cargo doesn't fit the new hold is
+        sold here); else it goes into the hangar with what doesn't fit. The
+        new ship comes with its standard weapons. A stolen one makes you an
+        offender. Returns True if it happened."""
+        if not self.yard:
+            return False
+        c = self.cmdr
+        name, price, stolen = self.yard[self.ysel]
+        old = ships.pack(c, self._kept_at())
+        credit = ships.value(old, self.equip) if trade else 0
+        if c.cash + credit < price:
+            self._say("NOT ENOUGH CASH")
+            return False
+        c.cash += credit - price
+        bp = self.bps(name)
+        ships.new_ship(c, name, bp, stolen)
+        ships.move_cargo(old["cargo"], c.cargo, c.hold)
+        if trade:
+            self._sell_off(old["cargo"])
+        else:
+            c.hangar.append(old)
+        if stolen:
+            c.legal = (c.legal | ships.STOLEN_LEGAL) & 255
+        self._now_flying()
+        self._say("NEW SHIP: " + (bp.title if bp is not None else name), True)
+        return True
+
+    def owned(self):
+        """Your ships for the Hangar: the one you fly, then the ones kept."""
+        return [ships.pack(self.cmdr)] + self.cmdr.hangar
+
+    def pick_owned(self, step):
+        self.hsel = (self.hsel + step) % len(self.owned())
+        self.msg = None
+
+    def _where(self, entry):
+        """Why a kept ship can't be used from here, or None if it can."""
+        c = self.cmdr
+        if ships.here(entry, c.galaxy, c.system, bool(c.hardcore)):
+            return None
+        g, s = entry["at"]
+        if g != c.galaxy:
+            return "KEPT IN GALAXY %d" % (g + 1)
+        return "KEPT AT " + self.gal.system(s).name
+
+    def fly_owned(self):
+        """Fly the picked kept ship; the one you flew goes into the hangar,
+        and its cargo moves across as far as it fits. True if it happened."""
+        c = self.cmdr
+        if self.hsel == 0:
+            self._say("YOU ARE FLYING IT")
+            return False
+        entry = c.hangar[self.hsel - 1]
+        why = self._where(entry)
+        if why:
+            self._say(why)
+            return False
+        old = ships.pack(c, self._kept_at())
+        c.hangar.pop(self.hsel - 1)
+        ships.unpack(c, entry)
+        ships.move_cargo(old["cargo"], c.cargo, c.hold)
+        c.hangar.insert(0, old)
+        self.hsel = 0
+        self._now_flying()
+        bp = self.ship
+        self._say("NOW FLYING " + (bp.title if bp is not None else c.ship), True)
+        return True
+
+    def sell_owned(self):
+        """Sell the picked kept ship and its cargo here. True if it happened."""
+        c = self.cmdr
+        if self.hsel == 0:
+            self._say("YOU ARE FLYING IT")
+            return False
+        entry = c.hangar[self.hsel - 1]
+        why = self._where(entry)
+        if why:
+            self._say(why)
+            return False
+        got = ships.value(entry, self.equip)
+        c.cash += got
+        self._sell_off(entry["cargo"])
+        c.hangar.pop(self.hsel - 1)
+        self.hsel = min(self.hsel, len(c.hangar))
+        self._say("SOLD: +%d.%d Cr" % (got // 10, got % 10), True)
+        return True
+
     def tick(self, dt):
         self.spin += SPIN * dt
         if self.msg_t > 0:
@@ -261,6 +402,10 @@ class Docked:
             self._draw_equip(ctx)
         elif self.name() == "REPAIR SHOP":
             self._draw_repair(ctx)
+        elif self.name() == "SHIPYARD":
+            self._draw_shipyard(ctx)
+        elif self.name() == "HANGAR":
+            self._draw_hangar(ctx)
         elif self.name() == "OPTIONS":
             self._draw_options(ctx)
         elif self.name() == "INVENTORY":     # the same screen as in flight
@@ -429,6 +574,103 @@ class Docked:
         else:
             text(ctx, "up/down: colour   C: paint", 0, 70, 11, cockpit.GREY)
         text(ctx, "< > screens   F: status", 0, 88, 11, cockpit.GREY)
+
+    def _spin_ship(self, ctx, bp, py, rgb, px=60.0):
+        """bp turning, its middle py pixels above the screen's middle, scaled
+        to about px pixels across."""
+        import math
+        o = _Show(bp)
+        z = max(200.0, bp.size * cockpit.FOCAL / px)
+        o.z = z
+        o.y = py * z / cockpit.FOCAL
+        a = self.spin
+        ca, sa = math.cos(a), math.sin(a)
+        t = 0.35
+        ct, st = math.cos(t), math.sin(t)
+        o.m = [ca, -sa * st, sa * ct, 0.0, ct, st, -sa, -ca * st, ca * ct]
+        cockpit.draw_ship(ctx, o, rgb, 3, True)
+
+    def _ship_lines(self, name, bp):
+        """Two lines on what a ship type flies like: top speed and hold,
+        then laser mounts and missile pylons."""
+        speed = ships.flight(bp, self.bps(ships.COBRA))[0]
+        mounts = {1: "front", 2: "front+rear", 4: "4 views"}[ships.mounts(name)]
+        return ("speed %d   hold %dt" % (int(speed + 0.5), ships.base_hold(name)),
+                "lasers %s   missiles %d" % (mounts, ships.pylons(name)))
+
+    def _foot(self, ctx, hint):
+        """The message (green if it worked) or the hint, then the tabs' line."""
+        text = cockpit.text
+        if self.msg:
+            text(ctx, self.msg, 0, 72, 12, cockpit.GREEN if self.sold else cockpit.RED)
+        else:
+            text(ctx, hint, 0, 72, 11, cockpit.GREY)
+        text(ctx, "< > screens   F: status", 0, 88, 11, cockpit.GREY)
+
+    def _draw_shipyard(self, ctx):
+        """One ship for sale at a time, turning, with its price and what it
+        flies like; up / down for the others (build 79)."""
+        text = cockpit.text
+        c = self.cmdr
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        text(ctx, "SHIPYARD  " + self.here.name, 0, -100, 11, cockpit.GREY)
+        if not self.yard:
+            text(ctx, "no ships for sale", 0, -20, 12, cockpit.GREY)
+            self._foot(ctx, "")
+            return
+        name, price, stolen = self.yard[self.ysel]
+        bp = self.bps(name)
+        if bp is not None:
+            self._spin_ship(ctx, bp, 48, cockpit.RED if stolen else cockpit.CYAN)
+        text(ctx, "%d of %d" % (self.ysel + 1, len(self.yard)), 0, -86, 10, cockpit.GREY)
+        title = bp.title if bp is not None else name
+        text(ctx, title + ("  (STOLEN)" if stolen else ""), 0, -12, 14,
+             cockpit.RED if stolen else cockpit.WHITE)
+        a, b = self._ship_lines(name, bp)
+        text(ctx, a, 0, 4, 11, cockpit.GREY)
+        text(ctx, b, 0, 18, 11, cockpit.GREY)
+        text(ctx, "%d Cr   trade-in %d Cr" % (price // 10, self.trade_in_value() // 10),
+             0, 36, 12, cockpit.YELLOW)
+        text(ctx, c.cash_text(), 0, 53, 12, cockpit.CYAN)
+        self._foot(ctx, "C: buy   D: trade in")
+
+    def _draw_hangar(self, ctx):
+        """Your ships: the one you fly, then the ones kept, where each is in
+        Hardcore Mode, and what the picked one is worth (build 79)."""
+        text = cockpit.text
+        c = self.cmdr
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        text(ctx, "HANGAR  " + self.here.name, 0, -100, 11, cockpit.GREY)
+        own = self.owned()
+        self.hsel %= len(own)
+        top = max(0, min(self.hsel - 2, len(own) - 5))
+        for row in range(min(5, len(own))):
+            i = top + row
+            e = own[i]
+            y = -68 + row * 17
+            if i == self.hsel:
+                ctx.rgb(*cockpit.DIM).rectangle(-96, y - 8, 192, 16).fill()
+            bp = self.bps(e["type"])
+            text(ctx, bp.title if bp is not None else e["type"], -86, y, 11,
+                 cockpit.GREEN if i == self.hsel else cockpit.WHITE, -1)
+            if i == 0:
+                where, col = "flying", cockpit.GREEN
+            else:
+                why = self._where(e)
+                where = "here" if why is None else why[8:] if why.startswith("KEPT AT ") else "away"
+                col = cockpit.CYAN if why is None else cockpit.GREY
+            text(ctx, where, 86, y, 11, col, 1)
+        if len(own) == 1:
+            text(ctx, "no other ships: buy one", 0, -40, 11, cockpit.GREY)
+            text(ctx, "at a shipyard", 0, -26, 11, cockpit.GREY)
+        e = own[self.hsel]
+        text(ctx, "hold %dt   missiles %d   %s" % (e["hold"], e["missiles"], e["lasers"][0]),
+             0, 24, 11, cockpit.GREY)
+        if self.hsel:
+            v = ships.value(e, self.equip)
+            text(ctx, "worth %d.%d Cr" % (v // 10, v % 10), 0, 39, 12, cockpit.YELLOW)
+        text(ctx, c.cash_text(), 0, 53, 12, cockpit.CYAN)
+        self._foot(ctx, "C: fly   D: sell" if self.hsel else "up / down: your ships")
 
     def _draw_equip(self, ctx):
         """What this station sells, ROWS at a time: name, price, what you have."""

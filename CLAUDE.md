@@ -43,6 +43,8 @@ description sentence (build 52) and the disc version's two missions (build 54).
 - `docked.py` - the docked tabs: Status, Market, Local chart, Galactic chart, System data.
 - `market.py` - market prices, stock, buying and selling. Rules only, no badge imports.
 - `equipment.py` - the Equip ship screen's rules: what is on sale, prices, fitting.
+- `ships.py` - the ship types you can own and fly (build 78): price, hold, mounts, pylons,
+  flight stats from the blueprint, the shipyard's stock, the hangar's entries. Rules only.
 - `describe.py` - the system description sentence ("goat soup"): the original's extended
   tokens from `game_data.py`, put together as DETOK does; also the mission texts and the
   special system sentences. Rules only.
@@ -143,11 +145,11 @@ the relevant build there before changing a feature.
 
 ## Next steps
 
-**For the next build (Brian, 2026-11-15, after the v59 release):**
-- Be able to change the ship you fly: the "Ship types" phase 6 extra in DESIGN.md (buy
-  another hull; its speed, turn rate, hold, pylons, lasers, shields and price; the
-  tunnel/chase-view model, `Game` constants, `commander.HOLD`, `Commander.ship`). Ask
-  Brian how ships are bought and what carries over before building.
+**Ship types (Brian, 2026-11-18):** build 78 has the rules (`ships.py`), the save
+(`Commander.ship` / `.stolen` / `.hangar`), each ship's flight stats (`Game.set_ship`), the
+equipment limits and DEBUG > SHIP CONFIG > SHIP; build 79 the Shipyard and Hangar tabs
+(`Docked.buy_ship` / `fly_owned` / `sell_owned`). Brian's rules are in BUILD_NOTES.md builds
+78-79. Not yet on the badge or played by hand.
 
 1. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
    said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone

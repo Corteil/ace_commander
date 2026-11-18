@@ -13,16 +13,25 @@ import random
 
 try:
     from .rules import GameRules
+    from . import ships
 except ImportError:        # run by a test as a top-level module
     from rules import GameRules
+    import ships
 
 SPEED_K = 25.0         # world units per second for one Elite speed unit
-PLAYER_MAX = 40.0      # top speed, in Elite speed units
+PLAYER_MAX = 40.0      # top speed, in Elite speed units, of the Cobra Mk III (others: Game.set_ship)
 THROTTLE_RATE = 25.0   # speed units gained per second at full throttle
 PITCH_RATE = 1.0       # radians per second at full stick
 ROLL_RATE = 1.7
 
-LASER_RANGE = 7000.0
+# Weapon ranges as Elite's (Brian, build 78): your lasers hit any ship in
+# your sights however far off (Elite's HITCH has no distance check: anything
+# in the local bubble, which is DESPAWN here), as missile locks do; an enemy
+# fires its laser only when you are within ENEMY_REACH of it along each of
+# x, y and z (TA3: no high byte of x, y or z may reach 32, so 32 * 256), and
+# launches missiles at any distance.
+LASER_RANGE = 14000.0          # = DESPAWN, below
+ENEMY_REACH = 8192.0
 LASER_COOL = 0.16      # heat lost per second
 # the front laser, by type: (seconds between hits, damage a hit, heat a hit
 # (1.0 = overheated)). Damage is Elite's laser power: pulse and beam 15,
@@ -63,7 +72,6 @@ MISSILE_SPEED = 1100.0     # world units per second
 PMISSILE_SPEED = 1700.0
 TURN_RATE = 1.1            # how fast enemy ships can turn, radians per second
 BREAK_DIST = 900.0         # enemies peel away when this close
-FIRE_RANGE = 5500.0
 DESPAWN = 14000.0
 RADAR_RANGE = 10000.0
 MAX_OBJECTS = 14
@@ -225,7 +233,7 @@ ROCKS = ("ASTEROID", "BOULDER")
 _INV14 = 1.0 / 16384
 THINK_EVERY = 3        # a ship re-plans on one frame in this many (see Game._think)
 SCOOP_GOODS = 8        # a canister holds one of the first this many goods (food to computers)
-MAX_MISSILES = 4       # missiles the player's ship carries
+MAX_MISSILES = 4       # missiles the Cobra Mk III carries (others: Game.max_missiles)
 PICKUP_MISSILE = 0.5   # combat practice: how often a canister holds a missile as well
 
 # What the level changes: (most hostile ships at once, how often enemy lasers
@@ -530,6 +538,11 @@ class Game:
         for entry in ships:
             bp = Blueprint(entry)
             self.types[bp.name] = bp
+        # the ship you fly (build 78): see set_ship; the Cobra Mk III until then
+        self.max_speed = PLAYER_MAX
+        self.turn_k = 1.0           # turn rates times this
+        self.tough = 1.0            # damage divided by this
+        self.max_missiles = MAX_MISSILES
         self.missile_bp = self.types.get("MISSILE")
         self.can_bp = self.types.get("CANISTER")
         tiered = set()
@@ -539,6 +552,19 @@ class Game:
         self.fallback = [bp for bp in self.types.values()
                          if bp.laser and bp.speed and bp.name not in tiered]
         self.reset()
+
+    def set_ship(self, name, pylons=MAX_MISSILES):
+        """Fly a ship of this type (ships.py): its top speed, turning and
+        toughness from its blueprint against the Cobra Mk III's, and pylons
+        for missiles. Missiles above the pylons are dropped."""
+        self.ship_name = name
+        self.max_speed, self.turn_k, self.tough = ships.flight(
+            self.types.get(name), self.types.get(ships.COBRA))
+        self.max_missiles = pylons
+        if self.missiles > pylons:
+            self.missiles = pylons
+        if self.speed > self.max_speed:
+            self.speed = self.max_speed
 
     def set_docking(self, style):
         """"A" authentic, "B" assisted or "C" automatic (commander.DOCKING).
@@ -650,7 +676,7 @@ class Game:
         self.hot = False       # laser overheated
         self.cool = 0.0
         self.beam = 0.0        # > 0 while the player's laser is drawn
-        self.missiles = MAX_MISSILES if self.missile_bp else 0
+        self.missiles = self.max_missiles if self.missile_bp else 0
         self.kills = 0
         self.bounty = 0        # bounties earned this flight, in tenths of a credit
         self.score = 0
@@ -1201,7 +1227,7 @@ class Game:
             if off > 0.5:
                 want = DOCK_SPEED * 0.5
             else:       # slowing as the point comes up, so as to turn onto the station there
-                want = max(DOCK_SPEED * 0.5, min(PLAYER_MAX, d / 60.0))
+                want = max(DOCK_SPEED * 0.5, min(self.max_speed, d / 60.0))
         else:
             pitch, roll, off = self._aim(st.x, st.y, st.z)
             self.auto_far = False
@@ -1332,26 +1358,26 @@ class Game:
         self.speed += throttle * THROTTLE_RATE * dt
         if self.speed < 0.0:
             self.speed = 0.0
-        elif self.speed > PLAYER_MAX:
-            self.speed = PLAYER_MAX
+        elif self.speed > self.max_speed:
+            self.speed = self.max_speed
 
         self.frame += 1
         fwd = self.speed * SPEED_K * dt
         sp = self.space
         # the jump drive: speed up held at full speed, with no ships about
         self.jumping = (sp is not None and not sp.witch and not self.over and throttle > 0
-                        and self.speed >= PLAYER_MAX and not sp.safe and self.jump_t <= 0
+                        and self.speed >= self.max_speed and not sp.safe and self.jump_t <= 0
                         and self.cabin <= COOL_CABIN    # not near the sun
                         and not self._near()
                         and not self._massed(sp))
         if (sp is not None and not sp.witch and not self.over
-                and throttle > 0 and self.speed >= PLAYER_MAX and self.msg_t <= 0
+                and throttle > 0 and self.speed >= self.max_speed and self.msg_t <= 0
                 and not self.jumping and self._massed(sp)):
             self.say("MASS LOCKED", 1.0)
-        if self.jumping or (self.autodock and self.speed >= PLAYER_MAX and self.auto_far):
+        if self.jumping or (self.autodock and self.speed >= self.max_speed and self.auto_far):
             fwd *= JUMP_K
         self.fwd = int(fwd)
-        self._rotate(pitch * PITCH_RATE * dt, roll * ROLL_RATE * dt, fwd)
+        self._rotate(pitch * PITCH_RATE * self.turn_k * dt, roll * ROLL_RATE * self.turn_k * dt, fwd)
         for o in self.objs:
             if not o.dead:
                 self._think(o, dt)
@@ -1564,7 +1590,8 @@ class Game:
                     aim = m[6] * tx + m[7] * ty + m[8] * tz
                     o.cool -= dt
                     if prey is not None:
-                        if dist < FIRE_RANGE and bp.laser and aim > 0.96 and o.cool <= 0:
+                        if (abs(px) < ENEMY_REACH and abs(py) < ENEMY_REACH and abs(pz) < ENEMY_REACH
+                                and bp.laser and aim > 0.96 and o.cool <= 0):
                             o.cool = _rnd(0.5, 1.1)
                             if random.random() < 0.5:
                                 prey.energy -= 3.0 + bp.laser * 2.5
@@ -1573,8 +1600,9 @@ class Game:
                                     prey.state = "flee"     # running for it
                                 if prey.energy <= 0:
                                     self._kill(prey, credit=False)
-                    elif not self.over and d < FIRE_RANGE:
-                        if bp.laser and aim > 0.96 and o.cool <= 0:
+                    elif not self.over:
+                        if (bp.laser and aim > 0.96 and o.cool <= 0 and abs(o.x) < ENEMY_REACH
+                                and abs(o.y) < ENEMY_REACH and abs(o.z) < ENEMY_REACH):
                             o.cool = _rnd(0.5, 1.1)
                             o.beam = 0.2
                             if random.random() < min(0.7, 0.3 + 0.05 * self.wave) * self.aim_k:
@@ -1762,7 +1790,7 @@ class Game:
         """Combat practice: a scooped canister recharges the shields, and
         sometimes holds a missile too (while there is room on the rack)."""
         self.shield = 100.0
-        if (self.missile_bp and self.missiles < MAX_MISSILES
+        if (self.missile_bp and self.missiles < self.max_missiles
                 and random.random() < PICKUP_MISSILE):
             self.missiles += 1
             self.say("MISSILE + SHIELDS")
@@ -1908,7 +1936,7 @@ class Game:
             if self.space is None and self.wave_kills >= 2 + self.wave:     # practice only
                 self.wave += 1
                 self.wave_kills = 0
-                if self.missile_bp and self.missiles < MAX_MISSILES:
+                if self.missile_bp and self.missiles < self.max_missiles:
                     self.missiles += 1
                 self.say("WAVE %d" % self.wave, 2.5)
             elif self.kills % 8 == 0:
@@ -1959,6 +1987,7 @@ class Game:
         if self.god:
             return
         self.since_hit = 0.0
+        damage /= self.tough        # a bigger ship's shields and hull soak up more (set_ship)
         s = damage if damage < self.shield else self.shield
         self.shield -= s
         self.hull -= damage - s

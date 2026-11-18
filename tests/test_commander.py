@@ -427,6 +427,20 @@ ship("CARGO BAY"); assert d.cmdr.hold == 35 and "CARGO BAY: 35T" in d._fitems()
 ship("CARGO BAY"); assert d.cmdr.hold == 20
 ship("FUEL SCOOPS"); assert g.fuel_scoops and "scoops" in d.cmdr.extras
 ship("FUEL SCOOPS"); assert not g.fuel_scoops and "scoops" not in d.cmdr.extras
+# SHIP (build 78, Brian): the next ship type, cheapest first, for good
+assert d._fitems()[4] == "SHIP: " + g.types["COBRA MK III"].title
+ship("CARGO BAY"); ship("MISSILES"); ship("MISSILES"); ship("MISSILES")
+assert d.cmdr.hold == 35 and d.cmdr.missiles == 4
+ship("SHIP"); assert d.cmdr.ship == g.ship_name == "ASP MK II", d.cmdr.ship
+assert g.max_speed > 40.0 and g.max_missiles == 2 and d.cmdr.missiles == g.missiles == 2
+assert d.cmdr.hold == 17, "the Asp's hold with the large cargo bay"
+assert commander.load(SAVE).ship == "ASP MK II", "saved"
+seen = []
+while d.cmdr.ship != "COBRA MK III":
+    ship("SHIP"); seen.append(d.cmdr.ship)
+    assert len(seen) < 30
+assert len(seen) == 16 and "WORM" in seen and "SHUTTLE" in seen, seen
+assert g.max_speed == 40.0 and d.cmdr.hold == 20 and d.cmdr.lasers[1:] == ["", "", ""]
 tick(d, fresh=["F"]); assert d.fsub == "debug" and d._fitems()[d.fmenu] == "SHIP", "F goes back"
 tick(d, fresh=["F"]); assert d.fsub == "settings"
 tick(d, fresh=["F"]); assert d.fsub is None
@@ -434,7 +448,7 @@ tick(d, fresh=["F"]); assert d.fsub is None
 d.fmenu = d._fitems().index("DEBUG"); tick(d, fresh=["C"]); assert d.fsub == "debug"
 tick(d, fresh=["C"]); assert d.fsub == "dgroup" and d.dgroup == "SHIP", "SHIP goes straight in"
 assert d._fitems()[:4] == ["INVINCIBLE: " + ("ON" if g.god else "OFF"), "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4"]
-assert d._fitems()[4].startswith("LASER")
+assert d._fitems()[4].startswith("SHIP:") and d._fitems()[5].startswith("LASER")
 tick(d, fresh=["F"]); tick(d, fresh=["F"]); assert d.fsub is None and d._fitems()[d.fmenu] == "DEBUG"
 tick(d, fresh=["A"])
 # TO THE SUN: at the edge of the heat, heading in; flying on, the cabin heats
@@ -697,7 +711,7 @@ d = e.dock
 # from Status; the Repair Shop after Equip ship and on by default; Options is
 # Status's sub-screen, not a tab (build 77, Brian)
 assert d.tabs == ("STATUS", "INVENTORY", "MARKET", "EQUIP SHIP", "REPAIR SHOP",
-                  "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA")
+                  "SHIPYARD", "HANGAR", "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA")
 assert d.tab == 0 and any("< > screens" in t for t in texts(e))
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "INVENTORY"
 # Inventory's C sells the whole hold at this station's prices (Brian)
@@ -802,6 +816,8 @@ c.cash = 100000; c.missiles = 2
 saved_c = commander.Commander.from_dict(c.to_dict())
 assert (saved_c.hold, saved_c.laser, saved_c.missiles, "scoops" in saved_c.extras) == (35, "beam", 2, True)
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "REPAIR SHOP", "after Equip ship (Brian)"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "SHIPYARD"
+tick(e, fresh=["JOYRIGHT"]); assert d.name() == "HANGAR"
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "GALACTIC CHART" and len(d.view.dots) == 256
 assert d.view.verb == "TARGET"
 tx = texts(e)

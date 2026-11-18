@@ -1213,7 +1213,7 @@ def draw_hud(ctx, g, ms=None, ring=True):
         ctx.rectangle(-0.75, -14, 1.5, 8).fill()
 
     # gauges: speed and laser heat on the left, shield and energy on the right
-    _vbar(ctx, -112, g.speed / 40.0, CYAN if g.jumping else GREEN)
+    _vbar(ctx, -112, g.speed / getattr(g, "max_speed", 40.0), CYAN if g.jumping else GREEN)
     _vbar(ctx, -103, g.heat, RED if g.hot else YELLOW)
     _vbar(ctx, 97, g.shield / 100.0, CYAN)
     _vbar(ctx, 106, g.hull / 100.0, GREEN if g.hull > 30 else RED)

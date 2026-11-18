@@ -104,17 +104,24 @@ station's safe zone.
 ## Docked
 
 Screens, shown by the squares at the top: **Status**, **Inventory**, **Market**,
-**Equip ship**, **Repair Shop**, **Galactic chart**, **Local chart** and **System data**.
+**Equip ship**, **Repair Shop**, **Shipyard**, **Hangar**, **Galactic chart**, **Local chart**
+and **System data**.
 Joystick left / right (or E / B) goes round them; A launches from any screen; C on
 Status opens **Options**; F goes back to Status, then to the title.
 
 - **Inventory**: what is in the hold; C sells all of it at this station's prices.
-
 - **Market**: joystick up / down picks a good, C buys, D sells. Prices depend on the
   system's economy: cheap food in agricultural systems, cheap machinery in industrial ones.
 - **Equip ship**: fuel, missiles, lasers, a larger hold, ECM, fuel scoops, escape pod,
   energy bomb, energy unit, docking computer and galactic hyperdrive; more is on sale at
-  higher tech levels.
+  higher tech levels. Missiles go on the ship's pylons and lasers on its laser mounts.
+- **Shipyard**: ships for sale, one at a time (up / down for the others), with their speed,
+  hold, laser mounts and missile pylons. Bigger ships need higher tech levels; pirate
+  worlds also sell stolen ships, cheap, but buying one makes you an offender. C buys (your
+  ship goes into the hangar), D trades your ship in. A new ship comes with its standard
+  weapons; cargo moves across as far as it fits.
+- **Hangar**: the ships you own. C flies the picked one, D sells it. In Hardcore Mode a ship
+  stays at the station where you left it.
 - **Charts**: press C to move the cursor (F gives the joystick back to the screens); C picks
   a hyperspace target, D shows a system's data.
 - **System data**: the system's government, economy, tech level, population and a line

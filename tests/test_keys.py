@@ -67,7 +67,7 @@ order = []
 for _ in range(len(d.tabs)):
     order.append(d.name()); tick(a, fresh=["JOYRIGHT"])
 assert order == ["STATUS", "INVENTORY", "MARKET", "EQUIP SHIP", "REPAIR SHOP",
-                 "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA"], order
+                 "SHIPYARD", "HANGAR", "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA"], order
 assert d.name() == "STATUS", "round again"
 # 3: Elite's Sell Cargo: the market, on the first good in the hold
 a.cmdr.cargo[5] = 2; a.cmdr.cargo[9] = 1

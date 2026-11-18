@@ -833,3 +833,39 @@ what is now `ace.py` (renamed in build 50).
    `ace.py` imports `JOYSTICK_BUTTON_TYPES` and `FRONTBOARD_BUTTON_TYPES` directly; the
    `new = FB is not None` checks, the d-pad flight branch (tilt default, up/down speed,
    left missile) and the `joystick=False` test stub are gone.
+   **Build 78** (2026-11-18, Brian: "next up is to be able to fly/buy other ships, plus a
+   hangar"; "weapons range should be the same as elite"; "add select ship to debug").
+   Ranges as Elite: your lasers hit anything in your sights in the bubble (HITCH has no
+   distance check; `LASER_RANGE` = `DESPAWN`); enemy lasers only within `ENEMY_REACH` 8192
+   on each of x, y, z (TA3: no high byte of x / y / z reaching 32), also ship against
+   trader; enemy missiles at any distance; missile lock never had a range.
+   Ship types (`ships.py`, rules only): `TYPES` gives price, hold, laser mounts (1 front,
+   2 front+rear, 4 all), pylons, shipyard tech level and stolen-only (Viper: police;
+   Constrictor: navy). From the blueprint against the Cobra in the same data: top speed
+   (speed), toughness (energy: damage divided by it) and turning (energy as mass, square
+   root, 0.6-1.4); standard weapons from laser power (2 pulse, 3-5 beam, 6+ military) and
+   missiles. The Cobra flies exactly as before. Large cargo bay: hold + 3/4 (Cobra 20 to
+   35). `Commander.ship`, `.stolen`, `.hangar` (save version 5; entries checked by
+   `_hangar_entry`; hold and missiles clamped to the ship's own). `Game.set_ship(name,
+   pylons)`: `max_speed`, `turn_k`, `tough`, `max_missiles` replace PLAYER_MAX / PITCH_RATE /
+   ROLL_RATE / MAX_MISSILES in flight (the HUD speed bar is against `max_speed`). Equip
+   ship: missiles up to the pylons ("NO PYLONS"), lasers only on mounted views ("NO LEFT
+   MOUNT"; D cycles only those). Practice always flies a Cobra. DEBUG > SHIP CONFIG > SHIP:
+   the next type, cheapest first (equipment cut to fit, saved). Brian's rules for the rest
+   (build 79): Shipyard tab by tech level and government (pirate worlds sell stolen ships,
+   buying one makes you an offender), each ship keeps its own equipment, a new one comes
+   with its standard weapons, trade-in counts the equipment; the hangar goes with you,
+   but in Hardcore a ship stays at the station where you left it. Tests: `tests/test_ships.py`.
+   **Build 79** (2026-11-18): the SHIPYARD and HANGAR tabs, after the Repair Shop
+   (`Docked(..., bps=ace._bp)`). Shipyard: `ships.for_sale` (up to 6 legal types by tech
+   level, chosen per system; anarchy / feudal add 1-2 stolen of any type at 65%), one ship
+   at a time turning, speed / hold / mounts / pylons, price and trade-in value; C buys
+   (your ship packed into the hangar; at this station in Hardcore), D trades in (value =
+   60% of price, half if stolen, plus half the equipment's cost; cargo that doesn't fit is
+   sold here). A new ship: standard weapons (`ships.new_ship`), cargo moved as it fits
+   (`ships.move_cargo`), the rest stays in the old ship. Stolen: legal |= 32 (offender).
+   Hangar: the flown ship first ("flying"), then the kept ones ("here", or in Hardcore
+   the system they are kept at); C flies one (the old one goes in, cargo moves across), D
+   sells one with its cargo. Messages clear when the pick moves. Open question for Brian:
+   the starting Cobra trades in for ~24,000 Cr, so a new commander can downgrade to a
+   Worm and pocket ~21,000 Cr. Tests: `tests/test_shipyard.py`.

@@ -54,7 +54,7 @@ import app
 from events.input import BUTTON_TYPES, ButtonDownEvent, ButtonUpEvent
 from system.eventbus import eventbus
 
-from . import bench, briefing, cockpit, commander, docked, game, missions, rules, title, viewer
+from . import bench, briefing, cockpit, commander, docked, game, missions, rules, ships, title, viewer
 
 try:
     import imu
@@ -453,6 +453,7 @@ class AceCommander(app.App):
         self.brief = None       # a mission message being shown (mode "brief")
         self.data_of = None     # the system whose data D shows from the in-flight chart
         self.fire_lock = False  # the lasers wait until C is let go (held on from a menu)
+        self._bps = {}              # blueprints made for the docked screens with no game yet (_bp)
         self.repair_shop = True     # show the Repair Shop tab (Brian: on by default; DEBUG can turn it off)
         self.chart = None       # the local chart, while it is open
         self.jump_to = None     # (system, distance) the hyperspace countdown is for
@@ -952,6 +953,8 @@ class AceCommander(app.App):
             g.rules = rules.GameRules(self._hardcore() if career else self.p_hardcore)
             if not career:
                 g.ecm = True    # practice flies with an ECM (by hand in Hardcore)
+                g.set_ship(ships.COBRA)     # practice is always in a Cobra Mk III
+                g.missiles = g.max_missiles if g.missile_bp else 0
             g.set_docking(g.docking)        # Hardcore: by hand, whatever the setting
         self.career = career
         g.again = "C: back to last save" if career else "C: fly again"
@@ -1009,7 +1012,8 @@ class AceCommander(app.App):
     def _make_dock(self):
         self.dock = docked.Docked(self.cmdr, self.galaxy, self.target, GOODS, EQUIP,
                                   self._ship_bp(), self.repair_shop,
-                                  (lambda: self._settings(True), self._change))
+                                  (lambda: self._settings(True), self._change),
+                                  self._bp if SHIPS else None)
 
     def _mission_flags(self):
         """Tell the game what the missions need of this system (see missions.py)."""
@@ -1184,6 +1188,24 @@ class AceCommander(app.App):
                 d.pick_paint(1)
             elif hit("C"):
                 d.buy_paint()
+        elif d.name() == "SHIPYARD":
+            if hit("j_up"):
+                d.pick_ship(-1)
+            elif hit("j_down"):
+                d.pick_ship(1)
+            elif hit("C"):
+                d.buy_ship(False)       # the one you fly goes into the hangar
+            elif hit(BTN_MISSILE) or hit("k_D"):
+                d.buy_ship(True)        # trade it in
+        elif d.name() == "HANGAR":
+            if hit("j_up"):
+                d.pick_owned(-1)
+            elif hit("j_down"):
+                d.pick_owned(1)
+            elif hit("C"):
+                d.fly_owned()
+            elif hit(BTN_MISSILE) or hit("k_D"):
+                d.sell_owned()
         elif d.name() == "OPTIONS":
             if hit("j_up"):
                 d.pick_option(-1)
@@ -1252,15 +1274,16 @@ class AceCommander(app.App):
         c = self.cmdr
         if c is None:
             return
-        g.missiles = c.missiles if g.missile_bp else 0
+        g.set_ship(self._ship_name(), ships.pylons(self._ship_name()))
+        g.missiles = min(c.missiles, g.max_missiles) if g.missile_bp else 0
+        mounts = ships.mounts(self._ship_name())
         for view in range(4):
-            g.set_laser(c.lasers[view] or None, view)
+            g.set_laser((c.lasers[view] or None) if view < mounts or view == 0 else None, view)
         g.energy_unit = "energy" in c.extras or "navy" in c.extras
         g.navy = "navy" in c.extras
         g.fuel_scoops = "scoops" in c.extras
         g.ecm = "ecm" in c.extras
         g.pod = "pod" in c.extras
-        g.ship_name = self._ship_name()
         g.bombs = 1 if "bomb" in c.extras else 0
         g.computer = "docking" in c.extras
         g.ship_rgb = cockpit.ship_rgb(c.colour)     # for the view from behind your ship
@@ -1698,19 +1721,28 @@ class AceCommander(app.App):
 
     def _ship_name(self):
         """The ship you fly, by Elite's name (the game's own design for that role
-        with DATA: OWN). Always the Cobra Mk III until ship types are built
-        (DESIGN.md phase 6): the scenes and the Repair Shop all ask here."""
-        return "COBRA MK III"
+        with DATA: OWN): the commander's (ships.py, build 78), the Cobra Mk III
+        without one. The scenes and the Repair Shop all ask here."""
+        c = self.cmdr
+        if c is not None and ships.known(c.ship):
+            return c.ship
+        return ships.COBRA
 
     def _ship_bp(self):
         """Your ship's blueprint, or None without ship data."""
-        name = self._ship_name()
+        return self._bp(self._ship_name())
+
+    def _bp(self, name):
+        """A ship type's blueprint, or None without ship data."""
         if self.game is not None:
             return self.game.types.get(name)
-        for e in SHIPS or ():
-            if e[0] == name:
-                return game.Blueprint(e)
-        return None
+        bp = self._bps.get(name)
+        if bp is None:
+            for e in SHIPS or ():
+                if e[0] == name:
+                    bp = self._bps[name] = game.Blueprint(e)
+                    break
+        return bp
 
     def _fly_in(self, pod=False):
         """The docking scene: in through the station's tunnel, a while in the
@@ -2079,7 +2111,8 @@ class AceCommander(app.App):
         c = self.cmdr
         onoff = lambda b: "ON" if b else "OFF"
         e = c.extras
-        return ["LASER: " + c.lasers[0].upper(),
+        return ["SHIP: " + self._ship_title(c.ship),
+                "LASER: " + c.lasers[0].upper(),
                 "REAR LASER: " + (c.lasers[1] or "none").upper(),
                 "LEFT LASER: " + (c.lasers[2] or "none").upper(),
                 "RIGHT LASER: " + (c.lasers[3] or "none").upper(),
@@ -2096,6 +2129,9 @@ class AceCommander(app.App):
                   "ECM": "ecm", "ESCAPE POD": "pod", "ENERGY BOMB": "bomb",
                   "DOCK COMPUTER": "docking", "GAL. HYPERDRIVE": "hyperdrive"}
         key = item.split(":")[0]
+        if key == "SHIP":
+            self._debug_ship()
+            return
         mount = self.MOUNTS.get(key)
         if mount is not None:
             kinds = list(commander.LASERS) + ([] if mount == 0 else [""])
@@ -2104,12 +2140,12 @@ class AceCommander(app.App):
             self._write_setting("lasers", list(c.lasers))
             return
         if key == "MISSILES":
-            c.missiles = (c.missiles + 1) % (game.MAX_MISSILES + 1)
+            c.missiles = (c.missiles + 1) % (ships.pylons(c.ship) + 1)
             self._write_setting("missiles", c.missiles)
             return
         if key == "CARGO BAY":
             from . import equipment
-            c.hold = commander.HOLD if c.hold >= equipment.BIG_HOLD else equipment.BIG_HOLD
+            c.hold = ships.base_hold(c.ship) if c.hold > ships.base_hold(c.ship) else ships.big_hold(c.ship)
             self._write_setting("hold", c.hold)
             return
         name = extras.get(key)
@@ -2123,12 +2159,55 @@ class AceCommander(app.App):
 
     MOUNTS = {"LASER": 0, "REAR LASER": 1, "LEFT LASER": 2, "RIGHT LASER": 3}
 
+    def _ship_title(self, name):
+        """A ship type's name as shown (the game's own name with DATA: OWN)."""
+        bp = self.game.types.get(name) if self.game is not None else None
+        if bp is None:
+            for e in SHIPS or ():
+                if e[0] == name:
+                    return e[5] if len(e) > 5 else e[0]
+        return bp.title if bp is not None else name
+
+    def _debug_ship(self):
+        """DEBUG > SHIP CONFIG > SHIP (Brian, build 78): fly the next ship
+        type, cheapest first, keeping the equipment it can take (the hold,
+        missiles and laser mounts cut down to its own). In a career flight or
+        docked it is the commander's ship from now on, saved; in practice only
+        this flight's."""
+        order = sorted(ships.TYPES, key=lambda n: ships.TYPES[n][ships.PRICE])
+        flying = self.mode == "flight" and self.game is not None
+        c = self.cmdr if (self.career or not flying) else None
+        now = c.ship if c is not None else self.game.ship_name
+        name = order[(order.index(now) + 1) % len(order)] if now in order else order[0]
+        if c is not None:
+            c.ship = name
+            c.hold = max(ships.base_hold(name), min(ships.big_hold(name), c.hold))
+            c.missiles = min(c.missiles, ships.pylons(name))
+            for v in range(1, 4):
+                if v >= ships.mounts(name):
+                    c.lasers[v] = ""
+            for key, value in (("ship", name), ("hold", c.hold), ("missiles", c.missiles),
+                               ("lasers", list(c.lasers))):
+                self._write_setting(key, value)
+            if not flying and self.dock is not None:
+                self.dock.ship = self._ship_bp()    # the Repair Shop shows the new one
+        if flying:
+            g = self.game
+            if c is not None:
+                self._fit(g)
+            else:
+                g.set_ship(name, ships.pylons(name))
+                for v in range(1, 4):
+                    if v >= ships.mounts(name):
+                        g.set_laser(None, v)
+
     def _ship_items(self):
         """The SHIP CONFIG page (a DEBUG page): the ship's equipment, changed
         straight away in this flight and, with a commander, for good."""
         g = self.game
         onoff = lambda b: "ON" if b else "OFF"
-        items = ["LASER: " + g.lasers[0].upper(),
+        items = ["SHIP: " + self._ship_title(g.ship_name),
+                 "LASER: " + g.lasers[0].upper(),
                  "REAR LASER: " + (g.lasers[1] or "none").upper(),
                  "LEFT LASER: " + (g.lasers[2] or "none").upper(),
                  "RIGHT LASER: " + (g.lasers[3] or "none").upper(),
@@ -2148,6 +2227,9 @@ class AceCommander(app.App):
         """Change one thing on the SHIP CONFIG page (C goes to the next setting)."""
         g = self.game
         c = self.cmdr if self.career else None
+        if item.startswith("SHIP:"):
+            self._debug_ship()
+            return
         mount = self.MOUNTS.get(item.split(":")[0])
         if mount is not None:      # C goes round: the lasers, then none (the front always has one)
             kinds = list(game.LASERS) + ([] if mount == 0 else [None])
@@ -2158,7 +2240,7 @@ class AceCommander(app.App):
                 c.lasers[mount] = nxt or ""
         elif item.startswith("MISSILES"):
             if g.missile_bp:
-                g.missiles = (g.missiles + 1) % (game.MAX_MISSILES + 1)
+                g.missiles = (g.missiles + 1) % (g.max_missiles + 1)
                 if c is not None:
                     c.missiles = g.missiles
         elif item.startswith("ENERGY UNIT"):
@@ -2176,7 +2258,7 @@ class AceCommander(app.App):
                 self._extra(c, "navy", g.navy)
         elif item.startswith("CARGO BAY") and c is not None:
             from . import equipment
-            c.hold = commander.HOLD if c.hold >= equipment.BIG_HOLD else equipment.BIG_HOLD
+            c.hold = ships.base_hold(c.ship) if c.hold > ships.base_hold(c.ship) else ships.big_hold(c.ship)
         elif item.startswith("FUEL SCOOPS") and c is not None:
             g.fuel_scoops = not g.fuel_scoops
             self._extra(c, "scoops", g.fuel_scoops)
@@ -2290,7 +2372,7 @@ class AceCommander(app.App):
                 g._spawn_ship()
         elif item == "REFILL MISSILES":
             if g.missile_bp:
-                g.missiles = game.MAX_MISSILES
+                g.missiles = g.max_missiles
         elif item == "REFILL FUEL":
             if self.career and self.cmdr is not None:
                 self.cmdr.fuel = commander.MAX_FUEL
