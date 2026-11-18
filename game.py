@@ -203,6 +203,15 @@ AVOID_SIDE = 300.0
 MISJUMP_ODDS = 3 / 256.0
 THARGOIDS = 4
 ALIEN_ITEMS = 16        # the good a scooped Thargon becomes (market.py's list)
+# Escape pods (build 86), as the original's TACTICS part 4: a ship that carries
+# one (POD_SHIPS: bit 7 of its NEWB flags in E%), down to its last eighth of
+# energy, bails out with chance POD_CHANCE each time it thinks. The pod flies
+# off; the ship is left adrift with no one aboard. A pod is scooped like a
+# canister (fuel scoops, from below) and holds one tonne of slaves.
+POD_SHIPS = ("ADDER", "ANACONDA", "ASP MK II", "BOA", "COBRA MK I", "COBRA MK III",
+             "COBRA MK III P", "FER DE LANCE", "KRAIT", "MAMBA", "PYTHON", "PYTHON P", "VIPER")
+POD_CHANCE = 0.1
+SLAVES = 3              # what a scooped escape pod holds (market.py's list)
 WITCH_DUST = 3          # stardust in witchspace (10 elsewhere)
 
 # The missions (missions.py; the app sets the flags from the commander). In
@@ -447,6 +456,7 @@ class Obj:
         self.dest = "station"   # a trader's: where it is making for, "station" or "planet"
         self.prey = None        # a pirate's: the trader it is after (None: you)
         self.checked = False    # a police ship's: it has looked at your ship (a stolen one: Game.stolen)
+        self.has_pod = bp.name in POD_SHIPS     # its crew can bail out (Game._bail)
         self.missiles = bp.missiles
         self.ecm = False    # an enemy ECM (the Constrictor's): destroys your missiles
         self.beam = 0.0     # > 0 while this ship's laser is drawn
@@ -1566,6 +1576,10 @@ class Game:
                 o.state = "drift"       # half speed, aimless (TACTICS part 1)
                 o.prey = None
                 return
+            if (o.has_pod and o.energy * 8 < o.max_energy and o.role != "constrictor"
+                    and random.random() < POD_CHANCE):
+                self._bail(o)           # out of energy and out of luck (TACTICS part 4)
+                return
             if (o.role == "pirate" and self.space is not None and self.space.safe
                     and (o.state == "attack" or o.state == "break")):
                 o.state = "patrol"      # near the station a pirate loses its nerve (TN3)
@@ -1925,6 +1939,49 @@ class Game:
         c.spin = _rnd(-2, 2)
         self.new.append(c)
         return c
+
+    def _bail(self, o):
+        """Ship o's crew launch their escape pod: it flies off, and the ship
+        is left adrift (no one aboard: it neither fights nor flees)."""
+        o.has_pod = False
+        o.state = "drift"
+        o.prey = None
+        o.beam = 0.0
+        bp = self.types.get("ESCAPE POD")
+        if bp is None or len(self.objs) + len(self.new) >= MAX_OBJECTS:
+            return None
+        dx, dy, dz = _unit(_rnd(-1, 1), _rnd(-1, 1), _rnd(-1, 1))
+        p = Obj(bp, "can", o.x + dx * 120, o.y + dy * 120, o.z + dz * 120)
+        _look(p.m, dx, dy, dz)
+        p.speed = bp.speed
+        p.spin = _rnd(-2, 2)
+        p.good = SLAVES         # scooped: a tonne of slaves, as the original
+        self.new.append(p)
+        return p
+
+    def release_pod(self, dist=700.0):
+        """A cheat: an escape pod just ahead, as release_canister does."""
+        bp = self.types.get("ESCAPE POD")
+        if bp is None or len(self.objs) + len(self.new) >= MAX_OBJECTS:
+            return None
+        p = Obj(bp, "can", 0.0, -30.0, dist)
+        _look(p.m, 0.0, 0.0, -1.0)
+        p.speed = 3.0
+        p.spin = _rnd(-2, 2)
+        p.good = SLAVES
+        self.new.append(p)
+        return p
+
+    def bail_nearest(self):
+        """A cheat: the nearest ship with an escape pod bails out now.
+        Returns the pod, or None."""
+        best = None
+        for o in self.objs:
+            if o.kind == "ship" and o.has_pod and not o.dead and o.state != "drift":
+                if best is None or o.x * o.x + o.y * o.y + o.z * o.z < \
+                        best.x * best.x + best.y * best.y + best.z * best.z:
+                    best = o
+        return self._bail(best) if best is not None else None
 
     def _kill(self, o, mine=False, credit=True):
         """o is destroyed. mine: by the mining laser, so a rock breaks into

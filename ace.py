@@ -121,6 +121,9 @@ TILT_FULL = 0.50        # tilt that gives full rate (about 30 degrees)
 TILT_PITCH_SIGN = 1.0
 TILT_ROLL_SIGN = 1.0
 TILT_SWAP_AXES = False  # True if the badge's x axis should pitch, y roll
+# the TILT setting (Options and Settings, saved, build 85): which way the tilt
+# steers, flipping up / down (pitch), left / right (roll), or both
+TILT_FLIPS = ("NORMAL", "FLIP UP/DOWN", "FLIP L/R", "FLIP BOTH")
 
 INVERT_PITCH = False    # False: joystick up raises the nose. True: up dives.
 LOG_KEYS = False        # True: print every button / key event to serial (to see what a keyboard sends)
@@ -212,7 +215,8 @@ DEBUG_GROUPS = (
     # SHIP is also the ship's equipment (SHIP CONFIG), below these
     ("SHIP", ("INVINCIBLE", "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4")),
     ("SPAWN", ("ADD AN ENEMY", "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ADD A THARGOID",
-               "ADD THE CONSTRICTOR", "RELEASE CANISTER", "KILL ALL ENEMIES", "NEXT WAVE")),
+               "ADD THE CONSTRICTOR", "RELEASE CANISTER", "RELEASE ESCAPE POD", "BAIL OUT",
+               "KILL ALL ENEMIES", "NEXT WAVE")),
     ("TRAVEL", ("TO THE STATION", "TO THE SUN", "DOCK NOW", "MIS-JUMP NEXT",
                 "TO MISSION SYSTEM")),
     ("COMMANDER", ("+10 KILLS", "+1000 CR", "LEVEL", "HARDCORE", "LEGAL", "ANGER STATION", "MISSION")),
@@ -471,6 +475,7 @@ class AceCommander(app.App):
         self.tilt_ok = imu is not None   # the accelerometer is there and working
         # steer by tilt as well as the joystick (TILT_DEFAULT, or the menu)
         self.use_tilt = self.tilt_ok and TILT_DEFAULT
+        self.tilt_flip = 0      # TILT_FLIPS: 1 pitch flipped, 2 roll, 3 both
         self.zero = None                 # accelerometer reading taken as "level"
         self.ms = 0.0                    # smoothed frame time
         self.leds_on = False             # we have taken over the LEDs
@@ -725,6 +730,10 @@ class AceCommander(app.App):
                     dx, dy = dy, dx
                 jx = TILT_ROLL_SIGN * _tilt(dx)
                 jy = TILT_PITCH_SIGN * _tilt(dy)
+                if self.tilt_flip & 1:      # the TILT setting
+                    jy = -jy
+                if self.tilt_flip & 2:
+                    jx = -jx
         if dirs is not None:
             if held(dirs[0]):
                 jy -= 1.0
@@ -1298,8 +1307,8 @@ class AceCommander(app.App):
 
     def _hot(self):
         """A stolen ship keeps you an offender while you fly it (Brian, build
-        84): jumps, the galactic hyperdrive and the escape pod clear your record
-        no further than ships.STOLEN_LEGAL."""
+        84): jumps and the escape pod clear your record no further than
+        ships.STOLEN_LEGAL. The galactic hyperdrive clears the ship too (85)."""
         c = self.cmdr
         if c is None or not c.stolen:
             return
@@ -1434,6 +1443,7 @@ class AceCommander(app.App):
             c.galaxy = (c.galaxy + 1) % 8
             self._extra(c, "hyperdrive", False)     # used up
             g.legal = 0         # a new galaxy: a clean record, as in the original
+            c.stolen = g.stolen = False     # and a clean ship: nobody knows it there (build 85)
             self._place()
             c.system = self.galaxy.nearest(*galaxy.GAL_ARRIVE)
             c.docked_at = None  # nowhere docked in this galaxy yet
@@ -1787,6 +1797,8 @@ class AceCommander(app.App):
         else:
             steer = "STEER: %s (no tilt sensor)" % stick
         items = [steer]
+        if self.tilt_ok:
+            items.append("TILT: " + TILT_FLIPS[self.tilt_flip])
         if cmdr and self.cmdr is not None:
             items.append("DOCKING: " + DOCK_NAMES["A" if self._manual_docking() else self.cmdr.docking])
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
@@ -1816,6 +1828,9 @@ class AceCommander(app.App):
                 self.od_sel = 0
                 self.od_msg = None
                 self.mode = "odebug"
+        elif item.startswith("TILT"):      # left goes back a choice
+            self.tilt_flip = (self.tilt_flip + (-1 if left else 1)) % len(TILT_FLIPS)
+            self._save_options()
         elif item.startswith("STEER"):
             if self.tilt_ok:
                 self.use_tilt = not self.use_tilt
@@ -1856,6 +1871,9 @@ class AceCommander(app.App):
                 self.use_tilt = d["tilt"] and self.tilt_ok
             if isinstance(d.get("leds"), bool):
                 self.use_leds = d["leds"]
+            k = d.get("tilt_flip")
+            if isinstance(k, int) and not isinstance(k, bool) and 0 <= k < len(TILT_FLIPS):
+                self.tilt_flip = k
             if isinstance(d.get("hardcore"), bool):
                 self.old_hardcore = d["hardcore"]
             if isinstance(d.get("practice_hardcore"), bool):
@@ -1872,7 +1890,8 @@ class AceCommander(app.App):
     def _save_options(self):
         try:
             with open(options_path(), "w") as f:
-                f.write(json.dumps({"tilt": self.use_tilt, "leds": self.use_leds,
+                f.write(json.dumps({"tilt": self.use_tilt, "tilt_flip": self.tilt_flip,
+                                    "leds": self.use_leds,
                                     "practice_level": self.p_level,
                                     "practice_hardcore": self.p_hardcore,
                                     "own": self.own_ships, "egg": self.egg,
@@ -1902,13 +1921,13 @@ class AceCommander(app.App):
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
         text(ctx, "OPTIONS", 0, -80, 20, cockpit.WHITE)
         items = self._settings(True)
-        y = -44
+        y = -52                 # seven lines fit (build 85: TILT)
         for i, label in enumerate(items):
             if i == self.omenu % len(items):
-                ctx.rgb(*cockpit.DIM).rectangle(-104, y - 9, 208, 18).fill()
+                ctx.rgb(*cockpit.DIM).rectangle(-104, y - 8, 208, 16).fill()
             text(ctx, label, 0, y, 14, cockpit.GREEN if i == self.omenu % len(items)
                  else cockpit.GREY)
-            y += 20
+            y += 17
         if self.cmdr is None:
             text(ctx, "more with a commander", 0, y + 4, 11, cockpit.GREY)
         text(ctx, "< > or C: change", 0, 82, 11, cockpit.GREY)     # below six lines
@@ -2419,6 +2438,14 @@ class AceCommander(app.App):
         elif item == "RELEASE CANISTER":
             if g.release_canister() is None:
                 g.say("TOO MANY OBJECTS")
+        elif item == "RELEASE ESCAPE POD":      # build 86
+            if g.release_pod() is None:
+                g.say("TOO MANY OBJECTS")
+        elif item == "BAIL OUT":           # the nearest ship with a pod abandons ship
+            if g.bail_nearest() is None:
+                g.say("NO SHIP WITH A POD")
+            else:
+                g.say("ESCAPE POD AWAY")
         elif item == "TO THE SUN":
             g.to_sun(1.15, 1.6)     # flying on takes you down through the scooping band
         elif item == "TO THE STATION":

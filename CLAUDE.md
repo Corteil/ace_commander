@@ -151,9 +151,10 @@ equipment limits and DEBUG > SHIP CONFIG > SHIP; build 79 the Shipyard and Hanga
 (`Docked.buy_ship` / `fly_owned` / `sell_owned`). Brian's rules are in BUILD_NOTES.md builds
 78-79. Not yet on the badge or played by hand.
 
-1. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
-   said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
-   (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
+1. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). Build 85
+   added Options > TILT to flip up/down, left/right or both (saved). Ask before changing
+   the rest: sensitivity (`TILT_FULL`), dead zone (`TILT_DEADZONE`), or the D hold time
+   (`HOLD_MISSILE`).
 2. Missile lock (build 19): the diamond is red, then green after `LOCK_TIME` (2 s, Brian's
    choice after playing with 1 s) and only then will D fire.
 3. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default

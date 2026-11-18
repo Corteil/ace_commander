@@ -177,9 +177,9 @@ assert "LAVE" in tx and "7.0 LY" in tx and "CLEAN" in tx and "GREEN" in tx, tx
 tick(a, fresh=["C"]); assert a.fsub is None and not a.paused, "C: back to the flight"
 tick(a, fresh=["A"])
 fpick(a, "SETTINGS"); assert a.fsub == "settings"
-assert a._fitems()[1] == "DOCKING: ASSISTED" and a.game.docking == "B", a._fitems()
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
-assert a._fitems()[1] == "DOCKING: AUTOMATIC" and a.game.docking == "C"
+assert a._fitems()[2] == "DOCKING: ASSISTED" and a.game.docking == "B", a._fitems()
+tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
+assert a._fitems()[2] == "DOCKING: AUTOMATIC" and a.game.docking == "C"
 assert commander.load(SAVE).docking == "C", "the choice is saved straight away"
 tick(a, fresh=["JOYRIGHT"]); assert a.cmdr.docking == "A" and a.game.docking == "A"
 tick(a, fresh=["JOYLEFT"]); tick(a, fresh=["JOYLEFT"]); assert a.cmdr.docking == "B"
@@ -580,6 +580,14 @@ cans = [o for o in e.game.objs + e.game.new if o.kind == "can"]
 assert len(cans) == n_cans + 1 and 0 < cans[-1].z <= 700 and cans[-1].m[8] < -0.99, "ahead, coming in"
 tx = texts(e)
 assert "RELEASE CANISTER" in tx and "DEBUG: SPAWN" in tx, tx
+# RELEASE ESCAPE POD and BAIL OUT (build 86)
+debug(e, "RELEASE ESCAPE POD")
+pods = [o for o in e.game.objs + e.game.new if o.kind == "can" and o.bp.name == "ESCAPE POD"]
+assert len(pods) == 1 and pods[0].good == game.SLAVES and 0 < pods[0].z <= 700
+debug(e, "BAIL OUT"); assert e.game.msg == "NO SHIP WITH A POD"
+v = game.Obj(e.game.types["MAMBA"], "ship", 0.0, 0.0, 3000.0); e.game.objs.append(v)
+debug(e, "BAIL OUT"); assert e.game.msg == "ESCAPE POD AWAY" and v.state == "drift" and not v.has_pod
+v.dead = True
 tick(e, fresh=["A"])
 # dying stops a countdown; quitting to the title and coming back keeps the system
 fpick(e, "LOCAL CHART")
@@ -730,7 +738,7 @@ tick(e, fresh=["JOYRIGHT"]); assert d.name() == "MARKET" and d.msg is None
 m = d.market; c = e.cmdr
 assert c.market["system"] == c.system == 7 and len(m.prices) == 17
 tx = texts(e)
-assert "MARKET  LAVE" in tx and "FOOD" in tx and "price" in tx and "C: buy   D: sell" in tx, tx
+assert "MARKET" in tx and "LAVE" not in tx and "FOOD" in tx and "price" in tx and "C: buy   D: sell" in tx, tx
 assert 36 <= m.prices[0] <= 40 and 896 <= m.prices[7] <= 908, (m.prices[0], m.prices[7])
 assert m.stock[16] == 0, "never any alien items"
 cash0, food0 = c.cash, m.stock[0]
@@ -782,7 +790,7 @@ eq = mod.EQUIP
 c = e.cmdr
 assert d.for_sale == 7 and len(eq) == 14
 tx = texts(e)
-assert "EQUIP SHIP  LAVE" in tx and "FUEL" in tx and "MISSILE" in tx and "PULSE LASER" in tx, tx
+assert "EQUIP SHIP" in tx and "FUEL" in tx and "MISSILE" in tx and "PULSE LASER" in tx, tx
 assert "LARGE CARGO BAY" in tx and "E.C.M. SYSTEM" in tx and "price" in tx and "have" in tx
 assert c.laser == "pulse" and "fitted" in tx and c.missiles == 3 and "3/4" in tx
 # fuel: 2 Cr a light year, filling the tank
@@ -839,8 +847,8 @@ assert d.tab == 0 and "F: back to status" in texts(e)
 tx = texts(e)
 before = c.docking
 assert "STEER: JOYSTICK" in tx and "DOCKING: " + mod.DOCK_NAMES[before] in tx, tx
-assert "CONSTRICTOR: 2 MIN" in tx
-tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["C"])
+assert "CONSTRICTOR: 2 MIN" in tx and "TILT: NORMAL" in tx
+tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["C"])     # past TILT
 after = commander.DOCKING[(commander.DOCKING.index(before) + 1) % 3]
 assert c.docking == after and "DOCKING: " + mod.DOCK_NAMES[after] in texts(e), "C changes it"
 assert commander.load(SAVE).docking == after, "saved"

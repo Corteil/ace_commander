@@ -935,3 +935,22 @@ what is now `ace.py` (renamed in build 50).
    `buy_transponder`), "NEW TRANSPONDER FITTED": the ship is clean. DEBUG > SHIP CONFIG
    > STOLEN switches it, in flight or docked, saved. Not done: the long system names clip
    the docked tabs' titles at the top (e.g. "REPAIR SHOP  CEBETELA").
+   **Build 85** (2026-11-18, Brian: "tilt should be able to be flipped in settings/options
+   and saved, galactic jump clears a hot ship"; "the name does not need to be
+   displayed"). A TILT line under STEER on Options, the docked Options and the in-flight
+   Settings (when there is a tilt sensor): NORMAL, FLIP UP/DOWN, FLIP L/R, FLIP BOTH
+   (`TILT_FLIPS`, `AceCommander.tilt_flip`, options.json "tilt_flip"); C or right goes on,
+   left back. The galactic hyperdrive clears a stolen ship as well as the record. The
+   docked tabs' titles no longer carry the system's name (it clipped on long names;
+   Status shows where you are). Options pages: lines 17 px apart so seven fit.
+   **Build 86** (2026-11-18, Brian: "is it possible to catch an escape pod?"; "add the
+   escape pods, and add in the debug menu"). As the original's TACTICS part 4: a ship
+   that carries a pod (`POD_SHIPS`, from bit 7 of the NEWB flags in each ship file's E%:
+   Adder, Anaconda, Asp Mk II, Boa, Cobra Mk I, Cobra Mk III and its pirate, Fer-de-Lance,
+   Krait, Mamba, Python and its pirate, Viper), below an eighth of its energy, bails out
+   with `POD_CHANCE` 0.1 each time it thinks (`Game._bail`): the pod (an Obj of kind
+   "can", the ESCAPE POD model, `good` = `SLAVES` 3) flies off at its own speed and the
+   ship is left adrift ("drift": no shots, no turning). Scooped like a canister (fuel
+   scoops, from below): a tonne of slaves, which are illegal cargo as usual. DEBUG >
+   SPAWN: RELEASE ESCAPE POD (just ahead, as RELEASE CANISTER) and BAIL OUT (the
+   nearest ship with a pod; "NO SHIP WITH A POD" if none).

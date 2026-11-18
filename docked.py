@@ -579,7 +579,7 @@ class Docked:
         m = self.market
         c = self.cmdr
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "MARKET  " + self.here.name, 0, -100, 11, cockpit.GREY)
+        text(ctx, "MARKET", 0, -100, 11, cockpit.GREY)     # no system name: Status has it (build 85)
         for label, x in (("price", PRICE_X), ("qty", STOCK_X), ("hold", HOLD_X)):
             text(ctx, label, x, -74, 10, cockpit.GREY, 1)
         if self.top > 0:                            # more above
@@ -616,12 +616,12 @@ class Docked:
         text(ctx, "OPTIONS", 0, -94, 14, cockpit.GREY)
         items = self.options[0]()
         sel = self.osel % len(items)
-        y = -60
+        y = -70                 # seven lines fit (build 85: TILT)
         for i, label in enumerate(items):
             if i == sel:
-                ctx.rgb(*cockpit.DIM).rectangle(-104, y - 9, 208, 18).fill()
+                ctx.rgb(*cockpit.DIM).rectangle(-104, y - 8, 208, 16).fill()
             text(ctx, label, 0, y, 14, cockpit.GREEN if i == sel else cockpit.GREY)
-            y += 20
+            y += 17
         text(ctx, "up / down: pick   C: change", 0, 66, 11, cockpit.GREY)
         text(ctx, "F: back to status", 0, 82, 11, cockpit.GREY)
 
@@ -632,7 +632,7 @@ class Docked:
         text = cockpit.text
         c = self.cmdr
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "REPAIR SHOP  " + self.here.name, 0, -100, 11, cockpit.GREY)
+        text(ctx, "REPAIR SHOP", 0, -100, 11, cockpit.GREY)     # no system name: Status has it (build 85)
         name, rgb = cockpit.SHIP_COLOURS[self.paint]
         o = _Show(self.ship)
         z = 560.0
@@ -708,7 +708,7 @@ class Docked:
         text = cockpit.text
         c = self.cmdr
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "SHIPYARD  " + self.here.name, 0, -100, 11, cockpit.GREY)
+        text(ctx, "SHIPYARD", 0, -100, 11, cockpit.GREY)     # no system name: Status has it (build 85)
         text(ctx, "%d of %d" % (self.ysel + 1, len(self.yard) + 1), 0, -86, 10, cockpit.GREY)
         if self.ysel == 0:          # your own ship
             bp = self.ship
@@ -820,7 +820,7 @@ class Docked:
         paint, where it is, its fit-out, and what it is worth (build 80)."""
         text = cockpit.text
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "HANGAR  " + self.here.name, 0, -100, 11, cockpit.GREY)
+        text(ctx, "HANGAR", 0, -100, 11, cockpit.GREY)     # no system name: Status has it (build 85)
         own = self.owned()
         self.hsel %= len(own)
         e = own[self.hsel]
@@ -852,7 +852,7 @@ class Docked:
         e = self.equip
         c = self.cmdr
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "EQUIP SHIP  " + self.here.name, 0, -100, 11, cockpit.GREY)
+        text(ctx, "EQUIP SHIP", 0, -100, 11, cockpit.GREY)     # no system name: Status has it (build 85)
         for label, x in (("price", EPRICE_X), ("have", HOLD_X)):
             text(ctx, label, x, -74, 10, cockpit.GREY, 1)
         if self.etop > 0:

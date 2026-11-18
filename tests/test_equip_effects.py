@@ -284,6 +284,7 @@ print("app: escape pod: ok")
 launch(e); g = e.game; g.spawn_t = g.rock_t = g.encounter_t = 1e9
 fuel = c.fuel
 g.legal = 30
+c.stolen = g.stolen = True      # a hot ship: the new galaxy clears it too (build 85)
 fpick(e, "GALACTIC JUMP")
 assert g.jump_t > 0 and e.jump_to == ("galaxy", 0)
 for _ in range(400):
@@ -293,6 +294,7 @@ for _ in range(400):
 assert c.galaxy == 1 and e.galaxy_n == 1 and "hyperdrive" not in c.extras
 assert c.system == e.galaxy.nearest(*galaxy.GAL_ARRIVE) and c.fuel == fuel
 assert g.legal == 0, "a new galaxy, a clean record"
+assert not c.stolen and not g.stolen, "and a clean ship"
 assert c.docked_at is None and commander.load(SAVE).galaxy == 0, "saved only on docking"
 tick(e, fresh=["A"]); assert "GALACTIC JUMP" not in e._fitems(); tick(e, fresh=["A"])
 print("app: galactic hyperdrive to galaxy 2: ok")

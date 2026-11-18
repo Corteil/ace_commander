@@ -198,6 +198,26 @@ assert a.mode == "menu" and not a.paused, "QUIT TO TITLE"
 choose(a, "COMBAT PRACTICE"); assert a.mode == "flight" and a.game is g, "the fight carries on"
 print("in-flight menu on A, steering switch, tilt with D tap and hold, quit and carry on: ok")
 
+# the TILT setting (build 85): flip up / down, left / right or both; saved
+a.zero = (0.0, 0.0)
+Imu.reading = [0.3 * G, 0.3 * G, G]
+roll0, pitch0 = a._steer(True, None, False, False)
+assert roll0 and pitch0
+for flip, want in ((0, (roll0, pitch0)), (1, (roll0, -pitch0)), (2, (-roll0, pitch0)), (3, (-roll0, -pitch0))):
+    a.tilt_flip = flip
+    assert a._steer(True, None, False, False) == want, (flip, want)
+a.tilt_flip = 0
+Imu.reading = [0.0, 0.0, G]
+items = a._settings(False)
+assert items[1] == "TILT: NORMAL", items
+for want in ("FLIP UP/DOWN", "FLIP L/R", "FLIP BOTH", "NORMAL"):
+    a._change(items[1], False); assert a._settings(False)[1] == "TILT: " + want
+a._change("TILT: NORMAL", True); assert a.tilt_flip == 3, "left goes back"
+assert json.load(open(mod.options_path()))["tilt_flip"] == 3
+b2 = pkg.AceCommander(); assert b2.tilt_flip == 3, "loaded from options.json"
+a.tilt_flip = 0; a._save_options()
+print("TILT setting: flips, saved: ok")
+
 # ---- keyboard ---------------------------------------------------------------
 ahead, side = rocks(mod, g)
 tick(a, held=["KEY_W"]); assert ahead.y < 0

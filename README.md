@@ -98,6 +98,8 @@ station's safe zone.
 - **The sun**: fly close with fuel scoops to skim fuel, watching the cabin temperature.
 - **Cargo**: destroyed ships drop canisters; scoop them (with fuel scoops) by passing over
   them. A mining laser breaks rocks into splinters you can scoop as ore.
+- **Escape pods**: a badly damaged ship may bail out, leaving its hull adrift; with fuel
+  scoops you can scoop the pod from below, for a tonne of slaves.
 - **Witchspace**: now and then a jump goes wrong and leaves you between the stars with the
   alien Vorn.
 

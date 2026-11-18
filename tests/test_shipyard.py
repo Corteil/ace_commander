@@ -55,7 +55,7 @@ assert d.yard == ships.for_sale(c.galaxy, c.system, d.here.tech, d.here.governme
 assert d.yard and all(ships.spec(n)[ships.TECH] <= d.here.tech for n, p, st in d.yard if not st)
 # page 1 is your own ship, with the Repair Shop (build 80)
 tx = texts(e)
-assert "SHIPYARD  " + here in tx and d.ysel == 0, tx
+assert "SHIPYARD" in tx and here not in tx and d.ysel == 0, tx
 # (the page names your ship plainly: Brian, build 81)
 assert not any(t.startswith("YOUR ") for t in tx) and "C: stats   D: repair shop" in tx, tx
 # C: your own ship's stats, with nothing to buy (C is stats on every page: build 82)
@@ -109,7 +109,7 @@ assert d.ship is not None and d.ship.name == "SIDEWINDER", "the Repair Shop show
 # ---- the Hangar: the one you fly first, then the Cobra
 d.open("HANGAR")
 tx = texts(e)
-assert "HANGAR  " + here in tx and "flying" in tx and "1 of 2" in tx, tx
+assert "HANGAR" in tx and "flying" in tx and "1 of 2" in tx, tx
 assert "lasers F pulse" in tx and "missiles 0/1   hold 4t, 4t used" in tx and "no other equipment" in tx, tx
 tick(e, fresh=["C"]); assert d.msg == "YOU ARE FLYING IT"
 tick(e, fresh=["JOYDOWN"]); assert d.hsel == 1

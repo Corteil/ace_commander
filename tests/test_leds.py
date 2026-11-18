@@ -247,7 +247,7 @@ assert "more with a commander" in tx, "no commander: no docking or Constrictor"
 for s_, (x, y), size in c.texts:
     assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5, (s_, y)
 tick(a, fresh=["JOYRIGHT"]); assert a.use_tilt, "right changes the steering"
-tick(a, fresh=["JOYDOWN"]); assert a.omenu == 1
+tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["JOYDOWN"]); assert a.omenu == 2   # past TILT
 tick(a, fresh=["C"]); assert not a.use_leds
 tick(a, fresh=["F"]); assert a.mode == "menu"
 # kept for next time
@@ -262,10 +262,11 @@ bs.choose(b, "NEW COMMANDER"); tick(b, fresh=["C"])
 b.dock.go(0); tick(b, fresh=["F"])
 bs.choose(b, "OPTIONS")
 items = b._settings(True)
-assert items[1].startswith("DOCKING") and items[2] == "CONSTRICTOR: 2 MIN", items
-b.omenu = 1; tick(b, fresh=["JOYLEFT"])
+assert items[1] == "TILT: NORMAL", items      # (build 85)
+assert items[2].startswith("DOCKING") and items[3] == "CONSTRICTOR: 2 MIN", items
+b.omenu = 2; tick(b, fresh=["JOYLEFT"])
 assert b.cmdr.docking == "A"
-b.omenu = 2; tick(b, fresh=["C"])
+b.omenu = 3; tick(b, fresh=["C"])
 assert not b.cmdr.quick_con
 from ace_commander import commander as cm
 d = cm.load(save); assert d.docking == "A" and d.quick_con is False
