@@ -45,6 +45,13 @@ class Button:
     def __contains__(self, other):
         return other == self or any(other == p for p in self.all_parents)
 
+    def find_parent_in_group(self, group):
+        """As the firmware's: this button or a parent in the group, or None."""
+        for b in [self] + self.all_parents:
+            if b.group == group:
+                return b
+        return None
+
     def __repr__(self):
         return "%s.%s" % (self.group, self.name)
 
@@ -175,7 +182,7 @@ class Imu:
         return tuple(Imu.reading)
 
 
-def install(imu=True, keyboard=True, joystick=True):
+def install(imu=True, keyboard=True):
     global bus, _down
     for name in list(sys.modules):
         if name == "ace_commander" or name.startswith("ace_commander."):
@@ -211,13 +218,12 @@ def install(imu=True, keyboard=True, joystick=True):
         kb = types.ModuleType("events.keyboard")
         kb.KEYBOARD_BUTTONS = KEYS
         sys.modules["events.keyboard"] = kb
-    if joystick:
-        j = types.ModuleType("events.joystick")
-        j.JOYSTICK_BUTTON_TYPES = JOY
-        fb = types.ModuleType("frontboards.common")
-        fb.FRONTBOARD_BUTTON_TYPES = FB
-        sys.modules.update({"events.joystick": j, "frontboards": types.ModuleType("frontboards"),
-                            "frontboards.common": fb})
+    j = types.ModuleType("events.joystick")     # the current firmware's (the only one supported)
+    j.JOYSTICK_BUTTON_TYPES = JOY
+    fb = types.ModuleType("frontboards.common")
+    fb.FRONTBOARD_BUTTON_TYPES = FB
+    sys.modules.update({"events.joystick": j, "frontboards": types.ModuleType("frontboards"),
+                        "frontboards.common": fb})
     Imu.reading = [0.0, 0.0, 9.81]
     Imu.fail = False
     App.minimised = 0

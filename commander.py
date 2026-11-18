@@ -11,6 +11,11 @@ the laser, and a list of the other items fitted. Then the missions' progress
 """
 import json
 
+try:
+    from . import ships
+except ImportError:         # imported on its own, as the PC tests do
+    import ships
+
 # The level is picked when the commander is made and never changes. It sets
 # how many kills each rank needs here, and how tough the enemies are in
 # game.py.
@@ -33,12 +38,12 @@ RANKS = (
 )
 
 DOCKING = ("A", "B", "C")    # authentic, assisted, automatic
-VERSION = 4
+VERSION = 5          # 5: ships (build 78)
 START_MISSILES = 3  # a new commander's missiles, as in the original
 LASERS = ("pulse", "beam", "military", "mining")
 GOODS = 17          # kinds of cargo (market.py)
 HOLD = 20           # tonnes in a standard cargo hold
-MAX_FUEL = 70       # tenths of a light year: a full tank is 7.0 light years
+MAX_FUEL = 70       # tenths of a light year: the Cobra's full tank is 7.0 light years (others: ships.tank)
 
 
 def thresholds(level):
@@ -77,7 +82,15 @@ class Commander:
         self.quick_con = True   # the Constrictor turns up after missions.QUICK_WAIT (else rarely, as the original)
         self.data = ""          # the data set the commander belongs to: "elite" or "own" ("" unknown)
         self.fuel = MAX_FUEL    # tenths of a light year
+        self.ship = "COBRA MK III"  # the ship flown (ships.TYPES), from build 78
+        self.stolen = False     # bought stolen at a pirate world's shipyard
+        self.hangar = []        # the other ships owned (ships.pack's dicts)
+        self.name = ""          # the commander's name (build 89); "" the badge's, or JAMESON
         self._needs = thresholds(self.level)
+
+    def max_fuel(self):
+        """A full tank for the ship flown (ships.tank: 0 with no hyperdrive)."""
+        return ships.tank(self.ship)
 
     @property
     def credits(self):
@@ -131,15 +144,20 @@ class Commander:
                 "laser": self.laser, "lasers": self.lasers, "extras": self.extras, "docked_at": self.docked_at,
                 "galaxy": self.galaxy, "colour": self.colour,
                 "legal": self.legal, "mission": self.mission,
-                "quick_con": self.quick_con, "data": self.data, "hardcore": self.hardcore}
+                "quick_con": self.quick_con, "data": self.data, "hardcore": self.hardcore,
+                "ship": self.ship, "stolen": self.stolen, "hangar": self.hangar,
+                "name": self.name}
 
     @classmethod
     def from_dict(cls, d):
         c = cls(d.get("level", 1))
         c.kills = max(0, int(d.get("kills", 0)))
         c.cash = max(0, int(round(float(d.get("credits", 100.0)) * 10)))
-        c.hold = max(HOLD, min(35, int(d.get("hold", HOLD))))
-        c.missiles = max(0, min(4, int(d.get("missiles", START_MISSILES))))
+        if isinstance(d.get("ship"), str) and ships.known(d["ship"]):
+            c.ship = d["ship"]
+        # the ship's hold (with the large cargo bay at most) and its pylons
+        c.hold = max(ships.base_hold(c.ship), min(ships.big_hold(c.ship), int(d.get("hold", HOLD))))
+        c.missiles = max(0, min(ships.pylons(c.ship), int(d.get("missiles", START_MISSILES))))
         if d.get("laser") in LASERS:
             c.laser = d["laser"]
         mounted = d.get("lasers")
@@ -165,7 +183,7 @@ class Commander:
         s = d.get("system")
         if isinstance(s, int) and 0 <= s < 256:
             c.system = s
-        c.fuel = max(0, min(MAX_FUEL, int(d.get("fuel", MAX_FUEL))))
+        c.fuel = max(0, min(c.max_fuel(), int(d.get("fuel", c.max_fuel()))))
         k = d.get("legal")
         if isinstance(k, int):
             c.legal = max(0, min(255, k))
@@ -187,6 +205,13 @@ class Commander:
         s = d.get("docked_at")
         if isinstance(s, int) and 0 <= s < 256:
             c.docked_at = s
+        c.stolen = d.get("stolen") is True
+        n = d.get("name")
+        if isinstance(n, str):
+            c.name = n.strip().upper()[:12]
+        h = d.get("hangar")
+        if isinstance(h, list):
+            c.hangar = [e for e in (_hangar_entry(x) for x in h) if e is not None]
         return c
 
     def save(self, path):
@@ -197,6 +222,32 @@ class Commander:
             return True
         except (OSError, ValueError):
             return False
+
+
+def _hangar_entry(x):
+    """A hangar entry from a save, checked (ships.pack makes them), or None."""
+    try:
+        lasers = [k if k in LASERS else "" for k in x["lasers"]][:4]
+        while len(lasers) < 4:
+            lasers.append("")
+        cargo = [max(0, int(n)) for n in x["cargo"]]
+        if len(cargo) != GOODS:
+            return None
+        at = x.get("at")
+        if at is not None:
+            at = [int(at[0]) & 7, int(at[1]) & 255]
+        t = x["type"]
+        if not ships.known(t):
+            return None
+        return {"type": t, "lasers": lasers,
+                "missiles": max(0, min(ships.pylons(t), int(x["missiles"]))),
+                "extras": [e for e in x["extras"] if isinstance(e, str)],
+                "hold": max(ships.base_hold(t), min(ships.big_hold(t), int(x["hold"]))), "cargo": cargo,
+                "colour": int(x.get("colour", 0)) & 31, "stolen": x.get("stolen") is True,
+                "fuel": max(0, min(ships.tank(t), int(x.get("fuel", ships.tank(t))))),
+                "at": at}
+    except (KeyError, TypeError, ValueError, IndexError):
+        return None
 
 
 def load(path, data=None):

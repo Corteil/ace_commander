@@ -883,6 +883,21 @@ def _my_ship(g):
     return _me[0]
 
 
+def _streak_tail(view, tail):
+    """Where a speck of stardust was, from where it is now, in the view's
+    frame (x, z), with the jump drive on: the dust rushes at you from the
+    front, away from you at the back and across the side views (left: from
+    the right; right: from the left), so each streak trails the way it came
+    (game.Game.view_dust)."""
+    if view == 1:
+        return 0, -tail
+    if view == 2:
+        return tail, 0
+    if view == 3:
+        return -tail, 0
+    return 0, tail
+
+
 def draw_world(ctx, g):
     """Space, ships, explosions and laser beams; from behind your ship while
     the docking computer flies."""
@@ -939,6 +954,7 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
         tail = 2 * g.fwd
         if tail < STREAK_MIN:
             tail = STREAK_MIN
+        tx, tz = _streak_tail(g.view, int(tail))
         ctx.begin_path()
         for p in g.dust:
             z = int(p[2])
@@ -946,7 +962,10 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
                 x = int(p[0])
                 y = int(p[1])
                 ctx.move_to(x * IFOCAL // z, -(y * IFOCAL // z))
-                z += tail
+                x += tx
+                z += tz
+                if z <= INEAR:      # rear view: where it was is behind the screen
+                    z = INEAR + 1
                 ctx.line_to(x * IFOCAL // z, -(y * IFOCAL // z))
         ctx.stroke()
     else:
@@ -1106,7 +1125,7 @@ SUN_GAUGE_ALT = math.sqrt((285 - COOL_CABIN) / SUN_HEAT) - 1.0
 # is safe, through yellow and orange to red near the surface
 CT_COLOURS = ((0.0, (0.2, 1.0, 0.3)), (0.45, (1.0, 0.9, 0.1)), (0.7, (1.0, 0.55, 0.1)),
               (0.86, (1.0, 0.15, 0.1)))
-MAX_FUEL = 70           # a full tank, tenths of a light year (commander.MAX_FUEL)
+MAX_FUEL = 70           # the Cobra's full tank, tenths of a light year (Game.fuel_max: the ship's)
 
 
 def ct_colour(cabin):
@@ -1143,11 +1162,12 @@ def _sun_gauges(ctx, g, sp):
     a = int(50 * d / (SUN_GAUGE_ALT * sp.sr))
     a = 0 if a < 0 else 50 if a > 50 else a
     ctx.rgb(*CYAN).rectangle(8, -94, a, 4).fill()
-    if g.fuel is not None:      # the fuel, under them: watch it fill as you skim
+    full = getattr(g, "fuel_max", MAX_FUEL)     # the ship's own tank (ships.tank)
+    if g.fuel is not None and full:     # the fuel, under them: watch it fill as you skim
         text(ctx, "FU", -66, -83, 9, GREY)
         ctx.rgb(*DIM).rectangle(-58, -85, 116, 4).fill()
-        f = g.fuel * 116 // MAX_FUEL
-        ctx.rgb(*(RED if g.fuel < MAX_FUEL // 4 else GREEN)).rectangle(-58, -85, f, 4).fill()
+        f = min(g.fuel, full) * 116 // full
+        ctx.rgb(*(RED if g.fuel < full // 4 else GREEN)).rectangle(-58, -85, f, 4).fill()
 
 
 def _compass(ctx, sp):
@@ -1194,13 +1214,13 @@ def draw_hud(ctx, g, ms=None, ring=True):
         ctx.rectangle(-0.75, -14, 1.5, 8).fill()
 
     # gauges: speed and laser heat on the left, shield and energy on the right
-    _vbar(ctx, -112, g.speed / 40.0, CYAN if g.jumping else GREEN)
+    _vbar(ctx, -112, g.speed / getattr(g, "max_speed", 40.0), CYAN if g.jumping else GREEN)
     _vbar(ctx, -103, g.heat, RED if g.hot else YELLOW)
     _vbar(ctx, 97, g.shield / 100.0, CYAN)
     _vbar(ctx, 106, g.hull / 100.0, GREEN if g.hull > 30 else RED)
 
-    # missiles left
-    for i in range(4):
+    # missiles left, one slot for each of the ship's pylons (build 82)
+    for i in range(getattr(g, "max_missiles", 4)):
         ctx.rgb(*(GREEN if i < g.missiles else DIM)).rectangle(-70 + i * 9, 56, 6, 4).fill()
 
     # radar: across is left-right, up the ellipse is ahead, sticks show height

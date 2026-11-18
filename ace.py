@@ -9,9 +9,10 @@ Title screen
 
 Docked
     Joystick left / right changes screen (on the charts the joystick moves
-    the cursor and E / B change screen). C launches from Status, and on a
-    chart makes the selected system the hyperspace target. A launches from
-    any screen. F goes back to Status, then to the title screen.
+    the cursor and E / B change screen). C on Status opens Options, on
+    Inventory sells the whole hold, and on a chart makes the selected system
+    the hyperspace target. A launches from any screen. F goes back to
+    Status, then to the title screen.
 
 Flight (2026 Spaceagon)
     Joystick      pitch and roll
@@ -53,7 +54,7 @@ import app
 from events.input import BUTTON_TYPES, ButtonDownEvent, ButtonUpEvent
 from system.eventbus import eventbus
 
-from . import bench, briefing, cockpit, commander, docked, game, missions, rules, title, viewer
+from . import bench, briefing, cockpit, commander, docked, game, missions, rules, ships, title, viewer
 
 try:
     import imu
@@ -88,11 +89,10 @@ EDGE_OUT = 140
 REPEAT_WAIT = 0.45      # seconds a market button is held before it starts repeating
 REPEAT_EVERY = 0.09     # then once every this many seconds
 
-try:    # the joystick's directions and buttons A-F, told apart from each other
-    from events.joystick import JOYSTICK_BUTTON_TYPES as JOY
-    from frontboards.common import FRONTBOARD_BUTTON_TYPES as FB
-except ImportError:
-    JOY = FB = None     # older firmware: fall back to the plain direction buttons
+# the joystick's directions and buttons A-F, told apart from each other (only
+# the current firmware is supported: Brian, 2026-11-18)
+from events.joystick import JOYSTICK_BUTTON_TYPES as JOY
+from frontboards.common import FRONTBOARD_BUTTON_TYPES as FB
 
 try:    # lets the flight screen skip the 50 ms pause the badge adds to every frame
     from system.scheduler import scheduler
@@ -121,6 +121,10 @@ TILT_FULL = 0.50        # tilt that gives full rate (about 30 degrees)
 TILT_PITCH_SIGN = 1.0
 TILT_ROLL_SIGN = 1.0
 TILT_SWAP_AXES = False  # True if the badge's x axis should pitch, y roll
+# the CONTROLS setting (Options and Settings, saved; builds 85-87): flips the
+# flight controls up / down (pitch), left / right (roll), or both, whichever
+# way you steer: tilt, joystick or keyboard (not the charts' cursor)
+TILT_FLIPS = ("NORMAL", "UP/DOWN FLIPPED", "L/R FLIPPED", "BOTH FLIPPED")
 
 INVERT_PITCH = False    # False: joystick up raises the nose. True: up dives.
 LOG_KEYS = False        # True: print every button / key event to serial (to see what a keyboard sends)
@@ -150,14 +154,14 @@ SCREENS = ("status", "inventory", "market", "chart", "data")
 # the first good in the hold), f3 equip ship, f4 galactic chart, f5 local
 # chart, f6 system data, f7 market prices, f8 status, f9 inventory (the same
 # screen as in flight, as a tab). A missing tab does nothing. The joystick goes
-# round the tabs in the same order (docked.TABS).
+# round the tabs in its own order (docked.TABS); = opens Options over Status.
 DOCK_KEYS = (("k_1", "LAUNCH"), ("k_2", "MARKET"), ("k_3", "SELL"),
              ("k_4", "EQUIP SHIP"), ("k_5", "GALACTIC CHART"), ("k_6", "LOCAL CHART"),
              ("k_7", "SYSTEM DATA"), ("k_8", "MARKET"), ("k_9", "STATUS"),
              ("k_0", "INVENTORY"),
              # the two screens Elite didn't have, on the keys after 0 (Brian):
-             # - (or _) the Repair Shop, = (or +) Options
-             ("k_slower", "REPAIR SHOP"), ("k_faster", "OPTIONS"))
+             # - (or _) the Shipyard (build 80: it holds the Repair Shop), = (or +) Options
+             ("k_slower", "SHIPYARD"), ("k_faster", "OPTIONS"))
 # DEBUG, a page of cheats for testing (the in-flight menu, Settings and
 # Options): True or False, or None to show it only if a file called debug.txt
 # is in the app's folder (always on a PC, where the tests run), or once it has
@@ -212,19 +216,20 @@ DEBUG_GROUPS = (
     # SHIP is also the ship's equipment (SHIP CONFIG), below these
     ("SHIP", ("INVINCIBLE", "REFILL MISSILES", "REFILL FUEL", "FUEL TO 1/4")),
     ("SPAWN", ("ADD AN ENEMY", "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ADD A THARGOID",
-               "ADD THE CONSTRICTOR", "RELEASE CANISTER", "KILL ALL ENEMIES", "NEXT WAVE")),
+               "ADD THE CONSTRICTOR", "RELEASE CANISTER", "RELEASE ESCAPE POD", "BAIL OUT",
+               "KILL ALL ENEMIES", "NEXT WAVE")),
     ("TRAVEL", ("TO THE STATION", "TO THE SUN", "DOCK NOW", "MIS-JUMP NEXT",
                 "TO MISSION SYSTEM")),
     ("COMMANDER", ("+10 KILLS", "+1000 CR", "LEVEL", "HARDCORE", "LEGAL", "ANGER STATION", "MISSION")),
-    ("DISPLAY", ("FRAME TIME", "REPAIR SHOP", "SPEED TEST")),
+    ("DISPLAY", ("FRAME TIME", "SPEED TEST")),
 )
 CAREER_ONLY = ("+1000 CR", "HARDCORE", "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION",
                "MIS-JUMP NEXT", "LEGAL", "FUEL TO 1/4", "TO MISSION SYSTEM", "MISSION")
-# the cheats that work away from a flight (title screen Options, docked Options tab);
+# the cheats that work away from a flight (title screen Options, docked Options);
 # all but the last two need a commander, as does SHIP (the equipment) there
 OFF_FLIGHT = ("+10 KILLS", "+1000 CR", "LEVEL", "HARDCORE", "LEGAL", "MISSION",
-              "FRAME TIME", "REPAIR SHOP", "SPEED TEST")
-NO_COMMANDER = ("FRAME TIME", "REPAIR SHOP", "SPEED TEST")
+              "FRAME TIME", "SPEED TEST")
+NO_COMMANDER = ("FRAME TIME", "SPEED TEST")
 MSG_TIME = 1.5          # seconds a DEBUG message stays on the Options' DEBUG page
 
 
@@ -237,11 +242,19 @@ def cheat_group(line):
     return None
 
 
-DEFAULT_NAME = "Jameson"    # what the missions call you if the badge has no name set
+DEFAULT_NAME = "Jameson"    # Elite's commander: the name when the badge has none set
 
 
-def cmdr_name():
-    """The badge owner's name from the badge's settings, for the mission texts."""
+def cmdr_name(c=None):
+    """The commander's name: commander c's own (build 89), else the badge
+    owner's from the badge's settings, else Elite's JAMESON."""
+    if c is not None and getattr(c, "name", ""):
+        return c.name
+    return badge_name()
+
+
+def badge_name():
+    """The badge owner's name from the badge's settings, or DEFAULT_NAME."""
     try:
         import settings
         n = settings.get("name")
@@ -310,18 +323,17 @@ class Pad:
     def __init__(self, owner):
         table = [(name.lower(), BUTTON_TYPES[name])
                  for name in ("UP", "DOWN", "LEFT", "RIGHT", "CONFIRM", "CANCEL")]
-        if JOY is not None:
-            for name in ("UP", "DOWN", "LEFT", "RIGHT"):
-                table.append(("j_" + name.lower(), JOY[name]))
-            for name in "ABCDEF":
-                table.append((name, FB[name]))
+        for name in ("UP", "DOWN", "LEFT", "RIGHT"):
+            table.append(("j_" + name.lower(), JOY[name]))
+        for name in "ABCDEF":
+            table.append((name, FB[name]))
         for name in ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "T", "U", "V", "C", "SPACE",
                      "BACKSPACE",
                      "UP", "DOWN", "LEFT", "RIGHT"):
             key = KEYBOARD_BUTTONS.get(name)
             if key is not None:
                 table.append(("k_" + name, key))
-                if name in ("UP", "DOWN", "LEFT", "RIGHT") and JOY is not None:
+                if name in ("UP", "DOWN", "LEFT", "RIGHT"):
                     # the cursor keys count as the joystick too, so every menu,
                     # tab and chart that reads "j_up" ... takes them (Brian)
                     table.append(("j_" + name.lower(), key))
@@ -347,6 +359,17 @@ class Pad:
             if key is not None:
                 table.append((control, key))
         self.table = table
+        # the letters a keyboard types, for finding a system by name (build 88)
+        self.letters = {}
+        for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
+            key = KEYBOARD_BUTTONS.get(ch)
+            if key is not None:
+                self.letters[key] = ch
+        key = KEYBOARD_BUTTONS.get("SPACE")
+        if key is not None:
+            self.letters[key] = " "
+        self.typed = ""      # letters typed since the last end_frame()
+        self.keyboard = False   # a keyboard key has been pressed (see AceCommander._keyboard)
         self.names = {}      # button -> the control names it counts as
         self.pressed = {}    # button -> True while it is down
         self.count = {}      # control name -> how many buttons hold it down
@@ -384,6 +407,12 @@ class Pad:
             self.hits.add(n)
             if mod:
                 self.hits.add("mod+" + n)
+            if n[:2] == "k_":
+                self.keyboard = True
+        ch = self.letters.get(button)
+        if ch is not None:
+            self.typed += ch
+            self.keyboard = True
 
     def _up(self, event):
         button = event.button
@@ -407,6 +436,8 @@ class Pad:
     def end_frame(self):
         if self.hits:
             self.hits = set()
+        if self.typed:
+            self.typed = ""
 
     def clear(self):
         self.pressed = {}
@@ -435,7 +466,7 @@ class AceCommander(app.App):
         self.p_hardcore = False # combat practice's own HARDCORE, apart from the commander's
         self.p_sel = 0          # the combat practice page's line: 0 LEVEL, 1 HARDCORE
         self.n_hardcore = False # the new-commander page's HARDCORE
-        self.n_sel = 0          # and its line: 0 LEVEL, 1 HARDCORE
+        self.n_sel = 0          # and its line: 0 NAME (build 89), 1 LEVEL, 2 HARDCORE
         self.game = None
         self.career = False     # the current game counts towards the commander
         self.docked = True      # the commander is at a station, not out in a flight
@@ -454,7 +485,19 @@ class AceCommander(app.App):
         self.brief = None       # a mission message being shown (mode "brief")
         self.data_of = None     # the system whose data D shows from the in-flight chart
         self.fire_lock = False  # the lasers wait until C is let go (held on from a menu)
-        self.repair_shop = True     # show the Repair Shop tab (Brian: on by default; DEBUG can turn it off)
+        self._bps = {}              # blueprints made for the docked screens with no game yet (_bp)
+        # finding a system on the Galactic chart (build 88): the keyboard's own
+        # page (find.Find), or the badge's text entry (the firmware's TextDialog)
+        self.finder = None
+        self.tdialog = None
+        # entering the commander's name (build 89): the keyboard's page
+        # (find.NameEntry) or the badge's text entry; what to do with it
+        self.namer = None
+        self.ndialog = None
+        self.name_done = None
+        self.n_name = ""        # the NEW COMMANDER page's name ("": the suggestion)
+        self.find_chart = None      # the chart the system found goes on
+        self.find_names = None      # find.Names for this galaxy, kept
         self.chart = None       # the local chart, while it is open
         self.jump_to = None     # (system, distance) the hyperspace countdown is for
         self.dt = 0.0           # seconds since the last update
@@ -470,10 +513,9 @@ class AceCommander(app.App):
         self.viewer = None
         self.paused = False
         self.tilt_ok = imu is not None   # the accelerometer is there and working
-        # steer by tilt as well as the joystick. Without the joystick's own
-        # button names (older firmware) tilt is the default, as the direction
-        # buttons are then needed for speed and missiles.
-        self.use_tilt = self.tilt_ok and (TILT_DEFAULT or JOY is None)
+        # steer by tilt as well as the joystick (TILT_DEFAULT, or the menu)
+        self.use_tilt = self.tilt_ok and TILT_DEFAULT
+        self.tilt_flip = 0      # CONTROLS (TILT_FLIPS): 1 pitch flipped, 2 roll, 3 both
         self.zero = None                 # accelerometer reading taken as "level"
         self.ms = 0.0                    # smoothed frame time
         self.leds_on = False             # we have taken over the LEDs
@@ -606,7 +648,7 @@ class AceCommander(app.App):
         elif g.jumping:         # stardust streaking past and off the edge
             self.jump_rgb = DUST_RGB
             f = cockpit.IFOCAL
-            for p in g.dust:
+            for p in g.view_dust():     # as the view being looked through sees it
                 z = int(p[2])
                 if z > cockpit.INEAR:
                     sx = int(p[0]) * f // z
@@ -769,7 +811,9 @@ class AceCommander(app.App):
         confirm = hit("confirm")
         self.dt = dt = delta / 1000.0
 
-        if self.mode == "menu":
+        if self._update_name(cancel, confirm):
+            pass                # the name being entered takes the input
+        elif self.mode == "menu":
             if cancel:
                 pad.clear()
                 self.minimise()
@@ -791,16 +835,21 @@ class AceCommander(app.App):
         elif self.mode == "level":
             if cancel:
                 self.mode = "menu"
-            elif hit("up") or hit("down"):
-                self.n_sel = 1 - self.n_sel
+            elif hit("up"):
+                self.n_sel = (self.n_sel - 1) % 3
+            elif hit("down"):
+                self.n_sel = (self.n_sel + 1) % 3
+            elif self.n_sel == 0 and (confirm or hit("right")):
+                self._open_name(self.n_name, self._new_name)    # NAME: C or right enters it
             elif hit("left") or hit("right"):
-                if self.n_sel == 0:
+                if self.n_sel == 1:
                     n = len(commander.LEVELS)
                     self.level = (self.level + (-1 if hit("left") else 1)) % n
-                else:
+                elif self.n_sel == 2:
                     self.n_hardcore = not self.n_hardcore
             elif confirm:
                 self.cmdr = commander.Commander(self.level)
+                self.cmdr.name = self.n_name or badge_name().upper()[:12]
                 self.cmdr.hardcore = self.n_hardcore    # fixed from now on (DEBUG can change it)
                 self.career = False     # an old commander's flight banks nothing into it
                 self._write()
@@ -815,9 +864,8 @@ class AceCommander(app.App):
         elif self.mode == "brief":
             b = self.brief
             held = pad.held
-            new = FB is not None    # the joystick told apart from A and D
-            up = held("j_up" if new else "up") or held("k_UP")
-            down = held("j_down" if new else "down") or held("k_DOWN")
+            up = held("j_up") or held("k_UP")
+            down = held("j_down") or held("k_DOWN")
             b.tick(dt, (1 if down else 0) - (1 if up else 0))
             if cancel:
                 b.skip()
@@ -877,7 +925,8 @@ class AceCommander(app.App):
         elif item == "NEW COMMANDER":
             self.level = 1
             self.n_hardcore = False
-            self.n_sel = 0
+            self.n_name = ""        # the badge's name, or JAMESON, until one is entered
+            self.n_sel = 1          # on LEVEL: C starts at once; up to NAME to change it
             self.mode = "level"
         elif item == "COMBAT PRACTICE":
             self.p_sel = 0
@@ -956,6 +1005,8 @@ class AceCommander(app.App):
             g.rules = rules.GameRules(self._hardcore() if career else self.p_hardcore)
             if not career:
                 g.ecm = True    # practice flies with an ECM (by hand in Hardcore)
+                g.set_ship(ships.COBRA)     # practice is always in a Cobra Mk III
+                g.missiles = g.max_missiles if g.missile_bp else 0
             g.set_docking(g.docking)        # Hardcore: by hand, whatever the setting
         self.career = career
         g.again = "C: back to last save" if career else "C: fly again"
@@ -994,7 +1045,7 @@ class AceCommander(app.App):
             self.galaxy_n = c.galaxy
         if c.system is None:
             c.system = self.galaxy.find(*game_data.START_XY) or 0
-            c.fuel = min(commander.MAX_FUEL, game_data.START_FUEL)
+            c.fuel = min(c.max_fuel(), game_data.START_FUEL)
 
     def _enter_space(self, how):
         """Put the game in the commander's star system: "launch" (from the
@@ -1012,8 +1063,9 @@ class AceCommander(app.App):
 
     def _make_dock(self):
         self.dock = docked.Docked(self.cmdr, self.galaxy, self.target, GOODS, EQUIP,
-                                  self._ship_bp(), self.repair_shop,
-                                  (lambda: self._settings(True), self._change))
+                                  self._ship_bp(),
+                                  (lambda: self._settings(True), self._change),
+                                  self._bp if SHIPS else None)
 
     def _mission_flags(self):
         """Tell the game what the missions need of this system (see missions.py)."""
@@ -1036,7 +1088,7 @@ class AceCommander(app.App):
         c.docked_at = c.system  # the last station docked at
         self.witch = None
         if not EQUIP:           # nowhere to buy fuel: it's free, as before the equipment
-            c.fuel = commander.MAX_FUEL
+            c.fuel = c.max_fuel()
         if GOODS and self.galaxy is not None and (c.market is None
                                                   or c.market["system"] != c.system):
             from . import market
@@ -1108,30 +1160,33 @@ class AceCommander(app.App):
             for e in SHIPS:
                 if e[0] == game.CONSTRICTOR:
                     ship = game.Blueprint(e)
-        self.brief = briefing.Briefing(game_data, n, cmdr_name(), c.galaxy, ship)
+        self.brief = briefing.Briefing(game_data, n, cmdr_name(c), c.galaxy, ship)
         if not self.brief.done:
             self.mode = "brief"
 
     def _update_docked(self, dt, cancel, confirm):
         """The docked tabs. The joystick changes tab, and E / B do too. On a
         chart C hands the joystick to the cursor, then C picks a target and F
-        hands it back. C launches from Status. A launches from any tab. F goes
-        back to Status, and from Status to the title screen."""
+        hands it back. C on Status opens Options. A launches from any tab. F
+        goes back to Status, and from Status to the title screen."""
         d = self.dock
         hit = self.pad.hit
-        new = FB is not None
         d.tick(dt)
+        if self._update_find(cancel, confirm):
+            return
+        if (d.view is not None and d.cursor and hasattr(d.view, "number")
+                and hit(BTN_BOMB)):
+            self._open_find(d.view)     # B on the Galactic chart (cursor on): find a system
+            return
         if cancel and d.view is not None and d.cursor:
             d.use_cursor(False)     # F: the joystick goes back to changing tabs
             return
         if cancel:
-            if d.tab:
-                d.go(0)
-            else:
+            if not d.back():        # a sub-screen to its tab, a tab to Status
                 self._save_docked()
                 self.mode = "menu"
             return
-        if new and hit(BTN_MENU):
+        if hit(BTN_MENU):
             self._launch()
             return
         for key, tab in DOCK_KEYS:      # Elite's f0-f9 on the number row
@@ -1143,78 +1198,109 @@ class AceCommander(app.App):
                     have = [i for i, n in enumerate(self.cmdr.cargo) if n]
                     if have:            # Elite's Sell Cargo: start on what you carry
                         d.pick_good(have[0] - d.sel)
-                elif tab in d.tabs:
-                    d.go(d.tabs.index(tab))
+                elif tab in d.tabs or tab == "OPTIONS":
+                    d.open(tab)
                 return
-        if new and hit(BTN_SPEED_DOWN):
+        if hit(BTN_SPEED_DOWN):
             d.go(d.tab - 1)
             return
-        if new and hit(BTN_BOMB):
+        if hit(BTN_BOMB):
             d.go(d.tab + 1)
             return
         if d.view is not None and d.cursor:
             if confirm:
                 d.pick()
                 self.target = d.target
-            elif (new and hit(BTN_MISSILE)) or hit("k_D"):
+            elif (hit(BTN_MISSILE)) or hit("k_D"):
                 d.show(d.view.picked())     # its data; the target stays as it was
             else:
-                jx, jy = self._steer(False, STICK if new else ANY, new)
+                jx, jy = self._steer(False, STICK, True)
                 d.view.move(jx, jy, dt)
             return
         if d.view is not None:              # the joystick changes tab (below) until C
             if confirm:
                 d.use_cursor(True)
                 return
-            if (new and hit(BTN_MISSILE)) or hit("k_D"):
+            if (hit(BTN_MISSILE)) or hit("k_D"):
                 d.show(d.view.picked())
                 return
-        if hit("j_left" if new else "left"):
+        if hit("j_left"):
             d.go(d.tab - 1)
-        elif hit("j_right" if new else "right"):
+        elif hit("j_right"):
             d.go(d.tab + 1)
         elif d.name() == "EQUIP SHIP":
-            if self._repeat("j_up" if new else "up", dt):
+            if self._repeat("j_up", dt):
                 d.pick_item(-1)
-            elif self._repeat("j_down" if new else "down", dt):
+            elif self._repeat("j_down", dt):
                 d.pick_item(1)
-            elif hit("C" if new else "confirm"):
+            elif hit("C"):
                 d.buy_item()
-            elif (new and hit(BTN_MISSILE)) or hit("k_D"):
+            elif (hit(BTN_MISSILE)) or hit("k_D"):
                 d.next_mount()      # which view a laser is fitted to
         elif d.name() == "REPAIR SHOP":
-            if hit("j_up" if new else "up"):
+            if hit("j_up"):
                 d.pick_paint(-1)
-            elif hit("j_down" if new else "down"):
+            elif hit("j_down"):
                 d.pick_paint(1)
-            elif hit("C" if new else "confirm"):
+            elif hit("C"):
                 d.buy_paint()
+            elif hit(BTN_MISSILE) or hit("k_D"):
+                d.buy_transponder()      # a stolen ship, on a pirate world (build 84)
+        elif d.name() == "SHIPYARD":
+            if hit("j_up"):
+                d.pick_ship(-1)
+            elif hit("j_down"):
+                d.pick_ship(1)
+            elif hit("C"):
+                d.open_stats()      # any page: that ship's stats (and buying, for one for sale)
+            elif (hit(BTN_MISSILE) or hit("k_D")) and d.ysel == 0:
+                d.open("REPAIR SHOP")       # your own ship: the Repair Shop (build 82: on D)
+        elif d.name() == "SHIP STATS":
+            if d.ysel and hit("C"):
+                d.buy_ship(False)       # the one you fly goes into the hangar
+            elif d.ysel and (hit(BTN_MISSILE) or hit("k_D")):
+                d.buy_ship(True)        # trade it in
+        elif d.name() == "HANGAR":
+            if hit("j_up"):
+                d.pick_owned(-1)
+            elif hit("j_down"):
+                d.pick_owned(1)
+            elif hit("C"):
+                d.fly_owned()
+            elif hit(BTN_MISSILE) or hit("k_D"):
+                d.sell_owned()
         elif d.name() == "OPTIONS":
-            if hit("j_up" if new else "up"):
+            if hit("j_up"):
                 d.pick_option(-1)
-            elif hit("j_down" if new else "down"):
+            elif hit("j_down"):
                 d.pick_option(1)
-            elif hit("C" if new else "confirm"):
+            elif hit("C"):
                 d.change_option()
-        elif d.name() == "SYSTEM DATA" and ((new and hit(BTN_MISSILE)) or hit("k_D")):
+        elif d.name() == "SYSTEM DATA" and ((hit(BTN_MISSILE)) or hit("k_D")):
             d.back_to_chart()       # D: back to the chart you came from
         elif d.name() == "INVENTORY":
-            if self._repeat("j_up" if new else "up", dt):
+            if self._repeat("j_up", dt):
                 d.scroll_inventory(-1)
-            elif self._repeat("j_down" if new else "down", dt):
+            elif self._repeat("j_down", dt):
                 d.scroll_inventory(1)
+            elif hit("C"):
+                d.sell_all()        # the whole hold at this station's prices
+                d.scroll_inventory(0)
         elif d.name() == "MARKET":
             # the joystick picks a good; C buys and D sells; all repeat when held
-            if self._repeat("j_up" if new else "up", dt):
+            if self._repeat("j_up", dt):
                 d.pick_good(-1)
-            elif self._repeat("j_down" if new else "down", dt):
+            elif self._repeat("j_down", dt):
                 d.pick_good(1)
-            elif self._repeat("C" if new else "confirm", dt):
+            elif self._repeat("C", dt):
                 d.trade(True)
-            elif new and self._repeat(BTN_MISSILE, dt):
+            elif self._repeat(BTN_MISSILE, dt):
                 d.trade(False)
         elif confirm and d.name() == "STATUS":
-            self._launch()
+            if d.options:
+                d.open("OPTIONS")   # A launches (Brian), so C is Options
+            else:
+                self._launch()
 
     def _repeat(self, name, dt):
         """True when button name is pressed, and again and again while it is
@@ -1251,25 +1337,41 @@ class AceCommander(app.App):
         c = self.cmdr
         if c is None:
             return
-        g.missiles = c.missiles if g.missile_bp else 0
+        g.set_ship(self._ship_name(), ships.pylons(self._ship_name()))
+        g.missiles = min(c.missiles, g.max_missiles) if g.missile_bp else 0
+        mounts = ships.mounts(self._ship_name())
         for view in range(4):
-            g.set_laser(c.lasers[view] or None, view)
+            g.set_laser((c.lasers[view] or None) if view < mounts or view == 0 else None, view)
         g.energy_unit = "energy" in c.extras or "navy" in c.extras
         g.navy = "navy" in c.extras
         g.fuel_scoops = "scoops" in c.extras
         g.ecm = "ecm" in c.extras
         g.pod = "pod" in c.extras
-        g.ship_name = self._ship_name()
         g.bombs = 1 if "bomb" in c.extras else 0
         g.computer = "docking" in c.extras
         g.ship_rgb = cockpit.ship_rgb(c.colour)     # for the view from behind your ship
+        g.fuel_max = c.max_fuel()   # the fuel gauge's full tank (0: no hyperdrive)
         g.legal = c.legal
+        g.stolen = c.stolen         # lawful police may spot a stolen ship (build 84)
+        self._hot()
+
+    def _hot(self):
+        """A stolen ship keeps you an offender while you fly it (Brian, build
+        84): jumps and the escape pod clear your record no further than
+        ships.STOLEN_LEGAL. The galactic hyperdrive clears the ship too (85)."""
+        c = self.cmdr
+        if c is None or not c.stolen:
+            return
+        c.legal = max(c.legal, ships.STOLEN_LEGAL)
+        g = self.game
+        if g is not None and self.career:
+            g.legal = max(g.legal, ships.STOLEN_LEGAL)
 
     def _refuel(self, n):
         """Fuel skimmed from the sun: n tenths of a light year into the tank.
         Returns how many fitted (see Game.refuel)."""
         c = self.cmdr
-        n = min(n, commander.MAX_FUEL - c.fuel)
+        n = min(n, c.max_fuel() - c.fuel)
         c.fuel += n
         self.game.fuel = c.fuel
         return n
@@ -1391,6 +1493,7 @@ class AceCommander(app.App):
             c.galaxy = (c.galaxy + 1) % 8
             self._extra(c, "hyperdrive", False)     # used up
             g.legal = 0         # a new galaxy: a clean record, as in the original
+            c.stolen = g.stolen = False     # and a clean ship: nobody knows it there (build 85)
             self._place()
             c.system = self.galaxy.nearest(*galaxy.GAL_ARRIVE)
             c.docked_at = None  # nowhere docked in this galaxy yet
@@ -1407,6 +1510,7 @@ class AceCommander(app.App):
         c.system = to[0]
         c.fuel = max(0, c.fuel - to[1])
         g.legal //= 2           # a jump halves your legal status
+        self._hot()             # but not below an offender's in a stolen ship
         c.market = None         # a new system: its market is worked out on docking
         self.target = None
         self._enter_space("arrive")
@@ -1504,8 +1608,7 @@ class AceCommander(app.App):
         hit = pad.hit
         held = pad.held
         g = self.game
-        new = FB is not None    # joystick and lettered buttons are told apart
-        menu = hit(BTN_MENU) if new else cancel
+        menu = hit(BTN_MENU)
         # Elite's docking computer keys (Brian): C on, P off. P is the pause menu
         # otherwise. Read in any view, as Elite's main loop reads them.
         if hit("k_P"):
@@ -1529,8 +1632,9 @@ class AceCommander(app.App):
                 if self.career and c is not None:
                     c.cargo = [0] * commander.GOODS
                     self._extra(c, "pod", False)
-                    c.fuel = commander.MAX_FUEL
+                    c.fuel = c.max_fuel()
                     c.legal = g.legal = 0       # the original's pod clears your record too
+                    self._hot()                 # (not the ship's: it is insured, still stolen)
                     self.jump_to = None
                 # nothing else since the last save is lost; docking saves it
             self.eject_t += dt
@@ -1569,7 +1673,7 @@ class AceCommander(app.App):
             return False
         if self.paused:
             if not self._screen_keys():
-                self._update_fmenu(new, menu, cancel, confirm)
+                self._update_fmenu(menu, cancel, confirm)
             return False
         if menu:
             self.paused = True
@@ -1586,7 +1690,7 @@ class AceCommander(app.App):
         # keyboard or by tilting; lasers fire but can't hit (Game.looking)
         busy = self.fsub in SCREENS
         if busy:
-            self._update_screen(new, cancel, confirm)
+            self._update_screen(cancel, confirm)
         g.looking = self.fsub not in SCREENS
 
         tilt = self.use_tilt and self.tilt_ok
@@ -1594,7 +1698,7 @@ class AceCommander(app.App):
         missile = False
         if busy:                # the keyboard's W / A / S / D, or tilt
             roll, jy = self._steer(tilt, None, False)
-        elif new:               # joystick steers; lettered buttons do the rest
+        else:                   # joystick steers; lettered buttons do the rest
             if held(BTN_SPEED_UP):
                 throttle += 1.0
             if held(BTN_SPEED_DOWN):
@@ -1621,21 +1725,13 @@ class AceCommander(app.App):
             if hit(BTN_BOMB) and g.energy_bomb() and self.career and self.cmdr is not None:
                 self._extra(self.cmdr, "bomb", False)     # used up
             roll, jy = self._steer(tilt, STICK, True)
-        elif tilt:              # older firmware: the d-pad is free for speed and missiles
-            if held("up"):
-                throttle += 1.0
-            if held("down"):
-                throttle -= 1.0
-            if hit("left"):
-                missile = True
-            if hit("right"):
-                self.zero = None
-            roll, jy = self._steer(True, None, False)
-        else:
-            roll, jy = self._steer(False, ANY, False)
+        if self.tilt_flip & 1:      # the CONTROLS setting (build 87: every way of steering)
+            jy = -jy
+        if self.tilt_flip & 2:
+            roll = -roll
         if g.rules.manual_ecm:      # Hardcore: E is the ECM (or both speed buttons together)
-            if not busy and (hit("k_E") or (new and ((hit(BTN_SPEED_UP) and held(BTN_SPEED_DOWN))
-                                                     or (hit(BTN_SPEED_DOWN) and held(BTN_SPEED_UP))))):
+            if not busy and (hit("k_E") or (hit(BTN_SPEED_UP) and held(BTN_SPEED_DOWN))
+                             or (hit(BTN_SPEED_DOWN) and held(BTN_SPEED_UP))):
                 g.fire_ecm()
         elif held("k_E"):
             throttle += 1.0
@@ -1660,7 +1756,7 @@ class AceCommander(app.App):
             if ((hit("k_TAB") or hit("k_BACKSPACE")) and g.energy_bomb() and self.career
                     and self.cmdr is not None):
                 self._extra(self.cmdr, "bomb", False)     # used up
-            if new and hit("k_ESCAPE"):
+            if hit("k_ESCAPE"):
                 g.eject()           # Elite's ESCAPE: the escape pod (Esc is still back on menus)
             for n in range(4):      # the views, on a keyboard (both modes)
                 if hit("k_view%d" % n):
@@ -1676,7 +1772,7 @@ class AceCommander(app.App):
         # Space and F fire too (not locked: they never choose anything, so
         # one held through closing a screen keeps firing)
         fire = fire or held("k_F") or held("k_SPACE")
-        if g.autodock and not busy and self._took_controls(new):
+        if g.autodock and not busy and self._took_controls():
             g.stop_autodock()       # taking the controls switches the docking computer off
         pitch = jy if INVERT_PITCH else -jy
         t0 = _us()
@@ -1693,15 +1789,15 @@ class AceCommander(app.App):
                 self._fly_in()
         return True
 
-    def _took_controls(self, new):
+    def _took_controls(self):
         """A fresh press of a flight control (not one still held from choosing
         DOCKING COMPUTER in the menu, and not tilting the badge): the
         docking computer hands back control."""
         hit = self.pad.hit
-        for name in (STICK if new else ANY):
+        for name in (STICK):
             if hit(name):
                 return True
-        if new and (hit(BTN_SPEED_UP) or hit(BTN_SPEED_DOWN) or hit(BTN_MISSILE)):
+        if (hit(BTN_SPEED_UP) or hit(BTN_SPEED_DOWN) or hit(BTN_MISSILE)):
             return True
         for name in ("confirm", "k_E", "k_Q", "k_F", "k_SPACE", "k_M"):
             if hit(name):
@@ -1710,19 +1806,28 @@ class AceCommander(app.App):
 
     def _ship_name(self):
         """The ship you fly, by Elite's name (the game's own design for that role
-        with DATA: OWN). Always the Cobra Mk III until ship types are built
-        (DESIGN.md phase 6): the scenes and the Repair Shop all ask here."""
-        return "COBRA MK III"
+        with DATA: OWN): the commander's (ships.py, build 78), the Cobra Mk III
+        without one. The scenes and the Repair Shop all ask here."""
+        c = self.cmdr
+        if c is not None and ships.known(c.ship):
+            return c.ship
+        return ships.COBRA
 
     def _ship_bp(self):
         """Your ship's blueprint, or None without ship data."""
-        name = self._ship_name()
+        return self._bp(self._ship_name())
+
+    def _bp(self, name):
+        """A ship type's blueprint, or None without ship data."""
         if self.game is not None:
             return self.game.types.get(name)
-        for e in SHIPS or ():
-            if e[0] == name:
-                return game.Blueprint(e)
-        return None
+        bp = self._bps.get(name)
+        if bp is None:
+            for e in SHIPS or ():
+                if e[0] == name:
+                    bp = self._bps[name] = game.Blueprint(e)
+                    break
+        return bp
 
     def _fly_in(self, pod=False):
         """The docking scene: in through the station's tunnel, a while in the
@@ -1740,12 +1845,15 @@ class AceCommander(app.App):
         """The settings, shared by the in-flight Settings page and the title
         screen's Options page. cmdr: include the commander's own (docking
         style and the Constrictor)."""
-        stick = "JOYSTICK" if FB is not None else "STICK"
+        stick = "JOYSTICK"
         if self.tilt_ok:
             steer = "STEER: " + ("TILT" if self.use_tilt else stick)
         else:
             steer = "STEER: %s (no tilt sensor)" % stick
         items = [steer]
+        items.append("CONTROLS: " + TILT_FLIPS[self.tilt_flip])
+        if cmdr and self.cmdr is not None and self.mode != "flight":
+            items.append("NAME: " + cmdr_name(self.cmdr).upper())     # build 89
         if cmdr and self.cmdr is not None:
             items.append("DOCKING: " + DOCK_NAMES["A" if self._manual_docking() else self.cmdr.docking])
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
@@ -1775,6 +1883,12 @@ class AceCommander(app.App):
                 self.od_sel = 0
                 self.od_msg = None
                 self.mode = "odebug"
+        elif item.startswith("NAME"):
+            if not left:
+                self._open_name(self.cmdr.name, self._set_name)
+        elif item.startswith("CONTROLS"):  # left goes back a choice
+            self.tilt_flip = (self.tilt_flip + (-1 if left else 1)) % len(TILT_FLIPS)
+            self._save_options()
         elif item.startswith("STEER"):
             if self.tilt_ok:
                 self.use_tilt = not self.use_tilt
@@ -1815,6 +1929,9 @@ class AceCommander(app.App):
                 self.use_tilt = d["tilt"] and self.tilt_ok
             if isinstance(d.get("leds"), bool):
                 self.use_leds = d["leds"]
+            k = d.get("tilt_flip")
+            if isinstance(k, int) and not isinstance(k, bool) and 0 <= k < len(TILT_FLIPS):
+                self.tilt_flip = k
             if isinstance(d.get("hardcore"), bool):
                 self.old_hardcore = d["hardcore"]
             if isinstance(d.get("practice_hardcore"), bool):
@@ -1831,7 +1948,8 @@ class AceCommander(app.App):
     def _save_options(self):
         try:
             with open(options_path(), "w") as f:
-                f.write(json.dumps({"tilt": self.use_tilt, "leds": self.use_leds,
+                f.write(json.dumps({"tilt": self.use_tilt, "tilt_flip": self.tilt_flip,
+                                    "leds": self.use_leds,
                                     "practice_level": self.p_level,
                                     "practice_hardcore": self.p_hardcore,
                                     "own": self.own_ships, "egg": self.egg,
@@ -1843,18 +1961,17 @@ class AceCommander(app.App):
         """The title screen's Options page: joystick up / down picks, left /
         right or C changes, F goes back to the title screen."""
         hit = self.pad.hit
-        new = FB is not None
         items = self._settings(True)
         self.omenu %= len(items)
         if cancel:
             self.mode = "menu"
-        elif hit("j_up" if new else "up"):
+        elif hit("j_up"):
             self.omenu = (self.omenu - 1) % len(items)
-        elif hit("j_down" if new else "down"):
+        elif hit("j_down"):
             self.omenu = (self.omenu + 1) % len(items)
         else:
-            left = hit("j_left" if new else "left")
-            if confirm or left or hit("j_right" if new else "right"):
+            left = hit("j_left")
+            if confirm or left or hit("j_right"):
                 self._change(items[self.omenu], left)
 
     def _draw_options(self, ctx):
@@ -1862,13 +1979,13 @@ class AceCommander(app.App):
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
         text(ctx, "OPTIONS", 0, -80, 20, cockpit.WHITE)
         items = self._settings(True)
-        y = -44
+        y = -52                 # seven lines fit (build 85: TILT)
         for i, label in enumerate(items):
             if i == self.omenu % len(items):
-                ctx.rgb(*cockpit.DIM).rectangle(-104, y - 9, 208, 18).fill()
+                ctx.rgb(*cockpit.DIM).rectangle(-104, y - 8, 208, 16).fill()
             text(ctx, label, 0, y, 14, cockpit.GREEN if i == self.omenu % len(items)
                  else cockpit.GREY)
-            y += 20
+            y += 17
         if self.cmdr is None:
             text(ctx, "more with a commander", 0, y + 4, 11, cockpit.GREY)
         text(ctx, "< > or C: change", 0, 82, 11, cockpit.GREY)     # below six lines
@@ -1918,8 +2035,6 @@ class AceCommander(app.App):
             return "LEGAL: " + game.legal_name(g.legal if flying else c.legal)
         if key == "MISSION":
             return "MISSION: " + missions.stage_name(c.mission if c else 0)
-        if key == "REPAIR SHOP":
-            return "REPAIR SHOP: " + onoff(self.repair_shop)
         return key
 
     def _cheats(self, group, flying):
@@ -1998,7 +2113,6 @@ class AceCommander(app.App):
 
     def _update_odebug(self, dt, cancel, confirm):
         hit = self.pad.hit
-        new = FB is not None
         if self.od_msg_t > 0:
             self.od_msg_t -= dt
             if self.od_msg_t <= 0:
@@ -2012,9 +2126,9 @@ class AceCommander(app.App):
                 self.od_page = None
             else:
                 self.mode = self.od_from or "menu"
-        elif hit("j_up" if new else "up"):
+        elif hit("j_up"):
             self.od_sel = (self.od_sel - 1) % n
-        elif hit("j_down" if new else "down"):
+        elif hit("j_down"):
             self.od_sel = (self.od_sel + 1) % n
         elif confirm and items:
             item = items[self.od_sel % n]
@@ -2047,13 +2161,6 @@ class AceCommander(app.App):
             self.bench = bench.Bench()      # F comes back to this page
             self.mode = "bench"
             return None
-        if item.startswith("REPAIR SHOP"):
-            self.repair_shop = not self.repair_shop
-            if self.od_from == "docked" and self.dock is not None:
-                self._make_dock()           # the tab comes or goes at once
-                self.dock.open("OPTIONS")
-                self.dock.osel = len(self._settings(True)) - 1
-            return "REPAIR SHOP " + ("ON" if self.repair_shop else "OFF")
         if c is None:
             return None
         if item == "+10 KILLS":
@@ -2093,7 +2200,8 @@ class AceCommander(app.App):
         c = self.cmdr
         onoff = lambda b: "ON" if b else "OFF"
         e = c.extras
-        return ["LASER: " + c.lasers[0].upper(),
+        return ["SHIP: " + self._ship_title(c.ship),
+                "LASER: " + c.lasers[0].upper(),
                 "REAR LASER: " + (c.lasers[1] or "none").upper(),
                 "LEFT LASER: " + (c.lasers[2] or "none").upper(),
                 "RIGHT LASER: " + (c.lasers[3] or "none").upper(),
@@ -2102,7 +2210,8 @@ class AceCommander(app.App):
                 "CARGO BAY: %dT" % c.hold, "FUEL SCOOPS: " + onoff("scoops" in e),
                 "ECM: " + onoff("ecm" in e), "ESCAPE POD: " + onoff("pod" in e),
                 "ENERGY BOMB: " + onoff("bomb" in e), "DOCK COMPUTER: " + onoff("docking" in e),
-                "GAL. HYPERDRIVE: " + onoff("hyperdrive" in e)]
+                "GAL. HYPERDRIVE: " + onoff("hyperdrive" in e),
+                "STOLEN: " + onoff(c.stolen)]
 
     def _ship_config_c(self, item):
         c = self.cmdr
@@ -2110,6 +2219,12 @@ class AceCommander(app.App):
                   "ECM": "ecm", "ESCAPE POD": "pod", "ENERGY BOMB": "bomb",
                   "DOCK COMPUTER": "docking", "GAL. HYPERDRIVE": "hyperdrive"}
         key = item.split(":")[0]
+        if key == "SHIP":
+            self._debug_ship()
+            return
+        if key == "STOLEN":
+            self._debug_stolen()
+            return
         mount = self.MOUNTS.get(key)
         if mount is not None:
             kinds = list(commander.LASERS) + ([] if mount == 0 else [""])
@@ -2118,12 +2233,12 @@ class AceCommander(app.App):
             self._write_setting("lasers", list(c.lasers))
             return
         if key == "MISSILES":
-            c.missiles = (c.missiles + 1) % (game.MAX_MISSILES + 1)
+            c.missiles = (c.missiles + 1) % (ships.pylons(c.ship) + 1)
             self._write_setting("missiles", c.missiles)
             return
         if key == "CARGO BAY":
             from . import equipment
-            c.hold = commander.HOLD if c.hold >= equipment.BIG_HOLD else equipment.BIG_HOLD
+            c.hold = ships.base_hold(c.ship) if c.hold > ships.base_hold(c.ship) else ships.big_hold(c.ship)
             self._write_setting("hold", c.hold)
             return
         name = extras.get(key)
@@ -2137,12 +2252,68 @@ class AceCommander(app.App):
 
     MOUNTS = {"LASER": 0, "REAR LASER": 1, "LEFT LASER": 2, "RIGHT LASER": 3}
 
+    def _ship_title(self, name):
+        """A ship type's name as shown (the game's own name with DATA: OWN)."""
+        bp = self.game.types.get(name) if self.game is not None else None
+        if bp is None:
+            for e in SHIPS or ():
+                if e[0] == name:
+                    return e[5] if len(e) > 5 else e[0]
+        return bp.title if bp is not None else name
+
+    def _debug_stolen(self):
+        """DEBUG > SHIP CONFIG > STOLEN (Brian, build 84): the ship you fly is
+        stolen or not, saved; in a flight the police see it at once."""
+        c = self.cmdr
+        c.stolen = not c.stolen
+        self._write_setting("stolen", c.stolen)
+        g = self.game
+        if g is not None and self.mode == "flight" and self.career:
+            g.stolen = c.stolen
+        self._hot()
+        self._write_setting("legal", c.legal)
+
+    def _debug_ship(self):
+        """DEBUG > SHIP CONFIG > SHIP (Brian, build 78): fly the next ship
+        type, cheapest first, keeping the equipment it can take (the hold,
+        missiles and laser mounts cut down to its own). In a career flight or
+        docked it is the commander's ship from now on, saved; in practice only
+        this flight's."""
+        order = sorted(ships.TYPES, key=lambda n: ships.TYPES[n][ships.PRICE])
+        flying = self.mode == "flight" and self.game is not None
+        c = self.cmdr if (self.career or not flying) else None
+        now = c.ship if c is not None else self.game.ship_name
+        name = order[(order.index(now) + 1) % len(order)] if now in order else order[0]
+        if c is not None:
+            c.ship = name
+            c.hold = max(ships.base_hold(name), min(ships.big_hold(name), c.hold))
+            c.missiles = min(c.missiles, ships.pylons(name))
+            c.fuel = min(c.fuel, c.max_fuel())
+            for v in range(1, 4):
+                if v >= ships.mounts(name):
+                    c.lasers[v] = ""
+            for key, value in (("ship", name), ("hold", c.hold), ("missiles", c.missiles),
+                               ("lasers", list(c.lasers)), ("fuel", c.fuel)):
+                self._write_setting(key, value)
+            if not flying and self.dock is not None:
+                self.dock.ship = self._ship_bp()    # the Repair Shop shows the new one
+        if flying:
+            g = self.game
+            if c is not None:
+                self._fit(g)
+            else:
+                g.set_ship(name, ships.pylons(name))
+                for v in range(1, 4):
+                    if v >= ships.mounts(name):
+                        g.set_laser(None, v)
+
     def _ship_items(self):
         """The SHIP CONFIG page (a DEBUG page): the ship's equipment, changed
         straight away in this flight and, with a commander, for good."""
         g = self.game
         onoff = lambda b: "ON" if b else "OFF"
-        items = ["LASER: " + g.lasers[0].upper(),
+        items = ["SHIP: " + self._ship_title(g.ship_name),
+                 "LASER: " + g.lasers[0].upper(),
                  "REAR LASER: " + (g.lasers[1] or "none").upper(),
                  "LEFT LASER: " + (g.lasers[2] or "none").upper(),
                  "RIGHT LASER: " + (g.lasers[3] or "none").upper(),
@@ -2156,12 +2327,19 @@ class AceCommander(app.App):
                   "ENERGY BOMB: " + onoff(g.bombs), "DOCK COMPUTER: " + onoff(g.computer)]
         if self.career and self.cmdr is not None:
             items.append("GAL. HYPERDRIVE: " + onoff("hyperdrive" in self.cmdr.extras))
+            items.append("STOLEN: " + onoff(self.cmdr.stolen))
         return items
 
     def _ship_config(self, item):
         """Change one thing on the SHIP CONFIG page (C goes to the next setting)."""
         g = self.game
         c = self.cmdr if self.career else None
+        if item.startswith("SHIP:"):
+            self._debug_ship()
+            return
+        if item.startswith("STOLEN:"):
+            self._debug_stolen()
+            return
         mount = self.MOUNTS.get(item.split(":")[0])
         if mount is not None:      # C goes round: the lasers, then none (the front always has one)
             kinds = list(game.LASERS) + ([] if mount == 0 else [None])
@@ -2172,7 +2350,7 @@ class AceCommander(app.App):
                 c.lasers[mount] = nxt or ""
         elif item.startswith("MISSILES"):
             if g.missile_bp:
-                g.missiles = (g.missiles + 1) % (game.MAX_MISSILES + 1)
+                g.missiles = (g.missiles + 1) % (g.max_missiles + 1)
                 if c is not None:
                     c.missiles = g.missiles
         elif item.startswith("ENERGY UNIT"):
@@ -2190,7 +2368,7 @@ class AceCommander(app.App):
                 self._extra(c, "navy", g.navy)
         elif item.startswith("CARGO BAY") and c is not None:
             from . import equipment
-            c.hold = commander.HOLD if c.hold >= equipment.BIG_HOLD else equipment.BIG_HOLD
+            c.hold = ships.base_hold(c.ship) if c.hold > ships.base_hold(c.ship) else ships.big_hold(c.ship)
         elif item.startswith("FUEL SCOOPS") and c is not None:
             g.fuel_scoops = not g.fuel_scoops
             self._extra(c, "scoops", g.fuel_scoops)
@@ -2226,10 +2404,6 @@ class AceCommander(app.App):
         """Do one of the DEBUG page's cheats. Kills made this way count like
         any others, so with a commander they raise the rank."""
         g = self.game
-        if item.startswith("REPAIR SHOP"):
-            self.repair_shop = not self.repair_shop     # shown from the next docking
-            g.say("REPAIR SHOP " + ("ON" if self.repair_shop else "OFF"))
-            return
         if item.startswith("HARDCORE"):
             # the commander's Hardcore, at once: this flight's rules too
             c = self.cmdr
@@ -2304,15 +2478,15 @@ class AceCommander(app.App):
                 g._spawn_ship()
         elif item == "REFILL MISSILES":
             if g.missile_bp:
-                g.missiles = game.MAX_MISSILES
+                g.missiles = g.max_missiles
         elif item == "REFILL FUEL":
             if self.career and self.cmdr is not None:
-                self.cmdr.fuel = commander.MAX_FUEL
+                self.cmdr.fuel = self.cmdr.max_fuel()
         elif item == "+10 KILLS":
             g.kills += 10
         elif item == "FUEL TO 1/4":
             if self.career and self.cmdr is not None:
-                self.cmdr.fuel = commander.MAX_FUEL // 4
+                self.cmdr.fuel = self.cmdr.max_fuel() // 4
                 c = self.cmdr
                 g.say("FUEL %d.%d LY" % (c.fuel // 10, c.fuel % 10))
         elif item == "+1000 CR":
@@ -2322,6 +2496,14 @@ class AceCommander(app.App):
         elif item == "RELEASE CANISTER":
             if g.release_canister() is None:
                 g.say("TOO MANY OBJECTS")
+        elif item == "RELEASE ESCAPE POD":      # build 86
+            if g.release_pod() is None:
+                g.say("TOO MANY OBJECTS")
+        elif item == "BAIL OUT":           # the nearest ship with a pod abandons ship
+            if g.bail_nearest() is None:
+                g.say("NO SHIP WITH A POD")
+            else:
+                g.say("ESCAPE POD AWAY")
         elif item == "TO THE SUN":
             g.to_sun(1.15, 1.6)     # flying on takes you down through the scooping band
         elif item == "TO THE STATION":
@@ -2373,15 +2555,15 @@ class AceCommander(app.App):
         self.zero = None
         self.fire_lock = True   # the C that chose a menu line isn't a shot
 
-    def _update_fmenu(self, new, menu, cancel, confirm):
+    def _update_fmenu(self, menu, cancel, confirm):
         hit = self.pad.hit
-        if menu and new:        # A closes the menu from any page
+        if menu:        # A closes the menu from any page
             self._resume()
             return
         items = self._fitems()
-        if hit("j_up" if new else "up"):
+        if hit("j_up"):
             self.fmenu = (self.fmenu - 1) % len(items)
-        elif hit("j_down" if new else "down"):
+        elif hit("j_down"):
             self.fmenu = (self.fmenu + 1) % len(items)
         elif cancel:
             if self.fsub is None:
@@ -2400,15 +2582,15 @@ class AceCommander(app.App):
                 self.fmenu = self._fitems_top().index("SETTINGS")
                 self.fsub = None
         elif self.fsub == "settings":
-            left = hit("j_left" if new else "left")
-            side = left or hit("j_right" if new else "right")
+            left = hit("j_left")
+            side = left or hit("j_right")
             if confirm or side:
                 self._change(items[self.fmenu], left)
         elif self.fsub is None and items[self.fmenu].startswith("VIEW: ") and (
-                confirm or hit("j_left" if new else "left") or hit("j_right" if new else "right")):
+                confirm or hit("j_left") or hit("j_right")):
             # the camera changes and the menu stays open (Brian): C or right
             # goes to the next view, left back
-            step = -1 if hit("j_left" if new else "left") else 1
+            step = -1 if hit("j_left") else 1
             self.game.set_view((self.game.view + step) % 4)
         elif self.fsub == "debug":
             if confirm:
@@ -2465,6 +2647,9 @@ class AceCommander(app.App):
             # a keyboard that sends it)
             pick = line("GALACTIC JUMP") if hit("mod+k_H") else line("HYPERSPACE")
             if pick is None:
+                c = self.cmdr
+                if self.career and c is not None and not c.max_fuel() and self.game is not None:
+                    self.game.say("NO HYPERDRIVE", 1.5)     # an in-system ship (ships.TANKS)
                 return False        # Ctrl+H is never plain hyperspace
             self._fpick(pick)
             return True
@@ -2512,16 +2697,16 @@ class AceCommander(app.App):
         self.fmarket = market.Market(GOODS, self.galaxy.system(c.system).economy, c)
         self._open("market")
 
-    def _update_screen(self, new, cancel, confirm):
+    def _update_screen(self, cancel, confirm):
         """A screen's own controls: the joystick and buttons (and the cursor
         keys, Enter and Esc). C or F goes back to the flight."""
         s = self.fsub
         hit = self.pad.hit
         if s == "chart":
-            self._update_chart(new, cancel, confirm)
+            self._update_chart(cancel, confirm)
             return
         if s == "data":         # back to the chart
-            if confirm or cancel or (new and hit(BTN_MISSILE)) or hit("k_D"):
+            if confirm or cancel or (hit(BTN_MISSILE)) or hit("k_D"):
                 self.fsub = "chart"
             return
         if confirm or cancel:
@@ -2533,9 +2718,9 @@ class AceCommander(app.App):
                 n, shown = len(GOODS), screens.ROWS
             else:
                 n, shown = len(screens.cargo_rows(self.cmdr)), screens.ROWS - 1
-            if self._repeat("j_up" if new else "up", self.dt):
+            if self._repeat("j_up", self.dt):
                 self.top = max(0, self.top - 1)
-            elif self._repeat("j_down" if new else "down", self.dt):
+            elif self._repeat("j_down", self.dt):
                 self.top = max(0, min(n - shown, self.top + 1))
 
     def _fpick(self, item):
@@ -2581,17 +2766,181 @@ class AceCommander(app.App):
             self.fsub = "settings"
             self.fmenu = 0
 
-    def _update_chart(self, new, cancel, confirm):
+    # ---- finding a system by name (build 88) -----------------------------
+
+    def _keyboard(self):
+        """True if a keyboard is fitted: its hexpansion's driver (KeyboardApp)
+        is running, or its header names a keyboard; else if a keyboard key
+        has been pressed."""
+        try:
+            from system.hexpansion.app import _hexpansion_manager as m
+            if m is not None:
+                for a in m.hexpansion_apps.values():
+                    if a is not None and type(a).__name__ == "KeyboardApp":
+                        return True
+                for h in m.hexpansion_headers.values():
+                    if h is not None and "KEYB" in str(getattr(h, "friendly_name", "")).upper():
+                        return True
+        except Exception:
+            pass
+        return self.pad.keyboard
+
+    def _names(self):
+        from . import find
+        if self.find_names is None or self.find_names[0] != self.galaxy_n:
+            self.find_names = (self.galaxy_n, find.Names(self.galaxy))
+        return self.find_names[1]
+
+    def _open_find(self, chart):
+        """Find a system for this chart: with a keyboard fitted, the game's
+        own page (type, suggestions, pick); without, the badge's text entry
+        (Brian: only one or the other)."""
+        from . import find
+        self.find_chart = chart
+        names = self._names()
+        if not self._keyboard():
+            try:
+                from app_components.dialog import TextDialog
+                TextDialog = find.small_dialog(TextDialog)     # smaller text (build 90)
+                # registered to the host (app.py's loader): the firmware's
+                # eventbus gives the buttons only to the focused app, and the
+                # game itself never is (build 89 fix: it froze the badge)
+                self.tdialog = TextDialog("FIND SYSTEM", self.host)
+                return
+            except Exception:
+                self.tdialog = None     # no firmware dialog (a PC): the keyboard page
+        self.finder = find.Find(self.galaxy, names)
+
+    def _found(self, i):
+        """Put the chart's cursor on system i (None: not found)."""
+        self.finder = None
+        self.tdialog = None
+        ch = self.find_chart
+        self.find_chart = None
+        if i is not None and ch is not None:
+            ch.goto(i)
+
+    def _update_find(self, cancel, confirm):
+        """While a search is open: True (it takes all the input)."""
+        if self.tdialog is not None:
+            dl = self.tdialog
+            found = self._names().matches(dl.text)
+            dl.message = self._names().names[found[0]] if found else (
+                "NO MATCH" if dl.text else "FIND SYSTEM")
+            r = getattr(dl, "_result", None)
+            if r is False:
+                self._found(None)
+            elif r is not None:
+                self._found(found[0] if found else None)
+            self.pad.clear()        # the dialog has the buttons
+            return True
+        if self.finder is None:
+            return False
+        f = self.finder
+        hit = self.pad.hit
+        for ch in self.pad.typed:
+            f.type(ch)
+        if hit("k_BACKSPACE"):
+            f.back()
+        elif hit("j_up"):
+            f.pick(-1)
+        elif hit("j_down"):
+            f.pick(1)
+        elif confirm:
+            self._found(f.chosen())
+        elif cancel:
+            self._found(None)
+        return True
+
+    def _open_name(self, current, done):
+        """Enter a commander's name, starting from current; done(name) gets
+        it. The suggestion is the badge's name (Elite's JAMESON without one):
+        greyed on the keyboard's page, Tab fills it; the badge's text entry
+        takes it when Done is pressed on nothing."""
+        from . import find
+        self.name_done = done
+        sug = badge_name().upper()[:find.NAME_MAX]
+        if not self._keyboard():
+            try:
+                from app_components.dialog import TextDialog
+                TextDialog = find.small_dialog(TextDialog)     # smaller text (build 90)
+                self.ndialog = TextDialog("NAME? (none: %s)" % sug, self.host)     # see _open_find
+                self.ndialog.text = current.lower()
+                return
+            except Exception:
+                self.ndialog = None
+        self.namer = find.NameEntry(sug, current)
+
+    def _name_entered(self, name):
+        done = self.name_done
+        self.namer = self.ndialog = self.name_done = None
+        if name is not None and done is not None:
+            done(name)
+
+    def _update_name(self, cancel, confirm):
+        """While the name is being entered: True (it takes all the input)."""
+        from . import find
+        if self.ndialog is not None:
+            r = getattr(self.ndialog, "_result", None)
+            if r is False:
+                self._name_entered(None)
+            elif r is not None:
+                n = r.strip().upper()[:find.NAME_MAX]
+                self._name_entered(n or badge_name().upper()[:find.NAME_MAX])
+            self.pad.clear()        # the dialog has the buttons
+            return True
+        if self.namer is None:
+            return False
+        e = self.namer
+        hit = self.pad.hit
+        for ch in self.pad.typed:
+            e.type(ch)
+        if hit("k_TAB"):
+            e.fill()
+        elif hit("k_BACKSPACE"):
+            e.back()
+        elif confirm:
+            self._name_entered(e.result())
+        elif cancel:
+            self._name_entered(None)
+        return True
+
+    def _draw_name(self, ctx):
+        if self.namer is not None:
+            self.namer.draw(ctx)
+        elif self.ndialog is not None:
+            self.ndialog.draw(ctx)
+
+    def _new_name(self, name):
+        self.n_name = name
+
+    def _set_name(self, name):
+        """The commander's new name, saved at once."""
+        self.cmdr.name = name
+        self._write_setting("name", name)
+
+    def _draw_find(self, ctx):
+        if self.finder is not None:
+            self.finder.draw(ctx)
+        elif self.tdialog is not None:
+            self.tdialog.draw(ctx)
+
+    def _update_chart(self, cancel, confirm):
         """The in-flight charts: the joystick moves the cursor, C makes the
         selected system the target (Brian: only that; H or the menu's
         HYPERSPACE line jumps, as Elite), C on where you are clears it, D
         shows its data, F goes back."""
+        if self._update_find(cancel, confirm):
+            return
         if cancel:
             self._resume()
             self.chart = None
             return
         ch = self.chart
-        if (new and self.pad.hit(BTN_MISSILE)) or self.pad.hit("k_D"):
+        if self.pad.hit(BTN_BOMB) and hasattr(ch, "number"):
+            self._open_find(ch)     # B on the Galactic chart: find a system by name
+            return
+        if (self.pad.hit(BTN_MISSILE)) or self.pad.hit("k_D"):
             if ch.picked() is not None:
                 self.data_of = ch.picked()      # D: the selected system's data
                 self.fsub = "data"
@@ -2602,7 +2951,7 @@ class AceCommander(app.App):
                 self.target = None if i == ch.here else i
                 ch.marked = self.target
             return
-        jx, jy = self._steer(False, STICK if new else ANY, new, False)   # W A S D fly the ship
+        jx, jy = self._steer(False, STICK, True, False)   # W A S D fly the ship
         ch.move(jx, jy, self.dt)
 
     def _draw_screen(self, ctx):
@@ -2610,6 +2959,7 @@ class AceCommander(app.App):
         s = self.fsub
         if s == "chart":
             self.chart.draw(ctx)
+            self._draw_find(ctx)
             return
         if s == "data":
             self._draw_data(ctx)
@@ -2630,7 +2980,7 @@ class AceCommander(app.App):
                 target = gal.system(self.target).name
                 dist = gal.distance(c.system, self.target)
             screens.draw_status(ctx, c, here, target, dist, self.game.condition(),
-                                game.legal_name(c.legal))
+                                game.legal_name(c.legal), cmdr_name(c).upper())
 
     def _draw_data(self, ctx):
         """D on the in-flight chart: the selected system's data."""
@@ -2650,7 +3000,8 @@ class AceCommander(app.App):
         if self.career:
             # always there, unless a countdown is on: with a target in range it
             # jumps, without one it opens the local chart to pick one
-            if self.galaxy is not None and self.game is not None and self.game.jump_t <= 0:
+            if (self.galaxy is not None and self.game is not None and self.game.jump_t <= 0
+                    and self.cmdr is not None and self.cmdr.max_fuel()):    # no hyperdrive: no line
                 to = self._jump_ok()
                 items.append("HYPERSPACE: " + self.galaxy.system(to[0]).name if to is not None
                              else "HYPERSPACE")
@@ -2663,7 +3014,7 @@ class AceCommander(app.App):
                     items.append("DOCK COMPUTER OFF")
                 elif g.space is not None and g.space.safe:
                     items.append("DOCKING COMPUTER")
-            if (c is not None and "hyperdrive" in c.extras and g is not None
+            if (c is not None and "hyperdrive" in c.extras and g is not None and c.max_fuel()
                     and g.jump_t <= 0 and self.galaxy is not None):
                 items.append("GALACTIC JUMP")
             items.append("STATUS")
@@ -2705,6 +3056,7 @@ class AceCommander(app.App):
             self._draw_practice(ctx)
         elif self.mode == "docked":
             self.dock.draw(ctx)
+            self._draw_find(ctx)
         elif self.mode == "brief":
             self.brief.draw(ctx)
         elif self.mode == "options":
@@ -2719,6 +3071,7 @@ class AceCommander(app.App):
                                 cockpit.station_colour(self._government()), True, self.tunnel)
         else:
             self._draw_menu(ctx)
+        self._draw_name(ctx)
         ctx.restore()
 
     def _draw_menu(self, ctx):
@@ -2738,13 +3091,22 @@ class AceCommander(app.App):
     def _draw_level(self, ctx):
         text = cockpit.text
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "NEW COMMANDER", 0, -80, 18, cockpit.WHITE)
-        self._draw_rows(ctx, self.level, self.n_hardcore, self.n_sel, -58, 54)
-        top = commander.thresholds(self.level)[-1]
-        text(ctx, "top rank at %d kills" % top, 0, 54, 11, cockpit.GREY)
+        text(ctx, "NEW COMMANDER", 0, -94, 15, cockpit.WHITE)
+        # NAME (build 89): the one entered, or the badge's (JAMESON) greyed
+        on = self.n_sel == 0
+        text(ctx, "NAME", 0, -76, 12, cockpit.GREY)
+        if on:
+            ctx.rgb(*cockpit.DIM).rectangle(-80, -69, 160, 22).fill()
+        name = self.n_name or badge_name().upper()[:12]
+        text(ctx, name, 0, -58, 16, (cockpit.GREEN if on else cockpit.WHITE) if self.n_name
+             else cockpit.GREY)
+        self._draw_rows(ctx, self.level, self.n_hardcore, self.n_sel - 1, -36, 54)
+        if self.n_sel == 1:
+            top = commander.thresholds(self.level)[-1]
+            text(ctx, "top rank at %d kills" % top, 0, 58, 11, cockpit.GREY)
         if self.cmdr is not None:
-            text(ctx, "replaces your saved commander", 0, 69, 11, cockpit.RED)
-        text(ctx, "C: start   F: back", 0, 86, 12, cockpit.GREY)
+            text(ctx, "replaces your saved commander", 0, 72, 11, cockpit.RED)
+        text(ctx, "C: name   F: back" if on else "C: start   F: back", 0, 86, 12, cockpit.GREY)
 
     def _draw_fmenu(self, ctx):
         text = cockpit.text

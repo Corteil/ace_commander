@@ -9,23 +9,26 @@ rules are written here afresh to behave as the original does:
   - a station sells the first (tech level + 2) items, as tech levels are
     shown (the original's internal level + 3), and all of them from tech
     level 10 up
-  - fuel is 2 Cr a light year and always fills the tank
-  - at most 4 missiles; one of each other item, and buying one you have
-    says so and costs nothing
+  - fuel is 2 Cr a light year and always fills the tank (each ship's own:
+    ships.tank; none for a ship with no hyperdrive, nor the galactic one)
+  - as many missiles as the ship has pylons (ships.py: the Cobra's 4); one
+    of each other item, and buying one you have says so and costs nothing
+  - the large cargo bay makes the ship's hold three quarters as big again
+    (the Cobra's 20 t to 35 t)
   - a laser is fitted to one of the four views (front, rear, left, right), as
     in the original; a new one replaces the old one on that view, whose price
-    is refunded
+    is refunded; only to a view the ship has a laser mount on (ships.mounts)
 """
 try:
-    from . import commander as _commander
+    from . import ships as _ships
 except ImportError:         # imported on its own, as the PC tests do
-    import commander as _commander
+    import ships as _ships
 
 (FUEL, MISSILE, CARGO_BAY, ECM, PULSE, BEAM, SCOOPS, POD, BOMB, ENERGY,
  DOCKING, HYPERDRIVE, MILITARY, MINING) = range(14)
 
-MAX_MISSILES = 4
-BIG_HOLD = 35           # tonnes with the large cargo bay
+MAX_MISSILES = 4        # the Cobra's pylons (each ship's: ships.pylons)
+BIG_HOLD = 35           # tonnes with the large cargo bay, in the Cobra (each ship's: ships.big_hold)
 FUEL_PRICE = 2          # tenths of a credit per tenth of a light year (2 Cr a light year)
 LASERS = {PULSE: "pulse", BEAM: "beam", MILITARY: "military", MINING: "mining"}
 # the other items, by the name the commander keeps them under
@@ -57,7 +60,7 @@ def name(equip, i):
 def price(equip, i, cmdr):
     """What item i costs this commander, in tenths of a credit (fuel: to fill up)."""
     if i == FUEL:
-        return (_commander.MAX_FUEL - cmdr.fuel) * FUEL_PRICE
+        return (cmdr.max_fuel() - cmdr.fuel) * FUEL_PRICE
     return equip[i][1]
 
 
@@ -71,9 +74,9 @@ def have(i, cmdr, mount=0):
     if i == FUEL:
         return "%d.%dLY" % (c.fuel // 10, c.fuel % 10)
     if i == MISSILE:
-        return "%d/%d" % (c.missiles, MAX_MISSILES)
+        return "%d/%d" % (c.missiles, _ships.pylons(c.ship))
     if i == CARGO_BAY:
-        return "fitted" if c.hold >= BIG_HOLD else ""
+        return "fitted" if c.hold > _ships.base_hold(c.ship) else ""
     if i in LASERS:
         return "fitted" if c.lasers[mount] == LASERS[i] else ""
     if i == ENERGY and "navy" in c.extras:     # mission 2's naval energy unit is better
@@ -87,24 +90,28 @@ def buy(equip, i, cmdr, mount=0):
     c = cmdr
     if i in SOON:
         return "COMING SOON"
-    if i == FUEL and c.fuel >= _commander.MAX_FUEL:
+    if i in (FUEL, HYPERDRIVE) and not c.max_fuel():
+        return "NO HYPERDRIVE"      # an in-system ship (ships.TANKS)
+    if i == FUEL and c.fuel >= c.max_fuel():
         return "TANK FULL"
-    if i == MISSILE and c.missiles >= MAX_MISSILES:
-        return "MISSILES FULL"
+    if i == MISSILE and c.missiles >= _ships.pylons(c.ship):
+        return "NO PYLONS" if not _ships.pylons(c.ship) else "MISSILES FULL"
+    if i in LASERS and mount >= _ships.mounts(c.ship):
+        return "NO " + MOUNT_NAMES[mount] + " MOUNT"
     if have(i, c, mount) == "fitted":
         return "ALREADY FITTED"
     cost = price(equip, i, c)
     old = c.lasers[mount] if i in LASERS else ""
-    refund = equip[_laser_item(old)][1] if old else 0
+    refund = equip[laser_item(old)][1] if old else 0
     if c.cash + refund < cost:
         return "NOT ENOUGH CASH"
     c.cash += refund - cost
     if i == FUEL:
-        c.fuel = _commander.MAX_FUEL
+        c.fuel = c.max_fuel()
     elif i == MISSILE:
         c.missiles += 1
     elif i == CARGO_BAY:
-        c.hold = BIG_HOLD
+        c.hold = _ships.big_hold(c.ship)
     elif i in LASERS:
         c.lasers[mount] = LASERS[i]
     else:
@@ -112,7 +119,7 @@ def buy(equip, i, cmdr, mount=0):
     return None
 
 
-def _laser_item(kind):
+def laser_item(kind):
     for i, k in LASERS.items():
         if k == kind:
             return i

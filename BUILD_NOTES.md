@@ -814,3 +814,198 @@ what is now `ace.py` (renamed in build 50).
    pages). Version string "0.2.0" in tildagon.toml and metadata.json. The firmware store
    compares versions as text lists (app_store.py compare_version), so badges with "59" are
    not offered it as an update (Brian chose 0.2.0 anyway; they must reinstall).
+   **Build 76** (2026-11-18, Brian: "the effects are wrong on the side views when jumping,
+   also check hyper space effect"): the jump drive's stardust streaks trail the way the
+   dust came in each view (`cockpit._streak_tail`: front out at you, rear away into the
+   middle, left/right across the screen), and the white LED flashes use `view_dust()`.
+   Out of hyperspace or into witchspace the view goes to the front (`Game._hyper`), as
+   Elite's TT110 / MJP call LOOK1 with X = 0. `tests/render.py` shoots the rear, left and
+   right jump views. Docking computer: not missing, only sold from tech level 9 (Lave is 5;
+   Leesti and Zaonce sell it), as the original's EQSHP; left as it is.
+   **Build 77** (2026-11-18, Brian): C on the docked Inventory sells the whole hold at this
+   station's prices (`Docked.sell_all`, green "SOLD: +x Cr"). Tabs: the Repair Shop after
+   Equip ship; Options is no longer a tab but Status's sub-screen, opened with C (A already
+   launches), F back to Status; Status shows "A: LAUNCH" and "C: options". = still opens
+   Options. Elite opens Status (f8) on docking (BAY), as we do. Tests launch with A now.
+   Only the current firmware matters (Brian: both badges, 2024 and 2026, run it); an
+   older-firmware tweak for A on Status was taken out again.
+   **Older-firmware fallback removed** (2026-11-18, Brian: "remove the old fallback"):
+   `ace.py` imports `JOYSTICK_BUTTON_TYPES` and `FRONTBOARD_BUTTON_TYPES` directly; the
+   `new = FB is not None` checks, the d-pad flight branch (tilt default, up/down speed,
+   left missile) and the `joystick=False` test stub are gone.
+   **Build 78** (2026-11-18, Brian: "next up is to be able to fly/buy other ships, plus a
+   hangar"; "weapons range should be the same as elite"; "add select ship to debug").
+   Ranges as Elite: your lasers hit anything in your sights in the bubble (HITCH has no
+   distance check; `LASER_RANGE` = `DESPAWN`); enemy lasers only within `ENEMY_REACH` 8192
+   on each of x, y, z (TA3: no high byte of x / y / z reaching 32), also ship against
+   trader; enemy missiles at any distance; missile lock never had a range.
+   Ship types (`ships.py`, rules only): `TYPES` gives price, hold, laser mounts (1 front,
+   2 front+rear, 4 all), pylons, shipyard tech level and stolen-only (Viper: police;
+   Constrictor: navy). From the blueprint against the Cobra in the same data: top speed
+   (speed), toughness (energy: damage divided by it) and turning (energy as mass, square
+   root, 0.6-1.4); standard weapons from laser power (2 pulse, 3-5 beam, 6+ military) and
+   missiles. The Cobra flies exactly as before. Large cargo bay: hold + 3/4 (Cobra 20 to
+   35). `Commander.ship`, `.stolen`, `.hangar` (save version 5; entries checked by
+   `_hangar_entry`; hold and missiles clamped to the ship's own). `Game.set_ship(name,
+   pylons)`: `max_speed`, `turn_k`, `tough`, `max_missiles` replace PLAYER_MAX / PITCH_RATE /
+   ROLL_RATE / MAX_MISSILES in flight (the HUD speed bar is against `max_speed`). Equip
+   ship: missiles up to the pylons ("NO PYLONS"), lasers only on mounted views ("NO LEFT
+   MOUNT"; D cycles only those). Practice always flies a Cobra. DEBUG > SHIP CONFIG > SHIP:
+   the next type, cheapest first (equipment cut to fit, saved). Brian's rules for the rest
+   (build 79): Shipyard tab by tech level and government (pirate worlds sell stolen ships,
+   buying one makes you an offender), each ship keeps its own equipment, a new one comes
+   with its standard weapons, trade-in counts the equipment; the hangar goes with you,
+   but in Hardcore a ship stays at the station where you left it. Tests: `tests/test_ships.py`.
+   **Build 79** (2026-11-18): the SHIPYARD and HANGAR tabs, after the Repair Shop
+   (`Docked(..., bps=ace._bp)`). Shipyard: `ships.for_sale` (up to 6 legal types by tech
+   level, chosen per system; anarchy / feudal add 1-2 stolen of any type at 65%), one ship
+   at a time turning, speed / hold / mounts / pylons, price and trade-in value; C buys
+   (your ship packed into the hangar; at this station in Hardcore), D trades in (value =
+   60% of price, half if stolen, plus half the equipment's cost; cargo that doesn't fit is
+   sold here). A new ship: standard weapons (`ships.new_ship`), cargo moved as it fits
+   (`ships.move_cargo`), the rest stays in the old ship. Stolen: legal |= 32 (offender).
+   Hangar: the flown ship first ("flying"), then the kept ones ("here", or in Hardcore
+   the system they are kept at); C flies one (the old one goes in, cargo moves across), D
+   sells one with its cargo. Messages clear when the pick moves. The starting Cobra
+   trades in for ~24,000 Cr, so a new commander can downgrade to a Worm and pocket
+   ~21,000 Cr: left as is (Brian, 2026-11-18: "downgrading is a bad buy").
+   Tests: `tests/test_shipyard.py`.
+   Badge fix: MicroPython's `random` has no `Random` class, so `ships.for_sale` uses its
+   own seeded generator (`ships._Rnd`). Found by a smoke test over the REPL after the PC
+   tests passed; Shipyard buy / Hangar fly / sell then ran on the badge.
+   **Build 80** (2026-11-18, Brian: "the ship yard should host the repairshop as a sub
+   screen. and the keyboard short cut take to the ship yard instead of the repairshop, the
+   hanger should have the current selected ship as 3d model with it fitout listed"). The
+   Repair Shop is no longer a tab: the Shipyard's first page is your own ship (turning in
+   its paint, its stats and trade-in value) and C there opens the Repair Shop over the
+   Shipyard (`Docked.in_repair`, `name()` "REPAIR SHOP"); F goes back to the Shipyard
+   (`Docked.back()`), < > leave it. The ships for sale are pages 2 on (`ysel - 1` in
+   `yard`). `-` opens the Shipyard. DEBUG REPAIR SHOP off: no "C: repair shop"
+   (`Docked.repair`). The Hangar shows one ship at a time, as the Shipyard does: its model
+   in its own paint, "flying" / "here, worth x Cr" / "kept at x", and its fit-out
+   (`_fitout`: lasers by view F/B/L/R, missiles / pylons, hold and tonnes used, the other
+   equipment on one or two lines). Not a sub-screen: it fits on the tab.
+   **Build 81** (2026-11-18, Brian: "the stats of each ship should be shown in the
+   shipyard as a sub screen"; and not "YOUR ..."). The Shipyard's first page names your
+   ship plainly (Brian chose name only); its hint is "C: repair shop   D: stats". On a
+   ship for sale C opens SHIP STATS (`Docked.in_stats`, `open_stats`) and buying happens
+   there: C buys, D trades in (Brian chose the two-press way), then back on the Shipyard's
+   first page with the new ship; F goes back to the same page. Stats: price and trade-in,
+   top speed, turning and shields as % of the Cobra (its shown name), hold with and
+   without the bay, laser mounts, pylons, standard fit, and "from tech n" / "stolen only".
+   Also build 81 (Brian: "if the cargo over spills, credit its value to the player's
+   balance, also remove the repairshop flag"): whenever you change ship (buy, trade in,
+   or fly a kept one) the cargo moves across and what doesn't fit is sold at this
+   station's prices (`Docked._sell_off`, kept if there is no market), with "CARGO OVER: +x
+   Cr" instead of the ship's name; a ship left in the hangar keeps no cargo. The DEBUG
+   REPAIR SHOP switch and `AceCommander.repair_shop` are gone; `Docked(..., repair)` too.
+   **Build 82** (2026-11-18, Brian: "the HUD should reflect the number of missile slots,
+   swap C and D on the shipyard"; "the buttons should be the same across those screens").
+   The HUD draws one missile slot per pylon (`Game.max_missiles`: none on the Worm,
+   Shuttle and Transporter, five on the Boa and Constrictor). In the Shipyard C is a
+   ship's stats on every page, your own included; D on your own ship's page is the Repair
+   Shop. In the stats, C buys and D trades in, as before.
+   **Build 83** (2026-11-18, Brian: "would some ships not be able to jump to hyperspace,
+   like the shuttle, and would different ships have different jump ranges"; then "build
+   the jump ranges as suggested"). Each ship has its own fuel tank (`ships.TANKS`, tenths
+   of a LY; `Commander.max_fuel()`), which is its jump range: none for the Shuttle,
+   Transporter and Worm (in-system craft); 5.0 LY Sidewinder, Gecko, Viper; 6.0 Adder,
+   Cobra Mk I, Krait, Mamba, Moray; 7.0 Cobra Mk III (Elite's) and Fer-de-Lance; 8.0 Asp
+   Mk II, Python, Boa; 10.0 Constrictor. Fuel is kept per ship (in `pack` / `unpack`; a
+   new ship comes full; old entries without it are full). Fuel price, refuelling, sun
+   skimming, the pod's refill, DEBUG REFILL / FUEL TO 1/4 and the sun gauge's FU bar
+   (`Game.fuel_max`) use the ship's tank. No hyperdrive: no HYPERSPACE or GALACTIC JUMP
+   line in flight, H says "NO HYPERDRIVE", Equip ship won't sell fuel or the galactic
+   hyperdrive ("NO HYPERDRIVE"). Never stranded: the Shipyard won't sell (or trade you
+   into) an in-system ship, and the Hangar won't sell a ship, if that leaves you no ship
+   that jumps here (`ships.stranded`; in Hardcore it must be kept at this station):
+   "NEED A SHIP THAT JUMPS". Shown: "jump range" on SHIP STATS, the range or "no jumps"
+   on the Shipyard page, "fuel x of y LY" / "no hyperdrive" in the Hangar's fit-out.
+   **Build 84** (2026-11-18, Brian: "the viper and the constrictor should be available to
+   buy at high tech worlds legally"; for a hot ship "1, 2 and 4"; "add stolen status to the
+   debug menu"; "it should be new transponder"). The Viper is sold legally from tech 12,
+   the Constrictor only at tech 15 (no type is stolen-only now; pirate worlds can still
+   sell any type stolen). A stolen ship (`Commander.stolen`): (1) keeps you an offender
+   while you fly it: jumps, the galactic hyperdrive and the pod clear the legal status no
+   further than `ships.STOLEN_LEGAL` (`ace._hot`); (2) in a law-abiding system
+   (`game.LAWFUL_GOV` 5 and up) each police Viper that comes within `SPOT_DIST` 6000 looks
+   once (`Obj.checked`) and with `SPOT_CHANCE` 0.5 knows it and attacks, "STOLEN SHIP
+   SPOTTED" (`Game.stolen`); (4) the Repair Shop on pirate worlds (anarchy, feudal) sells a
+   new transponder on D for a quarter of the ship's price (`Docked.transponder_price` /
+   `buy_transponder`), "NEW TRANSPONDER FITTED": the ship is clean. DEBUG > SHIP CONFIG
+   > STOLEN switches it, in flight or docked, saved. Not done: the long system names clip
+   the docked tabs' titles at the top (e.g. "REPAIR SHOP  CEBETELA").
+   **Build 85** (2026-11-18, Brian: "tilt should be able to be flipped in settings/options
+   and saved, galactic jump clears a hot ship"; "the name does not need to be
+   displayed"). A TILT line under STEER on Options, the docked Options and the in-flight
+   Settings (when there is a tilt sensor): NORMAL, UP/DOWN FLIPPED, L/R FLIPPED, BOTH FLIPPED (build 87: "should say flipped")
+   (`TILT_FLIPS`, `AceCommander.tilt_flip`, options.json "tilt_flip"); C or right goes on,
+   left back. The galactic hyperdrive clears a stolen ship as well as the record. The
+   docked tabs' titles no longer carry the system's name (it clipped on long names;
+   Status shows where you are). Options pages: lines 17 px apart so seven fit.
+   **Build 86** (2026-11-18, Brian: "is it possible to catch an escape pod?"; "add the
+   escape pods, and add in the debug menu"). As the original's TACTICS part 4: a ship
+   that carries a pod (`POD_SHIPS`, from bit 7 of the NEWB flags in each ship file's E%:
+   Adder, Anaconda, Asp Mk II, Boa, Cobra Mk I, Cobra Mk III and its pirate, Fer-de-Lance,
+   Krait, Mamba, Python and its pirate, Viper), below an eighth of its energy, bails out
+   with `POD_CHANCE` 0.1 each time it thinks (`Game._bail`): the pod (an Obj of kind
+   "can", the ESCAPE POD model, `good` = `SLAVES` 3) flies off at its own speed and the
+   ship is left adrift ("drift": no shots, no turning). Scooped like a canister (fuel
+   scoops, from below): a tonne of slaves, which are illegal cargo as usual. DEBUG >
+   SPAWN: RELEASE ESCAPE POD (just ahead, as RELEASE CANISTER) and BAIL OUT (the
+   nearest ship with a pod; "NO SHIP WITH A POD" if none).
+   **Build 87** (2026-11-18, Brian: "the tilt menu should say flipped when flipped", "the
+   flipped option does not seem to be working" (he steers with the joystick), "should
+   only affect flight controls"). The setting is now CONTROLS: NORMAL / UP/DOWN FLIPPED /
+   L/R FLIPPED / BOTH FLIPPED, always shown, and flips the flight steering after it is read
+   (tilt, joystick, cursor keys, W A S D: `_update_flight`, after `_steer`), not inside
+   `_steer`, so the charts' cursor, the ship viewer and the menus are untouched. Same
+   options.json key ("tilt_flip").
+   **Build 88** (2026-11-18, Brian: "a search function on the galactic viewer"; "keyboard
+   entry for search with suggestion for auto complete and the badge's own text entry
+   system when there is no keyboard attached"; "if the keyboard is fitted don't show the
+   badge entry method"). B on the Galactic chart (in flight; docked once C has given the
+   joystick to the cursor) finds a system by name, as Elite's "Planet Name?". Keyboard
+   fitted (`AceCommander._keyboard`: the firmware's hexpansion manager runs a
+   `KeyboardApp` or a header names a keyboard; else a keyboard key has been pressed,
+   `Pad.keyboard`): the game's own page (`find.py`): typed letters (`Pad.typed`), the best
+   match's rest shown dimmer to complete it, four matches listed (from the start
+   alphabetically, then holding it anywhere), up / down picks, Backspace, Enter goes
+   there, Esc back. No keyboard: the firmware's `app_components.dialog.TextDialog` (the
+   six-button letter picker), drawn over the chart, its message set to the best match
+   as you type; Done goes to it, Cancel back. Either way the chart's cursor lands on the
+   system (`Chart.goto`, exact even where dots overlap); C then targets it as usual.
+   Tests: `tests/test_find.py` (with a stand-in TextDialog). Next asked for: a custom
+   commander name.
+   **Build 89** (2026-11-18, Brian: a custom commander name, "fill out the badge name
+   grayed out as an option, press tab to fill it, if no name, same name as elite").
+   `Commander.name` (saved; "" in old saves: the badge's name). The NEW COMMANDER page has
+   a NAME line above LEVEL (it opens on LEVEL, so C still starts at once); C or right on
+   NAME enters it. Off flight, Options (and the docked Options) have "NAME: x" too. With a
+   keyboard: `find.NameEntry`, the suggestion (the badge's name from settings, else
+   Elite's JAMESON: `badge_name`) greyed after what is typed, Tab fills it, Backspace,
+   Enter takes it (empty: the suggestion), Esc back; up to 12 letters, upper case. With
+   no keyboard: the firmware's TextDialog, its message "NAME? (none: X)", Done on nothing
+   takes the suggestion. The name is in the mission briefings (`cmdr_name(c)`) and the
+   in-flight Status title, "COMMANDER X", as Elite.
+   Build 89 fix (Brian: "the search function crashed when using the badge keyboard,
+   keebd was ok"; badge log 2026-11-18 23:02: the dialog registered and drew, then
+   nothing). The firmware's eventbus gives ButtonDownEvent (requires_focus) only to
+   handlers whose app is `_focused`, and the focused app is the loader (`app.py`), not
+   the game inside it; the TextDialog was registered to the game, so no button reached
+   it, while the game passed all input to it: the badge froze. Both dialogs (find, name)
+   are now registered to `self.host`. Checked with the firmware's real dialog.py on the
+   PC (stand-ins for display and tokens only); `tests/test_loader.py` asserts the host.
+   **Build 90** (2026-11-18, Brian: "the text size is too big in the text selector").
+   Badge log of his test after the build 89 fix: search (v -> VEALE, Done put the cursor
+   there) and the name ("AA") both worked; the only tracebacks were the keyboard driver's
+   (ENODEV) as the hexpansion was pulled. The badge's text entry is now
+   `find.small_dialog(TextDialog)`: the firmware's TextDialog working as before, drawn
+   with the game's text (message 14 px green, typed text 18 px, the six button labels
+   14 px where the firmware puts them) on solid black instead of its 80% hexagon.
+   **v0.3.0: released** (2026-11-18, Brian: "all good, push, merge and release; update
+   docs first"): builds 76-90. Version "0.3.0" in tildagon.toml and metadata.json (the
+   store's text compare puts it after "0.2.0", so 0.2.0 badges are offered the update).
+   README (ships, Shipyard, Hangar, jump ranges, stolen ships, escape pods, weapon ranges,
+   CONTROLS, the name, search; the install list with ships.py and find.py), CLAUDE.md,
+   DESIGN.md and the key guide (B: find on the Galactic chart row; still one page) updated.

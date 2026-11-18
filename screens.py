@@ -59,14 +59,15 @@ def _kills(c):
     return "%d, %d more" % (c.kills, nxt[1]) if nxt else "%d" % c.kills
 
 
-def draw_status(ctx, c, here, target, dist, cond, legal):
+def draw_status(ctx, c, here, target, dist, cond, legal, name=None):
     """Elite's Commander Status: the systems, condition, fuel, cash, legal
     status, rating and the equipment fitted. here and target are system
     names (or None), dist the target's distance in tenths of a light year,
-    cond Game.condition()."""
+    cond Game.condition(). name: the commander's, for the title as Elite's
+    "COMMANDER JAMESON" (build 89)."""
     text = cockpit.text
     _blank(ctx)
-    text(ctx, "COMMANDER STATUS", 0, -99, 10, cockpit.WHITE)
+    text(ctx, "COMMANDER " + name if name else "COMMANDER STATUS", 0, -99, 10, cockpit.WHITE)
     rows = (("present", here or "-", cockpit.CYAN),
             ("hyperspace", ("%s %s" % (target, _ly(dist))) if target else "-", cockpit.CYAN),
             ("condition", cond, _rgb(cond)),

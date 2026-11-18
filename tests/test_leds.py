@@ -156,7 +156,7 @@ c = CountCtx(); a.draw(c)
 assert any(t[0] == "DOCKED" for t in c.texts)
 full = tuple(int(v * 255) for v in col)
 writes = leds.writes
-tick(a, fresh=["C"]); assert a.mode == "launch"
+tick(a, fresh=["A"]); assert a.mode == "launch"
 seen = []
 while a.mode == "launch":
     v = leds.values[1]
@@ -247,7 +247,7 @@ assert "more with a commander" in tx, "no commander: no docking or Constrictor"
 for s_, (x, y), size in c.texts:
     assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5, (s_, y)
 tick(a, fresh=["JOYRIGHT"]); assert a.use_tilt, "right changes the steering"
-tick(a, fresh=["JOYDOWN"]); assert a.omenu == 1
+tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["JOYDOWN"]); assert a.omenu == 2   # past CONTROLS
 tick(a, fresh=["C"]); assert not a.use_leds
 tick(a, fresh=["F"]); assert a.mode == "menu"
 # kept for next time
@@ -262,10 +262,12 @@ bs.choose(b, "NEW COMMANDER"); tick(b, fresh=["C"])
 b.dock.go(0); tick(b, fresh=["F"])
 bs.choose(b, "OPTIONS")
 items = b._settings(True)
-assert items[1].startswith("DOCKING") and items[2] == "CONSTRICTOR: 2 MIN", items
-b.omenu = 1; tick(b, fresh=["JOYLEFT"])
+assert items[1] == "CONTROLS: NORMAL", items      # (build 85)
+assert items[2] == "NAME: JAMESON", items       # (build 89)
+assert items[3].startswith("DOCKING") and items[4] == "CONSTRICTOR: 2 MIN", items
+b.omenu = 3; tick(b, fresh=["JOYLEFT"])
 assert b.cmdr.docking == "A"
-b.omenu = 2; tick(b, fresh=["C"])
+b.omenu = 4; tick(b, fresh=["C"])
 assert not b.cmdr.quick_con
 from ace_commander import commander as cm
 d = cm.load(save); assert d.docking == "A" and d.quick_con is False
@@ -298,18 +300,14 @@ b.od_sel = items.index("NAVY ENERGY UNIT: OFF"); tick(b, fresh=["C"])
 assert "navy" in b.cmdr.extras and "navy" in cm.load(save).extras
 tick(b, fresh=["F"]); assert b.od_page is None
 tick(b, fresh=["F"]); assert b.mode == "options", "back where it came from"
-# and from the docked Options tab, back to it; REPAIR SHOP comes at once
+# and from the docked Options, back to it
 tick(b, fresh=["F"]); bs.choose(b, "CONTINUE"); assert b.mode == "docked"
-assert "REPAIR SHOP" in b.dock.tabs, "on by default (Brian)"
-b.repair_shop = False; b._make_dock()     # off, so DEBUG can switch it back on below
-assert "REPAIR SHOP" not in b.dock.tabs
+assert b.dock.repair, "always there (Brian, build 81)"
 b.dock.open("OPTIONS"); b.dock.osel = len(b._settings(True)) - 1
 tick(b, fresh=["C"]); assert b.mode == "odebug" and b.od_from == "docked"
 b.od_sel = b._od_items().index("DISPLAY"); tick(b, fresh=["C"])
-b.od_sel = [i for i, t in enumerate(b._od_items()) if t.startswith("REPAIR")][0]
-tick(b, fresh=["C"]); assert b.repair_shop and "REPAIR SHOP" in b.dock.tabs
+assert not any(t.startswith("REPAIR") for t in b._od_items()), "no REPAIR SHOP switch"
 tick(b, fresh=["F"]); tick(b, fresh=["F"]); assert b.mode == "docked" and b.dock.name() == "OPTIONS"
-b.repair_shop = False
 b.dock.go(0); tick(b, fresh=["F"]); bs.choose(b, "OPTIONS")
 # no commander: just DISPLAY
 n_ = ace_commander.AceCommander(); n_.cmdr = None

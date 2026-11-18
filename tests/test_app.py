@@ -198,6 +198,37 @@ assert a.mode == "menu" and not a.paused, "QUIT TO TITLE"
 choose(a, "COMBAT PRACTICE"); assert a.mode == "flight" and a.game is g, "the fight carries on"
 print("in-flight menu on A, steering switch, tilt with D tap and hold, quit and carry on: ok")
 
+# the CONTROLS setting (builds 85-87): flips the flight controls up / down,
+# left / right or both, however you steer (joystick and tilt here); saved
+def turns(flip, stick=None, tilt_reading=None):
+    """How a rock dead ahead and one off to the right move in one frame."""
+    a.tilt_flip = flip
+    a.use_tilt = tilt_reading is not None
+    a.zero = (0.0, 0.0)
+    Imu.reading = tilt_reading or [0.0, 0.0, G]
+    g.objs = [mod.game.Obj(g.types["ASTEROID"], "rock", 0.0, 0.0, 3000.0),
+              mod.game.Obj(g.types["ASTEROID"], "rock", 3000.0, 0.0, 0.0)]
+    r, s_ = g.objs
+    tick(a, held=[stick] if stick else [])
+    return (r.y > 0) - (r.y < 0), (s_.y > 0) - (s_.y < 0)
+for how in (dict(stick="JOYUP"), dict(stick="JOYRIGHT"), dict(tilt_reading=[0.3 * G, 0.3 * G, G])):
+    p0, r0 = turns(0, **how)
+    assert p0 or r0, how
+    assert turns(1, **how) == (-p0, r0) or not p0, (how, "up/down")
+    assert turns(2, **how)[1] == -r0, (how, "left/right")
+    assert turns(3, **how) == (-p0, -r0), (how, "both")
+a.tilt_flip = 0; a.use_tilt = False
+Imu.reading = [0.0, 0.0, G]
+items = a._settings(False)
+assert items[1] == "CONTROLS: NORMAL", items
+for want in ("UP/DOWN FLIPPED", "L/R FLIPPED", "BOTH FLIPPED", "NORMAL"):
+    a._change(items[1], False); assert a._settings(False)[1] == "CONTROLS: " + want
+a._change("CONTROLS: NORMAL", True); assert a.tilt_flip == 3, "left goes back"
+assert json.load(open(mod.options_path()))["tilt_flip"] == 3
+b2 = pkg.AceCommander(); assert b2.tilt_flip == 3, "loaded from options.json"
+a.tilt_flip = 0; a._save_options()
+print("CONTROLS setting: flips joystick and tilt, saved: ok")
+
 # ---- keyboard ---------------------------------------------------------------
 ahead, side = rocks(mod, g)
 tick(a, held=["KEY_W"]); assert ahead.y < 0
@@ -299,32 +330,6 @@ pkg, mod = load()
 mod.TILT_DEFAULT = True
 assert pkg.AceCommander().use_tilt
 print("TILT_DEFAULT: ok")
-
-# ---- older firmware: no joystick / lettered-button names --------------------
-pkg, mod = load(joystick=False)
-assert mod.JOY is None and mod.FB is None
-a = pkg.AceCommander()
-assert a.use_tilt, "tilt is the default there"
-tick(a, fresh=["RIGHT"]); assert a.menu == 1
-tick(a, fresh=["CONFIRM"]); assert a.mode == "practice"
-tick(a, fresh=["CONFIRM"]); assert a.mode == "flight" and not a.career
-g = a.game; g.spawn_t = g.rock_t = 1e9
-tick(a)
-s = g.speed
-tick(a, held=["UP"]); assert g.speed > s
-tick(a, fresh=["LEFT"]); assert g.msg == "NO TARGET"
-tick(a, fresh=["CANCEL"]); assert a.paused
-tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"])   # past VIEW: FRONT
-tick(a, fresh=["CONFIRM"]); assert a.fsub == "settings"
-assert any("TILT" in t[0] for t in frame(a).texts)
-tick(a, fresh=["RIGHT"]); assert not a.use_tilt
-assert any("STICK" in t[0] for t in frame(a).texts)
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"]); assert not a.paused, "CANCEL backs out"
-ahead, side = rocks(mod, g)
-tick(a, held=["UP"]); assert ahead.y < 0 and g.speed == 0.0
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"])
-tick(a, fresh=["CONFIRM"]); assert a.mode == "menu", "QUIT TO TITLE"
-print("older firmware fallback: ok")
 
 # ---- no accelerometer and no keyboard modules -------------------------------
 pkg, mod = load(imu=False, keyboard=False)

@@ -97,7 +97,7 @@ for s_, (x, y), size in c.texts:
     assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5
 assert any("D: chart" in t[0] for t in c.texts)
 # in flight: D on the local chart shows the page, and back
-d.go(0); tick(e, fresh=["C"])
+d.go(0); tick(e, fresh=["A"])
 for _ in range(200):
     tick(e)
     if e.mode == "flight":

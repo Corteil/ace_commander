@@ -185,6 +185,58 @@ assert p.state == "attack" and g.legal == 0, "hitting a Viper only angers it"
 p.energy = 1.0; g.cool = 0.0; g.heat = 0.0
 g.step(DT, 0, 0, 0, True, False)
 assert p.dead and g.legal == game.KILL_COP and g.msg == "FUGITIVE"
+# a stolen ship (build 84): lawful police spot it, once each, with SPOT_CHANCE
+for gov, stolen, chance, want in ((7, True, 1.0, "attack"), (7, True, 0.0, "patrol"),
+                                  (7, False, 1.0, "patrol"), (game.LAWFUL_GOV - 1, True, 1.0, "patrol")):
+    g = system(gov=gov)
+    g.stolen = stolen
+    old = game.SPOT_CHANCE; game.SPOT_CHANCE = chance
+    p = g.add_police(False); g.objs.extend(g.new); g.new = []
+    p.x, p.y, p.z = 0.0, 0.0, game.SPOT_DIST - 500.0
+    for _ in range(6):
+        g.step(DT, 0, 0, 0, False, False)
+    game.SPOT_CHANCE = old
+    assert (p.state in ("attack", "break")) == (want == "attack"), (gov, stolen, chance, p.state)
+    assert p.checked == (stolen and gov >= game.LAWFUL_GOV)
+    if want == "attack":
+        assert g.msg == "STOLEN SHIP SPOTTED"
+g = system(gov=7); g.stolen = True
+p = g.add_police(False); g.objs.extend(g.new); g.new = []
+p.x, p.y, p.z = 0.0, 0.0, game.SPOT_DIST + 3000.0; p.speed = 0.0
+g.step(DT, 0, 0, 0, False, False)
+assert not p.checked, "too far off to look"
+# escape pods (build 86): a ship that carries one bails out in its last eighth
+# of energy (POD_CHANCE each think); the ship drifts, the pod holds a slave
+assert game.Obj(g.types["COBRA MK III"], "ship", 0, 0, 0).has_pod
+assert not game.Obj(g.types["SIDEWINDER"], "ship", 0, 0, 0).has_pod, "pirate fighters have none"
+old = game.POD_CHANCE; game.POD_CHANCE = 1.0
+g = system()
+k = game.Obj(g.types["KRAIT"], "ship", 0.0, 0.0, 4000.0); g.objs.append(k)
+k.energy = k.max_energy * 0.2
+for _ in range(6):
+    g.step(DT, 0, 0, 0, False, False)
+assert k.state != "drift" and k.has_pod, "not yet: above an eighth"
+k.energy = k.max_energy * 0.1
+for _ in range(6):
+    g.step(DT, 0, 0, 0, False, False)
+game.POD_CHANCE = old
+assert k.state == "drift" and not k.has_pod
+pods = [o for o in g.objs if o.bp.name == "ESCAPE POD"]
+assert len(pods) == 1 and pods[0].kind == "can" and pods[0].good == game.SLAVES
+# adrift: no shots at you
+k.cool = 0.0; game._look(k.m, 0.0, 0.0, -1.0); k.x = k.y = 0.0; k.z = 3000.0
+for _ in range(30):
+    g.step(DT, 0, 0, 0, False, False)
+assert k.beam == 0 and k.state == "drift", "no one aboard"
+# scooped (fuel scoops, from below): a tonne of slaves
+got = []
+g.scoop = lambda i: (got.append(i), "SLAVES")[1]
+g.fuel_scoops = True
+p = pods[0]; p.x, p.y, p.z = 0.0, -20.0, 60.0; p.speed = 0.0
+for _ in range(4):
+    g.step(DT, 0, 0, 0, False, False)
+assert got == [game.SLAVES] and p.dead, got
+print("escape pods: bail out in the last eighth, the ship adrift, scooped as slaves: ok")
 g = system(legal=3); g.objs.append(game.Obj(g.types["VIPER"], "ship", 0.0, 0.0, 3000.0))
 g.objs[-1].role = "police"; g._kill(g.objs[-1]); assert g.legal == 3 | 64
 # out of the slot when the station sends it
@@ -322,7 +374,7 @@ e = ace_commander.AceCommander()
 choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
 c = e.cmdr
 c.cargo[3] = 5          # five tonnes of slaves
-e.dock.go(0); tick(e, fresh=["C"])
+e.dock.go(0); tick(e, fresh=["A"])
 for _ in range(200):
     tick(e)
     if e.mode == "flight":

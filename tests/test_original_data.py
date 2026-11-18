@@ -116,7 +116,7 @@ assert e.galaxy.system(c.system).name == "DAENOR" and c.data == "own"
 
 
 def launch(a):
-    a.dock.go(0); tick(a, fresh=["C"])
+    a.dock.go(0); tick(a, fresh=["A"])
     for _ in range(200):
         tick(a)
         if a.mode == "flight":

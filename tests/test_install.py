@@ -82,7 +82,7 @@ a = ld.real
 bs.choose(a, "NEW COMMANDER"); bs.tick(a, fresh=["C"])
 assert a.mode == "docked" and a.galaxy.system(a.cmdr.system).name == "DAENOR"
 assert os.path.exists(ace.SAVE_PATH)
-a.dock.go(0); bs.tick(a, fresh=["C"])
+a.dock.go(0); bs.tick(a, fresh=["A"])
 for _ in range(300):
     bs.tick(a)
 c = CountCtx(); a.draw(c)

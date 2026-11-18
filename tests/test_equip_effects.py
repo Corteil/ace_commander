@@ -175,7 +175,7 @@ print("galaxy seeds, saved galaxy number: ok")
 # ---- in the app -----------------------------------------------------------
 def launch(a):
     a.dock.go(0)
-    tick(a, fresh=["C"])
+    tick(a, fresh=["A"])        # A launches (C on Status is Options)
     for _ in range(200):
         tick(a)
         if a.mode != "launch":
@@ -284,6 +284,7 @@ print("app: escape pod: ok")
 launch(e); g = e.game; g.spawn_t = g.rock_t = g.encounter_t = 1e9
 fuel = c.fuel
 g.legal = 30
+c.stolen = g.stolen = True      # a hot ship: the new galaxy clears it too (build 85)
 fpick(e, "GALACTIC JUMP")
 assert g.jump_t > 0 and e.jump_to == ("galaxy", 0)
 for _ in range(400):
@@ -293,6 +294,7 @@ for _ in range(400):
 assert c.galaxy == 1 and e.galaxy_n == 1 and "hyperdrive" not in c.extras
 assert c.system == e.galaxy.nearest(*galaxy.GAL_ARRIVE) and c.fuel == fuel
 assert g.legal == 0, "a new galaxy, a clean record"
+assert not c.stolen and not g.stolen, "and a clean ship"
 assert c.docked_at is None and commander.load(SAVE).galaxy == 0, "saved only on docking"
 tick(e, fresh=["A"]); assert "GALACTIC JUMP" not in e._fitems(); tick(e, fresh=["A"])
 print("app: galactic hyperdrive to galaxy 2: ok")
@@ -334,8 +336,8 @@ print("build 38: held buttons, cleared on docking and jumping, chase view: ok")
 # ---- build 39: C held on from a menu or the launch doesn't fire --------------
 e = ace_commander.AceCommander()
 choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
-e.dock.go(0)
-for _ in range(80):             # C launches, skips the tunnel, and stays held
+e.dock.go(0); tick(e, fresh=["A"])
+for _ in range(80):             # A launches; C skips the tunnel and stays held
     tick(e, held=["C"])
     if e.mode == "flight":
         break
@@ -359,7 +361,7 @@ print("build 39: held C after a menu or launch doesn't fire: ok")
 # ---- build 40: your ship in the tunnel scenes --------------------------------
 e = ace_commander.AceCommander()
 choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
-e.dock.go(0); tick(e, fresh=["C"])
+e.dock.go(0); tick(e, fresh=["A"])
 assert e.mode == "launch" and e.tunnel.me is not None and e.tunnel.me.bp.name == "COBRA MK III"
 for f in (0.0, 0.5, 0.99):
     e.launch_t = f * mod.LAUNCH_TIME
@@ -376,18 +378,15 @@ assert commander.Commander.from_dict({}).colour == 0
 assert cockpit.ship_rgb(5) == cockpit.SHIP_COLOURS[5][1] and cockpit.ship_rgb(99) == cockpit.ME_RGB
 e = ace_commander.AceCommander()
 choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
-assert "REPAIR SHOP" in e.dock.tabs, "on by default (Brian)"
-e.repair_shop = False; e._make_dock()     # DEBUG can turn it off; here it goes back on
-assert "REPAIR SHOP" not in e.dock.tabs
+assert e.dock.repair, "always there (Brian, build 81: no DEBUG switch)"
 launch(e); g = e.game
 tick(e, fresh=["A"]); e.fsub = "dgroup"; e.dgroup = "DISPLAY"
-e.fmenu = [i for i, t in enumerate(e._fitems()) if t.startswith("REPAIR SHOP")][0]
-tick(e, fresh=["C"]); assert e.repair_shop and "REPAIR SHOP: ON" in e._fitems()
+assert not any(t.startswith("REPAIR SHOP") for t in e._fitems())
 tick(e, fresh=["A"])
 e._dock()
 d = e.dock
-assert "REPAIR SHOP" in d.tabs
-d.open("REPAIR SHOP"); texts(e)
+assert d.repair
+d.open("REPAIR SHOP"); assert d.name() == "REPAIR SHOP"; texts(e)
 c = e.cmdr; c.cash = 1000
 tick(e, fresh=["C"]); assert d.msg == "ALREADY THAT COLOUR" and c.cash == 1000
 tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["JOYDOWN"]); assert d.paint == 2
@@ -396,7 +395,7 @@ d.paint = 4; c.cash = 5
 tick(e, fresh=["C"]); assert d.msg == "NOT ENOUGH CASH" and c.colour == 2
 assert "RED" in texts(e) or True
 # the paint shows in the tunnel and the docking computer's view
-d.go(0); tick(e, fresh=["C"])
+d.go(0); tick(e, fresh=["A"])
 assert e.mode == "launch" and e.tunnel.me_rgb == cockpit.SHIP_COLOURS[2][1]
 # taking off: on the floor at first, at flying height once up
 me = e.tunnel.me

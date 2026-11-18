@@ -15,9 +15,11 @@ button layout) and phase 2 (galaxy, local and galactic charts, system data, hype
 fuel, docked screens as tabs, launch tunnel), and the start of phase 3 (build 26: planet,
 sun, station, compass, jump drive, automatic docking; build 27: docking by hand; build
 30: the market; 31: scooped cargo; 32: bounties, which finishes phase 3), and the start
-of phase 4 (build 33: the Equip ship screen; build 36: every item's effect). Not built
-yet: the rest of phase 6 (see `DESIGN.md`). Phases 4 and 5 are done, the system
-description sentence (build 52) and the disc version's two missions (build 54).
+of phase 4 (build 33: the Equip ship screen; build 36: every item's effect). Phases 4 and
+5 are done, the system description sentence (build 52) and the disc version's two
+missions (build 54). Phase 6's ship types are done (builds 78-84: Shipyard, Hangar, jump
+ranges, stolen ships), with NPC escape pods (86), finding a system by name (88) and a
+commander name (89); released as v0.3.0 (2026-11-18).
 
 ## Files
 
@@ -40,9 +42,14 @@ description sentence (build 52) and the disc version's two missions (build 54).
   no badge imports. Saved to `commander.json` next to the app (gitignored).
 - `galaxy.py` - the 256 star systems, worked out from three seeds. Rules only.
 - `chart.py` - the local and galactic charts (imported the first time one is opened).
+- `find.py` - finding a system by name on the Galactic chart (build 88): the keyboard's
+  page; without a keyboard ace.py uses the firmware's TextDialog instead.
 - `docked.py` - the docked tabs: Status, Market, Local chart, Galactic chart, System data.
 - `market.py` - market prices, stock, buying and selling. Rules only, no badge imports.
 - `equipment.py` - the Equip ship screen's rules: what is on sale, prices, fitting.
+- `ships.py` - the ship types you can own and fly (build 78): price, hold, mounts, pylons,
+  fuel tank (jump range), flight stats from the blueprint, the shipyard's stock, the
+  hangar's entries. Rules only.
 - `describe.py` - the system description sentence ("goat soup"): the original's extended
   tokens from `game_data.py`, put together as DETOK does; also the mission texts and the
   special system sentences. Rules only.
@@ -117,7 +124,8 @@ Source: `github.com/emfcamp/badge-2024-software`, folder `modules/`. Brian's own
 - Buttons A to F are also UP, RIGHT, CONFIRM, DOWN, LEFT, CANCEL (`BUTTON_TYPES`). To tell a
   lettered button from the joystick use `frontboards.common.FRONTBOARD_BUTTON_TYPES["A".."F"]`
   and `events.joystick.JOYSTICK_BUTTON_TYPES["UP"/"DOWN"/"LEFT"/"RIGHT"/"SELECT"]`. The
-  joystick is a digital 5-way switch.
+  joystick is a digital 5-way switch. Only the current firmware, which has both, is
+  supported (Brian, 2026-11-18): `ace.py` imports them directly, with no fallback.
 - `Buttons.get()` / `.pressed()` search every known button in Python on each call. Polling
   about 25 controls a frame was a large hidden cost; `Pad` in `app.py` listens for
   `ButtonDownEvent` / `ButtonUpEvent` on `system.eventbus` instead.
@@ -142,15 +150,18 @@ the relevant build there before changing a feature.
 
 ## Next steps
 
-**For the next build (Brian, 2026-11-15, after the v59 release):**
-- Be able to change the ship you fly: the "Ship types" phase 6 extra in DESIGN.md (buy
-  another hull; its speed, turn rate, hold, pylons, lasers, shields and price; the
-  tunnel/chase-view model, `Game` constants, `commander.HOLD`, `Commander.ship`). Ask
-  Brian how ships are bought and what carries over before building.
+**v0.3.0 (2026-11-18)** has ship types (`ships.py`: `Game.set_ship`, Shipyard / Hangar,
+`Commander.ship` / `.stolen` / `.hangar`, per-ship fuel tanks), Elite's weapon ranges, NPC
+escape pods, the CONTROLS flip, Galactic chart search (`find.py`) and the commander's
+name. Brian's rules are in BUILD_NOTES.md builds 76-90. **The firmware's dialogs
+(TextDialog) must be registered to `self.host`** (app.py's loader is the focused app; the
+eventbus gives buttons only to focused apps), or the badge freezes (build 89).
 
-1. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). He has not
-   said what is wrong yet, so ask before changing it: sensitivity (`TILT_FULL`), dead zone
-   (`TILT_DEADZONE`), axis directions, or the D hold time (`HOLD_MISSILE`).
+1. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). Build 85
+   added Options > TILT, build 87 made it CONTROLS (flips the flight steering up/down,
+   left/right or both, joystick included; saved). Ask before changing
+   the rest: sensitivity (`TILT_FULL`), dead zone (`TILT_DEADZONE`), or the D hold time
+   (`HOLD_MISSILE`).
 2. Missile lock (build 19): the diamond is red, then green after `LOCK_TIME` (2 s, Brian's
    choice after playing with 1 s) and only then will D fire.
 3. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
@@ -260,10 +271,14 @@ in flight 1-4 the views, 5 galactic chart, 6 local chart, 7 the target's (or her
 Market Prices, 9 Commander Status, 0 Inventory. Docked (`DOCK_KEYS`, build 69): 1 launch, 2 / 8 market, 3
 market on the first good in the hold (Elite's Sell Cargo), 4 equip ship, 5 galactic chart, 6 local
 chart, 7 system data, 9 status, 0 Inventory (a tab since build 70, drawn by `screens.draw_inventory`), and the two screens
-Elite lacks on the keys after 0 (Brian): - (or _) Repair Shop, = (or +) Options. The joystick goes
-round the tabs in the same order (Brian, build 70; `docked.TABS`, launch left out): Status,
-Inventory, Repair Shop, Options, Market, Equip ship, Galactic chart, Local chart, System data.
-The Repair Shop is on by default (Brian, build 71); DEBUG > DISPLAY can still turn it off. Tests: `tests/test_keys.py`.
+Elite lacks on the keys after 0 (Brian): - (or _) Shipyard (was the Repair Shop), = (or +) Options. The joystick goes
+round the tabs in `docked.TABS` (Brian, builds 77-80): Status, Inventory, Market, Equip ship,
+Shipyard, Hangar, Galactic chart, Local chart, System data. The Repair Shop is the Shipyard's
+sub-screen (D on its first page, your own ship; C there and on every page is that ship's
+stats, where C buys and D trades in; `-` opens the Shipyard). Options is not a tab: C on Status opens it over
+Status (`Docked.in_options`, `name()` gives "OPTIONS"), F goes back; A launches. Only the current
+firmware matters (Brian, 2026-11-18: both badges run it). C on Inventory sells the whole hold (`Docked.sell_all`).
+The Repair Shop is always there (build 81: its DEBUG switch removed). Tests: `tests/test_keys.py`.
 **In-flight screens don't pause (Brian, build 62: "as Elite"; checked against the disc source).**
 Status, Inventory, Market Prices, both charts and system data are `SCREENS`: `fsub` names one while
 `paused` is False, and it is drawn instead of the space view (`_draw_screen`; the three new ones in

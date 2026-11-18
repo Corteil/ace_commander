@@ -113,7 +113,7 @@ e = ace_commander.AceCommander()
 choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
 c = e.cmdr
 home = c.system
-e.dock.go(0); tick(e, fresh=["C"])
+e.dock.go(0); tick(e, fresh=["A"])
 for _ in range(200):
     tick(e)
     if e.mode == "flight":

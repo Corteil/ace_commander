@@ -117,6 +117,28 @@ c = put(g, "ASTEROID", "rock", 0, 0, game.LASER_RANGE + 500)
 g.speed = 0.0
 g.step(DT, 0, 0, 0, True, False)
 assert c.energy == 60, "out of range"
+# Elite's ranges (build 78): your laser reaches anything in the bubble
+g = fresh()
+c = put(g, "ASTEROID", "rock", 0, 0, 12000)
+g.speed = 0.0
+g.step(DT, 0, 0, 0, True, False)
+assert c.energy < 60, "a far rock is hit: Elite's lasers have no range"
+# an enemy fires only within ENEMY_REACH along each axis (TA3)
+for z, fires in ((8000.0, True), (8400.0, False)):
+    g = fresh()
+    g.level = 1
+    v = put(g, "VIPER", "ship", 0, 0, z, face_player=True)
+    v.state = "attack"
+    hit = False
+    for _ in range(400):
+        v.x = v.y = 0.0; v.z = z; game._look(v.m, 0.0, 0.0, -1.0)
+        v.cool = 0.0; v.state = "attack"
+        g.shield = 100.0; g.hull = 100.0
+        g.step(DT, 0, 0, 0, False, False)
+        if v.beam > 0:
+            hit = True
+            break
+    assert hit == fires, (z, hit)
 print("laser aim, range, nearest-first: ok")
 
 g = fresh()

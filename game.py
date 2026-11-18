@@ -13,16 +13,25 @@ import random
 
 try:
     from .rules import GameRules
+    from . import ships
 except ImportError:        # run by a test as a top-level module
     from rules import GameRules
+    import ships
 
 SPEED_K = 25.0         # world units per second for one Elite speed unit
-PLAYER_MAX = 40.0      # top speed, in Elite speed units
+PLAYER_MAX = 40.0      # top speed, in Elite speed units, of the Cobra Mk III (others: Game.set_ship)
 THROTTLE_RATE = 25.0   # speed units gained per second at full throttle
 PITCH_RATE = 1.0       # radians per second at full stick
 ROLL_RATE = 1.7
 
-LASER_RANGE = 7000.0
+# Weapon ranges as Elite's (Brian, build 78): your lasers hit any ship in
+# your sights however far off (Elite's HITCH has no distance check: anything
+# in the local bubble, which is DESPAWN here), as missile locks do; an enemy
+# fires its laser only when you are within ENEMY_REACH of it along each of
+# x, y and z (TA3: no high byte of x, y or z may reach 32, so 32 * 256), and
+# launches missiles at any distance.
+LASER_RANGE = 14000.0          # = DESPAWN, below
+ENEMY_REACH = 8192.0
 LASER_COOL = 0.16      # heat lost per second
 # the front laser, by type: (seconds between hits, damage a hit, heat a hit
 # (1.0 = overheated)). Damage is Elite's laser power: pulse and beam 15,
@@ -63,7 +72,6 @@ MISSILE_SPEED = 1100.0     # world units per second
 PMISSILE_SPEED = 1700.0
 TURN_RATE = 1.1            # how fast enemy ships can turn, radians per second
 BREAK_DIST = 900.0         # enemies peel away when this close
-FIRE_RANGE = 5500.0
 DESPAWN = 14000.0
 RADAR_RANGE = 10000.0
 MAX_OBJECTS = 14
@@ -142,6 +150,13 @@ SUN_CHECK = 1.0
 # chance STATION_COP_CHANCE a second) and stays hostile until you leave.
 FUGITIVE = 50
 HUNT_LEGAL = 40         # bounty hunters (and the police, who are hunters too) attack at this or more
+# A stolen ship (ships.py, build 84): in a law-abiding system (LAWFUL_GOV and
+# up: confederacy, democracy, corporate state) a police Viper that comes
+# within SPOT_DIST of you checks it once, and knows it for stolen with chance
+# SPOT_CHANCE: then it attacks, as for a fugitive.
+LAWFUL_GOV = 5
+SPOT_DIST = 6000.0
+SPOT_CHANCE = 0.5
 KILL_COP = 64
 ILLEGAL = {3: 2, 6: 2, 10: 1}   # good number (market.py's list): weight a tonne
 DEATH_SPEED = 5         # Elite speed units: a refused docking this fast kills you
@@ -188,6 +203,15 @@ AVOID_SIDE = 300.0
 MISJUMP_ODDS = 3 / 256.0
 THARGOIDS = 4
 ALIEN_ITEMS = 16        # the good a scooped Thargon becomes (market.py's list)
+# Escape pods (build 86), as the original's TACTICS part 4: a ship that carries
+# one (POD_SHIPS: bit 7 of its NEWB flags in E%), down to its last eighth of
+# energy, bails out with chance POD_CHANCE each time it thinks. The pod flies
+# off; the ship is left adrift with no one aboard. A pod is scooped like a
+# canister (fuel scoops, from below) and holds one tonne of slaves.
+POD_SHIPS = ("ADDER", "ANACONDA", "ASP MK II", "BOA", "COBRA MK I", "COBRA MK III",
+             "COBRA MK III P", "FER DE LANCE", "KRAIT", "MAMBA", "PYTHON", "PYTHON P", "VIPER")
+POD_CHANCE = 0.1
+SLAVES = 3              # what a scooped escape pod holds (market.py's list)
 WITCH_DUST = 3          # stardust in witchspace (10 elsewhere)
 
 # The missions (missions.py; the app sets the flags from the commander). In
@@ -225,7 +249,7 @@ ROCKS = ("ASTEROID", "BOULDER")
 _INV14 = 1.0 / 16384
 THINK_EVERY = 3        # a ship re-plans on one frame in this many (see Game._think)
 SCOOP_GOODS = 8        # a canister holds one of the first this many goods (food to computers)
-MAX_MISSILES = 4       # missiles the player's ship carries
+MAX_MISSILES = 4       # missiles the Cobra Mk III carries (others: Game.max_missiles)
 PICKUP_MISSILE = 0.5   # combat practice: how often a canister holds a missile as well
 
 # What the level changes: (most hostile ships at once, how often enemy lasers
@@ -431,6 +455,8 @@ class Obj:
         self.role = "pirate"    # ships: "pirate", "trader", "police" or "hunter"
         self.dest = "station"   # a trader's: where it is making for, "station" or "planet"
         self.prey = None        # a pirate's: the trader it is after (None: you)
+        self.checked = False    # a police ship's: it has looked at your ship (a stolen one: Game.stolen)
+        self.has_pod = bp.name in POD_SHIPS     # its crew can bail out (Game._bail)
         self.missiles = bp.missiles
         self.ecm = False    # an enemy ECM (the Constrictor's): destroys your missiles
         self.beam = 0.0     # > 0 while this ship's laser is drawn
@@ -519,6 +545,7 @@ class Game:
         self.bombs = 0              # energy bombs (one at most, used once)
         self.computer = False       # a docking computer
         self.legal = 0              # legal status, 0 to 255: see FUGITIVE
+        self.stolen = False         # flying a stolen ship: lawful police may spot it (SPOT_CHANCE)
         # what skimmed fuel goes into: a function given tenths of a light year
         # that returns how many fitted in the tank; None: nowhere (practice)
         self.refuel = None
@@ -530,6 +557,11 @@ class Game:
         for entry in ships:
             bp = Blueprint(entry)
             self.types[bp.name] = bp
+        # the ship you fly (build 78): see set_ship; the Cobra Mk III until then
+        self.max_speed = PLAYER_MAX
+        self.turn_k = 1.0           # turn rates times this
+        self.tough = 1.0            # damage divided by this
+        self.max_missiles = MAX_MISSILES
         self.missile_bp = self.types.get("MISSILE")
         self.can_bp = self.types.get("CANISTER")
         tiered = set()
@@ -539,6 +571,19 @@ class Game:
         self.fallback = [bp for bp in self.types.values()
                          if bp.laser and bp.speed and bp.name not in tiered]
         self.reset()
+
+    def set_ship(self, name, pylons=MAX_MISSILES):
+        """Fly a ship of this type (ships.py): its top speed, turning and
+        toughness from its blueprint against the Cobra Mk III's, and pylons
+        for missiles. Missiles above the pylons are dropped."""
+        self.ship_name = name
+        self.max_speed, self.turn_k, self.tough = ships.flight(
+            self.types.get(name), self.types.get(ships.COBRA))
+        self.max_missiles = pylons
+        if self.missiles > pylons:
+            self.missiles = pylons
+        if self.speed > self.max_speed:
+            self.speed = self.max_speed
 
     def set_docking(self, style):
         """"A" authentic, "B" assisted or "C" automatic (commander.DOCKING).
@@ -650,7 +695,7 @@ class Game:
         self.hot = False       # laser overheated
         self.cool = 0.0
         self.beam = 0.0        # > 0 while the player's laser is drawn
-        self.missiles = MAX_MISSILES if self.missile_bp else 0
+        self.missiles = self.max_missiles if self.missile_bp else 0
         self.kills = 0
         self.bounty = 0        # bounties earned this flight, in tenths of a credit
         self.score = 0
@@ -734,6 +779,10 @@ class Game:
         self.beam = 0.0
         self.warp = WARP_TIME
         self.jumped = True
+        # out of hyperspace (or into witchspace) looking ahead, as Elite's
+        # TT110 and MJP do (LOOK1 with X = 0): the streaks rush out ahead
+        self.view = 0
+        self._aim_laser()
         self.space = None       # left behind too; whoever started the jump sets the new one
         self.jumping = False
         self.pending = 0
@@ -1197,7 +1246,7 @@ class Game:
             if off > 0.5:
                 want = DOCK_SPEED * 0.5
             else:       # slowing as the point comes up, so as to turn onto the station there
-                want = max(DOCK_SPEED * 0.5, min(PLAYER_MAX, d / 60.0))
+                want = max(DOCK_SPEED * 0.5, min(self.max_speed, d / 60.0))
         else:
             pitch, roll, off = self._aim(st.x, st.y, st.z)
             self.auto_far = False
@@ -1328,26 +1377,26 @@ class Game:
         self.speed += throttle * THROTTLE_RATE * dt
         if self.speed < 0.0:
             self.speed = 0.0
-        elif self.speed > PLAYER_MAX:
-            self.speed = PLAYER_MAX
+        elif self.speed > self.max_speed:
+            self.speed = self.max_speed
 
         self.frame += 1
         fwd = self.speed * SPEED_K * dt
         sp = self.space
         # the jump drive: speed up held at full speed, with no ships about
         self.jumping = (sp is not None and not sp.witch and not self.over and throttle > 0
-                        and self.speed >= PLAYER_MAX and not sp.safe and self.jump_t <= 0
+                        and self.speed >= self.max_speed and not sp.safe and self.jump_t <= 0
                         and self.cabin <= COOL_CABIN    # not near the sun
                         and not self._near()
                         and not self._massed(sp))
         if (sp is not None and not sp.witch and not self.over
-                and throttle > 0 and self.speed >= PLAYER_MAX and self.msg_t <= 0
+                and throttle > 0 and self.speed >= self.max_speed and self.msg_t <= 0
                 and not self.jumping and self._massed(sp)):
             self.say("MASS LOCKED", 1.0)
-        if self.jumping or (self.autodock and self.speed >= PLAYER_MAX and self.auto_far):
+        if self.jumping or (self.autodock and self.speed >= self.max_speed and self.auto_far):
             fwd *= JUMP_K
         self.fwd = int(fwd)
-        self._rotate(pitch * PITCH_RATE * dt, roll * ROLL_RATE * dt, fwd)
+        self._rotate(pitch * PITCH_RATE * self.turn_k * dt, roll * ROLL_RATE * self.turn_k * dt, fwd)
         for o in self.objs:
             if not o.dead:
                 self._think(o, dt)
@@ -1527,6 +1576,10 @@ class Game:
                 o.state = "drift"       # half speed, aimless (TACTICS part 1)
                 o.prey = None
                 return
+            if (o.has_pod and o.energy * 8 < o.max_energy and o.role != "constrictor"
+                    and random.random() < POD_CHANCE):
+                self._bail(o)           # out of energy and out of luck (TACTICS part 4)
+                return
             if (o.role == "pirate" and self.space is not None and self.space.safe
                     and (o.state == "attack" or o.state == "break")):
                 o.state = "patrol"      # near the station a pirate loses its nerve (TN3)
@@ -1560,7 +1613,8 @@ class Game:
                     aim = m[6] * tx + m[7] * ty + m[8] * tz
                     o.cool -= dt
                     if prey is not None:
-                        if dist < FIRE_RANGE and bp.laser and aim > 0.96 and o.cool <= 0:
+                        if (abs(px) < ENEMY_REACH and abs(py) < ENEMY_REACH and abs(pz) < ENEMY_REACH
+                                and bp.laser and aim > 0.96 and o.cool <= 0):
                             o.cool = _rnd(0.5, 1.1)
                             if random.random() < 0.5:
                                 prey.energy -= 3.0 + bp.laser * 2.5
@@ -1569,8 +1623,9 @@ class Game:
                                     prey.state = "flee"     # running for it
                                 if prey.energy <= 0:
                                     self._kill(prey, credit=False)
-                    elif not self.over and d < FIRE_RANGE:
-                        if bp.laser and aim > 0.96 and o.cool <= 0:
+                    elif not self.over:
+                        if (bp.laser and aim > 0.96 and o.cool <= 0 and abs(o.x) < ENEMY_REACH
+                                and abs(o.y) < ENEMY_REACH and abs(o.z) < ENEMY_REACH):
                             o.cool = _rnd(0.5, 1.1)
                             o.beam = 0.2
                             if random.random() < min(0.7, 0.3 + 0.05 * self.wave) * self.aim_k:
@@ -1615,6 +1670,13 @@ class Game:
                 if ((o.role == "police" or o.role == "hunter") and self.legal >= HUNT_LEGAL
                         and not self.over):
                     o.state = "attack"      # there's a price on your head (TN1)
+                elif (o.role == "police" and self.stolen and not o.checked and d < SPOT_DIST
+                      and sp is not None and sp.gov is not None and sp.gov >= LAWFUL_GOV
+                      and not self.over):
+                    o.checked = True        # one look at your ship
+                    if random.random() < SPOT_CHANCE:
+                        o.state = "attack"
+                        self.say("STOLEN SHIP SPOTTED", 2.0)
                 elif (0 < o.z < AVOID_AHEAD and o.x * o.x + o.y * o.y < (bp.radius + AVOID_SIDE) ** 2
                       or d < AVOID_DIST and m[6] * tx + m[7] * ty + m[8] * tz > 0):
                     # in your path, or coming your way: sideways out of it (not
@@ -1758,7 +1820,7 @@ class Game:
         """Combat practice: a scooped canister recharges the shields, and
         sometimes holds a missile too (while there is room on the rack)."""
         self.shield = 100.0
-        if (self.missile_bp and self.missiles < MAX_MISSILES
+        if (self.missile_bp and self.missiles < self.max_missiles
                 and random.random() < PICKUP_MISSILE):
             self.missiles += 1
             self.say("MISSILE + SHIELDS")
@@ -1878,6 +1940,49 @@ class Game:
         self.new.append(c)
         return c
 
+    def _bail(self, o):
+        """Ship o's crew launch their escape pod: it flies off, and the ship
+        is left adrift (no one aboard: it neither fights nor flees)."""
+        o.has_pod = False
+        o.state = "drift"
+        o.prey = None
+        o.beam = 0.0
+        bp = self.types.get("ESCAPE POD")
+        if bp is None or len(self.objs) + len(self.new) >= MAX_OBJECTS:
+            return None
+        dx, dy, dz = _unit(_rnd(-1, 1), _rnd(-1, 1), _rnd(-1, 1))
+        p = Obj(bp, "can", o.x + dx * 120, o.y + dy * 120, o.z + dz * 120)
+        _look(p.m, dx, dy, dz)
+        p.speed = bp.speed
+        p.spin = _rnd(-2, 2)
+        p.good = SLAVES         # scooped: a tonne of slaves, as the original
+        self.new.append(p)
+        return p
+
+    def release_pod(self, dist=700.0):
+        """A cheat: an escape pod just ahead, as release_canister does."""
+        bp = self.types.get("ESCAPE POD")
+        if bp is None or len(self.objs) + len(self.new) >= MAX_OBJECTS:
+            return None
+        p = Obj(bp, "can", 0.0, -30.0, dist)
+        _look(p.m, 0.0, 0.0, -1.0)
+        p.speed = 3.0
+        p.spin = _rnd(-2, 2)
+        p.good = SLAVES
+        self.new.append(p)
+        return p
+
+    def bail_nearest(self):
+        """A cheat: the nearest ship with an escape pod bails out now.
+        Returns the pod, or None."""
+        best = None
+        for o in self.objs:
+            if o.kind == "ship" and o.has_pod and not o.dead and o.state != "drift":
+                if best is None or o.x * o.x + o.y * o.y + o.z * o.z < \
+                        best.x * best.x + best.y * best.y + best.z * best.z:
+                    best = o
+        return self._bail(best) if best is not None else None
+
     def _kill(self, o, mine=False, credit=True):
         """o is destroyed. mine: by the mining laser, so a rock breaks into
         splinters you can scoop for minerals. credit False: not by you (a
@@ -1904,7 +2009,7 @@ class Game:
             if self.space is None and self.wave_kills >= 2 + self.wave:     # practice only
                 self.wave += 1
                 self.wave_kills = 0
-                if self.missile_bp and self.missiles < MAX_MISSILES:
+                if self.missile_bp and self.missiles < self.max_missiles:
                     self.missiles += 1
                 self.say("WAVE %d" % self.wave, 2.5)
             elif self.kills % 8 == 0:
@@ -1955,6 +2060,7 @@ class Game:
         if self.god:
             return
         self.since_hit = 0.0
+        damage /= self.tough        # a bigger ship's shields and hull soak up more (set_ship)
         s = damage if damage < self.shield else self.shield
         self.shield -= s
         self.hull -= damage - s

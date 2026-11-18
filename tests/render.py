@@ -59,6 +59,9 @@ tick(a, fresh=["CONFIRM"])
 a.cmdr.add_kills(140)
 shot(a, "1e_docked.png")
 d = a.dock
+d.open("OPTIONS")               # C on Status
+shot(a, "1e2_docked_options.png")
+d.go(0)
 d.open("MARKET")
 for i in (0, 0, 0, 7, 7):
     d.sel = i; d.trade(True)
@@ -68,11 +71,38 @@ for _ in range(9):
     d.pick_good(1)
 d.cmdr.cash = 3; d.trade(True)
 shot(a, "1k_market_scrolled.png")
+d.open("INVENTORY")
+shot(a, "1k2_inventory_docked.png")
+d.sell_all()                    # C: the whole hold
+shot(a, "1k3_inventory_sold.png")
 d.cmdr.cash = 1000
 d.open("EQUIP SHIP")
 d.cmdr.fuel = 52; d.esel = 1; d.buy_item()
 d.pick_item(1)
 shot(a, "1l_equip.png")
+d.cmdr.cash = 10 ** 6
+d.open("SHIPYARD"); d.ysel = 0; d.spin = 0.6
+d.cmdr.extras = ["ecm", "scoops", "pod", "docking", "energy"]; d.cmdr.cargo[0] = 3
+shot(a, "1m0_shipyard_yours.png")
+d.open("REPAIR SHOP")
+shot(a, "1m1_repair_shop.png")
+d.back(); d.open_stats()
+shot(a, "1m0b_stats_yours.png")
+d.back(); d.ysel = 1
+shot(a, "1m_shipyard.png")
+d.open_stats()
+shot(a, "1m0c_stats_for_sale.png")
+d.back()
+d.yard = d.yard + [("VIPER", 195000, True)]; d.ysel = len(d.yard)
+shot(a, "1m2_shipyard_stolen.png")
+d.ysel = 1; d.open_stats(); d.buy_ship(False)
+shot(a, "1m3_shipyard_bought.png")
+d.open("HANGAR")
+shot(a, "1n_hangar.png")
+d.pick_owned(1)
+shot(a, "1n2_hangar_kept.png")
+d.fly_owned(); d.cmdr.extras = []; d.cmdr.cargo[0] = 0
+d.cmdr.cash = 1000
 d.open("GALACTIC CHART")
 shot(a, "1f_galactic.png")
 d.target = 147; d.open("LOCAL CHART")
@@ -81,7 +111,7 @@ d.open("SYSTEM DATA")
 shot(a, "1h_system_data.png")
 d.go(0); a.target = 147
 shot(a, "1i_docked_target.png")
-tick(a, fresh=["CONFIRM"])
+tick(a, fresh=["A"])          # A launches
 for i, ft in enumerate((0.25, 0.6, 0.85, 0.97)):
     a.launch_t = ft * ace_commander.ace.LAUNCH_TIME
     shot(a, "1j_tunnel_%d.png" % i)
@@ -162,6 +192,10 @@ g.speed = 40.0; g.jumping = True; g.fwd = 400
 for p in g.dust:
     p[2] = 200 + (p[2] % 1300)
 shot(a, "4j_jump_drive.png")
+for v, n in ((1, "rear"), (2, "left"), (3, "right")):   # each view streams it its own way
+    g.view = v
+    shot(a, "4j_jump_drive_%s.png" % n)
+g.view = 0
 g.jumping = False; g.speed = 20.0
 g.to_station(2500.0)
 for _ in range(6):

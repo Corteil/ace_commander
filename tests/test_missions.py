@@ -250,7 +250,7 @@ c = e.cmdr
 
 
 def launch(a):
-    a.dock.go(0); tick(a, fresh=["C"])
+    a.dock.go(0); tick(a, fresh=["A"])
     for _ in range(200):
         tick(a)
         if a.mode == "flight":
@@ -292,7 +292,7 @@ assert texts(e) == ["INCOMING MESSAGE"]
 for _ in range(int(2.2 / DT)):
     tick(e)
 t = texts(e)
-assert any("Jameson" in s for s in t) and "stick: scroll  C: more" in t
+assert any("JAMESON" in s.upper() for s in t) and "stick: scroll  C: more" in t
 s0 = e.brief.scroll
 for _ in range(10):
     tick(e, held=["JOYDOWN"])
