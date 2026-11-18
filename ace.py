@@ -1217,17 +1217,11 @@ class AceCommander(app.App):
                 d.trade(True)
             elif new and self._repeat(BTN_MISSILE, dt):
                 d.trade(False)
-        elif d.name() == "STATUS":
-            if not new and hit("up"):
-                # older firmware names the lettered buttons by direction: A is
-                # "up" (B right, C confirm, D down, E left, F cancel), so A
-                # launches from Status there too (it scrolls the other tabs)
+        elif confirm and d.name() == "STATUS":
+            if d.options:
+                d.open("OPTIONS")   # A launches (Brian), so C is Options
+            else:
                 self._launch()
-            elif confirm:
-                if d.options:
-                    d.open("OPTIONS")   # A launches (Brian), so C is Options
-                else:
-                    self._launch()
 
     def _repeat(self, name, dt):
         """True when button name is pressed, and again and again while it is

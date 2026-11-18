@@ -326,21 +326,6 @@ tick(a, fresh=["CANCEL"]); tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"]); tic
 tick(a, fresh=["CONFIRM"]); assert a.mode == "menu", "QUIT TO TITLE"
 print("older firmware fallback: ok")
 
-# older firmware, docked: A ("up" there) launches from Status, C opens Options
-pkg, mod = load(joystick=False)
-mod.SAVE_PATH = TMP_SAVE
-if os.path.exists(TMP_SAVE):
-    os.remove(TMP_SAVE)
-a = pkg.AceCommander()
-choose(a, "NEW COMMANDER"); tick(a, fresh=["CONFIRM"])
-assert a.mode == "docked" and a.dock.name() == "STATUS", a.mode
-tick(a, fresh=["CONFIRM"]); assert a.dock.name() == "OPTIONS" and a.mode == "docked"
-tick(a, fresh=["UP"]); assert a.mode == "docked", "A is up on Options: it picks a line"
-tick(a, fresh=["CANCEL"]); assert a.dock.name() == "STATUS"
-tick(a, fresh=["UP"]); assert a.mode == "launch", "A launches from Status"
-os.remove(TMP_SAVE)
-print("older firmware docked: A launches, C options: ok")
-
 # ---- no accelerometer and no keyboard modules -------------------------------
 pkg, mod = load(imu=False, keyboard=False)
 a = pkg.AceCommander()

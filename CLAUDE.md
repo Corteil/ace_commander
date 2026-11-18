@@ -263,8 +263,8 @@ chart, 7 system data, 9 status, 0 Inventory (a tab since build 70, drawn by `scr
 Elite lacks on the keys after 0 (Brian): - (or _) Repair Shop, = (or +) Options. The joystick goes
 round the tabs in `docked.TABS` (Brian, build 77): Status, Inventory, Market, Equip ship, Repair
 Shop, Galactic chart, Local chart, System data. Options is not a tab: C on Status opens it over
-Status (`Docked.in_options`, `name()` gives "OPTIONS"), F goes back; A launches (on older firmware,
-which names A-F by direction, A is "up": it launches from Status only). C on Inventory sells the whole hold (`Docked.sell_all`).
+Status (`Docked.in_options`, `name()` gives "OPTIONS"), F goes back; A launches. Only the current
+firmware matters (Brian, 2026-11-18: both badges run it). C on Inventory sells the whole hold (`Docked.sell_all`).
 The Repair Shop is on by default (Brian, build 71); DEBUG > DISPLAY can still turn it off. Tests: `tests/test_keys.py`.
 **In-flight screens don't pause (Brian, build 62: "as Elite"; checked against the disc source).**
 Status, Inventory, Market Prices, both charts and system data are `SCREENS`: `fsub` names one while

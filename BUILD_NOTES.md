@@ -827,6 +827,5 @@ what is now `ace.py` (renamed in build 50).
    Equip ship; Options is no longer a tab but Status's sub-screen, opened with C (A already
    launches), F back to Status; Status shows "A: LAUNCH" and "C: options". = still opens
    Options. Elite opens Status (f8) on docking (BAY), as we do. Tests launch with A now.
-   Older firmware (no `FB`/`JOY`) names the lettered buttons by direction (A up, B right,
-   C confirm, D down, E left, F cancel; the 2024 badge has A-F on its corners too), so there A
-   launches from Status as "up" and C opens Options (test in `tests/test_app.py`).
+   Only the current firmware matters (Brian: both badges, 2024 and 2026, run it); an
+   older-firmware tweak for A on Status was taken out again.
