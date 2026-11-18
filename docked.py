@@ -20,6 +20,7 @@ game_data = content.DATA     # Elite's text tables, or the game's own (content.p
 TABS = ("STATUS", "INVENTORY", "MARKET", "EQUIP SHIP", "SHIPYARD", "HANGAR",
         "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA")
 PAINT_PRICE = 100   # tenths of a credit: a new colour at the Repair Shop costs 10.0 Cr
+TRANSPONDER_K = 0.25     # a new transponder for a stolen ship costs this much of its price (pirate worlds)
 SPIN = 0.8          # radians a second the Repair Shop's ship turns
 ROWS = 6            # goods shown at once on the market
 SAY_TIME = 1.5      # seconds a market message stays
@@ -278,7 +279,33 @@ class Docked:
             c.colour = self.paint
         self.msg = why
         self.msg_t = SAY_TIME if why else 0.0
+        self.sold = False
         return why is None
+
+    def transponder_price(self):
+        """A new transponder for a stolen ship (Brian, build 84): sold only at the
+        Repair Shop on pirate worlds, for TRANSPONDER_K of the ship's price; None
+        if not on offer here (a clean ship, or a law-abiding world)."""
+        c = self.cmdr
+        if not c.stolen or self.here is None or self.here.government >= ships.PIRATE_GOV:
+            return None
+        return int(ships.spec(c.ship)[ships.PRICE] * TRANSPONDER_K)
+
+    def buy_transponder(self):
+        """A new transponder, so the ship reads as a new one: it isn't stolen any more,
+        so it no longer keeps you an offender or gets spotted by the police.
+        Returns True if it happened."""
+        c = self.cmdr
+        p = self.transponder_price()
+        if p is None:
+            return False
+        if c.cash < p:
+            self._say("NOT ENOUGH CASH")
+            return False
+        c.cash -= p
+        c.stolen = False
+        self._say("NEW TRANSPONDER FITTED", True)
+        return True
 
     # ---- the shipyard and the hangar (build 79) ----------------------------------
 
@@ -352,6 +379,10 @@ class Docked:
         c = self.cmdr
         name, price, stolen = self.yard[self.ysel - 1]
         old = ships.pack(c, self._kept_at())
+        if not ships.tank(name) and ships.stranded(c.hangar + ([] if trade else [old]),
+                                                    c.galaxy, c.system, bool(c.hardcore)):
+            self._say("NEED A SHIP THAT JUMPS")     # it has no hyperdrive (build 83)
+            return False
         credit = ships.value(old, self.equip) if trade else 0
         if c.cash + credit < price:
             self._say("NOT ENOUGH CASH")
@@ -424,6 +455,10 @@ class Docked:
         why = self._where(entry)
         if why:
             self._say(why)
+            return False
+        rest = c.hangar[:self.hsel - 1] + c.hangar[self.hsel:]
+        if not c.max_fuel() and ships.stranded(rest, c.galaxy, c.system, bool(c.hardcore)):
+            self._say("NEED A SHIP THAT JUMPS")     # you fly one with no hyperdrive (build 83)
             return False
         got = ships.value(entry, self.equip)
         c.cash += got
@@ -623,8 +658,11 @@ class Docked:
         else:
             text(ctx, "paint %d.%d Cr   %s" % (PAINT_PRICE // 10, PAINT_PRICE % 10,
                                              c.cash_text()), 0, 52, 12, cockpit.YELLOW)
+        tp = self.transponder_price()
         if self.msg:
-            text(ctx, self.msg, 0, 70, 12, cockpit.RED)
+            text(ctx, self.msg, 0, 70, 12, cockpit.GREEN if self.sold else cockpit.RED)
+        elif tp is not None:    # a stolen ship on a pirate world (build 84)
+            text(ctx, "D: new transponder %d Cr" % (tp // 10), 0, 70, 11, cockpit.GREY)
         else:
             text(ctx, "up/down: colour   C: paint", 0, 70, 11, cockpit.GREY)
         text(ctx, "F: back to shipyard", 0, 88, 11, cockpit.GREY)
@@ -649,7 +687,9 @@ class Docked:
         then laser mounts and missile pylons."""
         speed = ships.flight(bp, self.bps(ships.COBRA))[0]
         mounts = {1: "front", 2: "front+rear", 4: "4 views"}[ships.mounts(name)]
-        return ("speed %d   hold %dt" % (int(speed + 0.5), ships.base_hold(name)),
+        t = ships.tank(name)
+        return ("speed %d   hold %dt   %s" % (int(speed + 0.5), ships.base_hold(name),
+                                           "%d.%d LY" % (t // 10, t % 10) if t else "no jumps"),
                 "lasers %s   missiles %d" % (mounts, ships.pylons(name)))
 
     def _foot(self, ctx, hint):
@@ -725,7 +765,8 @@ class Docked:
         n = ships.pylons(name)
         sp = ships.spec(name)
         std = ships.standard_missiles(name, bp)
-        rows = (("top speed", "%d" % int(speed + 0.5)),
+        rows = (("jump range", ships.jump_text(name)),
+                ("top speed", "%d" % int(speed + 0.5)),
                 ("turning", "%d%%" % int(turn * 100 + 0.5)),
                 ("shields", "%d%%" % int(tough * 100 + 0.5)),
                 ("hold", "%dt (%dt with bay)" % (hold, ships.big_hold(name))),
@@ -734,14 +775,14 @@ class Docked:
                 ("fitted", ("%s, %d missile%s" % (ships.standard_laser(bp), std, "" if std == 1 else "s"))
                  if std else ships.standard_laser(bp) + " laser"),
                 ("sold", "stolen only" if sp[ships.STOLEN_ONLY] else "from tech %d" % sp[ships.TECH]))
-        y = -64
+        y = -66
         for label, value in rows:
-            text(ctx, label, -84, y, 11, cockpit.GREY, -1)
-            text(ctx, value, 84, y, 11, cockpit.CYAN, 1)
-            y += 13
+            text(ctx, label, -86, y, 11, cockpit.GREY, -1)
+            text(ctx, value, 86, y, 11, cockpit.CYAN, 1)
+            y += 12
         cobra = self.bps(ships.COBRA)
         text(ctx, "turning, shields: %s = 100%%" % (cobra.title if cobra is not None else ships.COBRA),
-             0, 40, 9, cockpit.GREY)
+             0, 44, 9, cockpit.GREY)
         if self.msg:
             text(ctx, self.msg, 0, 58, 12, cockpit.GREEN if self.sold else cockpit.RED)
         elif not own:
@@ -749,13 +790,16 @@ class Docked:
         text(ctx, "F: back to shipyard", 0, 74, 11, cockpit.GREY)
 
     def _fitout(self, e):
-        """A ship's fit-out as lines for the Hangar: its lasers by view,
-        missiles and hold, then its other equipment."""
+        """A ship's fit-out as lines for the Hangar: its fuel, its lasers by
+        view, missiles and hold, then its other equipment."""
         short = {"pulse": "pulse", "beam": "beam", "military": "mil", "mining": "mine"}
         lasers = ["%s %s" % (v, short.get(k, k)) for v, k in zip("FBLR", e["lasers"]) if k]
         from . import market
         used = market.hold_used(e["cargo"])
-        lines = ["lasers " + "  ".join(lasers) if lasers else "no lasers",
+        t = ships.tank(e["type"])
+        f = e.get("fuel", t)
+        lines = ["fuel %d.%d of %d.%d LY" % (f // 10, f % 10, t // 10, t % 10) if t else "no hyperdrive",
+                 "lasers " + "  ".join(lasers) if lasers else "no lasers",
                  "missiles %d/%d   hold %dt, %dt used" % (e["missiles"], ships.pylons(e["type"]),
                                                        e["hold"], used)]
         names = {"ecm": "ECM", "scoops": "scoops", "pod": "pod", "bomb": "bomb",
@@ -792,11 +836,11 @@ class Docked:
             v = ships.value(e, self.equip)
             where = ("here, worth %d Cr" % (v // 10)) if why is None else why.lower()
             col = cockpit.YELLOW if why is None else cockpit.GREY
-        text(ctx, where, 0, -2, 11, col)
-        y = 12
-        for line in self._fitout(e):
+        text(ctx, where, 0, -4, 11, col)
+        y = 8
+        for line in self._fitout(e):      # up to six lines
             text(ctx, line, 0, y, 11, cockpit.CYAN)
-            y += 13
+            y += 11
         if len(own) == 1:
             self._foot(ctx, "your only ship")
         else:

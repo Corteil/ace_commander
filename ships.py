@@ -44,10 +44,22 @@ TYPES = {
     "FER DE LANCE": (750000, 6, 4, 2, 10, False),
     "PYTHON": (950000, 60, 4, 4, 10, False),
     "BOA": (1200000, 75, 4, 5, 12, False),
-    "VIPER": (300000, 4, 2, 2, 8, True),        # the police's: only stolen
-    "CONSTRICTOR": (3000000, 8, 4, 5, 14, True),  # the navy's prototype: only stolen
+    "VIPER": (300000, 4, 2, 2, 12, False),      # the police's: sold at high tech worlds (build 84)
+    "CONSTRICTOR": (3000000, 8, 4, 5, 15, False),  # the navy's prototype: only at the very top
 }
 PRICE, HOLD, MOUNTS, PYLONS, TECH, STOLEN_ONLY = range(6)
+
+# fuel tanks, in tenths of a light year: how far each can jump (Brian, build
+# 83). The Cobra's is Elite's 7.0 light years. The Shuttle, Transporter and
+# Worm are in-system craft with no hyperdrive at all.
+TANKS = {
+    "WORM": 0, "SHUTTLE": 0, "TRANSPORTER": 0,
+    "SIDEWINDER": 50, "GECKO": 50, "VIPER": 50,
+    "ADDER": 60, "COBRA MK I": 60, "KRAIT": 60, "MAMBA": 60, "MORAY": 60,
+    COBRA: 70, "FER DE LANCE": 70,
+    "ASP MK II": 80, "PYTHON": 80, "BOA": 80,
+    "CONSTRICTOR": 100,
+}
 
 SHOWN = 6               # most legal ships a shipyard has at once
 STOLEN_PRICE = 0.65     # a stolen ship costs this much of the price
@@ -84,6 +96,17 @@ def pylons(name):
 def mounts(name):
     """How many views take a laser: 1 front, 2 front and rear, 4 all."""
     return spec(name)[MOUNTS]
+
+
+def tank(name):
+    """The fuel tank, tenths of a light year (0: no hyperdrive)."""
+    return TANKS.get(name, 70)
+
+
+def jump_text(name):
+    """How far a ship of this type jumps, for the screens."""
+    t = tank(name)
+    return "%d.%d LY" % (t // 10, t % 10) if t else "in-system only"
 
 
 def flight(bp, cobra):
@@ -155,7 +178,8 @@ def pack(c, at=None):
     (galaxy, system) in Hardcore Mode, or None (it goes with you)."""
     return {"type": c.ship, "lasers": list(c.lasers), "missiles": c.missiles,
             "extras": list(c.extras), "hold": c.hold, "cargo": list(c.cargo),
-            "colour": c.colour, "stolen": c.stolen, "at": list(at) if at else None}
+            "colour": c.colour, "stolen": c.stolen, "fuel": c.fuel,
+            "at": list(at) if at else None}
 
 
 def unpack(c, d):
@@ -168,11 +192,13 @@ def unpack(c, d):
     c.cargo = list(d["cargo"])
     c.colour = d["colour"]
     c.stolen = d["stolen"]
+    c.fuel = min(tank(c.ship), d.get("fuel", tank(c.ship)))   # each ship its own tank
 
 
 def new_ship(c, name, bp, stolen=False):
     """Make a brand new ship of type name the commander's current one, with
-    its standard weapons and nothing else. Cargo is the caller's business."""
+    its standard weapons, a full tank and nothing else. Cargo is the
+    caller's business."""
     c.ship = name
     c.lasers = [standard_laser(bp), "", "", ""]
     c.missiles = standard_missiles(name, bp)
@@ -180,6 +206,7 @@ def new_ship(c, name, bp, stolen=False):
     c.hold = base_hold(name)
     c.cargo = [0] * len(c.cargo)
     c.stolen = stolen
+    c.fuel = tank(name)
 
 
 def move_cargo(src, dst, hold):
@@ -222,6 +249,16 @@ def value(entry, equip):
             extra += equip[equipment.CARGO_BAY][1]
         extra += entry["missiles"] * equip[equipment.MISSILE][1]
     return int(v + extra * EQUIP_RESALE)
+
+
+def stranded(entries, galaxy, system, hardcore):
+    """True if none of these ships (hangar entries) could get you out of
+    this system: none has a hyperdrive, or (Hardcore) none of those is kept
+    here."""
+    for e in entries:
+        if tank(e["type"]) and here(e, galaxy, system, hardcore):
+            return False
+    return True
 
 
 def here(entry, galaxy, system, hardcore):

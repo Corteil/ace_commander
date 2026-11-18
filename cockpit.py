@@ -1125,7 +1125,7 @@ SUN_GAUGE_ALT = math.sqrt((285 - COOL_CABIN) / SUN_HEAT) - 1.0
 # is safe, through yellow and orange to red near the surface
 CT_COLOURS = ((0.0, (0.2, 1.0, 0.3)), (0.45, (1.0, 0.9, 0.1)), (0.7, (1.0, 0.55, 0.1)),
               (0.86, (1.0, 0.15, 0.1)))
-MAX_FUEL = 70           # a full tank, tenths of a light year (commander.MAX_FUEL)
+MAX_FUEL = 70           # the Cobra's full tank, tenths of a light year (Game.fuel_max: the ship's)
 
 
 def ct_colour(cabin):
@@ -1162,11 +1162,12 @@ def _sun_gauges(ctx, g, sp):
     a = int(50 * d / (SUN_GAUGE_ALT * sp.sr))
     a = 0 if a < 0 else 50 if a > 50 else a
     ctx.rgb(*CYAN).rectangle(8, -94, a, 4).fill()
-    if g.fuel is not None:      # the fuel, under them: watch it fill as you skim
+    full = getattr(g, "fuel_max", MAX_FUEL)     # the ship's own tank (ships.tank)
+    if g.fuel is not None and full:     # the fuel, under them: watch it fill as you skim
         text(ctx, "FU", -66, -83, 9, GREY)
         ctx.rgb(*DIM).rectangle(-58, -85, 116, 4).fill()
-        f = g.fuel * 116 // MAX_FUEL
-        ctx.rgb(*(RED if g.fuel < MAX_FUEL // 4 else GREEN)).rectangle(-58, -85, f, 4).fill()
+        f = min(g.fuel, full) * 116 // full
+        ctx.rgb(*(RED if g.fuel < full // 4 else GREEN)).rectangle(-58, -85, f, 4).fill()
 
 
 def _compass(ctx, sp):

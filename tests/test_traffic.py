@@ -185,6 +185,26 @@ assert p.state == "attack" and g.legal == 0, "hitting a Viper only angers it"
 p.energy = 1.0; g.cool = 0.0; g.heat = 0.0
 g.step(DT, 0, 0, 0, True, False)
 assert p.dead and g.legal == game.KILL_COP and g.msg == "FUGITIVE"
+# a stolen ship (build 84): lawful police spot it, once each, with SPOT_CHANCE
+for gov, stolen, chance, want in ((7, True, 1.0, "attack"), (7, True, 0.0, "patrol"),
+                                  (7, False, 1.0, "patrol"), (game.LAWFUL_GOV - 1, True, 1.0, "patrol")):
+    g = system(gov=gov)
+    g.stolen = stolen
+    old = game.SPOT_CHANCE; game.SPOT_CHANCE = chance
+    p = g.add_police(False); g.objs.extend(g.new); g.new = []
+    p.x, p.y, p.z = 0.0, 0.0, game.SPOT_DIST - 500.0
+    for _ in range(6):
+        g.step(DT, 0, 0, 0, False, False)
+    game.SPOT_CHANCE = old
+    assert (p.state in ("attack", "break")) == (want == "attack"), (gov, stolen, chance, p.state)
+    assert p.checked == (stolen and gov >= game.LAWFUL_GOV)
+    if want == "attack":
+        assert g.msg == "STOLEN SHIP SPOTTED"
+g = system(gov=7); g.stolen = True
+p = g.add_police(False); g.objs.extend(g.new); g.new = []
+p.x, p.y, p.z = 0.0, 0.0, game.SPOT_DIST + 3000.0; p.speed = 0.0
+g.step(DT, 0, 0, 0, False, False)
+assert not p.checked, "too far off to look"
 g = system(legal=3); g.objs.append(game.Obj(g.types["VIPER"], "ship", 0.0, 0.0, 3000.0))
 g.objs[-1].role = "police"; g._kill(g.objs[-1]); assert g.legal == 3 | 64
 # out of the slot when the station sends it

@@ -905,3 +905,33 @@ what is now `ace.py` (renamed in build 50).
    Shuttle and Transporter, five on the Boa and Constrictor). In the Shipyard C is a
    ship's stats on every page, your own included; D on your own ship's page is the Repair
    Shop. In the stats, C buys and D trades in, as before.
+   **Build 83** (2026-11-18, Brian: "would some ships not be able to jump to hyperspace,
+   like the shuttle, and would different ships have different jump ranges"; then "build
+   the jump ranges as suggested"). Each ship has its own fuel tank (`ships.TANKS`, tenths
+   of a LY; `Commander.max_fuel()`), which is its jump range: none for the Shuttle,
+   Transporter and Worm (in-system craft); 5.0 LY Sidewinder, Gecko, Viper; 6.0 Adder,
+   Cobra Mk I, Krait, Mamba, Moray; 7.0 Cobra Mk III (Elite's) and Fer-de-Lance; 8.0 Asp
+   Mk II, Python, Boa; 10.0 Constrictor. Fuel is kept per ship (in `pack` / `unpack`; a
+   new ship comes full; old entries without it are full). Fuel price, refuelling, sun
+   skimming, the pod's refill, DEBUG REFILL / FUEL TO 1/4 and the sun gauge's FU bar
+   (`Game.fuel_max`) use the ship's tank. No hyperdrive: no HYPERSPACE or GALACTIC JUMP
+   line in flight, H says "NO HYPERDRIVE", Equip ship won't sell fuel or the galactic
+   hyperdrive ("NO HYPERDRIVE"). Never stranded: the Shipyard won't sell (or trade you
+   into) an in-system ship, and the Hangar won't sell a ship, if that leaves you no ship
+   that jumps here (`ships.stranded`; in Hardcore it must be kept at this station):
+   "NEED A SHIP THAT JUMPS". Shown: "jump range" on SHIP STATS, the range or "no jumps"
+   on the Shipyard page, "fuel x of y LY" / "no hyperdrive" in the Hangar's fit-out.
+   **Build 84** (2026-11-18, Brian: "the viper and the constrictor should be available to
+   buy at high tech worlds legally"; for a hot ship "1, 2 and 4"; "add stolen status to the
+   debug menu"; "it should be new transponder"). The Viper is sold legally from tech 12,
+   the Constrictor only at tech 15 (no type is stolen-only now; pirate worlds can still
+   sell any type stolen). A stolen ship (`Commander.stolen`): (1) keeps you an offender
+   while you fly it: jumps, the galactic hyperdrive and the pod clear the legal status no
+   further than `ships.STOLEN_LEGAL` (`ace._hot`); (2) in a law-abiding system
+   (`game.LAWFUL_GOV` 5 and up) each police Viper that comes within `SPOT_DIST` 6000 looks
+   once (`Obj.checked`) and with `SPOT_CHANCE` 0.5 knows it and attacks, "STOLEN SHIP
+   SPOTTED" (`Game.stolen`); (4) the Repair Shop on pirate worlds (anarchy, feudal) sells a
+   new transponder on D for a quarter of the ship's price (`Docked.transponder_price` /
+   `buy_transponder`), "NEW TRANSPONDER FITTED": the ship is clean. DEBUG > SHIP CONFIG
+   > STOLEN switches it, in flight or docked, saved. Not done: the long system names clip
+   the docked tabs' titles at the top (e.g. "REPAIR SHOP  CEBETELA").

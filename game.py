@@ -150,6 +150,13 @@ SUN_CHECK = 1.0
 # chance STATION_COP_CHANCE a second) and stays hostile until you leave.
 FUGITIVE = 50
 HUNT_LEGAL = 40         # bounty hunters (and the police, who are hunters too) attack at this or more
+# A stolen ship (ships.py, build 84): in a law-abiding system (LAWFUL_GOV and
+# up: confederacy, democracy, corporate state) a police Viper that comes
+# within SPOT_DIST of you checks it once, and knows it for stolen with chance
+# SPOT_CHANCE: then it attacks, as for a fugitive.
+LAWFUL_GOV = 5
+SPOT_DIST = 6000.0
+SPOT_CHANCE = 0.5
 KILL_COP = 64
 ILLEGAL = {3: 2, 6: 2, 10: 1}   # good number (market.py's list): weight a tonne
 DEATH_SPEED = 5         # Elite speed units: a refused docking this fast kills you
@@ -439,6 +446,7 @@ class Obj:
         self.role = "pirate"    # ships: "pirate", "trader", "police" or "hunter"
         self.dest = "station"   # a trader's: where it is making for, "station" or "planet"
         self.prey = None        # a pirate's: the trader it is after (None: you)
+        self.checked = False    # a police ship's: it has looked at your ship (a stolen one: Game.stolen)
         self.missiles = bp.missiles
         self.ecm = False    # an enemy ECM (the Constrictor's): destroys your missiles
         self.beam = 0.0     # > 0 while this ship's laser is drawn
@@ -527,6 +535,7 @@ class Game:
         self.bombs = 0              # energy bombs (one at most, used once)
         self.computer = False       # a docking computer
         self.legal = 0              # legal status, 0 to 255: see FUGITIVE
+        self.stolen = False         # flying a stolen ship: lawful police may spot it (SPOT_CHANCE)
         # what skimmed fuel goes into: a function given tenths of a light year
         # that returns how many fitted in the tank; None: nowhere (practice)
         self.refuel = None
@@ -1647,6 +1656,13 @@ class Game:
                 if ((o.role == "police" or o.role == "hunter") and self.legal >= HUNT_LEGAL
                         and not self.over):
                     o.state = "attack"      # there's a price on your head (TN1)
+                elif (o.role == "police" and self.stolen and not o.checked and d < SPOT_DIST
+                      and sp is not None and sp.gov is not None and sp.gov >= LAWFUL_GOV
+                      and not self.over):
+                    o.checked = True        # one look at your ship
+                    if random.random() < SPOT_CHANCE:
+                        o.state = "attack"
+                        self.say("STOLEN SHIP SPOTTED", 2.0)
                 elif (0 < o.z < AVOID_AHEAD and o.x * o.x + o.y * o.y < (bp.radius + AVOID_SIDE) ** 2
                       or d < AVOID_DIST and m[6] * tx + m[7] * ty + m[8] * tz > 0):
                     # in your path, or coming your way: sideways out of it (not

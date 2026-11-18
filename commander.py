@@ -43,7 +43,7 @@ START_MISSILES = 3  # a new commander's missiles, as in the original
 LASERS = ("pulse", "beam", "military", "mining")
 GOODS = 17          # kinds of cargo (market.py)
 HOLD = 20           # tonnes in a standard cargo hold
-MAX_FUEL = 70       # tenths of a light year: a full tank is 7.0 light years
+MAX_FUEL = 70       # tenths of a light year: the Cobra's full tank is 7.0 light years (others: ships.tank)
 
 
 def thresholds(level):
@@ -86,6 +86,10 @@ class Commander:
         self.stolen = False     # bought stolen at a pirate world's shipyard
         self.hangar = []        # the other ships owned (ships.pack's dicts)
         self._needs = thresholds(self.level)
+
+    def max_fuel(self):
+        """A full tank for the ship flown (ships.tank: 0 with no hyperdrive)."""
+        return ships.tank(self.ship)
 
     @property
     def credits(self):
@@ -177,7 +181,7 @@ class Commander:
         s = d.get("system")
         if isinstance(s, int) and 0 <= s < 256:
             c.system = s
-        c.fuel = max(0, min(MAX_FUEL, int(d.get("fuel", MAX_FUEL))))
+        c.fuel = max(0, min(c.max_fuel(), int(d.get("fuel", c.max_fuel()))))
         k = d.get("legal")
         if isinstance(k, int):
             c.legal = max(0, min(255, k))
@@ -235,6 +239,7 @@ def _hangar_entry(x):
                 "extras": [e for e in x["extras"] if isinstance(e, str)],
                 "hold": max(ships.base_hold(t), min(ships.big_hold(t), int(x["hold"]))), "cargo": cargo,
                 "colour": int(x.get("colour", 0)) & 31, "stolen": x.get("stolen") is True,
+                "fuel": max(0, min(ships.tank(t), int(x.get("fuel", ships.tank(t))))),
                 "at": at}
     except (KeyError, TypeError, ValueError, IndexError):
         return None

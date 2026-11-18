@@ -80,7 +80,7 @@ assert "4t (7t with bay)" in tx and "pulse laser" in tx and "fitted" in tx and "
 tick(e, fresh=["F"]); assert d.name() == "SHIPYARD" and d.ysel == 1
 tick(e, fresh=["JOYUP"]); tick(e, fresh=["JOYUP"]); assert d.ysel == 3, "round the list"
 assert any("(STOLEN)" in t for t in texts(e))
-tick(e, fresh=["C"]); assert "stolen only" in texts(e)
+tick(e, fresh=["C"]); assert "from tech 12" in texts(e), "the Viper: legal at high tech (build 84)"
 tick(e, fresh=["F"])
 d.ysel = 1
 # not enough cash
@@ -213,5 +213,70 @@ h._make_dock(); d = h.dock
 d.open("HANGAR"); tick(h, fresh=["JOYDOWN"]); tick(h, fresh=["C"])
 assert c.ship == ships.COBRA and c.hangar[0]["type"] == "SIDEWINDER" and c.hangar[0]["at"] == [c.galaxy, home]
 print("Hardcore: ships stay where they were left: ok")
+# ---- jump ranges (build 83): an in-system ship, and never stranded
+j = ace_commander.AceCommander()
+choose(j, "NEW COMMANDER"); tick(j, fresh=["C"])
+c = j.cmdr; d = j.dock
+c.cash = 10 ** 7
+d.open("SHIPYARD"); d.yard = [("SHUTTLE", 30000, False)]; d.ysel = 1; d.open_stats()
+tx = texts(j)
+assert "jump range" in tx and "in-system only" in tx, tx
+d.back(); assert any("no jumps" in t for t in texts(j))
+d.open_stats()
+tick(j, fresh=["D"])        # trading in the only ship that jumps
+assert d.msg == "NEED A SHIP THAT JUMPS" and c.ship == ships.COBRA and "NEED A SHIP THAT JUMPS" in texts(j)
+tick(j, fresh=["C"])        # buying, so the Cobra stays in the hangar
+assert c.ship == "SHUTTLE" and c.fuel == 0 and c.hangar[0]["type"] == ships.COBRA
+d.open("HANGAR"); tx = texts(j)
+assert "no hyperdrive" in tx, tx
+d.pick_owned(1); tx = texts(j)
+assert "fuel 7.0 of 7.0 LY" in tx, tx
+tick(j, fresh=["D"]); assert d.msg == "NEED A SHIP THAT JUMPS" and len(c.hangar) == 1, "can't sell the way out"
+# flying it: no HYPERSPACE line, H says so, no fuel gauge's tank
+launch(j)
+g = j.game
+assert g.fuel_max == 0 and not any(t.startswith("HYPERSPACE") for t in j._fitems_top())
+tick(j, fresh=["KEY_H"]); assert g.msg == "NO HYPERDRIVE", g.msg
+print("jump ranges: in-system ships, never stranded: ok")
+
+# ---- a hot ship (build 84): an offender while you fly it, lawful police spot it,
+# a new transponder on a pirate world clears it; DEBUG STOLEN
+k = ace_commander.AceCommander()
+choose(k, "NEW COMMANDER"); tick(k, fresh=["C"])
+c = k.cmdr; d = k.dock
+c.cash = 10 ** 7
+d.open("SHIPYARD"); d.yard = [("VIPER", 195000, True)]; d.ysel = 1; d.open_stats()
+tick(k, fresh=["C"])
+assert c.stolen and c.legal == ships.STOLEN_LEGAL
+launch(k); g = k.game
+assert g.stolen and g.legal == ships.STOLEN_LEGAL
+g.legal //= 2; k._hot(); assert g.legal == ships.STOLEN_LEGAL, "jumps don't clean it"
+c.legal = 0; k._hot(); assert c.legal == ships.STOLEN_LEGAL
+# DEBUG > SHIP CONFIG > STOLEN, in flight
+assert "STOLEN: ON" in k._ship_items()
+k._ship_config("STOLEN: ON")
+assert not c.stolen and not g.stolen and commander.load(SAVE).stolen is False
+k._ship_config("STOLEN: OFF"); assert c.stolen and g.stolen and g.legal >= ships.STOLEN_LEGAL
+# docked at a law-abiding world: no transponder on offer
+k._dock(); d = k.dock
+assert d.here.government >= ships.PIRATE_GOV and d.transponder_price() is None
+d.open("REPAIR SHOP"); tick(k, fresh=["D"]); assert c.stolen
+# at a pirate world: D buys a new transponder for a quarter of the ship's price
+anarchy = [i for i in range(256) if k.galaxy.system(i).government == 0][0]
+c.system = anarchy; c.market = None
+k._make_dock(); d = k.dock
+d.open("REPAIR SHOP")
+tp = d.transponder_price()
+assert tp == int(ships.TYPES["VIPER"][ships.PRICE] * 0.25)
+assert "D: new transponder %d Cr" % (tp // 10) in texts(k)
+c.cash = 10; tick(k, fresh=["D"]); assert d.msg == "NOT ENOUGH CASH" and c.stolen
+c.cash = 10 ** 6; tick(k, fresh=["D"])
+assert not c.stolen and c.cash == 10 ** 6 - tp and d.msg == "NEW TRANSPONDER FITTED"
+assert d.msg in texts(k) and d.transponder_price() is None
+c.legal = 0; k._hot(); assert c.legal == 0, "a clean ship: jumps clear the record again"
+# DEBUG > SHIP CONFIG > STOLEN away from a flight
+assert "STOLEN: OFF" in k._ship_items_c()
+k._ship_config_c("STOLEN: OFF"); assert c.stolen and commander.load(SAVE).stolen
+print("a hot ship: offender while flown, spotted, new transponder, DEBUG STOLEN: ok")
 os.remove(SAVE)
 print("ALL SHIPYARD TESTS PASSED")

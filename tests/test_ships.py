@@ -41,7 +41,11 @@ low = ships.for_sale(0, 7, 1, 5)
 assert low and all(ships.spec(n)[ships.TECH] <= 1 and not st for n, p, st in low), low
 high = ships.for_sale(0, 7, 15, 5)
 assert 0 < len(high) <= ships.SHOWN and not any(st for n, p, st in high)
-assert all(not ships.spec(n)[ships.STOLEN_ONLY] for n, p, st in high), "no police or navy ships"
+# the Viper and Constrictor are sold legally, but only at high tech worlds (build 84)
+assert ships.spec("VIPER")[ships.TECH] == 12 and ships.spec("CONSTRICTOR")[ships.TECH] == 15
+for t in range(1, 16):
+    legal = [n for s_ in range(60) for n, p, st in ships.for_sale(0, s_, t, 5)]
+    assert ("VIPER" in legal) == (t >= 12) and ("CONSTRICTOR" in legal) == (t >= 15), t
 assert [p for n, p, st in high] == sorted(p for n, p, st in high), "cheapest first"
 assert ships.for_sale(0, 7, 15, 5) == high, "the same each visit"
 assert any(ships.for_sale(0, s, 15, 5) != high for s in range(8)), "each station its own"
@@ -52,7 +56,7 @@ for s in range(40):
     assert 1 <= len(stolen) <= 2, stock
     for n, p in stolen:
         assert p == int(ships.TYPES[n][ships.PRICE] * ships.STOLEN_PRICE)
-        seen_stolen = seen_stolen or ships.spec(n)[ships.STOLEN_ONLY] or ships.spec(n)[ships.TECH] > 3
+        seen_stolen = seen_stolen or ships.spec(n)[ships.TECH] > 3
 assert seen_stolen, "pirate worlds sell what the tech level or the law wouldn't"
 fits = lambda n: n != "BOA"
 assert all(n != "BOA" for s in range(40) for n, p, st in ships.for_sale(0, s, 15, 0, fits))
@@ -128,4 +132,38 @@ g._hurt(50.0)
 assert abs(g.shield - (100.0 - 50.0 / boa[2])) < 1e-6, "a tougher ship soaks up more"
 g.set_ship(ships.COBRA)
 assert (g.max_speed, g.turn_k, g.tough, g.max_missiles) == (game.PLAYER_MAX, 1.0, 1.0, 4)
+# jump ranges (build 83): each ship its own tank; in-system craft none
+assert ships.tank(ships.COBRA) == commander.MAX_FUEL == 70, "the Cobra's is Elite's 7.0 LY"
+assert [ships.tank(n) for n in ("SHUTTLE", "TRANSPORTER", "WORM")] == [0, 0, 0]
+assert ships.tank("SIDEWINDER") == 50 and ships.tank("BOA") == 80 and ships.tank("CONSTRICTOR") == 100
+assert set(ships.TANKS) == set(ships.TYPES)
+assert ships.jump_text(ships.COBRA) == "7.0 LY" and ships.jump_text("SHUTTLE") == "in-system only"
+c = commander.Commander()
+ships.new_ship(c, "BOA", BP["BOA"])
+assert c.fuel == c.max_fuel() == 80, "a new ship comes with a full tank"
+c.fuel = 33
+boa = ships.pack(c)
+ships.new_ship(c, "SHUTTLE", BP["SHUTTLE"])
+assert c.fuel == c.max_fuel() == 0
+c.cash = 10 ** 6
+assert eq.buy(E, eq.FUEL, c) == "NO HYPERDRIVE" and eq.buy(E, eq.HYPERDRIVE, c) == "NO HYPERDRIVE"
+assert eq.price(E, eq.FUEL, c) == 0
+ships.unpack(c, boa)
+assert c.fuel == 33, "each ship keeps its own fuel"
+assert eq.price(E, eq.FUEL, c) == (80 - 33) * eq.FUEL_PRICE
+assert eq.buy(E, eq.FUEL, c) is None and c.fuel == 80
+# saving: fuel up to the ship's tank, in the hangar too
+c.hangar = [dict(boa, fuel=999), dict(bare, type="SHUTTLE", fuel=50)]
+d = commander.Commander.from_dict(c.to_dict())
+assert d.fuel == 80 and [h["fuel"] for h in d.hangar] == [80, 0]
+assert commander.Commander.from_dict({"ship": "SIDEWINDER", "fuel": 70}).fuel == 50
+del boa["fuel"]
+c2 = commander.Commander(); ships.unpack(c2, boa)
+assert c2.fuel == 80, "an old entry with no fuel: a full tank"
+# stranded: no ship that jumps (kept here, in Hardcore)
+shuttle = dict(bare, type="SHUTTLE")
+assert ships.stranded([shuttle], 0, 7, False) and not ships.stranded([shuttle, bare], 0, 7, False)
+away = dict(bare, at=[0, 8])
+assert ships.stranded([away], 0, 7, True) and not ships.stranded([away], 0, 7, False)
+print("jump ranges: ok")
 print("ALL SHIP TESTS PASSED")

@@ -117,8 +117,11 @@ Status opens **Options**; F goes back to Status, then to the title.
   higher tech levels. Missiles go on the ship's pylons and lasers on its laser mounts.
 - **Shipyard**: first your own ship (C shows its stats, D opens the **Repair Shop** to repaint
   it; F comes back), then the ships for sale, one at a time (up / down for the others), with
-  their speed, hold, laser mounts and missile pylons. Bigger ships need higher tech levels;
-  pirate worlds also sell stolen ships, cheap, but buying one makes you an offender. C opens
+  their speed, hold, jump range, laser mounts and missile pylons. Bigger ships need higher
+  tech levels; the Shuttle, Transporter and Worm are in-system craft that can't jump at all;
+  pirate worlds also sell stolen ships, cheap, but a stolen ship keeps you an offender
+  while you fly it and police in law-abiding systems may spot it; a pirate world's Repair
+  Shop sells a new transponder (D) that makes it clean. C opens
   a ship's stats; there C buys it (your ship goes into the hangar) and D trades yours in. A new ship comes with its standard
   weapons; cargo moves across, and what doesn't fit is sold here for its value.
 - **Hangar**: the ships you own, one at a time, each turning with its fit-out listed. C

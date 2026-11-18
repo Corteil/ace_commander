@@ -9,7 +9,8 @@ rules are written here afresh to behave as the original does:
   - a station sells the first (tech level + 2) items, as tech levels are
     shown (the original's internal level + 3), and all of them from tech
     level 10 up
-  - fuel is 2 Cr a light year and always fills the tank
+  - fuel is 2 Cr a light year and always fills the tank (each ship's own:
+    ships.tank; none for a ship with no hyperdrive, nor the galactic one)
   - as many missiles as the ship has pylons (ships.py: the Cobra's 4); one
     of each other item, and buying one you have says so and costs nothing
   - the large cargo bay makes the ship's hold three quarters as big again
@@ -19,10 +20,8 @@ rules are written here afresh to behave as the original does:
     is refunded; only to a view the ship has a laser mount on (ships.mounts)
 """
 try:
-    from . import commander as _commander
     from . import ships as _ships
 except ImportError:         # imported on its own, as the PC tests do
-    import commander as _commander
     import ships as _ships
 
 (FUEL, MISSILE, CARGO_BAY, ECM, PULSE, BEAM, SCOOPS, POD, BOMB, ENERGY,
@@ -61,7 +60,7 @@ def name(equip, i):
 def price(equip, i, cmdr):
     """What item i costs this commander, in tenths of a credit (fuel: to fill up)."""
     if i == FUEL:
-        return (_commander.MAX_FUEL - cmdr.fuel) * FUEL_PRICE
+        return (cmdr.max_fuel() - cmdr.fuel) * FUEL_PRICE
     return equip[i][1]
 
 
@@ -91,7 +90,9 @@ def buy(equip, i, cmdr, mount=0):
     c = cmdr
     if i in SOON:
         return "COMING SOON"
-    if i == FUEL and c.fuel >= _commander.MAX_FUEL:
+    if i in (FUEL, HYPERDRIVE) and not c.max_fuel():
+        return "NO HYPERDRIVE"      # an in-system ship (ships.TANKS)
+    if i == FUEL and c.fuel >= c.max_fuel():
         return "TANK FULL"
     if i == MISSILE and c.missiles >= _ships.pylons(c.ship):
         return "NO PYLONS" if not _ships.pylons(c.ship) else "MISSILES FULL"
@@ -106,7 +107,7 @@ def buy(equip, i, cmdr, mount=0):
         return "NOT ENOUGH CASH"
     c.cash += refund - cost
     if i == FUEL:
-        c.fuel = _commander.MAX_FUEL
+        c.fuel = c.max_fuel()
     elif i == MISSILE:
         c.missiles += 1
     elif i == CARGO_BAY:

@@ -992,7 +992,7 @@ class AceCommander(app.App):
             self.galaxy_n = c.galaxy
         if c.system is None:
             c.system = self.galaxy.find(*game_data.START_XY) or 0
-            c.fuel = min(commander.MAX_FUEL, game_data.START_FUEL)
+            c.fuel = min(c.max_fuel(), game_data.START_FUEL)
 
     def _enter_space(self, how):
         """Put the game in the commander's star system: "launch" (from the
@@ -1035,7 +1035,7 @@ class AceCommander(app.App):
         c.docked_at = c.system  # the last station docked at
         self.witch = None
         if not EQUIP:           # nowhere to buy fuel: it's free, as before the equipment
-            c.fuel = commander.MAX_FUEL
+            c.fuel = c.max_fuel()
         if GOODS and self.galaxy is not None and (c.market is None
                                                   or c.market["system"] != c.system):
             from . import market
@@ -1185,6 +1185,8 @@ class AceCommander(app.App):
                 d.pick_paint(1)
             elif hit("C"):
                 d.buy_paint()
+            elif hit(BTN_MISSILE) or hit("k_D"):
+                d.buy_transponder()      # a stolen ship, on a pirate world (build 84)
         elif d.name() == "SHIPYARD":
             if hit("j_up"):
                 d.pick_ship(-1)
@@ -1289,13 +1291,28 @@ class AceCommander(app.App):
         g.bombs = 1 if "bomb" in c.extras else 0
         g.computer = "docking" in c.extras
         g.ship_rgb = cockpit.ship_rgb(c.colour)     # for the view from behind your ship
+        g.fuel_max = c.max_fuel()   # the fuel gauge's full tank (0: no hyperdrive)
         g.legal = c.legal
+        g.stolen = c.stolen         # lawful police may spot a stolen ship (build 84)
+        self._hot()
+
+    def _hot(self):
+        """A stolen ship keeps you an offender while you fly it (Brian, build
+        84): jumps, the galactic hyperdrive and the escape pod clear your record
+        no further than ships.STOLEN_LEGAL."""
+        c = self.cmdr
+        if c is None or not c.stolen:
+            return
+        c.legal = max(c.legal, ships.STOLEN_LEGAL)
+        g = self.game
+        if g is not None and self.career:
+            g.legal = max(g.legal, ships.STOLEN_LEGAL)
 
     def _refuel(self, n):
         """Fuel skimmed from the sun: n tenths of a light year into the tank.
         Returns how many fitted (see Game.refuel)."""
         c = self.cmdr
-        n = min(n, commander.MAX_FUEL - c.fuel)
+        n = min(n, c.max_fuel() - c.fuel)
         c.fuel += n
         self.game.fuel = c.fuel
         return n
@@ -1433,6 +1450,7 @@ class AceCommander(app.App):
         c.system = to[0]
         c.fuel = max(0, c.fuel - to[1])
         g.legal //= 2           # a jump halves your legal status
+        self._hot()             # but not below an offender's in a stolen ship
         c.market = None         # a new system: its market is worked out on docking
         self.target = None
         self._enter_space("arrive")
@@ -1554,8 +1572,9 @@ class AceCommander(app.App):
                 if self.career and c is not None:
                     c.cargo = [0] * commander.GOODS
                     self._extra(c, "pod", False)
-                    c.fuel = commander.MAX_FUEL
+                    c.fuel = c.max_fuel()
                     c.legal = g.legal = 0       # the original's pod clears your record too
+                    self._hot()                 # (not the ship's: it is insured, still stolen)
                     self.jump_to = None
                 # nothing else since the last save is lost; docking saves it
             self.eject_t += dt
@@ -2114,7 +2133,8 @@ class AceCommander(app.App):
                 "CARGO BAY: %dT" % c.hold, "FUEL SCOOPS: " + onoff("scoops" in e),
                 "ECM: " + onoff("ecm" in e), "ESCAPE POD: " + onoff("pod" in e),
                 "ENERGY BOMB: " + onoff("bomb" in e), "DOCK COMPUTER: " + onoff("docking" in e),
-                "GAL. HYPERDRIVE: " + onoff("hyperdrive" in e)]
+                "GAL. HYPERDRIVE: " + onoff("hyperdrive" in e),
+                "STOLEN: " + onoff(c.stolen)]
 
     def _ship_config_c(self, item):
         c = self.cmdr
@@ -2124,6 +2144,9 @@ class AceCommander(app.App):
         key = item.split(":")[0]
         if key == "SHIP":
             self._debug_ship()
+            return
+        if key == "STOLEN":
+            self._debug_stolen()
             return
         mount = self.MOUNTS.get(key)
         if mount is not None:
@@ -2161,6 +2184,18 @@ class AceCommander(app.App):
                     return e[5] if len(e) > 5 else e[0]
         return bp.title if bp is not None else name
 
+    def _debug_stolen(self):
+        """DEBUG > SHIP CONFIG > STOLEN (Brian, build 84): the ship you fly is
+        stolen or not, saved; in a flight the police see it at once."""
+        c = self.cmdr
+        c.stolen = not c.stolen
+        self._write_setting("stolen", c.stolen)
+        g = self.game
+        if g is not None and self.mode == "flight" and self.career:
+            g.stolen = c.stolen
+        self._hot()
+        self._write_setting("legal", c.legal)
+
     def _debug_ship(self):
         """DEBUG > SHIP CONFIG > SHIP (Brian, build 78): fly the next ship
         type, cheapest first, keeping the equipment it can take (the hold,
@@ -2176,11 +2211,12 @@ class AceCommander(app.App):
             c.ship = name
             c.hold = max(ships.base_hold(name), min(ships.big_hold(name), c.hold))
             c.missiles = min(c.missiles, ships.pylons(name))
+            c.fuel = min(c.fuel, c.max_fuel())
             for v in range(1, 4):
                 if v >= ships.mounts(name):
                     c.lasers[v] = ""
             for key, value in (("ship", name), ("hold", c.hold), ("missiles", c.missiles),
-                               ("lasers", list(c.lasers))):
+                               ("lasers", list(c.lasers)), ("fuel", c.fuel)):
                 self._write_setting(key, value)
             if not flying and self.dock is not None:
                 self.dock.ship = self._ship_bp()    # the Repair Shop shows the new one
@@ -2214,6 +2250,7 @@ class AceCommander(app.App):
                   "ENERGY BOMB: " + onoff(g.bombs), "DOCK COMPUTER: " + onoff(g.computer)]
         if self.career and self.cmdr is not None:
             items.append("GAL. HYPERDRIVE: " + onoff("hyperdrive" in self.cmdr.extras))
+            items.append("STOLEN: " + onoff(self.cmdr.stolen))
         return items
 
     def _ship_config(self, item):
@@ -2222,6 +2259,9 @@ class AceCommander(app.App):
         c = self.cmdr if self.career else None
         if item.startswith("SHIP:"):
             self._debug_ship()
+            return
+        if item.startswith("STOLEN:"):
+            self._debug_stolen()
             return
         mount = self.MOUNTS.get(item.split(":")[0])
         if mount is not None:      # C goes round: the lasers, then none (the front always has one)
@@ -2364,12 +2404,12 @@ class AceCommander(app.App):
                 g.missiles = g.max_missiles
         elif item == "REFILL FUEL":
             if self.career and self.cmdr is not None:
-                self.cmdr.fuel = commander.MAX_FUEL
+                self.cmdr.fuel = self.cmdr.max_fuel()
         elif item == "+10 KILLS":
             g.kills += 10
         elif item == "FUEL TO 1/4":
             if self.career and self.cmdr is not None:
-                self.cmdr.fuel = commander.MAX_FUEL // 4
+                self.cmdr.fuel = self.cmdr.max_fuel() // 4
                 c = self.cmdr
                 g.say("FUEL %d.%d LY" % (c.fuel // 10, c.fuel % 10))
         elif item == "+1000 CR":
@@ -2522,6 +2562,9 @@ class AceCommander(app.App):
             # a keyboard that sends it)
             pick = line("GALACTIC JUMP") if hit("mod+k_H") else line("HYPERSPACE")
             if pick is None:
+                c = self.cmdr
+                if self.career and c is not None and not c.max_fuel() and self.game is not None:
+                    self.game.say("NO HYPERDRIVE", 1.5)     # an in-system ship (ships.TANKS)
                 return False        # Ctrl+H is never plain hyperspace
             self._fpick(pick)
             return True
@@ -2707,7 +2750,8 @@ class AceCommander(app.App):
         if self.career:
             # always there, unless a countdown is on: with a target in range it
             # jumps, without one it opens the local chart to pick one
-            if self.galaxy is not None and self.game is not None and self.game.jump_t <= 0:
+            if (self.galaxy is not None and self.game is not None and self.game.jump_t <= 0
+                    and self.cmdr is not None and self.cmdr.max_fuel()):    # no hyperdrive: no line
                 to = self._jump_ok()
                 items.append("HYPERSPACE: " + self.galaxy.system(to[0]).name if to is not None
                              else "HYPERSPACE")
@@ -2720,7 +2764,7 @@ class AceCommander(app.App):
                     items.append("DOCK COMPUTER OFF")
                 elif g.space is not None and g.space.safe:
                     items.append("DOCKING COMPUTER")
-            if (c is not None and "hyperdrive" in c.extras and g is not None
+            if (c is not None and "hyperdrive" in c.extras and g is not None and c.max_fuel()
                     and g.jump_t <= 0 and self.galaxy is not None):
                 items.append("GALACTIC JUMP")
             items.append("STATUS")
