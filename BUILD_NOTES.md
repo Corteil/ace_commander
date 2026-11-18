@@ -899,3 +899,9 @@ what is now `ace.py` (renamed in build 50).
    station's prices (`Docked._sell_off`, kept if there is no market), with "CARGO OVER: +x
    Cr" instead of the ship's name; a ship left in the hangar keeps no cargo. The DEBUG
    REPAIR SHOP switch and `AceCommander.repair_shop` are gone; `Docked(..., repair)` too.
+   **Build 82** (2026-11-18, Brian: "the HUD should reflect the number of missile slots,
+   swap C and D on the shipyard"; "the buttons should be the same across those screens").
+   The HUD draws one missile slot per pylon (`Game.max_missiles`: none on the Worm,
+   Shuttle and Transporter, five on the Boa and Constrictor). In the Shipyard C is a
+   ship's stats on every page, your own included; D on your own ship's page is the Repair
+   Shop. In the stats, C buys and D trades in, as before.

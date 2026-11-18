@@ -115,8 +115,8 @@ Status opens **Options**; F goes back to Status, then to the title.
 - **Equip ship**: fuel, missiles, lasers, a larger hold, ECM, fuel scoops, escape pod,
   energy bomb, energy unit, docking computer and galactic hyperdrive; more is on sale at
   higher tech levels. Missiles go on the ship's pylons and lasers on its laser mounts.
-- **Shipyard**: first your own ship (C opens the **Repair Shop** to repaint it, D its stats;
-  F comes back), then the ships for sale, one at a time (up / down for the others), with
+- **Shipyard**: first your own ship (C shows its stats, D opens the **Repair Shop** to repaint
+  it; F comes back), then the ships for sale, one at a time (up / down for the others), with
   their speed, hold, laser mounts and missile pylons. Bigger ships need higher tech levels;
   pirate worlds also sell stolen ships, cheap, but buying one makes you an offender. C opens
   a ship's stats; there C buys it (your ship goes into the hangar) and D trades yours in. A new ship comes with its standard

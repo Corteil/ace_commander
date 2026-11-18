@@ -57,9 +57,9 @@ assert d.yard and all(ships.spec(n)[ships.TECH] <= d.here.tech for n, p, st in d
 tx = texts(e)
 assert "SHIPYARD  " + here in tx and d.ysel == 0, tx
 # (the page names your ship plainly: Brian, build 81)
-assert not any(t.startswith("YOUR ") for t in tx) and "C: repair shop   D: stats" in tx, tx
-# D: your own ship's stats, with nothing to buy (build 81)
-tick(e, fresh=["D"]); assert d.name() == "SHIP STATS" and c.ship == ships.COBRA
+assert not any(t.startswith("YOUR ") for t in tx) and "C: stats   D: repair shop" in tx, tx
+# C: your own ship's stats, with nothing to buy (C is stats on every page: build 82)
+tick(e, fresh=["C"]); assert d.name() == "SHIP STATS" and c.ship == ships.COBRA
 tx = texts(e)
 assert "top speed" in tx and "40" in tx and "turning" in tx and "100%" in tx, tx
 assert "C: buy   D: trade in" not in tx and "F: back to shipyard" in tx
@@ -164,6 +164,26 @@ g = e.game
 assert g.ship_name == "VIPER" and g.max_missiles == ships.pylons("VIPER")
 assert g.max_speed == ships.flight(g.types["VIPER"], g.types[ships.COBRA])[0]
 assert e.tunnel is not None
+# the HUD has a missile slot for each pylon (build 82)
+from ace_commander import cockpit
+
+
+class Rec(CountCtx):
+    def rectangle(self, *a):
+        self.calls.setdefault("rects", []).append(a)
+        return self
+
+
+def slots(game_):
+    r = Rec(); cockpit.draw_hud(r, game_)
+    return len([a for a in r.calls.get("rects", []) if a[1:] == (56, 6, 4)])
+
+
+assert slots(g) == g.max_missiles == 2, slots(g)
+for name, n in (("SHUTTLE", 0), ("SIDEWINDER", 1), (ships.COBRA, 4), ("BOA", 5)):
+    g.set_ship(name, ships.pylons(name))
+    assert slots(g) == n, (name, slots(g))
+g.set_ship("VIPER", ships.pylons("VIPER"))
 saved = commander.load(SAVE)
 assert saved.ship == "VIPER" and [h["type"] for h in saved.hangar] == ["PYTHON"]
 print("flying the new ship, saved: ok")

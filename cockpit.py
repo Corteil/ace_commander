@@ -1218,8 +1218,8 @@ def draw_hud(ctx, g, ms=None, ring=True):
     _vbar(ctx, 97, g.shield / 100.0, CYAN)
     _vbar(ctx, 106, g.hull / 100.0, GREEN if g.hull > 30 else RED)
 
-    # missiles left
-    for i in range(4):
+    # missiles left, one slot for each of the ship's pylons (build 82)
+    for i in range(getattr(g, "max_missiles", 4)):
         ctx.rgb(*(GREEN if i < g.missiles else DIM)).rectangle(-70 + i * 9, 56, 6, 4).fill()
 
     # radar: across is left-right, up the ellipse is ahead, sticks show height

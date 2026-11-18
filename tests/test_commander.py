@@ -849,9 +849,9 @@ tick(e, fresh=["F"]); assert d.name() == "STATUS" and e.mode == "docked", "F: Op
 tick(e, fresh=["C"]); tick(e, fresh=["JOYRIGHT"]); assert d.name() == "INVENTORY", "< > leave it too"
 tick(e, fresh=["JOYRIGHT"]); tick(e, fresh=["JOYRIGHT"]); tick(e, fresh=["JOYRIGHT"])
 assert d.name() == "SHIPYARD", "after Equip ship"
-# the Repair Shop is the Shipyard's sub-screen (build 80): C on your own ship
-assert d.ysel == 0 and any("C: repair shop" in t for t in texts(e))
-tick(e, fresh=["C"]); assert d.name() == "REPAIR SHOP" and "F: back to shipyard" in texts(e)
+# the Repair Shop is the Shipyard's sub-screen (build 80): D on your own ship (build 82)
+assert d.ysel == 0 and any("D: repair shop" in t for t in texts(e))
+tick(e, fresh=["D"]); assert d.name() == "REPAIR SHOP" and "F: back to shipyard" in texts(e)
 tick(e, fresh=["F"]); assert d.name() == "SHIPYARD", "F: back to the Shipyard"
 tick(e, fresh=["E"]); assert d.name() == "EQUIP SHIP"
 tick(e, fresh=["F"]); assert d.name() == "STATUS" and e.mode == "docked", "F goes back to Status"

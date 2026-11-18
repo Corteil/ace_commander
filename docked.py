@@ -331,8 +331,8 @@ class Docked:
         self.msg = None
 
     def open_stats(self):
-        """The picked page's ship's stats, over the Shipyard (build 81): a
-        ship for sale (C there; then C buys, D trades in) or your own (D)."""
+        """The picked page's ship's stats, over the Shipyard (C on any page,
+        build 82): a ship for sale (then C buys, D trades in) or your own."""
         if "SHIPYARD" in self.tabs:
             self.in_stats = True
             self.msg = None
@@ -662,7 +662,7 @@ class Docked:
         text(ctx, "< > screens   F: status", 0, 88, 11, cockpit.GREY)
 
     def _draw_shipyard(self, ctx):
-        """One page at a time: first your own ship (C: the Repair Shop), then
+        """One page at a time: first your own ship (D: the Repair Shop), then
         each ship for sale, turning, with its price and what it flies like;
         up / down for the others (builds 79-80)."""
         text = cockpit.text
@@ -680,7 +680,7 @@ class Docked:
             text(ctx, b, 0, 18, 11, cockpit.GREY)
             text(ctx, "trade-in %d Cr" % (self.trade_in_value() // 10), 0, 36, 12, cockpit.YELLOW)
             text(ctx, c.cash_text(), 0, 53, 12, cockpit.CYAN)
-            self._foot(ctx, ("C: repair shop   " if self.repair else "") + "D: stats")
+            self._foot(ctx, "C: stats" + ("   D: repair shop" if self.repair else ""))
             return
         name, price, stolen = self.yard[self.ysel - 1]
         bp = self.bps(name)

@@ -266,7 +266,8 @@ chart, 7 system data, 9 status, 0 Inventory (a tab since build 70, drawn by `scr
 Elite lacks on the keys after 0 (Brian): - (or _) Shipyard (was the Repair Shop), = (or +) Options. The joystick goes
 round the tabs in `docked.TABS` (Brian, builds 77-80): Status, Inventory, Market, Equip ship,
 Shipyard, Hangar, Galactic chart, Local chart, System data. The Repair Shop is the Shipyard's
-sub-screen (C on its first page, your own ship; `-` opens the Shipyard). Options is not a tab: C on Status opens it over
+sub-screen (D on its first page, your own ship; C there and on every page is that ship's
+stats, where C buys and D trades in; `-` opens the Shipyard). Options is not a tab: C on Status opens it over
 Status (`Docked.in_options`, `name()` gives "OPTIONS"), F goes back; A launches. Only the current
 firmware matters (Brian, 2026-11-18: both badges run it). C on Inventory sells the whole hold (`Docked.sell_all`).
 The Repair Shop is always there (build 81: its DEBUG switch removed). Tests: `tests/test_keys.py`.

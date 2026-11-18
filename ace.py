@@ -1191,12 +1191,9 @@ class AceCommander(app.App):
             elif hit("j_down"):
                 d.pick_ship(1)
             elif hit("C"):
-                if d.ysel == 0:
-                    d.open("REPAIR SHOP")   # your own ship: the Repair Shop (build 80)
-                else:
-                    d.open_stats()          # a ship for sale: its stats, and buying (build 81)
+                d.open_stats()      # any page: that ship's stats (and buying, for one for sale)
             elif (hit(BTN_MISSILE) or hit("k_D")) and d.ysel == 0:
-                d.open_stats()              # your own ship's stats
+                d.open("REPAIR SHOP")       # your own ship: the Repair Shop (build 82: on D)
         elif d.name() == "SHIP STATS":
             if d.ysel and hit("C"):
                 d.buy_ship(False)       # the one you fly goes into the hangar

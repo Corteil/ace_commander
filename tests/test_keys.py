@@ -75,7 +75,7 @@ tick(a, fresh=["KEY_3"]); assert d.name() == "MARKET" and d.sel == 5, d.sel
 # -: the Shipyard (build 80: it holds the Repair Shop)
 tick(a, fresh=["KEY_-"]); assert d.name() == "SHIPYARD", d.name()
 tick(a, fresh=["KEY_3"]); tick(a, fresh=["KEY__"]); assert d.name() == "SHIPYARD"
-tick(a, fresh=["C"]); assert d.name() == "REPAIR SHOP", "C on your own ship"
+tick(a, fresh=["D"]); assert d.name() == "REPAIR SHOP", "D on your own ship"
 tick(a, fresh=["F"]); assert d.name() == "SHIPYARD"
 print("docked number keys, Inventory, Sell, Repair Shop, Options: ok")
 
