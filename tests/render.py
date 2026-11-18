@@ -162,6 +162,10 @@ g.speed = 40.0; g.jumping = True; g.fwd = 400
 for p in g.dust:
     p[2] = 200 + (p[2] % 1300)
 shot(a, "4j_jump_drive.png")
+for v, n in ((1, "rear"), (2, "left"), (3, "right")):   # each view streams it its own way
+    g.view = v
+    shot(a, "4j_jump_drive_%s.png" % n)
+g.view = 0
 g.jumping = False; g.speed = 20.0
 g.to_station(2500.0)
 for _ in range(6):

@@ -606,7 +606,7 @@ class AceCommander(app.App):
         elif g.jumping:         # stardust streaking past and off the edge
             self.jump_rgb = DUST_RGB
             f = cockpit.IFOCAL
-            for p in g.dust:
+            for p in g.view_dust():     # as the view being looked through sees it
                 z = int(p[2])
                 if z > cockpit.INEAR:
                     sx = int(p[0]) * f // z

@@ -814,3 +814,11 @@ what is now `ace.py` (renamed in build 50).
    pages). Version string "0.2.0" in tildagon.toml and metadata.json. The firmware store
    compares versions as text lists (app_store.py compare_version), so badges with "59" are
    not offered it as an update (Brian chose 0.2.0 anyway; they must reinstall).
+   **Build 76** (2026-11-18, Brian: "the effects are wrong on the side views when jumping,
+   also check hyper space effect"): the jump drive's stardust streaks trail the way the
+   dust came in each view (`cockpit._streak_tail`: front out at you, rear away into the
+   middle, left/right across the screen), and the white LED flashes use `view_dust()`.
+   Out of hyperspace or into witchspace the view goes to the front (`Game._hyper`), as
+   Elite's TT110 / MJP call LOOK1 with X = 0. `tests/render.py` shoots the rear, left and
+   right jump views. Docking computer: not missing, only sold from tech level 9 (Lave is 5;
+   Leesti and Zaonce sell it), as the original's EQSHP; left as it is.

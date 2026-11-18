@@ -734,6 +734,10 @@ class Game:
         self.beam = 0.0
         self.warp = WARP_TIME
         self.jumped = True
+        # out of hyperspace (or into witchspace) looking ahead, as Elite's
+        # TT110 and MJP do (LOOK1 with X = 0): the streaks rush out ahead
+        self.view = 0
+        self._aim_laser()
         self.space = None       # left behind too; whoever started the jump sets the new one
         self.jumping = False
         self.pending = 0

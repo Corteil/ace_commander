@@ -883,6 +883,21 @@ def _my_ship(g):
     return _me[0]
 
 
+def _streak_tail(view, tail):
+    """Where a speck of stardust was, from where it is now, in the view's
+    frame (x, z), with the jump drive on: the dust rushes at you from the
+    front, away from you at the back and across the side views (left: from
+    the right; right: from the left), so each streak trails the way it came
+    (game.Game.view_dust)."""
+    if view == 1:
+        return 0, -tail
+    if view == 2:
+        return tail, 0
+    if view == 3:
+        return -tail, 0
+    return 0, tail
+
+
 def draw_world(ctx, g):
     """Space, ships, explosions and laser beams; from behind your ship while
     the docking computer flies."""
@@ -939,6 +954,7 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
         tail = 2 * g.fwd
         if tail < STREAK_MIN:
             tail = STREAK_MIN
+        tx, tz = _streak_tail(g.view, int(tail))
         ctx.begin_path()
         for p in g.dust:
             z = int(p[2])
@@ -946,7 +962,10 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
                 x = int(p[0])
                 y = int(p[1])
                 ctx.move_to(x * IFOCAL // z, -(y * IFOCAL // z))
-                z += tail
+                x += tx
+                z += tz
+                if z <= INEAR:      # rear view: where it was is behind the screen
+                    z = INEAR + 1
                 ctx.line_to(x * IFOCAL // z, -(y * IFOCAL // z))
         ctx.stroke()
     else:
