@@ -100,6 +100,18 @@ class _Cursor:
             self.cy = y
             self._select()
 
+    def goto(self, i):
+        """Put the cursor on system i and select it (a search found it: build
+        88), even where dots overlap."""
+        for dot in self.dots:
+            if dot[2] == i:
+                self.cx = float(dot[0])
+                self.cy = float(dot[1])
+                self.sel = dot
+                self.info = self.gal.system(i)
+                return True
+        return False
+
     def picked(self):
         """The selected system's index, or None."""
         return self.sel[2] if self.sel is not None else None

@@ -40,6 +40,8 @@ description sentence (build 52) and the disc version's two missions (build 54).
   no badge imports. Saved to `commander.json` next to the app (gitignored).
 - `galaxy.py` - the 256 star systems, worked out from three seeds. Rules only.
 - `chart.py` - the local and galactic charts (imported the first time one is opened).
+- `find.py` - finding a system by name on the Galactic chart (build 88): the keyboard's
+  page; without a keyboard ace.py uses the firmware's TextDialog instead.
 - `docked.py` - the docked tabs: Status, Market, Local chart, Galactic chart, System data.
 - `market.py` - market prices, stock, buying and selling. Rules only, no badge imports.
 - `equipment.py` - the Equip ship screen's rules: what is on sale, prices, fitting.
@@ -152,7 +154,8 @@ equipment limits and DEBUG > SHIP CONFIG > SHIP; build 79 the Shipyard and Hanga
 78-79. Not yet on the badge or played by hand.
 
 1. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). Build 85
-   added Options > TILT to flip up/down, left/right or both (saved). Ask before changing
+   added Options > TILT, build 87 made it CONTROLS (flips the flight steering up/down,
+   left/right or both, joystick included; saved). Ask before changing
    the rest: sensitivity (`TILT_FULL`), dead zone (`TILT_DEADZONE`), or the D hold time
    (`HOLD_MISSILE`).
 2. Missile lock (build 19): the diamond is red, then green after `LOCK_TIME` (2 s, Brian's

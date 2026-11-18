@@ -121,9 +121,10 @@ TILT_FULL = 0.50        # tilt that gives full rate (about 30 degrees)
 TILT_PITCH_SIGN = 1.0
 TILT_ROLL_SIGN = 1.0
 TILT_SWAP_AXES = False  # True if the badge's x axis should pitch, y roll
-# the TILT setting (Options and Settings, saved, build 85): which way the tilt
-# steers, flipping up / down (pitch), left / right (roll), or both
-TILT_FLIPS = ("NORMAL", "FLIP UP/DOWN", "FLIP L/R", "FLIP BOTH")
+# the CONTROLS setting (Options and Settings, saved; builds 85-87): flips the
+# flight controls up / down (pitch), left / right (roll), or both, whichever
+# way you steer: tilt, joystick or keyboard (not the charts' cursor)
+TILT_FLIPS = ("NORMAL", "UP/DOWN FLIPPED", "L/R FLIPPED", "BOTH FLIPPED")
 
 INVERT_PITCH = False    # False: joystick up raises the nose. True: up dives.
 LOG_KEYS = False        # True: print every button / key event to serial (to see what a keyboard sends)
@@ -350,6 +351,17 @@ class Pad:
             if key is not None:
                 table.append((control, key))
         self.table = table
+        # the letters a keyboard types, for finding a system by name (build 88)
+        self.letters = {}
+        for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
+            key = KEYBOARD_BUTTONS.get(ch)
+            if key is not None:
+                self.letters[key] = ch
+        key = KEYBOARD_BUTTONS.get("SPACE")
+        if key is not None:
+            self.letters[key] = " "
+        self.typed = ""      # letters typed since the last end_frame()
+        self.keyboard = False   # a keyboard key has been pressed (see AceCommander._keyboard)
         self.names = {}      # button -> the control names it counts as
         self.pressed = {}    # button -> True while it is down
         self.count = {}      # control name -> how many buttons hold it down
@@ -387,6 +399,12 @@ class Pad:
             self.hits.add(n)
             if mod:
                 self.hits.add("mod+" + n)
+            if n[:2] == "k_":
+                self.keyboard = True
+        ch = self.letters.get(button)
+        if ch is not None:
+            self.typed += ch
+            self.keyboard = True
 
     def _up(self, event):
         button = event.button
@@ -410,6 +428,8 @@ class Pad:
     def end_frame(self):
         if self.hits:
             self.hits = set()
+        if self.typed:
+            self.typed = ""
 
     def clear(self):
         self.pressed = {}
@@ -458,6 +478,12 @@ class AceCommander(app.App):
         self.data_of = None     # the system whose data D shows from the in-flight chart
         self.fire_lock = False  # the lasers wait until C is let go (held on from a menu)
         self._bps = {}              # blueprints made for the docked screens with no game yet (_bp)
+        # finding a system on the Galactic chart (build 88): the keyboard's own
+        # page (find.Find), or the badge's text entry (the firmware's TextDialog)
+        self.finder = None
+        self.tdialog = None
+        self.find_chart = None      # the chart the system found goes on
+        self.find_names = None      # find.Names for this galaxy, kept
         self.chart = None       # the local chart, while it is open
         self.jump_to = None     # (system, distance) the hyperspace countdown is for
         self.dt = 0.0           # seconds since the last update
@@ -475,7 +501,7 @@ class AceCommander(app.App):
         self.tilt_ok = imu is not None   # the accelerometer is there and working
         # steer by tilt as well as the joystick (TILT_DEFAULT, or the menu)
         self.use_tilt = self.tilt_ok and TILT_DEFAULT
-        self.tilt_flip = 0      # TILT_FLIPS: 1 pitch flipped, 2 roll, 3 both
+        self.tilt_flip = 0      # CONTROLS (TILT_FLIPS): 1 pitch flipped, 2 roll, 3 both
         self.zero = None                 # accelerometer reading taken as "level"
         self.ms = 0.0                    # smoothed frame time
         self.leds_on = False             # we have taken over the LEDs
@@ -730,10 +756,6 @@ class AceCommander(app.App):
                     dx, dy = dy, dx
                 jx = TILT_ROLL_SIGN * _tilt(dx)
                 jy = TILT_PITCH_SIGN * _tilt(dy)
-                if self.tilt_flip & 1:      # the TILT setting
-                    jy = -jy
-                if self.tilt_flip & 2:
-                    jx = -jx
         if dirs is not None:
             if held(dirs[0]):
                 jy -= 1.0
@@ -1128,6 +1150,12 @@ class AceCommander(app.App):
         d = self.dock
         hit = self.pad.hit
         d.tick(dt)
+        if self._update_find(cancel, confirm):
+            return
+        if (d.view is not None and d.cursor and hasattr(d.view, "number")
+                and hit(BTN_BOMB)):
+            self._open_find(d.view)     # B on the Galactic chart (cursor on): find a system
+            return
         if cancel and d.view is not None and d.cursor:
             d.use_cursor(False)     # F: the joystick goes back to changing tabs
             return
@@ -1675,6 +1703,10 @@ class AceCommander(app.App):
             if hit(BTN_BOMB) and g.energy_bomb() and self.career and self.cmdr is not None:
                 self._extra(self.cmdr, "bomb", False)     # used up
             roll, jy = self._steer(tilt, STICK, True)
+        if self.tilt_flip & 1:      # the CONTROLS setting (build 87: every way of steering)
+            jy = -jy
+        if self.tilt_flip & 2:
+            roll = -roll
         if g.rules.manual_ecm:      # Hardcore: E is the ECM (or both speed buttons together)
             if not busy and (hit("k_E") or (hit(BTN_SPEED_UP) and held(BTN_SPEED_DOWN))
                              or (hit(BTN_SPEED_DOWN) and held(BTN_SPEED_UP))):
@@ -1797,8 +1829,7 @@ class AceCommander(app.App):
         else:
             steer = "STEER: %s (no tilt sensor)" % stick
         items = [steer]
-        if self.tilt_ok:
-            items.append("TILT: " + TILT_FLIPS[self.tilt_flip])
+        items.append("CONTROLS: " + TILT_FLIPS[self.tilt_flip])
         if cmdr and self.cmdr is not None:
             items.append("DOCKING: " + DOCK_NAMES["A" if self._manual_docking() else self.cmdr.docking])
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
@@ -1828,7 +1859,7 @@ class AceCommander(app.App):
                 self.od_sel = 0
                 self.od_msg = None
                 self.mode = "odebug"
-        elif item.startswith("TILT"):      # left goes back a choice
+        elif item.startswith("CONTROLS"):  # left goes back a choice
             self.tilt_flip = (self.tilt_flip + (-1 if left else 1)) % len(TILT_FLIPS)
             self._save_options()
         elif item.startswith("STEER"):
@@ -2708,16 +2739,109 @@ class AceCommander(app.App):
             self.fsub = "settings"
             self.fmenu = 0
 
+    # ---- finding a system by name (build 88) -----------------------------
+
+    def _keyboard(self):
+        """True if a keyboard is fitted: its hexpansion's driver (KeyboardApp)
+        is running, or its header names a keyboard; else if a keyboard key
+        has been pressed."""
+        try:
+            from system.hexpansion.app import _hexpansion_manager as m
+            if m is not None:
+                for a in m.hexpansion_apps.values():
+                    if a is not None and type(a).__name__ == "KeyboardApp":
+                        return True
+                for h in m.hexpansion_headers.values():
+                    if h is not None and "KEYB" in str(getattr(h, "friendly_name", "")).upper():
+                        return True
+        except Exception:
+            pass
+        return self.pad.keyboard
+
+    def _names(self):
+        from . import find
+        if self.find_names is None or self.find_names[0] != self.galaxy_n:
+            self.find_names = (self.galaxy_n, find.Names(self.galaxy))
+        return self.find_names[1]
+
+    def _open_find(self, chart):
+        """Find a system for this chart: with a keyboard fitted, the game's
+        own page (type, suggestions, pick); without, the badge's text entry
+        (Brian: only one or the other)."""
+        from . import find
+        self.find_chart = chart
+        names = self._names()
+        if not self._keyboard():
+            try:
+                from app_components.dialog import TextDialog
+                self.tdialog = TextDialog("FIND SYSTEM", self)
+                return
+            except Exception:
+                self.tdialog = None     # no firmware dialog (a PC): the keyboard page
+        self.finder = find.Find(self.galaxy, names)
+
+    def _found(self, i):
+        """Put the chart's cursor on system i (None: not found)."""
+        self.finder = None
+        self.tdialog = None
+        ch = self.find_chart
+        self.find_chart = None
+        if i is not None and ch is not None:
+            ch.goto(i)
+
+    def _update_find(self, cancel, confirm):
+        """While a search is open: True (it takes all the input)."""
+        if self.tdialog is not None:
+            dl = self.tdialog
+            found = self._names().matches(dl.text)
+            dl.message = self._names().names[found[0]] if found else (
+                "NO MATCH" if dl.text else "FIND SYSTEM")
+            r = getattr(dl, "_result", None)
+            if r is False:
+                self._found(None)
+            elif r is not None:
+                self._found(found[0] if found else None)
+            self.pad.clear()        # the dialog has the buttons
+            return True
+        if self.finder is None:
+            return False
+        f = self.finder
+        hit = self.pad.hit
+        for ch in self.pad.typed:
+            f.type(ch)
+        if hit("k_BACKSPACE"):
+            f.back()
+        elif hit("j_up"):
+            f.pick(-1)
+        elif hit("j_down"):
+            f.pick(1)
+        elif confirm:
+            self._found(f.chosen())
+        elif cancel:
+            self._found(None)
+        return True
+
+    def _draw_find(self, ctx):
+        if self.finder is not None:
+            self.finder.draw(ctx)
+        elif self.tdialog is not None:
+            self.tdialog.draw(ctx)
+
     def _update_chart(self, cancel, confirm):
         """The in-flight charts: the joystick moves the cursor, C makes the
         selected system the target (Brian: only that; H or the menu's
         HYPERSPACE line jumps, as Elite), C on where you are clears it, D
         shows its data, F goes back."""
+        if self._update_find(cancel, confirm):
+            return
         if cancel:
             self._resume()
             self.chart = None
             return
         ch = self.chart
+        if self.pad.hit(BTN_BOMB) and hasattr(ch, "number"):
+            self._open_find(ch)     # B on the Galactic chart: find a system by name
+            return
         if (self.pad.hit(BTN_MISSILE)) or self.pad.hit("k_D"):
             if ch.picked() is not None:
                 self.data_of = ch.picked()      # D: the selected system's data
@@ -2737,6 +2861,7 @@ class AceCommander(app.App):
         s = self.fsub
         if s == "chart":
             self.chart.draw(ctx)
+            self._draw_find(ctx)
             return
         if s == "data":
             self._draw_data(ctx)
@@ -2833,6 +2958,7 @@ class AceCommander(app.App):
             self._draw_practice(ctx)
         elif self.mode == "docked":
             self.dock.draw(ctx)
+            self._draw_find(ctx)
         elif self.mode == "brief":
             self.brief.draw(ctx)
         elif self.mode == "options":

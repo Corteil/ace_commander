@@ -938,7 +938,7 @@ what is now `ace.py` (renamed in build 50).
    **Build 85** (2026-11-18, Brian: "tilt should be able to be flipped in settings/options
    and saved, galactic jump clears a hot ship"; "the name does not need to be
    displayed"). A TILT line under STEER on Options, the docked Options and the in-flight
-   Settings (when there is a tilt sensor): NORMAL, FLIP UP/DOWN, FLIP L/R, FLIP BOTH
+   Settings (when there is a tilt sensor): NORMAL, UP/DOWN FLIPPED, L/R FLIPPED, BOTH FLIPPED (build 87: "should say flipped")
    (`TILT_FLIPS`, `AceCommander.tilt_flip`, options.json "tilt_flip"); C or right goes on,
    left back. The galactic hyperdrive clears a stolen ship as well as the record. The
    docked tabs' titles no longer carry the system's name (it clipped on long names;
@@ -954,3 +954,26 @@ what is now `ace.py` (renamed in build 50).
    scoops, from below): a tonne of slaves, which are illegal cargo as usual. DEBUG >
    SPAWN: RELEASE ESCAPE POD (just ahead, as RELEASE CANISTER) and BAIL OUT (the
    nearest ship with a pod; "NO SHIP WITH A POD" if none).
+   **Build 87** (2026-11-18, Brian: "the tilt menu should say flipped when flipped", "the
+   flipped option does not seem to be working" (he steers with the joystick), "should
+   only affect flight controls"). The setting is now CONTROLS: NORMAL / UP/DOWN FLIPPED /
+   L/R FLIPPED / BOTH FLIPPED, always shown, and flips the flight steering after it is read
+   (tilt, joystick, cursor keys, W A S D: `_update_flight`, after `_steer`), not inside
+   `_steer`, so the charts' cursor, the ship viewer and the menus are untouched. Same
+   options.json key ("tilt_flip").
+   **Build 88** (2026-11-18, Brian: "a search function on the galactic viewer"; "keyboard
+   entry for search with suggestion for auto complete and the badge's own text entry
+   system when there is no keyboard attached"; "if the keyboard is fitted don't show the
+   badge entry method"). B on the Galactic chart (in flight; docked once C has given the
+   joystick to the cursor) finds a system by name, as Elite's "Planet Name?". Keyboard
+   fitted (`AceCommander._keyboard`: the firmware's hexpansion manager runs a
+   `KeyboardApp` or a header names a keyboard; else a keyboard key has been pressed,
+   `Pad.keyboard`): the game's own page (`find.py`): typed letters (`Pad.typed`), the best
+   match's rest shown dimmer to complete it, four matches listed (from the start
+   alphabetically, then holding it anywhere), up / down picks, Backspace, Enter goes
+   there, Esc back. No keyboard: the firmware's `app_components.dialog.TextDialog` (the
+   six-button letter picker), drawn over the chart, its message set to the best match
+   as you type; Done goes to it, Cancel back. Either way the chart's cursor lands on the
+   system (`Chart.goto`, exact even where dots overlap); C then targets it as usual.
+   Tests: `tests/test_find.py` (with a stand-in TextDialog). Next asked for: a custom
+   commander name.

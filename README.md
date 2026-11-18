@@ -129,6 +129,8 @@ Status opens **Options**; F goes back to Status, then to the title.
 - **Hangar**: the ships you own, one at a time, each turning with its fit-out listed. C
   flies the picked one, D sells it. In Hardcore Mode a ship
   stays at the station where you left it.
+- **Galactic chart search**: B finds a system by name: type it on a keyboard (with the
+  best match suggested), or use the badge's own text entry without one.
 - **Charts**: press C to move the cursor (F gives the joystick back to the screens); C picks
   a hyperspace target, D shows a system's data.
 - **System data**: the system's government, economy, tech level, population and a line
