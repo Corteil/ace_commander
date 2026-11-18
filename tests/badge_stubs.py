@@ -175,7 +175,7 @@ class Imu:
         return tuple(Imu.reading)
 
 
-def install(imu=True, keyboard=True, joystick=True):
+def install(imu=True, keyboard=True):
     global bus, _down
     for name in list(sys.modules):
         if name == "ace_commander" or name.startswith("ace_commander."):
@@ -211,13 +211,12 @@ def install(imu=True, keyboard=True, joystick=True):
         kb = types.ModuleType("events.keyboard")
         kb.KEYBOARD_BUTTONS = KEYS
         sys.modules["events.keyboard"] = kb
-    if joystick:
-        j = types.ModuleType("events.joystick")
-        j.JOYSTICK_BUTTON_TYPES = JOY
-        fb = types.ModuleType("frontboards.common")
-        fb.FRONTBOARD_BUTTON_TYPES = FB
-        sys.modules.update({"events.joystick": j, "frontboards": types.ModuleType("frontboards"),
-                            "frontboards.common": fb})
+    j = types.ModuleType("events.joystick")     # the current firmware's (the only one supported)
+    j.JOYSTICK_BUTTON_TYPES = JOY
+    fb = types.ModuleType("frontboards.common")
+    fb.FRONTBOARD_BUTTON_TYPES = FB
+    sys.modules.update({"events.joystick": j, "frontboards": types.ModuleType("frontboards"),
+                        "frontboards.common": fb})
     Imu.reading = [0.0, 0.0, 9.81]
     Imu.fail = False
     App.minimised = 0

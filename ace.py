@@ -89,11 +89,10 @@ EDGE_OUT = 140
 REPEAT_WAIT = 0.45      # seconds a market button is held before it starts repeating
 REPEAT_EVERY = 0.09     # then once every this many seconds
 
-try:    # the joystick's directions and buttons A-F, told apart from each other
-    from events.joystick import JOYSTICK_BUTTON_TYPES as JOY
-    from frontboards.common import FRONTBOARD_BUTTON_TYPES as FB
-except ImportError:
-    JOY = FB = None     # older firmware: fall back to the plain direction buttons
+# the joystick's directions and buttons A-F, told apart from each other (only
+# the current firmware is supported: Brian, 2026-11-18)
+from events.joystick import JOYSTICK_BUTTON_TYPES as JOY
+from frontboards.common import FRONTBOARD_BUTTON_TYPES as FB
 
 try:    # lets the flight screen skip the 50 ms pause the badge adds to every frame
     from system.scheduler import scheduler
@@ -311,18 +310,17 @@ class Pad:
     def __init__(self, owner):
         table = [(name.lower(), BUTTON_TYPES[name])
                  for name in ("UP", "DOWN", "LEFT", "RIGHT", "CONFIRM", "CANCEL")]
-        if JOY is not None:
-            for name in ("UP", "DOWN", "LEFT", "RIGHT"):
-                table.append(("j_" + name.lower(), JOY[name]))
-            for name in "ABCDEF":
-                table.append((name, FB[name]))
+        for name in ("UP", "DOWN", "LEFT", "RIGHT"):
+            table.append(("j_" + name.lower(), JOY[name]))
+        for name in "ABCDEF":
+            table.append((name, FB[name]))
         for name in ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "T", "U", "V", "C", "SPACE",
                      "BACKSPACE",
                      "UP", "DOWN", "LEFT", "RIGHT"):
             key = KEYBOARD_BUTTONS.get(name)
             if key is not None:
                 table.append(("k_" + name, key))
-                if name in ("UP", "DOWN", "LEFT", "RIGHT") and JOY is not None:
+                if name in ("UP", "DOWN", "LEFT", "RIGHT"):
                     # the cursor keys count as the joystick too, so every menu,
                     # tab and chart that reads "j_up" ... takes them (Brian)
                     table.append(("j_" + name.lower(), key))
@@ -471,10 +469,8 @@ class AceCommander(app.App):
         self.viewer = None
         self.paused = False
         self.tilt_ok = imu is not None   # the accelerometer is there and working
-        # steer by tilt as well as the joystick. Without the joystick's own
-        # button names (older firmware) tilt is the default, as the direction
-        # buttons are then needed for speed and missiles.
-        self.use_tilt = self.tilt_ok and (TILT_DEFAULT or JOY is None)
+        # steer by tilt as well as the joystick (TILT_DEFAULT, or the menu)
+        self.use_tilt = self.tilt_ok and TILT_DEFAULT
         self.zero = None                 # accelerometer reading taken as "level"
         self.ms = 0.0                    # smoothed frame time
         self.leds_on = False             # we have taken over the LEDs
@@ -816,9 +812,8 @@ class AceCommander(app.App):
         elif self.mode == "brief":
             b = self.brief
             held = pad.held
-            new = FB is not None    # the joystick told apart from A and D
-            up = held("j_up" if new else "up") or held("k_UP")
-            down = held("j_down" if new else "down") or held("k_DOWN")
+            up = held("j_up") or held("k_UP")
+            down = held("j_down") or held("k_DOWN")
             b.tick(dt, (1 if down else 0) - (1 if up else 0))
             if cancel:
                 b.skip()
@@ -1120,7 +1115,6 @@ class AceCommander(app.App):
         goes back to Status, and from Status to the title screen."""
         d = self.dock
         hit = self.pad.hit
-        new = FB is not None
         d.tick(dt)
         if cancel and d.view is not None and d.cursor:
             d.use_cursor(False)     # F: the joystick goes back to changing tabs
@@ -1132,7 +1126,7 @@ class AceCommander(app.App):
                 self._save_docked()
                 self.mode = "menu"
             return
-        if new and hit(BTN_MENU):
+        if hit(BTN_MENU):
             self._launch()
             return
         for key, tab in DOCK_KEYS:      # Elite's f0-f9 on the number row
@@ -1147,75 +1141,75 @@ class AceCommander(app.App):
                 elif tab in d.tabs or tab == "OPTIONS":
                     d.open(tab)
                 return
-        if new and hit(BTN_SPEED_DOWN):
+        if hit(BTN_SPEED_DOWN):
             d.go(d.tab - 1)
             return
-        if new and hit(BTN_BOMB):
+        if hit(BTN_BOMB):
             d.go(d.tab + 1)
             return
         if d.view is not None and d.cursor:
             if confirm:
                 d.pick()
                 self.target = d.target
-            elif (new and hit(BTN_MISSILE)) or hit("k_D"):
+            elif (hit(BTN_MISSILE)) or hit("k_D"):
                 d.show(d.view.picked())     # its data; the target stays as it was
             else:
-                jx, jy = self._steer(False, STICK if new else ANY, new)
+                jx, jy = self._steer(False, STICK, True)
                 d.view.move(jx, jy, dt)
             return
         if d.view is not None:              # the joystick changes tab (below) until C
             if confirm:
                 d.use_cursor(True)
                 return
-            if (new and hit(BTN_MISSILE)) or hit("k_D"):
+            if (hit(BTN_MISSILE)) or hit("k_D"):
                 d.show(d.view.picked())
                 return
-        if hit("j_left" if new else "left"):
+        if hit("j_left"):
             d.go(d.tab - 1)
-        elif hit("j_right" if new else "right"):
+        elif hit("j_right"):
             d.go(d.tab + 1)
         elif d.name() == "EQUIP SHIP":
-            if self._repeat("j_up" if new else "up", dt):
+            if self._repeat("j_up", dt):
                 d.pick_item(-1)
-            elif self._repeat("j_down" if new else "down", dt):
+            elif self._repeat("j_down", dt):
                 d.pick_item(1)
-            elif hit("C" if new else "confirm"):
+            elif hit("C"):
                 d.buy_item()
-            elif (new and hit(BTN_MISSILE)) or hit("k_D"):
+            elif (hit(BTN_MISSILE)) or hit("k_D"):
                 d.next_mount()      # which view a laser is fitted to
         elif d.name() == "REPAIR SHOP":
-            if hit("j_up" if new else "up"):
+            if hit("j_up"):
                 d.pick_paint(-1)
-            elif hit("j_down" if new else "down"):
+            elif hit("j_down"):
                 d.pick_paint(1)
-            elif hit("C" if new else "confirm"):
+            elif hit("C"):
                 d.buy_paint()
         elif d.name() == "OPTIONS":
-            if hit("j_up" if new else "up"):
+            if hit("j_up"):
                 d.pick_option(-1)
-            elif hit("j_down" if new else "down"):
+            elif hit("j_down"):
                 d.pick_option(1)
-            elif hit("C" if new else "confirm"):
+            elif hit("C"):
                 d.change_option()
-        elif d.name() == "SYSTEM DATA" and ((new and hit(BTN_MISSILE)) or hit("k_D")):
+        elif d.name() == "SYSTEM DATA" and ((hit(BTN_MISSILE)) or hit("k_D")):
             d.back_to_chart()       # D: back to the chart you came from
         elif d.name() == "INVENTORY":
-            if self._repeat("j_up" if new else "up", dt):
+            if self._repeat("j_up", dt):
                 d.scroll_inventory(-1)
-            elif self._repeat("j_down" if new else "down", dt):
+            elif self._repeat("j_down", dt):
                 d.scroll_inventory(1)
-            elif hit("C" if new else "confirm"):
+            elif hit("C"):
                 d.sell_all()        # the whole hold at this station's prices
                 d.scroll_inventory(0)
         elif d.name() == "MARKET":
             # the joystick picks a good; C buys and D sells; all repeat when held
-            if self._repeat("j_up" if new else "up", dt):
+            if self._repeat("j_up", dt):
                 d.pick_good(-1)
-            elif self._repeat("j_down" if new else "down", dt):
+            elif self._repeat("j_down", dt):
                 d.pick_good(1)
-            elif self._repeat("C" if new else "confirm", dt):
+            elif self._repeat("C", dt):
                 d.trade(True)
-            elif new and self._repeat(BTN_MISSILE, dt):
+            elif self._repeat(BTN_MISSILE, dt):
                 d.trade(False)
         elif confirm and d.name() == "STATUS":
             if d.options:
@@ -1511,8 +1505,7 @@ class AceCommander(app.App):
         hit = pad.hit
         held = pad.held
         g = self.game
-        new = FB is not None    # joystick and lettered buttons are told apart
-        menu = hit(BTN_MENU) if new else cancel
+        menu = hit(BTN_MENU)
         # Elite's docking computer keys (Brian): C on, P off. P is the pause menu
         # otherwise. Read in any view, as Elite's main loop reads them.
         if hit("k_P"):
@@ -1576,7 +1569,7 @@ class AceCommander(app.App):
             return False
         if self.paused:
             if not self._screen_keys():
-                self._update_fmenu(new, menu, cancel, confirm)
+                self._update_fmenu(menu, cancel, confirm)
             return False
         if menu:
             self.paused = True
@@ -1593,7 +1586,7 @@ class AceCommander(app.App):
         # keyboard or by tilting; lasers fire but can't hit (Game.looking)
         busy = self.fsub in SCREENS
         if busy:
-            self._update_screen(new, cancel, confirm)
+            self._update_screen(cancel, confirm)
         g.looking = self.fsub not in SCREENS
 
         tilt = self.use_tilt and self.tilt_ok
@@ -1601,7 +1594,7 @@ class AceCommander(app.App):
         missile = False
         if busy:                # the keyboard's W / A / S / D, or tilt
             roll, jy = self._steer(tilt, None, False)
-        elif new:               # joystick steers; lettered buttons do the rest
+        else:                   # joystick steers; lettered buttons do the rest
             if held(BTN_SPEED_UP):
                 throttle += 1.0
             if held(BTN_SPEED_DOWN):
@@ -1628,21 +1621,9 @@ class AceCommander(app.App):
             if hit(BTN_BOMB) and g.energy_bomb() and self.career and self.cmdr is not None:
                 self._extra(self.cmdr, "bomb", False)     # used up
             roll, jy = self._steer(tilt, STICK, True)
-        elif tilt:              # older firmware: the d-pad is free for speed and missiles
-            if held("up"):
-                throttle += 1.0
-            if held("down"):
-                throttle -= 1.0
-            if hit("left"):
-                missile = True
-            if hit("right"):
-                self.zero = None
-            roll, jy = self._steer(True, None, False)
-        else:
-            roll, jy = self._steer(False, ANY, False)
         if g.rules.manual_ecm:      # Hardcore: E is the ECM (or both speed buttons together)
-            if not busy and (hit("k_E") or (new and ((hit(BTN_SPEED_UP) and held(BTN_SPEED_DOWN))
-                                                     or (hit(BTN_SPEED_DOWN) and held(BTN_SPEED_UP))))):
+            if not busy and (hit("k_E") or (hit(BTN_SPEED_UP) and held(BTN_SPEED_DOWN))
+                             or (hit(BTN_SPEED_DOWN) and held(BTN_SPEED_UP))):
                 g.fire_ecm()
         elif held("k_E"):
             throttle += 1.0
@@ -1667,7 +1648,7 @@ class AceCommander(app.App):
             if ((hit("k_TAB") or hit("k_BACKSPACE")) and g.energy_bomb() and self.career
                     and self.cmdr is not None):
                 self._extra(self.cmdr, "bomb", False)     # used up
-            if new and hit("k_ESCAPE"):
+            if hit("k_ESCAPE"):
                 g.eject()           # Elite's ESCAPE: the escape pod (Esc is still back on menus)
             for n in range(4):      # the views, on a keyboard (both modes)
                 if hit("k_view%d" % n):
@@ -1683,7 +1664,7 @@ class AceCommander(app.App):
         # Space and F fire too (not locked: they never choose anything, so
         # one held through closing a screen keeps firing)
         fire = fire or held("k_F") or held("k_SPACE")
-        if g.autodock and not busy and self._took_controls(new):
+        if g.autodock and not busy and self._took_controls():
             g.stop_autodock()       # taking the controls switches the docking computer off
         pitch = jy if INVERT_PITCH else -jy
         t0 = _us()
@@ -1700,15 +1681,15 @@ class AceCommander(app.App):
                 self._fly_in()
         return True
 
-    def _took_controls(self, new):
+    def _took_controls(self):
         """A fresh press of a flight control (not one still held from choosing
         DOCKING COMPUTER in the menu, and not tilting the badge): the
         docking computer hands back control."""
         hit = self.pad.hit
-        for name in (STICK if new else ANY):
+        for name in (STICK):
             if hit(name):
                 return True
-        if new and (hit(BTN_SPEED_UP) or hit(BTN_SPEED_DOWN) or hit(BTN_MISSILE)):
+        if (hit(BTN_SPEED_UP) or hit(BTN_SPEED_DOWN) or hit(BTN_MISSILE)):
             return True
         for name in ("confirm", "k_E", "k_Q", "k_F", "k_SPACE", "k_M"):
             if hit(name):
@@ -1747,7 +1728,7 @@ class AceCommander(app.App):
         """The settings, shared by the in-flight Settings page and the title
         screen's Options page. cmdr: include the commander's own (docking
         style and the Constrictor)."""
-        stick = "JOYSTICK" if FB is not None else "STICK"
+        stick = "JOYSTICK"
         if self.tilt_ok:
             steer = "STEER: " + ("TILT" if self.use_tilt else stick)
         else:
@@ -1850,18 +1831,17 @@ class AceCommander(app.App):
         """The title screen's Options page: joystick up / down picks, left /
         right or C changes, F goes back to the title screen."""
         hit = self.pad.hit
-        new = FB is not None
         items = self._settings(True)
         self.omenu %= len(items)
         if cancel:
             self.mode = "menu"
-        elif hit("j_up" if new else "up"):
+        elif hit("j_up"):
             self.omenu = (self.omenu - 1) % len(items)
-        elif hit("j_down" if new else "down"):
+        elif hit("j_down"):
             self.omenu = (self.omenu + 1) % len(items)
         else:
-            left = hit("j_left" if new else "left")
-            if confirm or left or hit("j_right" if new else "right"):
+            left = hit("j_left")
+            if confirm or left or hit("j_right"):
                 self._change(items[self.omenu], left)
 
     def _draw_options(self, ctx):
@@ -2005,7 +1985,6 @@ class AceCommander(app.App):
 
     def _update_odebug(self, dt, cancel, confirm):
         hit = self.pad.hit
-        new = FB is not None
         if self.od_msg_t > 0:
             self.od_msg_t -= dt
             if self.od_msg_t <= 0:
@@ -2019,9 +1998,9 @@ class AceCommander(app.App):
                 self.od_page = None
             else:
                 self.mode = self.od_from or "menu"
-        elif hit("j_up" if new else "up"):
+        elif hit("j_up"):
             self.od_sel = (self.od_sel - 1) % n
-        elif hit("j_down" if new else "down"):
+        elif hit("j_down"):
             self.od_sel = (self.od_sel + 1) % n
         elif confirm and items:
             item = items[self.od_sel % n]
@@ -2380,15 +2359,15 @@ class AceCommander(app.App):
         self.zero = None
         self.fire_lock = True   # the C that chose a menu line isn't a shot
 
-    def _update_fmenu(self, new, menu, cancel, confirm):
+    def _update_fmenu(self, menu, cancel, confirm):
         hit = self.pad.hit
-        if menu and new:        # A closes the menu from any page
+        if menu:        # A closes the menu from any page
             self._resume()
             return
         items = self._fitems()
-        if hit("j_up" if new else "up"):
+        if hit("j_up"):
             self.fmenu = (self.fmenu - 1) % len(items)
-        elif hit("j_down" if new else "down"):
+        elif hit("j_down"):
             self.fmenu = (self.fmenu + 1) % len(items)
         elif cancel:
             if self.fsub is None:
@@ -2407,15 +2386,15 @@ class AceCommander(app.App):
                 self.fmenu = self._fitems_top().index("SETTINGS")
                 self.fsub = None
         elif self.fsub == "settings":
-            left = hit("j_left" if new else "left")
-            side = left or hit("j_right" if new else "right")
+            left = hit("j_left")
+            side = left or hit("j_right")
             if confirm or side:
                 self._change(items[self.fmenu], left)
         elif self.fsub is None and items[self.fmenu].startswith("VIEW: ") and (
-                confirm or hit("j_left" if new else "left") or hit("j_right" if new else "right")):
+                confirm or hit("j_left") or hit("j_right")):
             # the camera changes and the menu stays open (Brian): C or right
             # goes to the next view, left back
-            step = -1 if hit("j_left" if new else "left") else 1
+            step = -1 if hit("j_left") else 1
             self.game.set_view((self.game.view + step) % 4)
         elif self.fsub == "debug":
             if confirm:
@@ -2519,16 +2498,16 @@ class AceCommander(app.App):
         self.fmarket = market.Market(GOODS, self.galaxy.system(c.system).economy, c)
         self._open("market")
 
-    def _update_screen(self, new, cancel, confirm):
+    def _update_screen(self, cancel, confirm):
         """A screen's own controls: the joystick and buttons (and the cursor
         keys, Enter and Esc). C or F goes back to the flight."""
         s = self.fsub
         hit = self.pad.hit
         if s == "chart":
-            self._update_chart(new, cancel, confirm)
+            self._update_chart(cancel, confirm)
             return
         if s == "data":         # back to the chart
-            if confirm or cancel or (new and hit(BTN_MISSILE)) or hit("k_D"):
+            if confirm or cancel or (hit(BTN_MISSILE)) or hit("k_D"):
                 self.fsub = "chart"
             return
         if confirm or cancel:
@@ -2540,9 +2519,9 @@ class AceCommander(app.App):
                 n, shown = len(GOODS), screens.ROWS
             else:
                 n, shown = len(screens.cargo_rows(self.cmdr)), screens.ROWS - 1
-            if self._repeat("j_up" if new else "up", self.dt):
+            if self._repeat("j_up", self.dt):
                 self.top = max(0, self.top - 1)
-            elif self._repeat("j_down" if new else "down", self.dt):
+            elif self._repeat("j_down", self.dt):
                 self.top = max(0, min(n - shown, self.top + 1))
 
     def _fpick(self, item):
@@ -2588,7 +2567,7 @@ class AceCommander(app.App):
             self.fsub = "settings"
             self.fmenu = 0
 
-    def _update_chart(self, new, cancel, confirm):
+    def _update_chart(self, cancel, confirm):
         """The in-flight charts: the joystick moves the cursor, C makes the
         selected system the target (Brian: only that; H or the menu's
         HYPERSPACE line jumps, as Elite), C on where you are clears it, D
@@ -2598,7 +2577,7 @@ class AceCommander(app.App):
             self.chart = None
             return
         ch = self.chart
-        if (new and self.pad.hit(BTN_MISSILE)) or self.pad.hit("k_D"):
+        if (self.pad.hit(BTN_MISSILE)) or self.pad.hit("k_D"):
             if ch.picked() is not None:
                 self.data_of = ch.picked()      # D: the selected system's data
                 self.fsub = "data"
@@ -2609,7 +2588,7 @@ class AceCommander(app.App):
                 self.target = None if i == ch.here else i
                 ch.marked = self.target
             return
-        jx, jy = self._steer(False, STICK if new else ANY, new, False)   # W A S D fly the ship
+        jx, jy = self._steer(False, STICK, True, False)   # W A S D fly the ship
         ch.move(jx, jy, self.dt)
 
     def _draw_screen(self, ctx):

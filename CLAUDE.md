@@ -117,7 +117,8 @@ Source: `github.com/emfcamp/badge-2024-software`, folder `modules/`. Brian's own
 - Buttons A to F are also UP, RIGHT, CONFIRM, DOWN, LEFT, CANCEL (`BUTTON_TYPES`). To tell a
   lettered button from the joystick use `frontboards.common.FRONTBOARD_BUTTON_TYPES["A".."F"]`
   and `events.joystick.JOYSTICK_BUTTON_TYPES["UP"/"DOWN"/"LEFT"/"RIGHT"/"SELECT"]`. The
-  joystick is a digital 5-way switch.
+  joystick is a digital 5-way switch. Only the current firmware, which has both, is
+  supported (Brian, 2026-11-18): `ace.py` imports them directly, with no fallback.
 - `Buttons.get()` / `.pressed()` search every known button in Python on each call. Polling
   about 25 controls a frame was a large hidden cost; `Pad` in `app.py` listens for
   `ButtonDownEvent` / `ButtonUpEvent` on `system.eventbus` instead.

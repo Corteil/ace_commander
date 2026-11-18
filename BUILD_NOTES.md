@@ -829,3 +829,7 @@ what is now `ace.py` (renamed in build 50).
    Options. Elite opens Status (f8) on docking (BAY), as we do. Tests launch with A now.
    Only the current firmware matters (Brian: both badges, 2024 and 2026, run it); an
    older-firmware tweak for A on Status was taken out again.
+   **Older-firmware fallback removed** (2026-11-18, Brian: "remove the old fallback"):
+   `ace.py` imports `JOYSTICK_BUTTON_TYPES` and `FRONTBOARD_BUTTON_TYPES` directly; the
+   `new = FB is not None` checks, the d-pad flight branch (tilt default, up/down speed,
+   left missile) and the `joystick=False` test stub are gone.

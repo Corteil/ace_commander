@@ -300,32 +300,6 @@ mod.TILT_DEFAULT = True
 assert pkg.AceCommander().use_tilt
 print("TILT_DEFAULT: ok")
 
-# ---- older firmware: no joystick / lettered-button names --------------------
-pkg, mod = load(joystick=False)
-assert mod.JOY is None and mod.FB is None
-a = pkg.AceCommander()
-assert a.use_tilt, "tilt is the default there"
-tick(a, fresh=["RIGHT"]); assert a.menu == 1
-tick(a, fresh=["CONFIRM"]); assert a.mode == "practice"
-tick(a, fresh=["CONFIRM"]); assert a.mode == "flight" and not a.career
-g = a.game; g.spawn_t = g.rock_t = 1e9
-tick(a)
-s = g.speed
-tick(a, held=["UP"]); assert g.speed > s
-tick(a, fresh=["LEFT"]); assert g.msg == "NO TARGET"
-tick(a, fresh=["CANCEL"]); assert a.paused
-tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"])   # past VIEW: FRONT
-tick(a, fresh=["CONFIRM"]); assert a.fsub == "settings"
-assert any("TILT" in t[0] for t in frame(a).texts)
-tick(a, fresh=["RIGHT"]); assert not a.use_tilt
-assert any("STICK" in t[0] for t in frame(a).texts)
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["CANCEL"]); assert not a.paused, "CANCEL backs out"
-ahead, side = rocks(mod, g)
-tick(a, held=["UP"]); assert ahead.y < 0 and g.speed == 0.0
-tick(a, fresh=["CANCEL"]); tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"]); tick(a, fresh=["DOWN"])
-tick(a, fresh=["CONFIRM"]); assert a.mode == "menu", "QUIT TO TITLE"
-print("older firmware fallback: ok")
-
 # ---- no accelerometer and no keyboard modules -------------------------------
 pkg, mod = load(imu=False, keyboard=False)
 a = pkg.AceCommander()
