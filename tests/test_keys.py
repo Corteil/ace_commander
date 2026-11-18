@@ -66,17 +66,18 @@ tick(a, fresh=["F"]); assert d.name() == "STATUS", "F: back to Status"
 order = []
 for _ in range(len(d.tabs)):
     order.append(d.name()); tick(a, fresh=["JOYRIGHT"])
-assert order == ["STATUS", "INVENTORY", "MARKET", "EQUIP SHIP", "REPAIR SHOP",
+assert order == ["STATUS", "INVENTORY", "MARKET", "EQUIP SHIP",
                  "SHIPYARD", "HANGAR", "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA"], order
 assert d.name() == "STATUS", "round again"
 # 3: Elite's Sell Cargo: the market, on the first good in the hold
 a.cmdr.cargo[5] = 2; a.cmdr.cargo[9] = 1
 tick(a, fresh=["KEY_3"]); assert d.name() == "MARKET" and d.sel == 5, d.sel
-# -: the Repair Shop (on by default; DEBUG can turn it off)
-tick(a, fresh=["KEY_-"]); assert d.name() == "REPAIR SHOP", d.name()
-tick(a, fresh=["KEY_3"]); tick(a, fresh=["KEY__"]); assert d.name() == "REPAIR SHOP"
+# -: the Shipyard (build 80: it holds the Repair Shop)
+tick(a, fresh=["KEY_-"]); assert d.name() == "SHIPYARD", d.name()
+tick(a, fresh=["KEY_3"]); tick(a, fresh=["KEY__"]); assert d.name() == "SHIPYARD"
 a.repair_shop = False; a._make_dock(); d = a.dock
-tick(a, fresh=["KEY_3"]); tick(a, fresh=["KEY_-"]); assert d.name() == "MARKET", "off: - does nothing"
+tick(a, fresh=["KEY_-"]); assert d.name() == "SHIPYARD" and not d.repair, "the Repair Shop off"
+tick(a, fresh=["C"]); assert d.name() == "SHIPYARD", "no Repair Shop to open"
 print("docked number keys, Inventory, Sell, Repair Shop, Options: ok")
 
 # ---- + / - and J ------------------------------------------------------------

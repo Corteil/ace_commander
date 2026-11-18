@@ -866,9 +866,22 @@ what is now `ace.py` (renamed in build 50).
    (`ships.move_cargo`), the rest stays in the old ship. Stolen: legal |= 32 (offender).
    Hangar: the flown ship first ("flying"), then the kept ones ("here", or in Hardcore
    the system they are kept at); C flies one (the old one goes in, cargo moves across), D
-   sells one with its cargo. Messages clear when the pick moves. Open question for Brian:
-   the starting Cobra trades in for ~24,000 Cr, so a new commander can downgrade to a
-   Worm and pocket ~21,000 Cr. Tests: `tests/test_shipyard.py`.
+   sells one with its cargo. Messages clear when the pick moves. The starting Cobra
+   trades in for ~24,000 Cr, so a new commander can downgrade to a Worm and pocket
+   ~21,000 Cr: left as is (Brian, 2026-11-18: "downgrading is a bad buy").
+   Tests: `tests/test_shipyard.py`.
    Badge fix: MicroPython's `random` has no `Random` class, so `ships.for_sale` uses its
    own seeded generator (`ships._Rnd`). Found by a smoke test over the REPL after the PC
    tests passed; Shipyard buy / Hangar fly / sell then ran on the badge.
+   **Build 80** (2026-11-18, Brian: "the ship yard should host the repairshop as a sub
+   screen. and the keyboard short cut take to the ship yard instead of the repairshop, the
+   hanger should have the current selected ship as 3d model with it fitout listed"). The
+   Repair Shop is no longer a tab: the Shipyard's first page is your own ship (turning in
+   its paint, its stats and trade-in value) and C there opens the Repair Shop over the
+   Shipyard (`Docked.in_repair`, `name()` "REPAIR SHOP"); F goes back to the Shipyard
+   (`Docked.back()`), < > leave it. The ships for sale are pages 2 on (`ysel - 1` in
+   `yard`). `-` opens the Shipyard. DEBUG REPAIR SHOP off: no "C: repair shop"
+   (`Docked.repair`). The Hangar shows one ship at a time, as the Shipyard does: its model
+   in its own paint, "flying" / "here, worth x Cr" / "kept at x", and its fit-out
+   (`_fitout`: lasers by view F/B/L/R, missiles / pylons, hold and tonnes used, the other
+   equipment on one or two lines). Not a sub-screen: it fits on the tab.

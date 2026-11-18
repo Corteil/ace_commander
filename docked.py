@@ -17,7 +17,7 @@ game_data = content.DATA     # Elite's text tables, or the game's own (content.p
 # the Hangar (build 79), Galactic chart,
 # Local chart, System data. Options is not a tab: C on Status opens it, and F
 # goes back to Status (Brian: A launches, so C is free).
-TABS = ("STATUS", "INVENTORY", "MARKET", "EQUIP SHIP", "REPAIR SHOP", "SHIPYARD", "HANGAR",
+TABS = ("STATUS", "INVENTORY", "MARKET", "EQUIP SHIP", "SHIPYARD", "HANGAR",
         "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA")
 PAINT_PRICE = 100   # tenths of a credit: a new colour at the Repair Shop costs 10.0 Cr
 SPIN = 0.8          # radians a second the Repair Shop's ship turns
@@ -63,7 +63,6 @@ class Docked:
                               if not (t == "MARKET" and not (goods and cmdr.market is not None))
                               and not (t == "INVENTORY" and not goods)
                               and not (t == "EQUIP SHIP" and not equip)
-                              and not (t == "REPAIR SHOP" and not (repair and ship))
                               and not (t in ("SHIPYARD", "HANGAR") and not (bps and equip)))
         self.goods = goods
         self.itop = 0           # the first good shown on Inventory
@@ -89,6 +88,8 @@ class Docked:
         self.sold = False       # the message says what Inventory's sell all made
         self.tab = 0
         self.in_options = False     # Options open, over Status (C on Status)
+        self.repair = bool(repair and ship) and "SHIPYARD" in self.tabs   # the Repair Shop, in the Shipyard
+        self.in_repair = False      # the Repair Shop open, over the Shipyard (C on your ship there)
         self.target = target if gal is not None else None   # a system index, or None
         self.here = gal.system(cmdr.system) if gal is not None else None
         self.view = None        # the chart, on the chart tabs
@@ -99,22 +100,43 @@ class Docked:
     def name(self):
         if self.in_options:
             return "OPTIONS"
+        if self.in_repair:
+            return "REPAIR SHOP"
         return self.tabs[self.tab]
 
     def open(self, name):
-        """Open the tab with this name, or OPTIONS: Status's sub-screen."""
+        """Open the tab with this name, or a sub-screen: OPTIONS (Status's)
+        or REPAIR SHOP (the Shipyard's, build 80)."""
         if name == "OPTIONS":
             if self.options:
                 self.go(0)
                 self.in_options = True
             return
+        if name == "REPAIR SHOP":
+            if self.repair:
+                self.go(self.tabs.index("SHIPYARD"))
+                self.ysel = 0
+                self.in_repair = True
+            return
         self.go(self.tabs.index(name))
+
+    def back(self):
+        """F: from a sub-screen to its tab, else to Status. False if already
+        on Status (then F leaves for the title)."""
+        if self.in_repair:
+            self.go(self.tab)
+            return True
+        if self.tab or self.in_options:
+            self.go(0)
+            return True
+        return False
 
     def go(self, tab, sel=None):
         """Open tab number tab (it wraps round). On a chart the cursor starts
         on system sel, or on the target if sel is None."""
         self.tab = tab % len(self.tabs)
         self.in_options = False
+        self.in_repair = False
         self.msg = None         # a message is about the tab it was said on
         self.sold = False
         n = self.name()
@@ -283,10 +305,10 @@ class Docked:
         self.mount = 0
 
     def pick_ship(self, step):
-        """The Shipyard's next (1) or previous (-1) ship."""
-        if self.yard:
-            self.ysel = (self.ysel + step) % len(self.yard)
-            self.msg = None
+        """The Shipyard's next (1) or previous (-1) page: 0 is your own ship
+        (and the Repair Shop), then the ships for sale."""
+        self.ysel = (self.ysel + step) % (len(self.yard) + 1)
+        self.msg = None
 
     def trade_in_value(self):
         """What the ship you fly fetches in trade, cargo not counted."""
@@ -298,10 +320,10 @@ class Docked:
         sold here); else it goes into the hangar with what doesn't fit. The
         new ship comes with its standard weapons. A stolen one makes you an
         offender. Returns True if it happened."""
-        if not self.yard:
+        if not self.ysel or not self.yard:
             return False
         c = self.cmdr
-        name, price, stolen = self.yard[self.ysel]
+        name, price, stolen = self.yard[self.ysel - 1]
         old = ships.pack(c, self._kept_at())
         credit = ships.value(old, self.equip) if trade else 0
         if c.cash + credit < price:
@@ -573,7 +595,7 @@ class Docked:
             text(ctx, self.msg, 0, 70, 12, cockpit.RED)
         else:
             text(ctx, "up/down: colour   C: paint", 0, 70, 11, cockpit.GREY)
-        text(ctx, "< > screens   F: status", 0, 88, 11, cockpit.GREY)
+        text(ctx, "F: back to shipyard", 0, 88, 11, cockpit.GREY)
 
     def _spin_ship(self, ctx, bp, py, rgb, px=60.0):
         """bp turning, its middle py pixels above the screen's middle, scaled
@@ -608,21 +630,31 @@ class Docked:
         text(ctx, "< > screens   F: status", 0, 88, 11, cockpit.GREY)
 
     def _draw_shipyard(self, ctx):
-        """One ship for sale at a time, turning, with its price and what it
-        flies like; up / down for the others (build 79)."""
+        """One page at a time: first your own ship (C: the Repair Shop), then
+        each ship for sale, turning, with its price and what it flies like;
+        up / down for the others (builds 79-80)."""
         text = cockpit.text
         c = self.cmdr
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
         text(ctx, "SHIPYARD  " + self.here.name, 0, -100, 11, cockpit.GREY)
-        if not self.yard:
-            text(ctx, "no ships for sale", 0, -20, 12, cockpit.GREY)
-            self._foot(ctx, "")
+        text(ctx, "%d of %d" % (self.ysel + 1, len(self.yard) + 1), 0, -86, 10, cockpit.GREY)
+        if self.ysel == 0:          # your own ship
+            bp = self.ship
+            if bp is not None:
+                self._spin_ship(ctx, bp, 48, cockpit.ship_rgb(c.colour))
+            text(ctx, "YOUR " + (bp.title if bp is not None else c.ship), 0, -12, 14, cockpit.WHITE)
+            a, b = self._ship_lines(c.ship, bp)
+            text(ctx, a, 0, 4, 11, cockpit.GREY)
+            text(ctx, b, 0, 18, 11, cockpit.GREY)
+            text(ctx, "trade-in %d Cr" % (self.trade_in_value() // 10), 0, 36, 12, cockpit.YELLOW)
+            text(ctx, c.cash_text(), 0, 53, 12, cockpit.CYAN)
+            self._foot(ctx, ("C: repair shop   " if self.repair else "")
+                       + ("down: for sale" if self.yard else "none for sale"))
             return
-        name, price, stolen = self.yard[self.ysel]
+        name, price, stolen = self.yard[self.ysel - 1]
         bp = self.bps(name)
         if bp is not None:
             self._spin_ship(ctx, bp, 48, cockpit.RED if stolen else cockpit.CYAN)
-        text(ctx, "%d of %d" % (self.ysel + 1, len(self.yard)), 0, -86, 10, cockpit.GREY)
         title = bp.title if bp is not None else name
         text(ctx, title + ("  (STOLEN)" if stolen else ""), 0, -12, 14,
              cockpit.RED if stolen else cockpit.WHITE)
@@ -634,43 +666,59 @@ class Docked:
         text(ctx, c.cash_text(), 0, 53, 12, cockpit.CYAN)
         self._foot(ctx, "C: buy   D: trade in")
 
+    def _fitout(self, e):
+        """A ship's fit-out as lines for the Hangar: its lasers by view,
+        missiles and hold, then its other equipment."""
+        short = {"pulse": "pulse", "beam": "beam", "military": "mil", "mining": "mine"}
+        lasers = ["%s %s" % (v, short.get(k, k)) for v, k in zip("FBLR", e["lasers"]) if k]
+        from . import market
+        used = market.hold_used(e["cargo"])
+        lines = ["lasers " + "  ".join(lasers) if lasers else "no lasers",
+                 "missiles %d/%d   hold %dt, %dt used" % (e["missiles"], ships.pylons(e["type"]),
+                                                       e["hold"], used)]
+        names = {"ecm": "ECM", "scoops": "scoops", "pod": "pod", "bomb": "bomb",
+                 "energy": "energy unit", "navy": "navy unit", "docking": "dock comp",
+                 "hyperdrive": "gal. drive"}
+        kit = [names[k] for k in ("ecm", "scoops", "pod", "bomb", "energy", "navy", "docking",
+                                  "hyperdrive") if k in e["extras"]]
+        if not kit:
+            lines.append("no other equipment")
+        else:
+            lines.append("  ".join(kit[:4]))
+            if kit[4:]:
+                lines.append("  ".join(kit[4:]))
+        return lines
+
     def _draw_hangar(self, ctx):
-        """Your ships: the one you fly, then the ones kept, where each is in
-        Hardcore Mode, and what the picked one is worth (build 79)."""
+        """Your ships one at a time, the one you fly first: turning in its own
+        paint, where it is, its fit-out, and what it is worth (build 80)."""
         text = cockpit.text
-        c = self.cmdr
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
         text(ctx, "HANGAR  " + self.here.name, 0, -100, 11, cockpit.GREY)
         own = self.owned()
         self.hsel %= len(own)
-        top = max(0, min(self.hsel - 2, len(own) - 5))
-        for row in range(min(5, len(own))):
-            i = top + row
-            e = own[i]
-            y = -68 + row * 17
-            if i == self.hsel:
-                ctx.rgb(*cockpit.DIM).rectangle(-96, y - 8, 192, 16).fill()
-            bp = self.bps(e["type"])
-            text(ctx, bp.title if bp is not None else e["type"], -86, y, 11,
-                 cockpit.GREEN if i == self.hsel else cockpit.WHITE, -1)
-            if i == 0:
-                where, col = "flying", cockpit.GREEN
-            else:
-                why = self._where(e)
-                where = "here" if why is None else why[8:] if why.startswith("KEPT AT ") else "away"
-                col = cockpit.CYAN if why is None else cockpit.GREY
-            text(ctx, where, 86, y, 11, col, 1)
-        if len(own) == 1:
-            text(ctx, "no other ships: buy one", 0, -40, 11, cockpit.GREY)
-            text(ctx, "at a shipyard", 0, -26, 11, cockpit.GREY)
         e = own[self.hsel]
-        text(ctx, "hold %dt   missiles %d   %s" % (e["hold"], e["missiles"], e["lasers"][0]),
-             0, 24, 11, cockpit.GREY)
-        if self.hsel:
+        text(ctx, "%d of %d" % (self.hsel + 1, len(own)), 0, -86, 10, cockpit.GREY)
+        bp = self.bps(e["type"])
+        if bp is not None:
+            self._spin_ship(ctx, bp, 50, cockpit.ship_rgb(e["colour"]), 54.0)
+        text(ctx, bp.title if bp is not None else e["type"], 0, -16, 14, cockpit.WHITE)
+        if self.hsel == 0:
+            where, col = "flying", cockpit.GREEN
+        else:
+            why = self._where(e)
             v = ships.value(e, self.equip)
-            text(ctx, "worth %d.%d Cr" % (v // 10, v % 10), 0, 39, 12, cockpit.YELLOW)
-        text(ctx, c.cash_text(), 0, 53, 12, cockpit.CYAN)
-        self._foot(ctx, "C: fly   D: sell" if self.hsel else "up / down: your ships")
+            where = ("here, worth %d Cr" % (v // 10)) if why is None else why.lower()
+            col = cockpit.YELLOW if why is None else cockpit.GREY
+        text(ctx, where, 0, -2, 11, col)
+        y = 12
+        for line in self._fitout(e):
+            text(ctx, line, 0, y, 11, cockpit.CYAN)
+            y += 13
+        if len(own) == 1:
+            self._foot(ctx, "your only ship")
+        else:
+            self._foot(ctx, "C: fly   D: sell" if self.hsel else "down: your other ships")
 
     def _draw_equip(self, ctx):
         """What this station sells, ROWS at a time: name, price, what you have."""

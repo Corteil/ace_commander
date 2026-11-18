@@ -263,9 +263,10 @@ in flight 1-4 the views, 5 galactic chart, 6 local chart, 7 the target's (or her
 Market Prices, 9 Commander Status, 0 Inventory. Docked (`DOCK_KEYS`, build 69): 1 launch, 2 / 8 market, 3
 market on the first good in the hold (Elite's Sell Cargo), 4 equip ship, 5 galactic chart, 6 local
 chart, 7 system data, 9 status, 0 Inventory (a tab since build 70, drawn by `screens.draw_inventory`), and the two screens
-Elite lacks on the keys after 0 (Brian): - (or _) Repair Shop, = (or +) Options. The joystick goes
-round the tabs in `docked.TABS` (Brian, build 77): Status, Inventory, Market, Equip ship, Repair
-Shop, Galactic chart, Local chart, System data. Options is not a tab: C on Status opens it over
+Elite lacks on the keys after 0 (Brian): - (or _) Shipyard (was the Repair Shop), = (or +) Options. The joystick goes
+round the tabs in `docked.TABS` (Brian, builds 77-80): Status, Inventory, Market, Equip ship,
+Shipyard, Hangar, Galactic chart, Local chart, System data. The Repair Shop is the Shipyard's
+sub-screen (C on its first page, your own ship; `-` opens the Shipyard). Options is not a tab: C on Status opens it over
 Status (`Docked.in_options`, `name()` gives "OPTIONS"), F goes back; A launches. Only the current
 firmware matters (Brian, 2026-11-18: both badges run it). C on Inventory sells the whole hold (`Docked.sell_all`).
 The Repair Shop is on by default (Brian, build 71); DEBUG > DISPLAY can still turn it off. Tests: `tests/test_keys.py`.

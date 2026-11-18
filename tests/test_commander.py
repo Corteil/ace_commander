@@ -710,7 +710,7 @@ print("launching, arriving, flying to the station, docking, refuelling: ok")
 d = e.dock
 # from Status; the Repair Shop after Equip ship and on by default; Options is
 # Status's sub-screen, not a tab (build 77, Brian)
-assert d.tabs == ("STATUS", "INVENTORY", "MARKET", "EQUIP SHIP", "REPAIR SHOP",
+assert d.tabs == ("STATUS", "INVENTORY", "MARKET", "EQUIP SHIP",
                   "SHIPYARD", "HANGAR", "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA")
 assert d.tab == 0 and any("< > screens" in t for t in texts(e))
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "INVENTORY"
@@ -815,7 +815,6 @@ tick(e, fresh=["C"]); assert d.msg == "NOT ENOUGH CASH" and c.missiles == 0
 c.cash = 100000; c.missiles = 2
 saved_c = commander.Commander.from_dict(c.to_dict())
 assert (saved_c.hold, saved_c.laser, saved_c.missiles, "scoops" in saved_c.extras) == (35, "beam", 2, True)
-tick(e, fresh=["JOYRIGHT"]); assert d.name() == "REPAIR SHOP", "after Equip ship (Brian)"
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "SHIPYARD"
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "HANGAR"
 tick(e, fresh=["JOYRIGHT"]); assert d.name() == "GALACTIC CHART" and len(d.view.dots) == 256
@@ -849,7 +848,11 @@ tick(e, fresh=["C"]); tick(e, fresh=["C"]); assert c.docking == before
 tick(e, fresh=["F"]); assert d.name() == "STATUS" and e.mode == "docked", "F: Options back to Status"
 tick(e, fresh=["C"]); tick(e, fresh=["JOYRIGHT"]); assert d.name() == "INVENTORY", "< > leave it too"
 tick(e, fresh=["JOYRIGHT"]); tick(e, fresh=["JOYRIGHT"]); tick(e, fresh=["JOYRIGHT"])
-assert d.name() == "REPAIR SHOP", "after Equip ship"
+assert d.name() == "SHIPYARD", "after Equip ship"
+# the Repair Shop is the Shipyard's sub-screen (build 80): C on your own ship
+assert d.ysel == 0 and any("C: repair shop" in t for t in texts(e))
+tick(e, fresh=["C"]); assert d.name() == "REPAIR SHOP" and "F: back to shipyard" in texts(e)
+tick(e, fresh=["F"]); assert d.name() == "SHIPYARD", "F: back to the Shipyard"
 tick(e, fresh=["E"]); assert d.name() == "EQUIP SHIP"
 tick(e, fresh=["F"]); assert d.name() == "STATUS" and e.mode == "docked", "F goes back to Status"
 # pick Diso (147) on the galactic chart by steering to it

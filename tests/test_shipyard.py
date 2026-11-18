@@ -46,25 +46,27 @@ d = e.dock
 c = e.cmdr
 here = d.here.name
 assert "SHIPYARD" in d.tabs and "HANGAR" in d.tabs
-assert d.tabs.index("SHIPYARD") == d.tabs.index("REPAIR SHOP") + 1
+assert d.tabs.index("SHIPYARD") == d.tabs.index("EQUIP SHIP") + 1 and "REPAIR SHOP" not in d.tabs
 assert d.tabs.index("HANGAR") == d.tabs.index("SHIPYARD") + 1
 
 # ---- the Shipyard: what this station sells, by its tech level
 d.open("SHIPYARD")
 assert d.yard == ships.for_sale(c.galaxy, c.system, d.here.tech, d.here.government)
 assert d.yard and all(ships.spec(n)[ships.TECH] <= d.here.tech for n, p, st in d.yard if not st)
+# page 1 is your own ship, with the Repair Shop (build 80)
 tx = texts(e)
-assert "SHIPYARD  " + here in tx and "C: buy   D: trade in" in tx, tx
+assert "SHIPYARD  " + here in tx and d.ysel == 0, tx
+assert any(t.startswith("YOUR ") for t in tx) and any("C: repair shop" in t for t in tx), tx
+tick(e, fresh=["D"]); assert c.ship == ships.COBRA, "nothing to trade for on your own page"
 # a known stock for the rest of the test
 d.yard = [("SIDEWINDER", 40000, False), ("PYTHON", 950000, False), ("VIPER", 195000, True)]
-d.ysel = 0
-tx = texts(e)
-assert e.game is None or True
-assert any(t.startswith("speed ") for t in tx) and any(t.startswith("lasers ") for t in tx), tx
 tick(e, fresh=["JOYDOWN"]); assert d.ysel == 1
-tick(e, fresh=["JOYUP"]); tick(e, fresh=["JOYUP"]); assert d.ysel == 2, "round the list"
+tx = texts(e)
+assert "C: buy   D: trade in" in tx and "2 of 4" in tx, tx
+assert any(t.startswith("speed ") for t in tx) and any(t.startswith("lasers ") for t in tx), tx
+tick(e, fresh=["JOYUP"]); tick(e, fresh=["JOYUP"]); assert d.ysel == 3, "round the list"
 assert any("(STOLEN)" in t for t in texts(e))
-d.ysel = 0
+d.ysel = 1
 # not enough cash
 c.cash = 100
 tick(e, fresh=["C"]); assert d.msg == "NOT ENOUGH CASH" and c.ship == ships.COBRA
@@ -84,10 +86,13 @@ assert d.ship is not None and d.ship.name == "SIDEWINDER", "the Repair Shop show
 # ---- the Hangar: the one you fly first, then the Cobra
 d.open("HANGAR")
 tx = texts(e)
-assert "HANGAR  " + here in tx and "flying" in tx and "here" in tx, tx
+assert "HANGAR  " + here in tx and "flying" in tx and "1 of 2" in tx, tx
+assert "lasers F pulse" in tx and "missiles 0/1   hold 4t, 4t used" in tx and "no other equipment" in tx, tx
 tick(e, fresh=["C"]); assert d.msg == "YOU ARE FLYING IT"
-tick(e, fresh=["JOYDOWN"]); assert d.hsel == 1 and "C: fly   D: sell" in texts(e)
-assert any(t.startswith("worth ") for t in texts(e))
+tick(e, fresh=["JOYDOWN"]); assert d.hsel == 1
+tx = texts(e)
+assert "C: fly   D: sell" in tx and any(t.startswith("here, worth ") for t in tx), tx
+assert "lasers F beam" in tx and "ECM" in tx and "missiles 3/4   hold 20t, 11t used" in tx, tx
 tick(e, fresh=["C"])
 assert c.ship == ships.COBRA and c.lasers[0] == "beam" and c.extras == ["ecm"]
 assert c.cargo[0] == 15, "the cargo moves back across"
@@ -100,7 +105,7 @@ assert c.hangar == [] and c.cash == cash + v and d.msg.startswith("SOLD: ")
 print("shipyard: buy; hangar: fly and sell: ok")
 
 # ---- trade in: the Cobra's value comes off a Python's price
-d.open("SHIPYARD"); d.yard = [("PYTHON", 950000, False)]; d.ysel = 0
+d.open("SHIPYARD"); d.yard = [("PYTHON", 950000, False)]; d.ysel = 1
 c.cash = 10 ** 7; c.cargo[0] = 15
 cash = c.cash
 v = d.trade_in_value()
@@ -111,7 +116,7 @@ assert c.cargo[0] == 15 and c.hold == 60 and c.lasers[0] == "beam" and c.missile
 print("trade in: ok")
 
 # ---- a stolen ship makes you an offender
-d.yard = [("VIPER", 195000, True)]; d.ysel = 0
+d.yard = [("VIPER", 195000, True)]; d.ysel = 1
 assert c.legal == 0
 tick(e, fresh=["C"])
 assert c.ship == "VIPER" and c.stolen and game.legal_name(c.legal) == "OFFENDER", c.legal
@@ -135,7 +140,7 @@ c = h.cmdr
 c.hardcore = True
 h._make_dock(); d = h.dock
 home = c.system
-d.open("SHIPYARD"); d.yard = [("SIDEWINDER", 40000, False)]; d.ysel = 0
+d.open("SHIPYARD"); d.yard = [("SIDEWINDER", 40000, False)]; d.ysel = 1
 c.cash = 10 ** 6
 tick(h, fresh=["C"])
 assert c.hangar[0]["at"] == [c.galaxy, home], "kept here"
@@ -145,7 +150,8 @@ h._make_dock(); d = h.dock
 d.open("HANGAR"); tick(h, fresh=["JOYDOWN"])
 tick(h, fresh=["C"]); assert d.msg == "KEPT AT " + d.gal.system(home).name and c.ship == "SIDEWINDER"
 tick(h, fresh=["D"]); assert d.msg.startswith("KEPT AT ") and len(c.hangar) == 1
-assert d.gal.system(home).name in texts(h)
+d.msg = None
+assert "kept at " + d.gal.system(home).name.lower() in texts(h)
 # back home it can
 c.system = home
 h._make_dock(); d = h.dock

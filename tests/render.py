@@ -82,14 +82,21 @@ d.pick_item(1)
 shot(a, "1l_equip.png")
 d.cmdr.cash = 10 ** 6
 d.open("SHIPYARD"); d.ysel = 0; d.spin = 0.6
+d.cmdr.extras = ["ecm", "scoops", "pod", "docking", "energy"]; d.cmdr.cargo[0] = 3
+shot(a, "1m0_shipyard_yours.png")
+d.open("REPAIR SHOP")
+shot(a, "1m1_repair_shop.png")
+d.back(); d.ysel = 1
 shot(a, "1m_shipyard.png")
-d.yard = d.yard + [("VIPER", 195000, True)]; d.ysel = len(d.yard) - 1
+d.yard = d.yard + [("VIPER", 195000, True)]; d.ysel = len(d.yard)
 shot(a, "1m2_shipyard_stolen.png")
-d.ysel = 0; d.buy_ship(False)
+d.ysel = 1; d.buy_ship(False)
 shot(a, "1m3_shipyard_bought.png")
-d.open("HANGAR"); d.pick_owned(1)
+d.open("HANGAR")
 shot(a, "1n_hangar.png")
-d.fly_owned()
+d.pick_owned(1)
+shot(a, "1n2_hangar_kept.png")
+d.fly_owned(); d.cmdr.extras = []; d.cmdr.cargo[0] = 0
 d.cmdr.cash = 1000
 d.open("GALACTIC CHART")
 shot(a, "1f_galactic.png")

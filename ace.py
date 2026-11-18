@@ -156,8 +156,8 @@ DOCK_KEYS = (("k_1", "LAUNCH"), ("k_2", "MARKET"), ("k_3", "SELL"),
              ("k_7", "SYSTEM DATA"), ("k_8", "MARKET"), ("k_9", "STATUS"),
              ("k_0", "INVENTORY"),
              # the two screens Elite didn't have, on the keys after 0 (Brian):
-             # - (or _) the Repair Shop, = (or +) Options
-             ("k_slower", "REPAIR SHOP"), ("k_faster", "OPTIONS"))
+             # - (or _) the Shipyard (build 80: it holds the Repair Shop), = (or +) Options
+             ("k_slower", "SHIPYARD"), ("k_faster", "OPTIONS"))
 # DEBUG, a page of cheats for testing (the in-flight menu, Settings and
 # Options): True or False, or None to show it only if a file called debug.txt
 # is in the app's folder (always on a PC, where the tests run), or once it has
@@ -1124,9 +1124,7 @@ class AceCommander(app.App):
             d.use_cursor(False)     # F: the joystick goes back to changing tabs
             return
         if cancel:
-            if d.tab or d.in_options:
-                d.go(0)
-            else:
+            if not d.back():        # a sub-screen to its tab, a tab to Status
                 self._save_docked()
                 self.mode = "menu"
             return
@@ -1194,7 +1192,10 @@ class AceCommander(app.App):
             elif hit("j_down"):
                 d.pick_ship(1)
             elif hit("C"):
-                d.buy_ship(False)       # the one you fly goes into the hangar
+                if d.ysel == 0:
+                    d.open("REPAIR SHOP")   # your own ship: the Repair Shop (build 80)
+                else:
+                    d.buy_ship(False)       # the one you fly goes into the hangar
             elif hit(BTN_MISSILE) or hit("k_D"):
                 d.buy_ship(True)        # trade it in
         elif d.name() == "HANGAR":
@@ -2068,7 +2069,7 @@ class AceCommander(app.App):
         if item.startswith("REPAIR SHOP"):
             self.repair_shop = not self.repair_shop
             if self.od_from == "docked" and self.dock is not None:
-                self._make_dock()           # the tab comes or goes at once
+                self._make_dock()           # the Shipyard's Repair Shop comes or goes at once
                 self.dock.open("OPTIONS")
                 self.dock.osel = len(self._settings(True)) - 1
             return "REPAIR SHOP " + ("ON" if self.repair_shop else "OFF")

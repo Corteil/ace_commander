@@ -300,14 +300,14 @@ tick(b, fresh=["F"]); assert b.od_page is None
 tick(b, fresh=["F"]); assert b.mode == "options", "back where it came from"
 # and from the docked Options tab, back to it; REPAIR SHOP comes at once
 tick(b, fresh=["F"]); bs.choose(b, "CONTINUE"); assert b.mode == "docked"
-assert "REPAIR SHOP" in b.dock.tabs, "on by default (Brian)"
+assert b.dock.repair, "on by default (Brian)"
 b.repair_shop = False; b._make_dock()     # off, so DEBUG can switch it back on below
-assert "REPAIR SHOP" not in b.dock.tabs
+assert not b.dock.repair
 b.dock.open("OPTIONS"); b.dock.osel = len(b._settings(True)) - 1
 tick(b, fresh=["C"]); assert b.mode == "odebug" and b.od_from == "docked"
 b.od_sel = b._od_items().index("DISPLAY"); tick(b, fresh=["C"])
 b.od_sel = [i for i, t in enumerate(b._od_items()) if t.startswith("REPAIR")][0]
-tick(b, fresh=["C"]); assert b.repair_shop and "REPAIR SHOP" in b.dock.tabs
+tick(b, fresh=["C"]); assert b.repair_shop and b.dock.repair
 tick(b, fresh=["F"]); tick(b, fresh=["F"]); assert b.mode == "docked" and b.dock.name() == "OPTIONS"
 b.repair_shop = False
 b.dock.go(0); tick(b, fresh=["F"]); bs.choose(b, "OPTIONS")

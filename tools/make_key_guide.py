@@ -146,7 +146,7 @@ right = [
         [k("4"), "Equip ship: " + k("C") + " buys"],
         [k("5") + " " + k("6") + " " + k("7"), "Galactic chart · local chart · system data"],
         [k("9") + " / " + k("0"), "Status (" + k("C") + ": Options) / Inventory (" + k("C") + ": sell all)"],
-        [k("−") + " / " + k("="), "Repair Shop / Options"],
+        [k("−") + " / " + k("="), "Shipyard (Repair Shop inside) / Options"],
         ["Joystick " + k("←", "→"), "Next / previous screen (or " + k("E") + " / " + k("B") + ")"],
         [k("F") + " or " + k("Esc"), "Back to Status, then the title"],
     ], [W * 0.33, W * 0.67])),
