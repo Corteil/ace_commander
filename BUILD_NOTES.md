@@ -885,3 +885,17 @@ what is now `ace.py` (renamed in build 50).
    in its own paint, "flying" / "here, worth x Cr" / "kept at x", and its fit-out
    (`_fitout`: lasers by view F/B/L/R, missiles / pylons, hold and tonnes used, the other
    equipment on one or two lines). Not a sub-screen: it fits on the tab.
+   **Build 81** (2026-11-18, Brian: "the stats of each ship should be shown in the
+   shipyard as a sub screen"; and not "YOUR ..."). The Shipyard's first page names your
+   ship plainly (Brian chose name only); its hint is "C: repair shop   D: stats". On a
+   ship for sale C opens SHIP STATS (`Docked.in_stats`, `open_stats`) and buying happens
+   there: C buys, D trades in (Brian chose the two-press way), then back on the Shipyard's
+   first page with the new ship; F goes back to the same page. Stats: price and trade-in,
+   top speed, turning and shields as % of the Cobra (its shown name), hold with and
+   without the bay, laser mounts, pylons, standard fit, and "from tech n" / "stolen only".
+   Also build 81 (Brian: "if the cargo over spills, credit its value to the player's
+   balance, also remove the repairshop flag"): whenever you change ship (buy, trade in,
+   or fly a kept one) the cargo moves across and what doesn't fit is sold at this
+   station's prices (`Docked._sell_off`, kept if there is no market), with "CARGO OVER: +x
+   Cr" instead of the ship's name; a ship left in the hangar keeps no cargo. The DEBUG
+   REPAIR SHOP switch and `AceCommander.repair_shop` are gone; `Docked(..., repair)` too.

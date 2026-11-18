@@ -56,32 +56,55 @@ assert d.yard and all(ships.spec(n)[ships.TECH] <= d.here.tech for n, p, st in d
 # page 1 is your own ship, with the Repair Shop (build 80)
 tx = texts(e)
 assert "SHIPYARD  " + here in tx and d.ysel == 0, tx
-assert any(t.startswith("YOUR ") for t in tx) and any("C: repair shop" in t for t in tx), tx
-tick(e, fresh=["D"]); assert c.ship == ships.COBRA, "nothing to trade for on your own page"
+# (the page names your ship plainly: Brian, build 81)
+assert not any(t.startswith("YOUR ") for t in tx) and "C: repair shop   D: stats" in tx, tx
+# D: your own ship's stats, with nothing to buy (build 81)
+tick(e, fresh=["D"]); assert d.name() == "SHIP STATS" and c.ship == ships.COBRA
+tx = texts(e)
+assert "top speed" in tx and "40" in tx and "turning" in tx and "100%" in tx, tx
+assert "C: buy   D: trade in" not in tx and "F: back to shipyard" in tx
+tick(e, fresh=["C"]); tick(e, fresh=["D"]); assert c.ship == ships.COBRA and c.hangar == []
+tick(e, fresh=["F"]); assert d.name() == "SHIPYARD" and d.ysel == 0
 # a known stock for the rest of the test
 d.yard = [("SIDEWINDER", 40000, False), ("PYTHON", 950000, False), ("VIPER", 195000, True)]
 tick(e, fresh=["JOYDOWN"]); assert d.ysel == 1
 tx = texts(e)
-assert "C: buy   D: trade in" in tx and "2 of 4" in tx, tx
+assert "C: stats and buying" in tx and "2 of 4" in tx, tx
 assert any(t.startswith("speed ") for t in tx) and any(t.startswith("lasers ") for t in tx), tx
+tick(e, fresh=["D"]); assert d.name() == "SHIPYARD" and c.ship == ships.COBRA, "D does nothing here"
+# C: its stats; F back to the same page
+tick(e, fresh=["C"]); assert d.name() == "SHIP STATS"
+tx = texts(e)
+assert "SIDEWINDER" in tx and "C: buy   D: trade in" in tx and "front, rear" in tx and "1 pylon" in tx, tx
+assert "4t (7t with bay)" in tx and "pulse laser" in tx and "fitted" in tx and "from tech 1" in tx, tx
+tick(e, fresh=["F"]); assert d.name() == "SHIPYARD" and d.ysel == 1
 tick(e, fresh=["JOYUP"]); tick(e, fresh=["JOYUP"]); assert d.ysel == 3, "round the list"
 assert any("(STOLEN)" in t for t in texts(e))
+tick(e, fresh=["C"]); assert "stolen only" in texts(e)
+tick(e, fresh=["F"])
 d.ysel = 1
 # not enough cash
 c.cash = 100
-tick(e, fresh=["C"]); assert d.msg == "NOT ENOUGH CASH" and c.ship == ships.COBRA
-# buy a Sidewinder: the Cobra, its beam laser, ECM and cargo go into the hangar,
-# with what doesn't fit the Sidewinder's 4 t hold
+tick(e, fresh=["C"]); tick(e, fresh=["C"])
+assert d.msg == "NOT ENOUGH CASH" and c.ship == ships.COBRA and d.name() == "SHIP STATS"
+assert "NOT ENOUGH CASH" in texts(e)
+# buy a Sidewinder: the Cobra, its beam laser and ECM go into the hangar; the
+# cargo moves across and what doesn't fit the Sidewinder's 4 t hold is sold,
+# its value credited (Brian, build 81)
 c.cash = 10 ** 6
 c.lasers[0] = "beam"; c.extras.append("ecm"); c.cargo[0] = 15
+food = d.market.prices[0]; stock = d.market.stock[0]
 tick(e, fresh=["C"])
-assert c.ship == "SIDEWINDER" and c.cash == 10 ** 6 - 40000 and d.sold
+assert c.ship == "SIDEWINDER" and c.cash == 10 ** 6 - 40000 + 11 * food and d.sold
+assert d.market.stock[0] == stock + 11
+assert d.name() == "SHIPYARD" and d.ysel == 0, "back on the Shipyard, on the new ship"
 assert (c.lasers, c.missiles, c.extras, c.hold) == (["pulse", "", "", ""], 0, [], 4), "standard weapons"
 assert c.cargo[0] == 4 and len(c.hangar) == 1
 kept = c.hangar[0]
 assert (kept["type"], kept["lasers"][0], kept["extras"], kept["cargo"][0], kept["at"]) == \
-    (ships.COBRA, "beam", ["ecm"], 11, None), kept
-assert d.msg.startswith("NEW SHIP: ") and d.msg in texts(e)
+    (ships.COBRA, "beam", ["ecm"], 0, None), kept
+want = 11 * food
+assert d.msg == "CARGO OVER: +%d.%d Cr" % (want // 10, want % 10) and d.msg in texts(e), d.msg
 assert d.ship is not None and d.ship.name == "SIDEWINDER", "the Repair Shop shows it"
 # ---- the Hangar: the one you fly first, then the Cobra
 d.open("HANGAR")
@@ -92,20 +115,32 @@ tick(e, fresh=["C"]); assert d.msg == "YOU ARE FLYING IT"
 tick(e, fresh=["JOYDOWN"]); assert d.hsel == 1
 tx = texts(e)
 assert "C: fly   D: sell" in tx and any(t.startswith("here, worth ") for t in tx), tx
-assert "lasers F beam" in tx and "ECM" in tx and "missiles 3/4   hold 20t, 11t used" in tx, tx
+assert "lasers F beam" in tx and "ECM" in tx and "missiles 3/4   hold 20t, 0t used" in tx, tx
 tick(e, fresh=["C"])
 assert c.ship == ships.COBRA and c.lasers[0] == "beam" and c.extras == ["ecm"]
-assert c.cargo[0] == 15, "the cargo moves back across"
+assert c.cargo[0] == 4 and d.msg == "NOW FLYING COBRA MK III", "the cargo moves across, all of it fits"
 assert [h["type"] for h in c.hangar] == ["SIDEWINDER"] and c.hangar[0]["cargo"][0] == 0
 # sell the Sidewinder
 cash = c.cash
 v = ships.value(c.hangar[0], mod.EQUIP)
 tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["D"])
 assert c.hangar == [] and c.cash == cash + v and d.msg.startswith("SOLD: ")
-print("shipyard: buy; hangar: fly and sell: ok")
+# flying a smaller kept ship sells what doesn't fit too
+d.cmdr.cash = 10 ** 6
+d.open("SHIPYARD"); d.yard = [("SIDEWINDER", 40000, False)]; d.ysel = 1; d.open_stats()
+d.buy_ship(False)       # a second Sidewinder; the Cobra (4 t) into the hangar
+d.open("HANGAR"); d.hsel = 1; d.fly_owned()     # back to the Cobra
+c.cargo[0] = 10; cash = c.cash
+d.hsel = 1; d.fly_owned()       # into a Sidewinder: 6 t over
+assert c.ship == "SIDEWINDER" and c.cargo[0] == 4 and c.cash == cash + 6 * d.market.prices[0]
+assert d.msg.startswith("CARGO OVER: ") and c.hangar[0]["cargo"][0] == 0
+d.hsel = 1; d.fly_owned()       # back to the Cobra again
+assert c.ship == ships.COBRA
+c.hangar = []
+print("shipyard: buy; hangar: fly and sell; cargo over sold: ok")
 
 # ---- trade in: the Cobra's value comes off a Python's price
-d.open("SHIPYARD"); d.yard = [("PYTHON", 950000, False)]; d.ysel = 1
+d.open("SHIPYARD"); d.yard = [("PYTHON", 950000, False)]; d.ysel = 1; d.open_stats()
 c.cash = 10 ** 7; c.cargo[0] = 15
 cash = c.cash
 v = d.trade_in_value()
@@ -116,7 +151,7 @@ assert c.cargo[0] == 15 and c.hold == 60 and c.lasers[0] == "beam" and c.missile
 print("trade in: ok")
 
 # ---- a stolen ship makes you an offender
-d.yard = [("VIPER", 195000, True)]; d.ysel = 1
+d.yard = [("VIPER", 195000, True)]; d.ysel = 1; d.open_stats()
 assert c.legal == 0
 tick(e, fresh=["C"])
 assert c.ship == "VIPER" and c.stolen and game.legal_name(c.legal) == "OFFENDER", c.legal
@@ -140,7 +175,7 @@ c = h.cmdr
 c.hardcore = True
 h._make_dock(); d = h.dock
 home = c.system
-d.open("SHIPYARD"); d.yard = [("SIDEWINDER", 40000, False)]; d.ysel = 1
+d.open("SHIPYARD"); d.yard = [("SIDEWINDER", 40000, False)]; d.ysel = 1; d.open_stats()
 c.cash = 10 ** 6
 tick(h, fresh=["C"])
 assert c.hangar[0]["at"] == [c.galaxy, home], "kept here"

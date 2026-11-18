@@ -415,7 +415,8 @@ Constrictor and the Thargoid plans, as the disc original; see `missions.py`).
 
 **Phase 6 extras asked for by Brian (2026-11-15):**
 
-- **Repair Shop** (started in build 41, behind a DEBUG switch): a docked tab that repaints
+- **Repair Shop** (started in build 41; since build 80 inside the Shipyard, and since build 81
+  without its DEBUG switch): repaints
   your ship (`cockpit.SHIP_COLOURS`, 10 Cr a coat, saved as `Commander.colour`). The colour
   shows in the launch and docking tunnels and the docking computer's view. It could later
   also mend damage, if damage comes to last between flights.

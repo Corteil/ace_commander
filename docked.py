@@ -40,9 +40,9 @@ def _ly(d):
 
 class Docked:
     def __init__(self, cmdr, gal, target=None, goods=None, equip=None, ship=None,
-                 repair=False, options=None, bps=None):
+                 options=None, bps=None):
         """ship is your ship's blueprint, for the Repair Shop, which is shown
-        only with repair (a DEBUG switch for now). options: (a function giving
+        inside the Shipyard. options: (a function giving
         the settings' lines, a function changing one: given the line and
         whether to go back), the app's, for Options (C on Status); None: no Options.
         bps: a function giving a ship type's blueprint (or None), for the
@@ -88,8 +88,9 @@ class Docked:
         self.sold = False       # the message says what Inventory's sell all made
         self.tab = 0
         self.in_options = False     # Options open, over Status (C on Status)
-        self.repair = bool(repair and ship) and "SHIPYARD" in self.tabs   # the Repair Shop, in the Shipyard
+        self.repair = ship is not None and "SHIPYARD" in self.tabs   # the Repair Shop, in the Shipyard
         self.in_repair = False      # the Repair Shop open, over the Shipyard (C on your ship there)
+        self.in_stats = False       # a ship's stats open, over the Shipyard (build 81)
         self.target = target if gal is not None else None   # a system index, or None
         self.here = gal.system(cmdr.system) if gal is not None else None
         self.view = None        # the chart, on the chart tabs
@@ -102,6 +103,8 @@ class Docked:
             return "OPTIONS"
         if self.in_repair:
             return "REPAIR SHOP"
+        if self.in_stats:
+            return "SHIP STATS"
         return self.tabs[self.tab]
 
     def open(self, name):
@@ -123,8 +126,10 @@ class Docked:
     def back(self):
         """F: from a sub-screen to its tab, else to Status. False if already
         on Status (then F leaves for the title)."""
-        if self.in_repair:
+        if self.in_repair or self.in_stats:
+            ysel = self.ysel
             self.go(self.tab)
+            self.ysel = ysel        # back on the page it came from
             return True
         if self.tab or self.in_options:
             self.go(0)
@@ -137,6 +142,7 @@ class Docked:
         self.tab = tab % len(self.tabs)
         self.in_options = False
         self.in_repair = False
+        self.in_stats = False
         self.msg = None         # a message is about the tab it was said on
         self.sold = False
         n = self.name()
@@ -288,14 +294,28 @@ class Docked:
         self.sold = good        # green, not a refusal
 
     def _sell_off(self, cargo):
-        """Sell what is left in a ship being parted with at this station's
-        prices (lost if there is no market here)."""
+        """Sell cargo at this station's prices, crediting your balance: what
+        is left in a ship being sold, or what doesn't fit the hold of the ship
+        you change to (Brian, build 81). Returns what it made. With no market
+        here nothing is sold and the cargo stays where it is."""
         m = self.market
+        got = 0
+        if m is None:
+            return 0
         for i, n in enumerate(cargo):
-            if n and m is not None:
-                self.cmdr.cash += n * m.prices[i]
+            if n:
+                got += n * m.prices[i]
                 m.stock[i] += n
             cargo[i] = 0
+        self.cmdr.cash += got
+        return got
+
+    def _changed(self, title, spill):
+        """Say the change of ship, or what the cargo that didn't fit made."""
+        if spill:
+            self._say("CARGO OVER: +%d.%d Cr" % (spill // 10, spill % 10), True)
+        else:
+            self._say(title, True)
 
     def _now_flying(self):
         """The ship changed: the Repair Shop and the lasers' mounts follow."""
@@ -310,16 +330,23 @@ class Docked:
         self.ysel = (self.ysel + step) % (len(self.yard) + 1)
         self.msg = None
 
+    def open_stats(self):
+        """The picked page's ship's stats, over the Shipyard (build 81): a
+        ship for sale (C there; then C buys, D trades in) or your own (D)."""
+        if "SHIPYARD" in self.tabs:
+            self.in_stats = True
+            self.msg = None
+
     def trade_in_value(self):
         """What the ship you fly fetches in trade, cargo not counted."""
         return ships.value(ships.pack(self.cmdr), self.equip)
 
     def buy_ship(self, trade):
         """Buy the picked ship. trade: trade in the one you fly (its value
-        comes off the price; what of its cargo doesn't fit the new hold is
-        sold here); else it goes into the hangar with what doesn't fit. The
-        new ship comes with its standard weapons. A stolen one makes you an
-        offender. Returns True if it happened."""
+        comes off the price); else it goes into the hangar. Its cargo moves
+        across; what doesn't fit the new hold is sold here. The new ship
+        comes with its standard weapons. A stolen one makes you an offender.
+        Returns True if it happened."""
         if not self.ysel or not self.yard:
             return False
         c = self.cmdr
@@ -333,14 +360,15 @@ class Docked:
         bp = self.bps(name)
         ships.new_ship(c, name, bp, stolen)
         ships.move_cargo(old["cargo"], c.cargo, c.hold)
-        if trade:
-            self._sell_off(old["cargo"])
-        else:
+        spill = self._sell_off(old["cargo"])    # what doesn't fit is sold (Brian, build 81)
+        if not trade:
             c.hangar.append(old)
         if stolen:
             c.legal = (c.legal | ships.STOLEN_LEGAL) & 255
         self._now_flying()
-        self._say("NEW SHIP: " + (bp.title if bp is not None else name), True)
+        self.in_stats = False       # back to the Shipyard, on your new ship
+        self.ysel = 0
+        self._changed("NEW SHIP: " + (bp.title if bp is not None else name), spill)
         return True
 
     def owned(self):
@@ -363,7 +391,8 @@ class Docked:
 
     def fly_owned(self):
         """Fly the picked kept ship; the one you flew goes into the hangar,
-        and its cargo moves across as far as it fits. True if it happened."""
+        and its cargo moves across, what doesn't fit sold here. True if it
+        happened."""
         c = self.cmdr
         if self.hsel == 0:
             self._say("YOU ARE FLYING IT")
@@ -377,11 +406,12 @@ class Docked:
         c.hangar.pop(self.hsel - 1)
         ships.unpack(c, entry)
         ships.move_cargo(old["cargo"], c.cargo, c.hold)
+        spill = self._sell_off(old["cargo"])    # what doesn't fit is sold (Brian, build 81)
         c.hangar.insert(0, old)
         self.hsel = 0
         self._now_flying()
         bp = self.ship
-        self._say("NOW FLYING " + (bp.title if bp is not None else c.ship), True)
+        self._changed("NOW FLYING " + (bp.title if bp is not None else c.ship), spill)
         return True
 
     def sell_owned(self):
@@ -426,6 +456,8 @@ class Docked:
             self._draw_repair(ctx)
         elif self.name() == "SHIPYARD":
             self._draw_shipyard(ctx)
+        elif self.name() == "SHIP STATS":
+            self._draw_stats(ctx)
         elif self.name() == "HANGAR":
             self._draw_hangar(ctx)
         elif self.name() == "OPTIONS":
@@ -642,14 +674,13 @@ class Docked:
             bp = self.ship
             if bp is not None:
                 self._spin_ship(ctx, bp, 48, cockpit.ship_rgb(c.colour))
-            text(ctx, "YOUR " + (bp.title if bp is not None else c.ship), 0, -12, 14, cockpit.WHITE)
+            text(ctx, bp.title if bp is not None else c.ship, 0, -12, 14, cockpit.WHITE)
             a, b = self._ship_lines(c.ship, bp)
             text(ctx, a, 0, 4, 11, cockpit.GREY)
             text(ctx, b, 0, 18, 11, cockpit.GREY)
             text(ctx, "trade-in %d Cr" % (self.trade_in_value() // 10), 0, 36, 12, cockpit.YELLOW)
             text(ctx, c.cash_text(), 0, 53, 12, cockpit.CYAN)
-            self._foot(ctx, ("C: repair shop   " if self.repair else "")
-                       + ("down: for sale" if self.yard else "none for sale"))
+            self._foot(ctx, ("C: repair shop   " if self.repair else "") + "D: stats")
             return
         name, price, stolen = self.yard[self.ysel - 1]
         bp = self.bps(name)
@@ -664,7 +695,58 @@ class Docked:
         text(ctx, "%d Cr   trade-in %d Cr" % (price // 10, self.trade_in_value() // 10),
              0, 36, 12, cockpit.YELLOW)
         text(ctx, c.cash_text(), 0, 53, 12, cockpit.CYAN)
-        self._foot(ctx, "C: buy   D: trade in")
+        self._foot(ctx, "C: stats and buying")
+
+    def _draw_stats(self, ctx):
+        """A ship's stats, over the Shipyard (build 81): what it costs (or
+        fetches in trade), how it flies against the Cobra Mk III, its hold,
+        mounts and pylons, what it comes with and where it is sold. For one
+        for sale, C buys it and D trades yours in."""
+        text = cockpit.text
+        c = self.cmdr
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        own = self.ysel == 0 or not self.yard
+        if own:
+            name, price, stolen = c.ship, None, c.stolen
+        else:
+            name, price, stolen = self.yard[self.ysel - 1]
+        bp = self.bps(name)
+        title = bp.title if bp is not None else name
+        text(ctx, title + ("  (STOLEN)" if stolen else ""), 0, -98, 14,
+             cockpit.RED if stolen else cockpit.WHITE)
+        if own:
+            text(ctx, "trade-in %d Cr" % (self.trade_in_value() // 10), 0, -82, 12, cockpit.YELLOW)
+        else:
+            text(ctx, "%d Cr   trade-in %d Cr" % (price // 10, self.trade_in_value() // 10),
+                 0, -82, 12, cockpit.YELLOW)
+        speed, turn, tough = ships.flight(bp, self.bps(ships.COBRA))
+        hold = ships.base_hold(name)
+        mounts = {1: "front", 2: "front, rear", 4: "all 4 views"}[ships.mounts(name)]
+        n = ships.pylons(name)
+        sp = ships.spec(name)
+        std = ships.standard_missiles(name, bp)
+        rows = (("top speed", "%d" % int(speed + 0.5)),
+                ("turning", "%d%%" % int(turn * 100 + 0.5)),
+                ("shields", "%d%%" % int(tough * 100 + 0.5)),
+                ("hold", "%dt (%dt with bay)" % (hold, ships.big_hold(name))),
+                ("lasers", mounts),
+                ("missiles", "%d pylon%s" % (n, "" if n == 1 else "s")),
+                ("fitted", ("%s, %d missile%s" % (ships.standard_laser(bp), std, "" if std == 1 else "s"))
+                 if std else ships.standard_laser(bp) + " laser"),
+                ("sold", "stolen only" if sp[ships.STOLEN_ONLY] else "from tech %d" % sp[ships.TECH]))
+        y = -64
+        for label, value in rows:
+            text(ctx, label, -84, y, 11, cockpit.GREY, -1)
+            text(ctx, value, 84, y, 11, cockpit.CYAN, 1)
+            y += 13
+        cobra = self.bps(ships.COBRA)
+        text(ctx, "turning, shields: %s = 100%%" % (cobra.title if cobra is not None else ships.COBRA),
+             0, 40, 9, cockpit.GREY)
+        if self.msg:
+            text(ctx, self.msg, 0, 58, 12, cockpit.GREEN if self.sold else cockpit.RED)
+        elif not own:
+            text(ctx, "C: buy   D: trade in", 0, 58, 11, cockpit.GREY)
+        text(ctx, "F: back to shipyard", 0, 74, 11, cockpit.GREY)
 
     def _fitout(self, e):
         """A ship's fit-out as lines for the Hangar: its lasers by view,

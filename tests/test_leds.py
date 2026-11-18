@@ -298,18 +298,14 @@ b.od_sel = items.index("NAVY ENERGY UNIT: OFF"); tick(b, fresh=["C"])
 assert "navy" in b.cmdr.extras and "navy" in cm.load(save).extras
 tick(b, fresh=["F"]); assert b.od_page is None
 tick(b, fresh=["F"]); assert b.mode == "options", "back where it came from"
-# and from the docked Options tab, back to it; REPAIR SHOP comes at once
+# and from the docked Options, back to it
 tick(b, fresh=["F"]); bs.choose(b, "CONTINUE"); assert b.mode == "docked"
-assert b.dock.repair, "on by default (Brian)"
-b.repair_shop = False; b._make_dock()     # off, so DEBUG can switch it back on below
-assert not b.dock.repair
+assert b.dock.repair, "always there (Brian, build 81)"
 b.dock.open("OPTIONS"); b.dock.osel = len(b._settings(True)) - 1
 tick(b, fresh=["C"]); assert b.mode == "odebug" and b.od_from == "docked"
 b.od_sel = b._od_items().index("DISPLAY"); tick(b, fresh=["C"])
-b.od_sel = [i for i, t in enumerate(b._od_items()) if t.startswith("REPAIR")][0]
-tick(b, fresh=["C"]); assert b.repair_shop and b.dock.repair
+assert not any(t.startswith("REPAIR") for t in b._od_items()), "no REPAIR SHOP switch"
 tick(b, fresh=["F"]); tick(b, fresh=["F"]); assert b.mode == "docked" and b.dock.name() == "OPTIONS"
-b.repair_shop = False
 b.dock.go(0); tick(b, fresh=["F"]); bs.choose(b, "OPTIONS")
 # no commander: just DISPLAY
 n_ = ace_commander.AceCommander(); n_.cmdr = None

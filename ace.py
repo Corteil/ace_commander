@@ -216,15 +216,15 @@ DEBUG_GROUPS = (
     ("TRAVEL", ("TO THE STATION", "TO THE SUN", "DOCK NOW", "MIS-JUMP NEXT",
                 "TO MISSION SYSTEM")),
     ("COMMANDER", ("+10 KILLS", "+1000 CR", "LEVEL", "HARDCORE", "LEGAL", "ANGER STATION", "MISSION")),
-    ("DISPLAY", ("FRAME TIME", "REPAIR SHOP", "SPEED TEST")),
+    ("DISPLAY", ("FRAME TIME", "SPEED TEST")),
 )
 CAREER_ONLY = ("+1000 CR", "HARDCORE", "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION",
                "MIS-JUMP NEXT", "LEGAL", "FUEL TO 1/4", "TO MISSION SYSTEM", "MISSION")
 # the cheats that work away from a flight (title screen Options, docked Options);
 # all but the last two need a commander, as does SHIP (the equipment) there
 OFF_FLIGHT = ("+10 KILLS", "+1000 CR", "LEVEL", "HARDCORE", "LEGAL", "MISSION",
-              "FRAME TIME", "REPAIR SHOP", "SPEED TEST")
-NO_COMMANDER = ("FRAME TIME", "REPAIR SHOP", "SPEED TEST")
+              "FRAME TIME", "SPEED TEST")
+NO_COMMANDER = ("FRAME TIME", "SPEED TEST")
 MSG_TIME = 1.5          # seconds a DEBUG message stays on the Options' DEBUG page
 
 
@@ -454,7 +454,6 @@ class AceCommander(app.App):
         self.data_of = None     # the system whose data D shows from the in-flight chart
         self.fire_lock = False  # the lasers wait until C is let go (held on from a menu)
         self._bps = {}              # blueprints made for the docked screens with no game yet (_bp)
-        self.repair_shop = True     # show the Repair Shop tab (Brian: on by default; DEBUG can turn it off)
         self.chart = None       # the local chart, while it is open
         self.jump_to = None     # (system, distance) the hyperspace countdown is for
         self.dt = 0.0           # seconds since the last update
@@ -1011,7 +1010,7 @@ class AceCommander(app.App):
 
     def _make_dock(self):
         self.dock = docked.Docked(self.cmdr, self.galaxy, self.target, GOODS, EQUIP,
-                                  self._ship_bp(), self.repair_shop,
+                                  self._ship_bp(),
                                   (lambda: self._settings(True), self._change),
                                   self._bp if SHIPS else None)
 
@@ -1195,8 +1194,13 @@ class AceCommander(app.App):
                 if d.ysel == 0:
                     d.open("REPAIR SHOP")   # your own ship: the Repair Shop (build 80)
                 else:
-                    d.buy_ship(False)       # the one you fly goes into the hangar
-            elif hit(BTN_MISSILE) or hit("k_D"):
+                    d.open_stats()          # a ship for sale: its stats, and buying (build 81)
+            elif (hit(BTN_MISSILE) or hit("k_D")) and d.ysel == 0:
+                d.open_stats()              # your own ship's stats
+        elif d.name() == "SHIP STATS":
+            if d.ysel and hit("C"):
+                d.buy_ship(False)       # the one you fly goes into the hangar
+            elif d.ysel and (hit(BTN_MISSILE) or hit("k_D")):
                 d.buy_ship(True)        # trade it in
         elif d.name() == "HANGAR":
             if hit("j_up"):
@@ -1938,8 +1942,6 @@ class AceCommander(app.App):
             return "LEGAL: " + game.legal_name(g.legal if flying else c.legal)
         if key == "MISSION":
             return "MISSION: " + missions.stage_name(c.mission if c else 0)
-        if key == "REPAIR SHOP":
-            return "REPAIR SHOP: " + onoff(self.repair_shop)
         return key
 
     def _cheats(self, group, flying):
@@ -2066,13 +2068,6 @@ class AceCommander(app.App):
             self.bench = bench.Bench()      # F comes back to this page
             self.mode = "bench"
             return None
-        if item.startswith("REPAIR SHOP"):
-            self.repair_shop = not self.repair_shop
-            if self.od_from == "docked" and self.dock is not None:
-                self._make_dock()           # the Shipyard's Repair Shop comes or goes at once
-                self.dock.open("OPTIONS")
-                self.dock.osel = len(self._settings(True)) - 1
-            return "REPAIR SHOP " + ("ON" if self.repair_shop else "OFF")
         if c is None:
             return None
         if item == "+10 KILLS":
@@ -2295,10 +2290,6 @@ class AceCommander(app.App):
         """Do one of the DEBUG page's cheats. Kills made this way count like
         any others, so with a commander they raise the rank."""
         g = self.game
-        if item.startswith("REPAIR SHOP"):
-            self.repair_shop = not self.repair_shop     # shown from the next docking
-            g.say("REPAIR SHOP " + ("ON" if self.repair_shop else "OFF"))
-            return
         if item.startswith("HARDCORE"):
             # the commander's Hardcore, at once: this flight's rules too
             c = self.cmdr

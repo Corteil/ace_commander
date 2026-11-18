@@ -269,7 +269,7 @@ Shipyard, Hangar, Galactic chart, Local chart, System data. The Repair Shop is t
 sub-screen (C on its first page, your own ship; `-` opens the Shipyard). Options is not a tab: C on Status opens it over
 Status (`Docked.in_options`, `name()` gives "OPTIONS"), F goes back; A launches. Only the current
 firmware matters (Brian, 2026-11-18: both badges run it). C on Inventory sells the whole hold (`Docked.sell_all`).
-The Repair Shop is on by default (Brian, build 71); DEBUG > DISPLAY can still turn it off. Tests: `tests/test_keys.py`.
+The Repair Shop is always there (build 81: its DEBUG switch removed). Tests: `tests/test_keys.py`.
 **In-flight screens don't pause (Brian, build 62: "as Elite"; checked against the disc source).**
 Status, Inventory, Market Prices, both charts and system data are `SCREENS`: `fsub` names one while
 `paused` is False, and it is drawn instead of the space view (`_draw_screen`; the three new ones in
