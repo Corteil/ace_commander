@@ -278,7 +278,7 @@ os.remove(SAVE); os.remove(mod.options_path())
 n = ace_commander.AceCommander()
 tick(n)
 choose(n, "NEW COMMANDER")
-assert n.mode == "level" and n.n_sel == 0 and not n.n_hardcore
+assert n.mode == "level" and n.n_sel == 1 and not n.n_hardcore, "on LEVEL (NAME above it: build 89)"
 tx = [t[0] for t in bs_texts(n)]
 assert "< NORMAL >" in tx and "< OFF >" in tx and "top rank at 3200 kills" in tx, tx
 tick(n, fresh=["JOYDOWN"]); tick(n, fresh=["JOYRIGHT"])

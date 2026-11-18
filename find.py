@@ -98,3 +98,50 @@ class Find:
             text(ctx, "%d of %d" % (self.sel + 1, len(self.found)), 0, 46, 10, cockpit.GREY)
         text(ctx, "type a name   up / down: pick", 0, 64, 11, cockpit.GREY)
         text(ctx, "Enter: go there   Esc: back", 0, 80, 11, cockpit.GREY)
+
+
+NAME_MAX = 12       # "COMMANDER " and the name fit Status's title
+
+
+class NameEntry:
+    """The keyboard's page for the commander's name (Brian, build 89): what
+    is typed, with the suggestion (the badge's name, or Elite's JAMESON)
+    greyed after it; Tab fills it in, Enter takes it (an empty name: the
+    suggestion), Esc goes back."""
+
+    def __init__(self, suggestion, text=""):
+        self.suggestion = suggestion.upper()[:NAME_MAX]
+        self.text = text.upper()[:NAME_MAX]
+
+    def type(self, ch):
+        if len(self.text) < NAME_MAX and (ch != " " or self.text):
+            self.text += ch
+
+    def back(self):
+        self.text = self.text[:-1]
+
+    def fill(self):
+        """Tab: the suggestion."""
+        self.text = self.suggestion
+
+    def result(self):
+        return self.text.strip() or self.suggestion
+
+    def draw(self, ctx):
+        text = cockpit.text
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        text(ctx, "COMMANDER NAME", 0, -70, 14, cockpit.WHITE)
+        typed = self.text
+        rest = self.suggestion[len(typed):] if self.suggestion.startswith(typed) else ""
+        w = 10 * (len(typed) + len(rest))       # about 10 px a letter at size 18
+        x = -w // 2
+        ctx.rgb(*cockpit.DIM).rectangle(-100, -42, 200, 26).fill()
+        text(ctx, typed, x, -29, 18, cockpit.WHITE, -1)
+        cx = x + 10 * len(typed)
+        if rest:
+            text(ctx, rest, cx, -29, 18, cockpit.GREY, -1)
+        ctx.rgb(*cockpit.GREEN).rectangle(cx + 1, -38, 2, 18).fill()
+        if rest:
+            text(ctx, "Tab: " + self.suggestion, 0, 6, 12, cockpit.GREY)
+        text(ctx, "type a name   Backspace: delete", 0, 40, 11, cockpit.GREY)
+        text(ctx, "Enter: done   Esc: back", 0, 56, 11, cockpit.GREY)

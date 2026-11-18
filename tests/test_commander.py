@@ -848,7 +848,8 @@ tx = texts(e)
 before = c.docking
 assert "STEER: JOYSTICK" in tx and "DOCKING: " + mod.DOCK_NAMES[before] in tx, tx
 assert "CONSTRICTOR: 2 MIN" in tx and "CONTROLS: NORMAL" in tx
-tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["C"])     # past CONTROLS
+tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["JOYDOWN"])   # past CONTROLS, NAME
+tick(e, fresh=["C"])
 after = commander.DOCKING[(commander.DOCKING.index(before) + 1) % 3]
 assert c.docking == after and "DOCKING: " + mod.DOCK_NAMES[after] in texts(e), "C changes it"
 assert commander.load(SAVE).docking == after, "saved"

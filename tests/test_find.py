@@ -81,6 +81,7 @@ d.open("GALACTIC CHART")
 tick(e, fresh=["C"]); assert d.cursor, "C gives the joystick to the cursor"
 tick(e, fresh=["B"])
 assert e.tdialog is made[-1] and e.finder is None, "no keyboard: the badge's own entry"
+assert e.tdialog.app is e.host, "registered to the focused app (the host), or no button reaches it"
 dl = e.tdialog
 dl.text = "dis"; tick(e)
 assert dl.message == "DISO", dl.message
@@ -145,6 +146,64 @@ tick(e, fresh=["C"]); assert e.target == best or best == e.cmdr.system, "C then 
 tick(e, fresh=["F"]); tick(e, fresh=["KEY_6"]); assert e.fsub == "chart" and not hasattr(e.chart, "number")
 e.pad.keyboard = False
 tick(e, fresh=["B"]); assert e.tdialog is None and e.finder is None
-os.remove(SAVE)
 print("in flight: B on the Galactic chart only: ok")
+
+# ---- the commander's name (build 89) -----------------------------------------
+assert mod.badge_name() == mod.DEFAULT_NAME == "Jameson", "no badge name: Elite's"
+settings = types.ModuleType("settings")
+settings.get = lambda k: "Brian" if k == "name" else None
+sys.modules["settings"] = settings
+assert mod.badge_name() == "Brian"
+# the NEW COMMANDER page: on LEVEL, NAME above it showing the suggestion greyed
+e.mode = "menu"; e.pad.keyboard = True
+choose(e, "NEW COMMANDER")
+assert e.mode == "level" and e.n_sel == 1 and "BRIAN" in texts(e)
+tick(e, fresh=["JOYUP"]); assert e.n_sel == 0 and "C: name   F: back" in texts(e)
+tick(e, fresh=["C"]); assert e.namer is not None and e.namer.suggestion == "BRIAN"
+tx = texts(e)
+assert "COMMANDER NAME" in tx and "BRIAN" in tx and "Tab: BRIAN" in tx, tx
+for k in ("KEY_A", "KEY_C", "KEY_E"):
+    tick(e, fresh=[k])
+assert e.namer.text == "ACE" and "Tab: BRIAN" not in texts(e)
+tick(e, fresh=["KEY_TAB"]); assert e.namer.text == "BRIAN", "Tab fills it in"
+tick(e, fresh=["KEY_BACKSPACE"]); tick(e, fresh=["KEY_BACKSPACE"])
+tick(e, fresh=["KEY_O"]); tick(e, fresh=["KEY_X"]); assert e.namer.text == "BRIOX"
+tick(e, fresh=["KEY_ESCAPE"]); assert e.namer is None and e.n_name == "" and e.mode == "level", "Esc: unchanged"
+tick(e, fresh=["C"])
+for k in ("KEY_H", "KEY_A", "KEY_N"):
+    tick(e, fresh=[k])
+tick(e, fresh=["C"]); assert e.namer is None and e.n_name == "HAN" and "HAN" in texts(e)
+tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["C"])
+assert e.mode == "docked" and e.cmdr.name == "HAN"
+import json as _json
+assert _json.load(open(SAVE))["name"] == "HAN"
+# no keyboard: the badge's text entry; Done on nothing takes the suggestion
+e.pad.keyboard = False
+e.dock.open("OPTIONS")
+items = e._settings(True); assert "NAME: HAN" in items, items
+e._change("NAME: HAN", False)
+dl = e.ndialog; assert dl is made[-1] and "BRIAN" in dl.message and dl.text == "han"
+assert dl.app is e.host
+dl.text = ""; dl._result = ""; tick(e)
+assert e.ndialog is None and e.cmdr.name == "BRIAN" and _json.load(open(SAVE))["name"] == "BRIAN"
+e._change("NAME: BRIAN", False); dl = e.ndialog
+dl._result = "zaphod"; tick(e); assert e.cmdr.name == "ZAPHOD"
+e._change("NAME: ZAPHOD", False); e.ndialog._result = False; tick(e)
+assert e.cmdr.name == "ZAPHOD", "cancelled"
+assert mod.cmdr_name(e.cmdr) == "ZAPHOD"
+# an old save with no name: the badge's
+from ace_commander import commander as cm_
+assert cm_.Commander.from_dict({}).name == "" and mod.cmdr_name(cm_.Commander()) == "Brian"
+# Status in flight: COMMANDER and the name, as Elite
+e.dock.go(0); tick(e, fresh=["A"])
+for _ in range(300):
+    tick(e)
+    if e.mode == "flight":
+        break
+e._open("status")
+assert "COMMANDER ZAPHOD" in texts(e)
+assert not any(t.startswith("NAME") for t in e._settings(True)), "not in flight"
+del sys.modules["settings"]
+os.remove(SAVE)
+print("commander's name: suggested from the badge, Tab, Options, saved, Status: ok")
 print("ALL FIND TESTS PASSED")

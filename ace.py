@@ -242,11 +242,19 @@ def cheat_group(line):
     return None
 
 
-DEFAULT_NAME = "Jameson"    # what the missions call you if the badge has no name set
+DEFAULT_NAME = "Jameson"    # Elite's commander: the name when the badge has none set
 
 
-def cmdr_name():
-    """The badge owner's name from the badge's settings, for the mission texts."""
+def cmdr_name(c=None):
+    """The commander's name: commander c's own (build 89), else the badge
+    owner's from the badge's settings, else Elite's JAMESON."""
+    if c is not None and getattr(c, "name", ""):
+        return c.name
+    return badge_name()
+
+
+def badge_name():
+    """The badge owner's name from the badge's settings, or DEFAULT_NAME."""
     try:
         import settings
         n = settings.get("name")
@@ -458,7 +466,7 @@ class AceCommander(app.App):
         self.p_hardcore = False # combat practice's own HARDCORE, apart from the commander's
         self.p_sel = 0          # the combat practice page's line: 0 LEVEL, 1 HARDCORE
         self.n_hardcore = False # the new-commander page's HARDCORE
-        self.n_sel = 0          # and its line: 0 LEVEL, 1 HARDCORE
+        self.n_sel = 0          # and its line: 0 NAME (build 89), 1 LEVEL, 2 HARDCORE
         self.game = None
         self.career = False     # the current game counts towards the commander
         self.docked = True      # the commander is at a station, not out in a flight
@@ -482,6 +490,12 @@ class AceCommander(app.App):
         # page (find.Find), or the badge's text entry (the firmware's TextDialog)
         self.finder = None
         self.tdialog = None
+        # entering the commander's name (build 89): the keyboard's page
+        # (find.NameEntry) or the badge's text entry; what to do with it
+        self.namer = None
+        self.ndialog = None
+        self.name_done = None
+        self.n_name = ""        # the NEW COMMANDER page's name ("": the suggestion)
         self.find_chart = None      # the chart the system found goes on
         self.find_names = None      # find.Names for this galaxy, kept
         self.chart = None       # the local chart, while it is open
@@ -797,7 +811,9 @@ class AceCommander(app.App):
         confirm = hit("confirm")
         self.dt = dt = delta / 1000.0
 
-        if self.mode == "menu":
+        if self._update_name(cancel, confirm):
+            pass                # the name being entered takes the input
+        elif self.mode == "menu":
             if cancel:
                 pad.clear()
                 self.minimise()
@@ -819,16 +835,21 @@ class AceCommander(app.App):
         elif self.mode == "level":
             if cancel:
                 self.mode = "menu"
-            elif hit("up") or hit("down"):
-                self.n_sel = 1 - self.n_sel
+            elif hit("up"):
+                self.n_sel = (self.n_sel - 1) % 3
+            elif hit("down"):
+                self.n_sel = (self.n_sel + 1) % 3
+            elif self.n_sel == 0 and (confirm or hit("right")):
+                self._open_name(self.n_name, self._new_name)    # NAME: C or right enters it
             elif hit("left") or hit("right"):
-                if self.n_sel == 0:
+                if self.n_sel == 1:
                     n = len(commander.LEVELS)
                     self.level = (self.level + (-1 if hit("left") else 1)) % n
-                else:
+                elif self.n_sel == 2:
                     self.n_hardcore = not self.n_hardcore
             elif confirm:
                 self.cmdr = commander.Commander(self.level)
+                self.cmdr.name = self.n_name or badge_name().upper()[:12]
                 self.cmdr.hardcore = self.n_hardcore    # fixed from now on (DEBUG can change it)
                 self.career = False     # an old commander's flight banks nothing into it
                 self._write()
@@ -904,7 +925,8 @@ class AceCommander(app.App):
         elif item == "NEW COMMANDER":
             self.level = 1
             self.n_hardcore = False
-            self.n_sel = 0
+            self.n_name = ""        # the badge's name, or JAMESON, until one is entered
+            self.n_sel = 1          # on LEVEL: C starts at once; up to NAME to change it
             self.mode = "level"
         elif item == "COMBAT PRACTICE":
             self.p_sel = 0
@@ -1138,7 +1160,7 @@ class AceCommander(app.App):
             for e in SHIPS:
                 if e[0] == game.CONSTRICTOR:
                     ship = game.Blueprint(e)
-        self.brief = briefing.Briefing(game_data, n, cmdr_name(), c.galaxy, ship)
+        self.brief = briefing.Briefing(game_data, n, cmdr_name(c), c.galaxy, ship)
         if not self.brief.done:
             self.mode = "brief"
 
@@ -1830,6 +1852,8 @@ class AceCommander(app.App):
             steer = "STEER: %s (no tilt sensor)" % stick
         items = [steer]
         items.append("CONTROLS: " + TILT_FLIPS[self.tilt_flip])
+        if cmdr and self.cmdr is not None and self.mode != "flight":
+            items.append("NAME: " + cmdr_name(self.cmdr).upper())     # build 89
         if cmdr and self.cmdr is not None:
             items.append("DOCKING: " + DOCK_NAMES["A" if self._manual_docking() else self.cmdr.docking])
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
@@ -1859,6 +1883,9 @@ class AceCommander(app.App):
                 self.od_sel = 0
                 self.od_msg = None
                 self.mode = "odebug"
+        elif item.startswith("NAME"):
+            if not left:
+                self._open_name(self.cmdr.name, self._set_name)
         elif item.startswith("CONTROLS"):  # left goes back a choice
             self.tilt_flip = (self.tilt_flip + (-1 if left else 1)) % len(TILT_FLIPS)
             self._save_options()
@@ -2774,7 +2801,10 @@ class AceCommander(app.App):
         if not self._keyboard():
             try:
                 from app_components.dialog import TextDialog
-                self.tdialog = TextDialog("FIND SYSTEM", self)
+                # registered to the host (app.py's loader): the firmware's
+                # eventbus gives the buttons only to the focused app, and the
+                # game itself never is (build 89 fix: it froze the badge)
+                self.tdialog = TextDialog("FIND SYSTEM", self.host)
                 return
             except Exception:
                 self.tdialog = None     # no firmware dialog (a PC): the keyboard page
@@ -2820,6 +2850,72 @@ class AceCommander(app.App):
         elif cancel:
             self._found(None)
         return True
+
+    def _open_name(self, current, done):
+        """Enter a commander's name, starting from current; done(name) gets
+        it. The suggestion is the badge's name (Elite's JAMESON without one):
+        greyed on the keyboard's page, Tab fills it; the badge's text entry
+        takes it when Done is pressed on nothing."""
+        from . import find
+        self.name_done = done
+        sug = badge_name().upper()[:find.NAME_MAX]
+        if not self._keyboard():
+            try:
+                from app_components.dialog import TextDialog
+                self.ndialog = TextDialog("NAME? (none: %s)" % sug, self.host)     # see _open_find
+                self.ndialog.text = current.lower()
+                return
+            except Exception:
+                self.ndialog = None
+        self.namer = find.NameEntry(sug, current)
+
+    def _name_entered(self, name):
+        done = self.name_done
+        self.namer = self.ndialog = self.name_done = None
+        if name is not None and done is not None:
+            done(name)
+
+    def _update_name(self, cancel, confirm):
+        """While the name is being entered: True (it takes all the input)."""
+        from . import find
+        if self.ndialog is not None:
+            r = getattr(self.ndialog, "_result", None)
+            if r is False:
+                self._name_entered(None)
+            elif r is not None:
+                n = r.strip().upper()[:find.NAME_MAX]
+                self._name_entered(n or badge_name().upper()[:find.NAME_MAX])
+            self.pad.clear()        # the dialog has the buttons
+            return True
+        if self.namer is None:
+            return False
+        e = self.namer
+        hit = self.pad.hit
+        for ch in self.pad.typed:
+            e.type(ch)
+        if hit("k_TAB"):
+            e.fill()
+        elif hit("k_BACKSPACE"):
+            e.back()
+        elif confirm:
+            self._name_entered(e.result())
+        elif cancel:
+            self._name_entered(None)
+        return True
+
+    def _draw_name(self, ctx):
+        if self.namer is not None:
+            self.namer.draw(ctx)
+        elif self.ndialog is not None:
+            self.ndialog.draw(ctx)
+
+    def _new_name(self, name):
+        self.n_name = name
+
+    def _set_name(self, name):
+        """The commander's new name, saved at once."""
+        self.cmdr.name = name
+        self._write_setting("name", name)
 
     def _draw_find(self, ctx):
         if self.finder is not None:
@@ -2882,7 +2978,7 @@ class AceCommander(app.App):
                 target = gal.system(self.target).name
                 dist = gal.distance(c.system, self.target)
             screens.draw_status(ctx, c, here, target, dist, self.game.condition(),
-                                game.legal_name(c.legal))
+                                game.legal_name(c.legal), cmdr_name(c).upper())
 
     def _draw_data(self, ctx):
         """D on the in-flight chart: the selected system's data."""
@@ -2973,6 +3069,7 @@ class AceCommander(app.App):
                                 cockpit.station_colour(self._government()), True, self.tunnel)
         else:
             self._draw_menu(ctx)
+        self._draw_name(ctx)
         ctx.restore()
 
     def _draw_menu(self, ctx):
@@ -2992,13 +3089,22 @@ class AceCommander(app.App):
     def _draw_level(self, ctx):
         text = cockpit.text
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "NEW COMMANDER", 0, -80, 18, cockpit.WHITE)
-        self._draw_rows(ctx, self.level, self.n_hardcore, self.n_sel, -58, 54)
-        top = commander.thresholds(self.level)[-1]
-        text(ctx, "top rank at %d kills" % top, 0, 54, 11, cockpit.GREY)
+        text(ctx, "NEW COMMANDER", 0, -94, 15, cockpit.WHITE)
+        # NAME (build 89): the one entered, or the badge's (JAMESON) greyed
+        on = self.n_sel == 0
+        text(ctx, "NAME", 0, -76, 12, cockpit.GREY)
+        if on:
+            ctx.rgb(*cockpit.DIM).rectangle(-80, -69, 160, 22).fill()
+        name = self.n_name or badge_name().upper()[:12]
+        text(ctx, name, 0, -58, 16, (cockpit.GREEN if on else cockpit.WHITE) if self.n_name
+             else cockpit.GREY)
+        self._draw_rows(ctx, self.level, self.n_hardcore, self.n_sel - 1, -36, 54)
+        if self.n_sel == 1:
+            top = commander.thresholds(self.level)[-1]
+            text(ctx, "top rank at %d kills" % top, 0, 58, 11, cockpit.GREY)
         if self.cmdr is not None:
-            text(ctx, "replaces your saved commander", 0, 69, 11, cockpit.RED)
-        text(ctx, "C: start   F: back", 0, 86, 12, cockpit.GREY)
+            text(ctx, "replaces your saved commander", 0, 72, 11, cockpit.RED)
+        text(ctx, "C: name   F: back" if on else "C: start   F: back", 0, 86, 12, cockpit.GREY)
 
     def _draw_fmenu(self, ctx):
         text = cockpit.text

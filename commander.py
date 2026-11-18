@@ -85,6 +85,7 @@ class Commander:
         self.ship = "COBRA MK III"  # the ship flown (ships.TYPES), from build 78
         self.stolen = False     # bought stolen at a pirate world's shipyard
         self.hangar = []        # the other ships owned (ships.pack's dicts)
+        self.name = ""          # the commander's name (build 89); "" the badge's, or JAMESON
         self._needs = thresholds(self.level)
 
     def max_fuel(self):
@@ -144,7 +145,8 @@ class Commander:
                 "galaxy": self.galaxy, "colour": self.colour,
                 "legal": self.legal, "mission": self.mission,
                 "quick_con": self.quick_con, "data": self.data, "hardcore": self.hardcore,
-                "ship": self.ship, "stolen": self.stolen, "hangar": self.hangar}
+                "ship": self.ship, "stolen": self.stolen, "hangar": self.hangar,
+                "name": self.name}
 
     @classmethod
     def from_dict(cls, d):
@@ -204,6 +206,9 @@ class Commander:
         if isinstance(s, int) and 0 <= s < 256:
             c.docked_at = s
         c.stolen = d.get("stolen") is True
+        n = d.get("name")
+        if isinstance(n, str):
+            c.name = n.strip().upper()[:12]
         h = d.get("hangar")
         if isinstance(h, list):
             c.hangar = [e for e in (_hangar_entry(x) for x in h) if e is not None]

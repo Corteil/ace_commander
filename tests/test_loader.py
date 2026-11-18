@@ -67,6 +67,31 @@ App.minimised = 0
 real.minimise(); assert App.minimised == 1
 alone = ace_commander.ace.AceCommander()
 assert alone.host is alone
+# the badge's own text entry must be registered to the host, the app the
+# firmware focuses, or no button reaches it (build 89: it froze the badge)
+import types as _types
+_made = []
+class _Dialog:
+    def __init__(self, message, app, *a, **k):
+        self.app = app; self.text = ""; self._result = None; self.message = message
+        _made.append(self)
+_comp = _types.ModuleType("app_components"); _dlg = _types.ModuleType("app_components.dialog")
+_dlg.TextDialog = _Dialog
+sys.modules.update({"app_components": _comp, "app_components.dialog": _dlg})
+class _Chart:
+    number = 1
+    def goto(self, i):
+        return True
+real.galaxy = ace_commander.galaxy.Galaxy(ace_commander.galaxy.seeds_for(ace_commander.ace.game_data.SEEDS, 0),
+                                          ace_commander.ace.game_data.PAIRS)
+real.pad.keyboard = False
+real._open_find(_Chart())
+assert _made and _made[-1].app is ld, "the find dialog is the host's"
+real.tdialog = None
+real._open_name("", lambda n: None)
+assert _made[-1].app is ld, "and so is the name's"
+real.ndialog = None
+del sys.modules["app_components"], sys.modules["app_components.dialog"]
 # a module that won't load: the screen says so
 ld2 = loader.AceCommander()
 ld2.error = "game: MemoryError"

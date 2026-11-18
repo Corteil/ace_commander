@@ -263,10 +263,11 @@ b.dock.go(0); tick(b, fresh=["F"])
 bs.choose(b, "OPTIONS")
 items = b._settings(True)
 assert items[1] == "CONTROLS: NORMAL", items      # (build 85)
-assert items[2].startswith("DOCKING") and items[3] == "CONSTRICTOR: 2 MIN", items
-b.omenu = 2; tick(b, fresh=["JOYLEFT"])
+assert items[2] == "NAME: JAMESON", items       # (build 89)
+assert items[3].startswith("DOCKING") and items[4] == "CONSTRICTOR: 2 MIN", items
+b.omenu = 3; tick(b, fresh=["JOYLEFT"])
 assert b.cmdr.docking == "A"
-b.omenu = 3; tick(b, fresh=["C"])
+b.omenu = 4; tick(b, fresh=["C"])
 assert not b.cmdr.quick_con
 from ace_commander import commander as cm
 d = cm.load(save); assert d.docking == "A" and d.quick_con is False

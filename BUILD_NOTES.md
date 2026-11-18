@@ -977,3 +977,22 @@ what is now `ace.py` (renamed in build 50).
    system (`Chart.goto`, exact even where dots overlap); C then targets it as usual.
    Tests: `tests/test_find.py` (with a stand-in TextDialog). Next asked for: a custom
    commander name.
+   **Build 89** (2026-11-18, Brian: a custom commander name, "fill out the badge name
+   grayed out as an option, press tab to fill it, if no name, same name as elite").
+   `Commander.name` (saved; "" in old saves: the badge's name). The NEW COMMANDER page has
+   a NAME line above LEVEL (it opens on LEVEL, so C still starts at once); C or right on
+   NAME enters it. Off flight, Options (and the docked Options) have "NAME: x" too. With a
+   keyboard: `find.NameEntry`, the suggestion (the badge's name from settings, else
+   Elite's JAMESON: `badge_name`) greyed after what is typed, Tab fills it, Backspace,
+   Enter takes it (empty: the suggestion), Esc back; up to 12 letters, upper case. With
+   no keyboard: the firmware's TextDialog, its message "NAME? (none: X)", Done on nothing
+   takes the suggestion. The name is in the mission briefings (`cmdr_name(c)`) and the
+   in-flight Status title, "COMMANDER X", as Elite.
+   Build 89 fix (Brian: "the search function crashed when using the badge keyboard,
+   keebd was ok"; badge log 2026-11-18 23:02: the dialog registered and drew, then
+   nothing). The firmware's eventbus gives ButtonDownEvent (requires_focus) only to
+   handlers whose app is `_focused`, and the focused app is the loader (`app.py`), not
+   the game inside it; the TextDialog was registered to the game, so no button reached
+   it, while the game passed all input to it: the badge froze. Both dialogs (find, name)
+   are now registered to `self.host`. Checked with the firmware's real dialog.py on the
+   PC (stand-ins for display and tokens only); `tests/test_loader.py` asserts the host.

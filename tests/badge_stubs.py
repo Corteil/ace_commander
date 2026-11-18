@@ -45,6 +45,13 @@ class Button:
     def __contains__(self, other):
         return other == self or any(other == p for p in self.all_parents)
 
+    def find_parent_in_group(self, group):
+        """As the firmware's: this button or a parent in the group, or None."""
+        for b in [self] + self.all_parents:
+            if b.group == group:
+                return b
+        return None
+
     def __repr__(self):
         return "%s.%s" % (self.group, self.name)
 
