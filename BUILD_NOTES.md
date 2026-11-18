@@ -869,3 +869,6 @@ what is now `ace.py` (renamed in build 50).
    sells one with its cargo. Messages clear when the pick moves. Open question for Brian:
    the starting Cobra trades in for ~24,000 Cr, so a new commander can downgrade to a
    Worm and pocket ~21,000 Cr. Tests: `tests/test_shipyard.py`.
+   Badge fix: MicroPython's `random` has no `Random` class, so `ships.for_sale` uses its
+   own seeded generator (`ships._Rnd`). Found by a smoke test over the REPL after the PC
+   tests passed; Shipyard buy / Hangar fly / sell then ran on the badge.

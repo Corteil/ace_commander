@@ -22,8 +22,6 @@ You can own several ships. The one you fly is the commander's own fields
 hangar as dicts (pack / unpack). In Hardcore Mode a ship stays at the
 station where you left it; otherwise the hangar goes with you.
 """
-import random
-
 COBRA = "COBRA MK III"
 PLAYER_MAX = 40.0       # the Cobra's top speed (game.PLAYER_MAX)
 
@@ -114,11 +112,29 @@ def standard_missiles(name, bp):
     return min(pylons(name), bp.missiles if bp is not None else 0)
 
 
+class _Rnd:
+    """A small seeded generator (MicroPython's random has no Random class):
+    the same numbers for the same seed, on the badge and on a PC."""
+
+    def __init__(self, seed):
+        self.x = seed & 0x7FFFFFFF
+
+    def below(self, n):
+        """A number from 0 to n - 1."""
+        self.x = (self.x * 1103515245 + 12345) & 0x7FFFFFFF
+        return (self.x >> 8) % n
+
+    def shuffle(self, a):
+        for i in range(len(a) - 1, 0, -1):
+            j = self.below(i + 1)
+            a[i], a[j] = a[j], a[i]
+
+
 def for_sale(galaxy, system, tech, gov, fits=None):
     """What this system's shipyard sells: a list of (name, price, stolen),
     cheapest first. fits(name): True if the type fits the station's slot
     (None: all do)."""
-    rnd = random.Random(galaxy * 4099 + system * 31 + 7)
+    rnd = _Rnd(galaxy * 4099 + system * 31 + 7)
     ok = sorted(n for n, s in TYPES.items()
                 if not s[STOLEN_ONLY] and s[TECH] <= tech and (fits is None or fits(n)))
     rnd.shuffle(ok)
@@ -126,7 +142,7 @@ def for_sale(galaxy, system, tech, gov, fits=None):
     if gov < PIRATE_GOV:
         hot = sorted(n for n in TYPES if fits is None or fits(n))
         rnd.shuffle(hot)
-        for n in hot[:rnd.randint(1, 2)]:
+        for n in hot[:1 + rnd.below(2)]:
             out.append((n, int(TYPES[n][PRICE] * STOLEN_PRICE), True))
     out.sort(key=lambda e: e[1])
     return out
