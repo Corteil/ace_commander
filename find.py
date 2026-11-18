@@ -145,3 +145,33 @@ class NameEntry:
             text(ctx, "Tab: " + self.suggestion, 0, 6, 12, cockpit.GREY)
         text(ctx, "type a name   Backspace: delete", 0, 40, 11, cockpit.GREY)
         text(ctx, "Enter: done   Esc: back", 0, 56, 11, cockpit.GREY)
+
+
+def small_dialog(TextDialog):
+    """The firmware's TextDialog with smaller text (Brian, build 90: its own
+    is too big for these messages): it works just as the firmware's, only
+    drawn with the game's text at 14 / 18 px."""
+
+    class SmallDialog(TextDialog):
+        def draw(self, ctx):
+            text = cockpit.text
+            ctx.save()
+            ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()    # solid: easier to read
+            text(ctx, self.message, 0, -28, 14, cockpit.GREEN)
+            shown = self.text if not self.masked else "*" * len(self.text)
+            ctx.rgb(*cockpit.DIM).rectangle(-80, -12, 160, 24).fill()
+            text(ctx, shown + "_", 0, 0, 18, cockpit.WHITE)
+            k = self._keys
+            if len(k) == 6:
+                lab = ["".join(x) for x in k]
+                # where the firmware puts each button's label: A top, B top
+                # right, C bottom right, D bottom, E bottom left, F top left
+                text(ctx, lab[0], 0, -92, 14, cockpit.CYAN)
+                text(ctx, lab[1], 78, -64, 14, cockpit.CYAN, 1)
+                text(ctx, lab[2], 78, 64, 14, cockpit.CYAN, 1)
+                text(ctx, lab[3], 0, 92, 14, cockpit.CYAN)
+                text(ctx, lab[4], -78, 64, 14, cockpit.CYAN, -1)
+                text(ctx, lab[5], -78, -64, 14, cockpit.CYAN, -1)
+            ctx.restore()
+
+    return SmallDialog

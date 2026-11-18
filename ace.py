@@ -2801,6 +2801,7 @@ class AceCommander(app.App):
         if not self._keyboard():
             try:
                 from app_components.dialog import TextDialog
+                TextDialog = find.small_dialog(TextDialog)     # smaller text (build 90)
                 # registered to the host (app.py's loader): the firmware's
                 # eventbus gives the buttons only to the focused app, and the
                 # game itself never is (build 89 fix: it froze the badge)
@@ -2862,6 +2863,7 @@ class AceCommander(app.App):
         if not self._keyboard():
             try:
                 from app_components.dialog import TextDialog
+                TextDialog = find.small_dialog(TextDialog)     # smaller text (build 90)
                 self.ndialog = TextDialog("NAME? (none: %s)" % sug, self.host)     # see _open_find
                 self.ndialog.text = current.lower()
                 return

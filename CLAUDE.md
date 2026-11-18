@@ -15,9 +15,11 @@ button layout) and phase 2 (galaxy, local and galactic charts, system data, hype
 fuel, docked screens as tabs, launch tunnel), and the start of phase 3 (build 26: planet,
 sun, station, compass, jump drive, automatic docking; build 27: docking by hand; build
 30: the market; 31: scooped cargo; 32: bounties, which finishes phase 3), and the start
-of phase 4 (build 33: the Equip ship screen; build 36: every item's effect). Not built
-yet: the rest of phase 6 (see `DESIGN.md`). Phases 4 and 5 are done, the system
-description sentence (build 52) and the disc version's two missions (build 54).
+of phase 4 (build 33: the Equip ship screen; build 36: every item's effect). Phases 4 and
+5 are done, the system description sentence (build 52) and the disc version's two
+missions (build 54). Phase 6's ship types are done (builds 78-84: Shipyard, Hangar, jump
+ranges, stolen ships), with NPC escape pods (86), finding a system by name (88) and a
+commander name (89); released as v0.3.0 (2026-11-18).
 
 ## Files
 
@@ -46,7 +48,8 @@ description sentence (build 52) and the disc version's two missions (build 54).
 - `market.py` - market prices, stock, buying and selling. Rules only, no badge imports.
 - `equipment.py` - the Equip ship screen's rules: what is on sale, prices, fitting.
 - `ships.py` - the ship types you can own and fly (build 78): price, hold, mounts, pylons,
-  flight stats from the blueprint, the shipyard's stock, the hangar's entries. Rules only.
+  fuel tank (jump range), flight stats from the blueprint, the shipyard's stock, the
+  hangar's entries. Rules only.
 - `describe.py` - the system description sentence ("goat soup"): the original's extended
   tokens from `game_data.py`, put together as DETOK does; also the mission texts and the
   special system sentences. Rules only.
@@ -147,11 +150,12 @@ the relevant build there before changing a feature.
 
 ## Next steps
 
-**Ship types (Brian, 2026-11-18):** build 78 has the rules (`ships.py`), the save
-(`Commander.ship` / `.stolen` / `.hangar`), each ship's flight stats (`Game.set_ship`), the
-equipment limits and DEBUG > SHIP CONFIG > SHIP; build 79 the Shipyard and Hangar tabs
-(`Docked.buy_ship` / `fly_owned` / `sell_owned`). Brian's rules are in BUILD_NOTES.md builds
-78-79. Not yet on the badge or played by hand.
+**v0.3.0 (2026-11-18)** has ship types (`ships.py`: `Game.set_ship`, Shipyard / Hangar,
+`Commander.ship` / `.stolen` / `.hangar`, per-ship fuel tanks), Elite's weapon ranges, NPC
+escape pods, the CONTROLS flip, Galactic chart search (`find.py`) and the commander's
+name. Brian's rules are in BUILD_NOTES.md builds 76-90. **The firmware's dialogs
+(TextDialog) must be registered to `self.host`** (app.py's loader is the focused app; the
+eventbus gives buttons only to focused apps), or the badge freezes (build 89).
 
 1. **Tilt steering needs tuning: Brian doesn't like how it feels** (2026-11-13). Build 85
    added Options > TILT, build 87 made it CONTROLS (flips the flight steering up/down,

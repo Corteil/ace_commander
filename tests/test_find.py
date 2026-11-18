@@ -41,6 +41,8 @@ class FakeDialog:
         self.app = app
         self.text = ""
         self._result = None
+        self.masked = masked
+        self._keys = [["a", "b"], ["c"], ["Done"], ["d"], ["e"], ["..."]]   # as the firmware's
         made.append(self)
 
     def draw(self, ctx):

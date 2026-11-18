@@ -144,7 +144,7 @@ right = [
         [k("2") + " " + k("8"), "Market: " + k("C") + " buys, " + k("D") + " sells, joystick picks"],
         [k("3"), "Market, on the first good in your hold (to sell)"],
         [k("4"), "Equip ship: " + k("C") + " buys"],
-        [k("5") + " " + k("6") + " " + k("7"), "Galactic chart · local chart · system data"],
+        [k("5") + " " + k("6") + " " + k("7"), "Galactic chart (" + k("B") + ": find) · local chart · system data"],
         [k("9") + " / " + k("0"), "Status (" + k("C") + ": Options) / Inventory (" + k("C") + ": sell all)"],
         [k("−") + " / " + k("="), "Shipyard (Repair Shop inside) / Options"],
         ["Joystick " + k("←", "→"), "Next / previous screen (or " + k("E") + " / " + k("B") + ")"],

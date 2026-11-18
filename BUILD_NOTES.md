@@ -996,3 +996,16 @@ what is now `ace.py` (renamed in build 50).
    it, while the game passed all input to it: the badge froze. Both dialogs (find, name)
    are now registered to `self.host`. Checked with the firmware's real dialog.py on the
    PC (stand-ins for display and tokens only); `tests/test_loader.py` asserts the host.
+   **Build 90** (2026-11-18, Brian: "the text size is too big in the text selector").
+   Badge log of his test after the build 89 fix: search (v -> VEALE, Done put the cursor
+   there) and the name ("AA") both worked; the only tracebacks were the keyboard driver's
+   (ENODEV) as the hexpansion was pulled. The badge's text entry is now
+   `find.small_dialog(TextDialog)`: the firmware's TextDialog working as before, drawn
+   with the game's text (message 14 px green, typed text 18 px, the six button labels
+   14 px where the firmware puts them) on solid black instead of its 80% hexagon.
+   **v0.3.0: released** (2026-11-18, Brian: "all good, push, merge and release; update
+   docs first"): builds 76-90. Version "0.3.0" in tildagon.toml and metadata.json (the
+   store's text compare puts it after "0.2.0", so 0.2.0 badges are offered the update).
+   README (ships, Shipyard, Hangar, jump ranges, stolen ships, escape pods, weapon ranges,
+   CONTROLS, the name, search; the install list with ships.py and find.py), CLAUDE.md,
+   DESIGN.md and the key guide (B: find on the Galactic chart row; still one page) updated.
