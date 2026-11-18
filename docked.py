@@ -1,6 +1,6 @@
-"""The docked screens, as tabs: Status, Market, Equip ship, Local chart,
-Galactic chart and System data. A row of small squares at the top shows
-which is open.
+"""The docked screens, as tabs: Status, Inventory, Market, Equip ship,
+Repair Shop, Galactic chart, Local chart and System data. A row of small
+squares at the top shows which is open. Options opens from Status (C).
 
 On the market the joystick picks a good, C buys one and D sells one (hold
 either to keep going). On Equip ship the joystick picks an item and C buys
@@ -11,11 +11,12 @@ from . import chart, cockpit, commander, describe, equipment, market, missions
 from . import content
 game_data = content.DATA     # Elite's text tables, or the game's own (content.py)
 
-# in the number keys' order (Brian: the joystick goes round them as the keys
-# are laid out, launch left out), starting from Status: 9 Status, 0 Inventory,
-# - Repair Shop, = Options, 2 Market, 4 Equip ship, 5 Galactic chart, 6 Local
-# chart, 7 System data. Status stays first: you arrive there and F goes back.
-TABS = ("STATUS", "INVENTORY", "REPAIR SHOP", "OPTIONS", "MARKET", "EQUIP SHIP",
+# the order the joystick goes round them, starting from Status (you arrive
+# there, as Elite's BAY shows f8, and F goes back): Status, Inventory, Market,
+# Equip ship, then the Repair Shop after it (Brian, build 77), Galactic chart,
+# Local chart, System data. Options is not a tab: C on Status opens it, and F
+# goes back to Status (Brian: A launches, so C is free).
+TABS = ("STATUS", "INVENTORY", "MARKET", "EQUIP SHIP", "REPAIR SHOP",
         "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA")
 PAINT_PRICE = 100   # tenths of a credit: a new colour at the Repair Shop costs 10.0 Cr
 SPIN = 0.8          # radians a second the Repair Shop's ship turns
@@ -42,7 +43,7 @@ class Docked:
         """ship is your ship's blueprint, for the Repair Shop, which is shown
         only with repair (a DEBUG switch for now). options: (a function giving
         the settings' lines, a function changing one: given the line and
-        whether to go back), the app's, for the Options tab; None: no tab."""
+        whether to go back), the app's, for Options (C on Status); None: no Options."""
         self.options = options
         self.osel = 0           # the line picked on Options
         self.cmdr = cmdr
@@ -52,14 +53,13 @@ class Docked:
         self.gal = gal          # None without game_data.py: then only Status
         self.equip = equip
         if gal is None:
-            self.tabs = TABS[:1] + (("OPTIONS",) if options else ())
+            self.tabs = TABS[:1]
         else:                   # an older game_data.py may not have goods or equipment
             self.tabs = tuple(t for t in TABS
                               if not (t == "MARKET" and not (goods and cmdr.market is not None))
                               and not (t == "INVENTORY" and not goods)
                               and not (t == "EQUIP SHIP" and not equip)
-                              and not (t == "REPAIR SHOP" and not (repair and ship))
-                              and not (t == "OPTIONS" and not options))
+                              and not (t == "REPAIR SHOP" and not (repair and ship)))
         self.goods = goods
         self.itop = 0           # the first good shown on Inventory
         self.market = None
@@ -75,7 +75,9 @@ class Docked:
             self.for_sale = equipment.on_sale(gal.system(cmdr.system).tech)
         self.msg = None         # why the last trade didn't happen
         self.msg_t = 0.0
+        self.sold = False       # the message says what Inventory's sell all made
         self.tab = 0
+        self.in_options = False     # Options open, over Status (C on Status)
         self.target = target if gal is not None else None   # a system index, or None
         self.here = gal.system(cmdr.system) if gal is not None else None
         self.view = None        # the chart, on the chart tabs
@@ -84,16 +86,26 @@ class Docked:
         self.data = None        # the galaxy.System on the System data tab
 
     def name(self):
+        if self.in_options:
+            return "OPTIONS"
         return self.tabs[self.tab]
 
     def open(self, name):
-        """Open the tab with this name."""
+        """Open the tab with this name, or OPTIONS: Status's sub-screen."""
+        if name == "OPTIONS":
+            if self.options:
+                self.go(0)
+                self.in_options = True
+            return
         self.go(self.tabs.index(name))
 
     def go(self, tab, sel=None):
         """Open tab number tab (it wraps round). On a chart the cursor starts
         on system sel, or on the target if sel is None."""
         self.tab = tab % len(self.tabs)
+        self.in_options = False
+        self.msg = None         # a message is about the tab it was said on
+        self.sold = False
         n = self.name()
         c = self.cmdr
         self.view = None
@@ -182,6 +194,31 @@ class Docked:
         self.msg_t = SAY_TIME if why else 0.0
         return why is None
 
+    def sell_all(self):
+        """Sell everything in the hold at this station's prices (Inventory's C,
+        Brian's). Returns True if anything was sold."""
+        m = self.market
+        c = self.cmdr
+        why = None
+        if m is None:
+            why = "NO MARKET HERE"
+        elif not any(c.cargo):
+            why = "NOTHING TO SELL"
+        if why:
+            self.msg = why
+            self.msg_t = SAY_TIME
+            self.sold = False
+            return False
+        before = c.cash
+        for i in range(len(c.cargo)):
+            while c.cargo[i] > 0 and m.sell(i) is None:
+                pass
+        got = c.cash - before
+        self.msg = "SOLD: +%d.%d Cr" % (got // 10, got % 10)
+        self.msg_t = SAY_TIME
+        self.sold = True        # shown in green: not a refusal
+        return True
+
     # ---- the repair shop --------------------------------------------------------
 
     def pick_paint(self, step):
@@ -209,6 +246,7 @@ class Docked:
             self.msg_t -= dt
             if self.msg_t <= 0:
                 self.msg = None
+                self.sold = False
 
     # ---- drawing ------------------------------------------------------------
 
@@ -227,7 +265,13 @@ class Docked:
             self._draw_options(ctx)
         elif self.name() == "INVENTORY":     # the same screen as in flight
             from . import screens
-            screens.draw_inventory(ctx, self.cmdr, self.goods, self.itop, "< > screens   F: status")
+            sell = self.market is not None and any(self.cmdr.cargo)
+            screens.draw_inventory(ctx, self.cmdr, self.goods, self.itop,
+                                   "C: sell all   < > screens" if sell
+                                   else "< > screens   F: status")
+            if self.msg:
+                cockpit.text(ctx, self.msg, 0, 76, 12,
+                             cockpit.GREEN if self.sold else cockpit.RED)
         else:
             self._draw_status(ctx)
         if len(self.tabs) > 1:      # which tab is open
@@ -265,11 +309,12 @@ class Docked:
             text(ctx, "target: %s %s" % (t.name, _ly(d)), 0, 45, 11,
                  cockpit.CYAN if 0 < d <= c.fuel else cockpit.RED)
         ctx.rgb(*cockpit.DIM).rectangle(-70, 56, 140, 1).fill()
-        text(ctx, "C: LAUNCH", 0, 70, 14, cockpit.GREEN)
+        text(ctx, "A: LAUNCH", 0, 68, 14, cockpit.GREEN)
+        hint = ["C: options"] if self.options else []
         if len(self.tabs) > 1:
-            text(ctx, "< > screens   F: title", 0, 88, 11, cockpit.GREY)
-        else:
-            text(ctx, "F: title screen", 0, 88, 11, cockpit.GREY)
+            hint.append("< > screens")
+        text(ctx, "   ".join(hint), 0, 84, 11, cockpit.GREY)
+        text(ctx, "F: title screen", 0, 98, 11, cockpit.GREY)
 
     def back_to_chart(self):
         """D on System data: back to the chart you came from (the local chart
@@ -344,7 +389,7 @@ class Docked:
             text(ctx, label, 0, y, 14, cockpit.GREEN if i == sel else cockpit.GREY)
             y += 20
         text(ctx, "up / down: pick   C: change", 0, 66, 11, cockpit.GREY)
-        text(ctx, "< > screens   F: status", 0, 82, 11, cockpit.GREY)
+        text(ctx, "F: back to status", 0, 82, 11, cockpit.GREY)
 
     def _draw_repair(self, ctx):
         """Your ship turning in the chosen colour, the colours as a row of

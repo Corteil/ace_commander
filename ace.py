@@ -9,9 +9,10 @@ Title screen
 
 Docked
     Joystick left / right changes screen (on the charts the joystick moves
-    the cursor and E / B change screen). C launches from Status, and on a
-    chart makes the selected system the hyperspace target. A launches from
-    any screen. F goes back to Status, then to the title screen.
+    the cursor and E / B change screen). C on Status opens Options, on
+    Inventory sells the whole hold, and on a chart makes the selected system
+    the hyperspace target. A launches from any screen. F goes back to
+    Status, then to the title screen.
 
 Flight (2026 Spaceagon)
     Joystick      pitch and roll
@@ -150,7 +151,7 @@ SCREENS = ("status", "inventory", "market", "chart", "data")
 # the first good in the hold), f3 equip ship, f4 galactic chart, f5 local
 # chart, f6 system data, f7 market prices, f8 status, f9 inventory (the same
 # screen as in flight, as a tab). A missing tab does nothing. The joystick goes
-# round the tabs in the same order (docked.TABS).
+# round the tabs in its own order (docked.TABS); = opens Options over Status.
 DOCK_KEYS = (("k_1", "LAUNCH"), ("k_2", "MARKET"), ("k_3", "SELL"),
              ("k_4", "EQUIP SHIP"), ("k_5", "GALACTIC CHART"), ("k_6", "LOCAL CHART"),
              ("k_7", "SYSTEM DATA"), ("k_8", "MARKET"), ("k_9", "STATUS"),
@@ -220,7 +221,7 @@ DEBUG_GROUPS = (
 )
 CAREER_ONLY = ("+1000 CR", "HARDCORE", "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION",
                "MIS-JUMP NEXT", "LEGAL", "FUEL TO 1/4", "TO MISSION SYSTEM", "MISSION")
-# the cheats that work away from a flight (title screen Options, docked Options tab);
+# the cheats that work away from a flight (title screen Options, docked Options);
 # all but the last two need a commander, as does SHIP (the equipment) there
 OFF_FLIGHT = ("+10 KILLS", "+1000 CR", "LEVEL", "HARDCORE", "LEGAL", "MISSION",
               "FRAME TIME", "REPAIR SHOP", "SPEED TEST")
@@ -1115,8 +1116,8 @@ class AceCommander(app.App):
     def _update_docked(self, dt, cancel, confirm):
         """The docked tabs. The joystick changes tab, and E / B do too. On a
         chart C hands the joystick to the cursor, then C picks a target and F
-        hands it back. C launches from Status. A launches from any tab. F goes
-        back to Status, and from Status to the title screen."""
+        hands it back. C on Status opens Options. A launches from any tab. F
+        goes back to Status, and from Status to the title screen."""
         d = self.dock
         hit = self.pad.hit
         new = FB is not None
@@ -1125,7 +1126,7 @@ class AceCommander(app.App):
             d.use_cursor(False)     # F: the joystick goes back to changing tabs
             return
         if cancel:
-            if d.tab:
+            if d.tab or d.in_options:
                 d.go(0)
             else:
                 self._save_docked()
@@ -1143,8 +1144,8 @@ class AceCommander(app.App):
                     have = [i for i, n in enumerate(self.cmdr.cargo) if n]
                     if have:            # Elite's Sell Cargo: start on what you carry
                         d.pick_good(have[0] - d.sel)
-                elif tab in d.tabs:
-                    d.go(d.tabs.index(tab))
+                elif tab in d.tabs or tab == "OPTIONS":
+                    d.open(tab)
                 return
         if new and hit(BTN_SPEED_DOWN):
             d.go(d.tab - 1)
@@ -1203,6 +1204,9 @@ class AceCommander(app.App):
                 d.scroll_inventory(-1)
             elif self._repeat("j_down" if new else "down", dt):
                 d.scroll_inventory(1)
+            elif hit("C" if new else "confirm"):
+                d.sell_all()        # the whole hold at this station's prices
+                d.scroll_inventory(0)
         elif d.name() == "MARKET":
             # the joystick picks a good; C buys and D sells; all repeat when held
             if self._repeat("j_up" if new else "up", dt):
@@ -1213,8 +1217,17 @@ class AceCommander(app.App):
                 d.trade(True)
             elif new and self._repeat(BTN_MISSILE, dt):
                 d.trade(False)
-        elif confirm and d.name() == "STATUS":
-            self._launch()
+        elif d.name() == "STATUS":
+            if not new and hit("up"):
+                # older firmware names the lettered buttons by direction: A is
+                # "up" (B right, C confirm, D down, E left, F cancel), so A
+                # launches from Status there too (it scrolls the other tabs)
+                self._launch()
+            elif confirm:
+                if d.options:
+                    d.open("OPTIONS")   # A launches (Brian), so C is Options
+                else:
+                    self._launch()
 
     def _repeat(self, name, dt):
         """True when button name is pressed, and again and again while it is

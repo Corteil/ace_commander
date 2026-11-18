@@ -250,7 +250,7 @@ c = e.cmdr
 
 
 def launch(a):
-    a.dock.go(0); tick(a, fresh=["C"])
+    a.dock.go(0); tick(a, fresh=["A"])
     for _ in range(200):
         tick(a)
         if a.mode == "flight":

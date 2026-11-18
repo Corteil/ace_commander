@@ -156,7 +156,7 @@ c = CountCtx(); a.draw(c)
 assert any(t[0] == "DOCKED" for t in c.texts)
 full = tuple(int(v * 255) for v in col)
 writes = leds.writes
-tick(a, fresh=["C"]); assert a.mode == "launch"
+tick(a, fresh=["A"]); assert a.mode == "launch"
 seen = []
 while a.mode == "launch":
     v = leds.values[1]

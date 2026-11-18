@@ -61,13 +61,12 @@ for key, tab in (("KEY_2", "MARKET"), ("KEY_4", "EQUIP SHIP"), ("KEY_5", "GALACT
 tick(a, fresh=["KEY_0"]); assert d.name() == "INVENTORY"
 assert "INVENTORY" in [x[0] for x in (lambda c: (a.draw(c), c)[1])(bs.CountCtx()).texts]
 tick(a, fresh=["F"]); assert d.name() == "STATUS", "F: back to Status"
-# the joystick goes round the tabs in the number keys' order, launch left out
-# (Brian): 9 Status, 0 Inventory, - Repair Shop, = Options, 2 Market, 4 Equip,
-# 5 Galactic, 6 Local, 7 System data
+# the joystick goes round the tabs from Status, the Repair Shop after Equip
+# ship; Options is Status's sub-screen (build 77, Brian)
 order = []
 for _ in range(len(d.tabs)):
     order.append(d.name()); tick(a, fresh=["JOYRIGHT"])
-assert order == ["STATUS", "INVENTORY", "REPAIR SHOP", "OPTIONS", "MARKET", "EQUIP SHIP",
+assert order == ["STATUS", "INVENTORY", "MARKET", "EQUIP SHIP", "REPAIR SHOP",
                  "GALACTIC CHART", "LOCAL CHART", "SYSTEM DATA"], order
 assert d.name() == "STATUS", "round again"
 # 3: Elite's Sell Cargo: the market, on the first good in the hold

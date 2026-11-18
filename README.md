@@ -103,11 +103,12 @@ station's safe zone.
 
 ## Docked
 
-Screens, shown by the squares at the top, in the number keys' order from Status: **Status**,
-**Inventory**, **Repair Shop**, **Options**, **Market**, **Equip ship**, **Galactic chart**,
-**Local chart** and **System data**. Joystick left / right (or E / B) goes
-round them; A launches from any screen, C from Status; F goes back to Status, then
-to the title.
+Screens, shown by the squares at the top: **Status**, **Inventory**, **Market**,
+**Equip ship**, **Repair Shop**, **Galactic chart**, **Local chart** and **System data**.
+Joystick left / right (or E / B) goes round them; A launches from any screen; C on
+Status opens **Options**; F goes back to Status, then to the title.
+
+- **Inventory**: what is in the hold; C sells all of it at this station's prices.
 
 - **Market**: joystick up / down picks a good, C buys, D sells. Prices depend on the
   system's economy: cheap food in agricultural systems, cheap machinery in industrial ones.

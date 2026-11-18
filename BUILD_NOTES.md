@@ -822,3 +822,11 @@ what is now `ace.py` (renamed in build 50).
    Elite's TT110 / MJP call LOOK1 with X = 0. `tests/render.py` shoots the rear, left and
    right jump views. Docking computer: not missing, only sold from tech level 9 (Lave is 5;
    Leesti and Zaonce sell it), as the original's EQSHP; left as it is.
+   **Build 77** (2026-11-18, Brian): C on the docked Inventory sells the whole hold at this
+   station's prices (`Docked.sell_all`, green "SOLD: +x Cr"). Tabs: the Repair Shop after
+   Equip ship; Options is no longer a tab but Status's sub-screen, opened with C (A already
+   launches), F back to Status; Status shows "A: LAUNCH" and "C: options". = still opens
+   Options. Elite opens Status (f8) on docking (BAY), as we do. Tests launch with A now.
+   Older firmware (no `FB`/`JOY`) names the lettered buttons by direction (A up, B right,
+   C confirm, D down, E left, F cancel; the 2024 badge has A-F on its corners too), so there A
+   launches from Status as "up" and C opens Options (test in `tests/test_app.py`).

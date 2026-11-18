@@ -175,7 +175,7 @@ print("galaxy seeds, saved galaxy number: ok")
 # ---- in the app -----------------------------------------------------------
 def launch(a):
     a.dock.go(0)
-    tick(a, fresh=["C"])
+    tick(a, fresh=["A"])        # A launches (C on Status is Options)
     for _ in range(200):
         tick(a)
         if a.mode != "launch":
@@ -334,8 +334,8 @@ print("build 38: held buttons, cleared on docking and jumping, chase view: ok")
 # ---- build 39: C held on from a menu or the launch doesn't fire --------------
 e = ace_commander.AceCommander()
 choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
-e.dock.go(0)
-for _ in range(80):             # C launches, skips the tunnel, and stays held
+e.dock.go(0); tick(e, fresh=["A"])
+for _ in range(80):             # A launches; C skips the tunnel and stays held
     tick(e, held=["C"])
     if e.mode == "flight":
         break
@@ -359,7 +359,7 @@ print("build 39: held C after a menu or launch doesn't fire: ok")
 # ---- build 40: your ship in the tunnel scenes --------------------------------
 e = ace_commander.AceCommander()
 choose(e, "NEW COMMANDER"); tick(e, fresh=["C"])
-e.dock.go(0); tick(e, fresh=["C"])
+e.dock.go(0); tick(e, fresh=["A"])
 assert e.mode == "launch" and e.tunnel.me is not None and e.tunnel.me.bp.name == "COBRA MK III"
 for f in (0.0, 0.5, 0.99):
     e.launch_t = f * mod.LAUNCH_TIME
@@ -396,7 +396,7 @@ d.paint = 4; c.cash = 5
 tick(e, fresh=["C"]); assert d.msg == "NOT ENOUGH CASH" and c.colour == 2
 assert "RED" in texts(e) or True
 # the paint shows in the tunnel and the docking computer's view
-d.go(0); tick(e, fresh=["C"])
+d.go(0); tick(e, fresh=["A"])
 assert e.mode == "launch" and e.tunnel.me_rgb == cockpit.SHIP_COLOURS[2][1]
 # taking off: on the floor at first, at flying height once up
 me = e.tunnel.me

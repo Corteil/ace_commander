@@ -59,6 +59,9 @@ tick(a, fresh=["CONFIRM"])
 a.cmdr.add_kills(140)
 shot(a, "1e_docked.png")
 d = a.dock
+d.open("OPTIONS")               # C on Status
+shot(a, "1e2_docked_options.png")
+d.go(0)
 d.open("MARKET")
 for i in (0, 0, 0, 7, 7):
     d.sel = i; d.trade(True)
@@ -68,6 +71,10 @@ for _ in range(9):
     d.pick_good(1)
 d.cmdr.cash = 3; d.trade(True)
 shot(a, "1k_market_scrolled.png")
+d.open("INVENTORY")
+shot(a, "1k2_inventory_docked.png")
+d.sell_all()                    # C: the whole hold
+shot(a, "1k3_inventory_sold.png")
 d.cmdr.cash = 1000
 d.open("EQUIP SHIP")
 d.cmdr.fuel = 52; d.esel = 1; d.buy_item()
@@ -81,7 +88,7 @@ d.open("SYSTEM DATA")
 shot(a, "1h_system_data.png")
 d.go(0); a.target = 147
 shot(a, "1i_docked_target.png")
-tick(a, fresh=["CONFIRM"])
+tick(a, fresh=["A"])          # A launches
 for i, ft in enumerate((0.25, 0.6, 0.85, 0.97)):
     a.launch_t = ft * ace_commander.ace.LAUNCH_TIME
     shot(a, "1j_tunnel_%d.png" % i)
