@@ -1002,8 +1002,8 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
         ctx.stroke()
 
     t = g.lock
-    if t is not None and t.z > NEAR:    # missile sights: a diamond round the ship,
-        k = FOCAL / t.z                 # red until the missile has locked on, then green
+    if t is not None and t.z > NEAR:    # missile sights: a diamond round the ship, red
+        k = FOCAL / t.z                 # (white for a low-risk ship) until the missile has locked on, then green
         h = int(t.bp.size * k) + 5
         if h < 9:
             h = 9
@@ -1011,7 +1011,7 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
             h = 48
         bx = int(t.x * k)
         by = -int(t.y * k)
-        ctx.rgb(*(GREEN if g.locked else RED))
+        ctx.rgb(*(GREEN if g.locked else RED if hostile(t) else WHITE))
         ctx.begin_path()
         ctx.move_to(bx, by - h)
         ctx.line_to(bx + h, by)
@@ -1019,6 +1019,15 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
         ctx.line_to(bx - h, by)
         ctx.line_to(bx, by - h)
         ctx.stroke()
+
+
+def hostile(o):
+    """A ship that is a danger to you: a pirate, or anything attacking you
+    (red on the radar and in the missile sights). A hull left adrift after
+    its crew bailed out isn't (build 92: low-risk ships' sights are white)."""
+    if o.state == "drift":
+        return False
+    return o.role == "pirate" or o.state == "attack" or o.state == "break"
 
 
 def _sphere(x, y, z, r):
@@ -1242,7 +1251,7 @@ def draw_hud(ctx, g, ms=None, ring=True):
         elif h < -6:
             h = -6
         if o.kind == "ship":    # hostile ships red, the police blue, traders white
-            if o.role == "pirate" or o.state == "attack" or o.state == "break":
+            if hostile(o):
                 ctx.rgb(*RED)
             elif o.role == "police":
                 ctx.rgb(*POLICE_BLUE)
