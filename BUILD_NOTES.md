@@ -1086,3 +1086,7 @@ what is now `ace.py` (renamed in build 50).
    (`AUTO_SPIN`, feed-forward `STATION_SPIN / (ROLL_RATE * turn_k)`); the chase camera
    drops onto your ship's axis as it closes in. At the face: 0 off the axis, 0 degrees off
    the roll, the face square on. Test in `tests/test_equip_effects.py`.
+   **v0.3.2: released** (2026-11-19, Brian: "badge is ok, release should be 0.3.2"): builds
+   93-95 (keyboard A-F as the badge's buttons off the flight; analogue controls and yaw for
+   a host's pad; your ship always in the tunnels; the docking computer flies into the slot,
+   lined up with it, the station filling the screen). Version "0.3.2".

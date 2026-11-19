@@ -73,7 +73,8 @@ prices, `9` status, `0` inventory (press it again to go back to space; docked, t
 pick the screen: `1` launches, `3` opens the market on what you carry, `0` the inventory, `-` the
 Shipyard and `=` Options). `H` hyperspace, `Shift`+`H` galactic jump, `J` jump drive, `Esc` the escape pod (in flight;
 back on menus), `Tab` or `Backspace` the energy bomb, `C` / `P` the docking computer on / off
-(`P` is the menu otherwise).
+(`P` is the menu otherwise). Docked and on the title screen the keyboard's `A`-`F` are the
+badge's buttons A-F (`C` buys, `D` sells, `F` goes back...), except while typing a name or a search.
 On a status, market or chart screen only steering, speed and lasers work (and the lasers
 can't hit anything), as in Elite.
 
@@ -184,8 +185,11 @@ python3 hosts/pi/run.py           # the badge's round screen at 2x; --scale 3, -
 ```
 
 Arrows are the joystick, Enter confirms, Esc goes back, F1-F6 are the badge's buttons A-F, and
-the rest of the keyboard works as the Keyboard Hexpansion. Saves go in
-`~/.local/share/ace_commander/`. Work in progress: see `hosts/pi/PLAN.md`.
+the rest of the keyboard works as the Keyboard Hexpansion. A game pad (Xbox, PlayStation,
+8BitDo...) flies with analogue sticks: left stick power and yaw, right stick pitch and roll,
+triggers missile and fire, bumpers E.C.M. and energy bomb, D-pad views; docked it works as the
+badge, and the screens name its buttons. Saves go in `~/.local/share/ace_commander/`.
+Work in progress: see `hosts/pi/PLAN.md`.
 
 ## For developers
 
