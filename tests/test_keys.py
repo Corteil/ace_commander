@@ -79,15 +79,14 @@ tick(a, fresh=["D"]); assert d.name() == "REPAIR SHOP", "D on your own ship"
 tick(a, fresh=["F"]); assert d.name() == "SHIPYARD"
 print("docked number keys, Inventory, Sell, Repair Shop, Options: ok")
 
-# B buys and S sells on a keyboard (Brian, build 93): the market, Equip ship,
-# a ship's stats in the Shipyard, the Hangar and Inventory
+# B buys on a keyboard (Brian, build 93): the market, Equip ship and a ship's
+# stats in the Shipyard; S does nothing docked (Brian: "s not required for selling")
 a = docked(); d = a.dock; c = a.cmdr
 tick(a, fresh=["KEY_2"]); assert d.name() == "MARKET"
 cash, held = c.cash, sum(c.cargo)
 tick(a, fresh=["KEY_B"]); assert sum(c.cargo) == held + 1 and c.cash < cash, "B buys"
-tick(a, fresh=["KEY_S"]); assert sum(c.cargo) == held and c.cash == cash, "S sells"
-tick(a, fresh=["KEY_B"]); tick(a, fresh=["KEY_0"]); assert d.name() == "INVENTORY"
-tick(a, fresh=["KEY_S"]); assert sum(c.cargo) == 0, "S on Inventory sells the hold"
+tick(a, fresh=["KEY_S"]); assert sum(c.cargo) == held + 1, "S doesn't sell"
+tick(a, fresh=["D"]); assert sum(c.cargo) == held and c.cash == cash, "D sells"
 tick(a, fresh=["KEY_4"]); assert d.name() == "EQUIP SHIP"
 c.cash += 10 ** 6
 cash = c.cash
@@ -99,14 +98,10 @@ for _ in range(10):                 # the first item may be one you can't buy (f
 assert c.cash < cash, "B buys equipment"
 tick(a, fresh=["KEY_-"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["C"])
 assert d.name() == "SHIP STATS", d.name()
-old = a._ship_name(); tick(a, fresh=["KEY_B"])
+old = a._ship_name(); tick(a, fresh=["KEY_S"]); assert a._ship_name() == old, "S doesn't trade in"
+tick(a, fresh=["KEY_B"])
 assert a._ship_name() != old and c.hangar, "B buys the ship, the old one to the hangar"
-while d.name() != "HANGAR":
-    tick(a, fresh=["JOYRIGHT"])
-owned = len(c.hangar); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["KEY_S"])
-# S sells it, or says why not (flying one with no hyperdrive: the rule from build 83)
-assert len(c.hangar) == owned - 1 or d.msg == "NEED A SHIP THAT JUMPS", ("S: sell", d.msg)
-print("B buys and S sells, docked: ok")
+print("B buys on a keyboard, docked; S doesn't sell: ok")
 
 # ---- + / - and J ------------------------------------------------------------
 for hardcore in (False, True):

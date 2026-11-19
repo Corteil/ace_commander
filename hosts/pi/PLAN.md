@@ -102,7 +102,8 @@ Brian (2026-11-19, from a `--log-keys` run: he pressed A, C, D, F docked and not
 happened): off the flight (docked, title, menus, the pause menu) and not while typing, the
 letter keys A-F are also the badge's buttons (`keys_pi.BOTH`; Brian: "when docked the letter
 keys act the same as the badge keys, apart when entering text"); then "badges b everywhere": docked, keyboard B
-is only the badge's B (next tab, find on the chart), so on the Pi C buys and S sells.
+is only the badge's B (next tab, find on the chart), so on the Pi C buys and D sells; then "s not required for
+selling": S no longer sells anywhere (the game's build 93 change dropped).
 Pi host only; the badge's Keyboard Hexpansion is unchanged.
 
 ### P2 - Gamepad

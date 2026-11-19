@@ -15,7 +15,7 @@
   well as keyboard keys: C chooses, F goes back, A launches, B the next tab (on
   the Galactic chart's cursor: find), and so on. B is only the badge's B there
   (Brian: "badges b everywhere"), so the game's keyboard B (buy, build 93)
-  isn't sent: C buys, S sells. Not in flight (C is the docking computer, F
+  isn't sent: C buys, D sells. Not in flight (C is the docking computer, F
   fires, A and D steer) and not on the typing pages.
 """
 import pygame

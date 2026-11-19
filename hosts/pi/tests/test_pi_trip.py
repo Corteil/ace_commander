@@ -137,7 +137,7 @@ ch_key(h, "2")
 cash = c.cash
 ch_key(h, "b"); assert d.name() == "EQUIP SHIP" and c.cash == cash, ("B: next tab", d.name())
 
-# ---- buy on the market: 2, then C held (C buys, S sells) ------------------------
+# ---- buy on the market: 2, then C held (C buys, D sells) ------------------------
 ch_key(h, "2")
 assert d.name() == "MARKET", d.name()
 press(h, pygame.K_c, "c")
@@ -241,15 +241,15 @@ assert until(h, lambda: a.mode == "docked", 800), a.mode
 shot(h, "docked_again")
 print("docking computer flew in; docked at", a.galaxy.system(c.system).name)
 
-# ---- sell: 3 opens the market on the first good in the hold, S held sells ---------
+# ---- sell: 3 opens the market on the first good in the hold, D held sells ---------
 d = a.dock
 ch_key(h, "3")
 assert d.name() == "MARKET" and c.cargo[d.sel] > 0, (d.name(), d.sel)
 before = sum(c.cargo)
 cash = c.cash
-press(h, pygame.K_s, "s")
+press(h, pygame.K_d, "d")
 until(h, lambda: False, 20)
-let_go(h, pygame.K_s, "s")
+let_go(h, pygame.K_d, "d")
 h.step(40)
 assert sum(c.cargo) < before and c.cash > cash, (sum(c.cargo), c.cash)
 print("market: sold %d t" % (before - sum(c.cargo)))

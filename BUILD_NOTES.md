@@ -1042,3 +1042,7 @@ what is now `ace.py` (renamed in build 50).
    for the B key (it had a fixed list of letters). Tests in `tests/test_keys.py`; the Pi trip
    test buys and sells with B and S. Key guide: Market C/B buys, D/S sells; Equip ship C/B;
    Inventory C/S. Not yet on the badge.
+   Then (same day, Brian: "s not required for selling"): S no longer sells, trades in or
+   sells the hold; B still buys on the badge's keyboard. On the Pi host keyboard B is the
+   badge's B when docked ("badges b everywhere"), so there C buys and D sells. Key guide:
+   Market C/B buys, D sells.
