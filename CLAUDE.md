@@ -78,7 +78,7 @@ commander name (89); released as v0.3.0 (2026-11-18).
   `hosts/pi/` (2026-11-19, P0): pygame window; `pi_firmware.py` stand-ins for the firmware
   modules (real `ace.py` unchanged), `ctx_pygame.py` (the ctx calls at scale), `keys_pi.py`
   (arrows = joystick, F1-F6 = badge A-F, the rest = Keyboard Hexpansion; off the flight and not
-  typing, letters A C D E F are the badge's buttons too, never B), `run.py` (`Host`:
+  typing, letters A-F are the badge's buttons too; B buys on Market / Equip ship / Ship stats), `run.py` (`Host`:
   loop, round mask, LED ring). Tests: `hosts/pi/tests/test_pi_host.py` and `test_pi_trip.py`
   (P1: a whole trip by keys; SDL dummy driver), run by `tests/run_all.py` when pygame is there.
   `run.load_game` keeps save, options.json and debug.txt in `~/.local/share/ace_commander/`

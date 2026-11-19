@@ -99,7 +99,9 @@ untested against the jump flashes. Brian's answer to the F3 / F4 buying (2026-11
 in the game itself (build 93), so the badge's Keyboard Hexpansion has them too.
 Brian (2026-11-19, from a `--log-keys` run: he pressed A, C, D, F docked and nothing
 happened): off the flight (docked, title, menus, the pause menu) and not while typing, the
-letter keys A, C, D, E, F are also the badge's buttons (`keys_pi.BOTH`); B stays buy.
+letter keys A-F are also the badge's buttons (`keys_pi.BOTH`; Brian: "when docked the letter
+keys act the same as the badge keys, apart when entering text"); B buys on Market, Equip ship
+and Ship stats (`run.BUYS`), elsewhere it is the badge's B (next tab, find on the chart).
 Pi host only; the badge's Keyboard Hexpansion is unchanged.
 
 ### P2 - Gamepad

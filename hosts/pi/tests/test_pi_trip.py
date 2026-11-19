@@ -121,7 +121,16 @@ ch_key(h, "2"); cash = c.cash
 ch_key(h, "c"); assert sum(c.cargo) == 1 and c.cash < cash, "C buys, as the badge's C"
 ch_key(h, "d"); assert sum(c.cargo) == 0 and c.cash == cash, "D sells, as the badge's D"
 ch_key(h, "e"); assert d.name() != "MARKET", "E: the tab before"
-print("docked, the letters A C D E F work as the badge's buttons")
+ch_key(h, "9"); ch_key(h, "b"); assert d.name() == "INVENTORY", ("B: the next tab", d.name())
+ch_key(h, "5"); ch_key(h, "c"); assert d.cursor, "C: the chart's cursor"
+ch_key(h, "b"); assert a.finder is not None, "B on the Galactic chart: find a system"
+for ch in "abcdef":     # typing: the letters are only letters
+    ch_key(h, ch)
+assert a.finder is not None and d.name() == "GALACTIC CHART"
+key(h, pygame.K_ESCAPE)
+assert a.finder is None, "Esc leaves the search"
+key(h, pygame.K_ESCAPE); ch_key(h, "9")
+print("docked, the letters A-F work as the badge's buttons (not while typing)")
 
 # ---- buy on the market: 2, then B held (B buys, S sells) ------------------------
 ch_key(h, "2")
