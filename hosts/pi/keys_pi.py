@@ -9,6 +9,9 @@
 - Letters, digits, symbols, Space, Backspace, Tab, Shift, Ctrl: the Keyboard
   Hexpansion's keys, so every keyboard key the game knows works as on the badge
   (Elite's keys, the search and name pages).
+- Off the flight (docked, the title and its pages; not in flight, pause menu
+  included) and not while typing, the game itself makes the letter keys A-F the badge's buttons, on
+  the Pi as on the badge's Keyboard Hexpansion (ace.Pad.as_buttons).
 """
 import pygame
 

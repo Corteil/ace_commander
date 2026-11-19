@@ -79,6 +79,43 @@ tick(a, fresh=["D"]); assert d.name() == "REPAIR SHOP", "D on your own ship"
 tick(a, fresh=["F"]); assert d.name() == "SHIPYARD"
 print("docked number keys, Inventory, Sell, Repair Shop, Options: ok")
 
+# off the flight the keyboard's A-F are the badge's buttons, apart from typing
+# (Brian, 2026-11-19: "the same everywhere"; build 93's B buys and S sells are gone)
+a = docked(); d = a.dock; c = a.cmdr
+tick(a); tick(a, fresh=["KEY_C"]); assert d.name() == "OPTIONS", "C on Status: Options"
+tick(a, fresh=["KEY_F"]); assert d.name() == "STATUS", "F: back"
+tick(a, fresh=["KEY_2"]); assert d.name() == "MARKET"
+cash, held = c.cash, sum(c.cargo)
+tick(a, fresh=["KEY_C"]); assert sum(c.cargo) == held + 1 and c.cash < cash, "C buys"
+tick(a, fresh=["KEY_S"]); assert sum(c.cargo) == held + 1, "S doesn't sell"
+tick(a, fresh=["KEY_D"]); assert sum(c.cargo) == held and c.cash == cash, "D sells"
+tick(a, fresh=["KEY_B"]); assert d.name() == "EQUIP SHIP", ("B: the next tab", d.name())
+tick(a, fresh=["KEY_E"]); assert d.name() == "MARKET", "E: the tab before"
+tick(a, fresh=["KEY_A"]); assert a.mode == "launch", "A launches"
+for _ in range(200):
+    tick(a)
+    if a.mode != "launch":
+        break
+g = a.game; g.spawn_t = g.rock_t = g.encounter_t = 1e9; g.objs[:] = []
+# in flight they are the keyboard's keys again: F fires, not "back"
+assert a.mode == "flight" and not a.paused
+tick(a, fresh=["KEY_F"]); assert a.mode == "flight" and not a.paused and g.beam > 0, "F fires"
+tick(a); tick(a, fresh=["A"]); assert a.paused, "the badge's A: the pause menu"
+tick(a, fresh=["KEY_F"]); assert a.paused, "in the pause menu too F is the keyboard's F"
+tick(a, fresh=["A"]); assert not a.paused
+print("keyboard A-F as the badge's buttons off the flight: ok")
+
+# typing a name: the letters are letters
+a = docked()
+tick(a, fresh=["F"]); assert a.mode == "menu"
+choose(a, "NEW COMMANDER")
+tick(a, fresh=["UP"]); tick(a, fresh=["C"]); assert a.namer is not None, a.mode
+tick(a)
+for k in ("KEY_F", "KEY_A", "KEY_C", "KEY_E", "KEY_B", "KEY_D"):
+    tick(a, fresh=[k])
+assert a.namer is not None and a.namer.text.endswith("FACEBD"), a.namer.text
+print("typing: A-F are letters: ok")
+
 # ---- + / - and J ------------------------------------------------------------
 for hardcore in (False, True):
     a, g = flying(hardcore)

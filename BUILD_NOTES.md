@@ -1034,3 +1034,24 @@ what is now `ace.py` (renamed in build 50).
    **v0.3.1: released** (2026-11-19, Brian: "it's only a small version bump, but go ahead
    and release it"): builds 91-92 (Options fit eight lines; missile sights white for
    low-risk ships, one hostile rule with the radar). Version "0.3.1".
+   **Build 93** (2026-11-19, Brian, on the Pi host: "use B to buy and S to sell"). On a
+   keyboard (the Pi's, or the Keyboard Hexpansion on the badge) B buys and S sells, docked:
+   the market (both repeat when held, as C / D), Equip ship (B), a ship's stats in the
+   Shipyard (B buys, S trades yours in), the Hangar (S sells the picked ship) and Inventory
+   (S sells the hold). The badge buttons are unchanged (C buys, D sells). `Pad` now listens
+   for the B key (it had a fixed list of letters). Tests in `tests/test_keys.py`; the Pi trip
+   test buys and sells with B and S. Key guide: Market C/B buys, D/S sells; Equip ship C/B;
+   Inventory C/S. Not yet on the badge.
+   Then (same day, Brian: "s not required for selling"): S no longer sells, trades in or
+   sells the hold; B still buys on the badge's keyboard. On the Pi host keyboard B is the
+   badge's B when docked ("badges b everywhere"), so there C buys and D sells. Key guide:
+   Market C/B buys, D sells.
+   Then (same day, Brian: "when docked the letter keys on the keyboard act the same as
+   the badge keys, apart when entering text", "badges b everywhere", "should be the same
+   everywhere"): build 93's B buys is dropped too. Instead the game's `Pad` makes the
+   keyboard's A-F the badge's buttons A-F (each the lettered button and its direction: A
+   up, B right, C confirm, D down, E left, F cancel) off the flight (docked, the title and
+   its pages), not while typing a name or a search (`as_buttons`, set at the end of each
+   update; a key goes up as the names it went down as). In flight, pause menu included,
+   they stay Elite's keys. Same on the badge's Keyboard Hexpansion and the Pi (its own
+   mapping removed). Tests in `tests/test_keys.py`; key guide footer line.

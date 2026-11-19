@@ -368,6 +368,20 @@ class Pad:
         key = KEYBOARD_BUTTONS.get("SPACE")
         if key is not None:
             self.letters[key] = " "
+        # off the flight the keyboard's A-F are the badge's buttons (Brian,
+        # 2026-11-19: "the letter keys act the same as the badge keys, apart
+        # when entering text", "the same everywhere"): each counts as the
+        # lettered button and its system direction, as the badge's own do
+        # (A up, B right, C confirm, D down, E left, F cancel), instead of as
+        # a keyboard key. AceCommander sets as_buttons each frame.
+        self.as_buttons = False
+        self.badge_keys = {}
+        for ch, sysname in (("A", "up"), ("B", "right"), ("C", "confirm"),
+                            ("D", "down"), ("E", "left"), ("F", "cancel")):
+            key = KEYBOARD_BUTTONS.get(ch)
+            if key is not None:
+                self.badge_keys[key] = (ch, sysname)
+        self.down_names = {}    # button -> the names it went down as (for its up)
         self.typed = ""      # letters typed since the last end_frame()
         self.keyboard = False   # a keyboard key has been pressed (see AceCommander._keyboard)
         self.names = {}      # button -> the control names it counts as
@@ -402,7 +416,12 @@ class Pad:
         # badge log, build 64). hit("mod+k_H") is a shifted H.
         mod = (count.get("k_SHIFT", 0) > 0 or count.get("k_CTRL", 0) > 0
                or count.get("k_LSHIFT", 0) > 0 or count.get("k_RSHIFT", 0) > 0)
-        for n in self._names(button):
+        names = self._names(button)
+        if self.as_buttons and button in self.badge_keys:
+            names = self.badge_keys[button]     # the badge's button, not the key
+            self.keyboard = True
+        self.down_names[button] = names
+        for n in names:
             count[n] = count.get(n, 0) + 1
             self.hits.add(n)
             if mod:
@@ -422,7 +441,7 @@ class Pad:
             return
         self.pressed[button] = False
         count = self.count
-        for n in self._names(button):
+        for n in self.down_names.pop(button, None) or self._names(button):
             if count.get(n, 0) > 0:
                 count[n] -= 1
 
@@ -443,6 +462,7 @@ class Pad:
         self.pressed = {}
         self.count = {}
         self.hits = set()
+        self.down_names = {}
 
 
 class AceCommander(app.App):
@@ -907,6 +927,11 @@ class AceCommander(app.App):
             if flying and PERF_LOG:
                 self._perf(delta, _diff(_us(), t0) / 1000.0)
         pad.end_frame()
+        # the keyboard's A-F are the badge's buttons for the next frame's keys:
+        # off the flight (docked, the title, its pages), not while typing; in
+        # flight, pause menu too, they stay Elite's keys
+        pad.as_buttons = (self.mode != "flight" and self.namer is None
+                          and self.finder is None and self.tdialog is None)
 
     def choices(self):
         """The title screen's choices, in order."""

@@ -77,9 +77,12 @@ commander name (89); released as v0.3.0 (2026-11-18).
 - `hosts/` - the same game on other devices, left out of release tarballs (`.gitattributes`).
   `hosts/pi/` (2026-11-19, P0): pygame window; `pi_firmware.py` stand-ins for the firmware
   modules (real `ace.py` unchanged), `ctx_pygame.py` (the ctx calls at scale), `keys_pi.py`
-  (arrows = joystick, F1-F6 = badge A-F, the rest = Keyboard Hexpansion), `run.py` (`Host`:
-  loop, round mask, LED ring). Test: `hosts/pi/tests/test_pi_host.py` (SDL dummy driver), run
-  by `tests/run_all.py` when pygame is there. Plan: `hosts/pi/PLAN.md`.
+  (arrows = joystick, F1-F6 = badge A-F, the rest = Keyboard Hexpansion; docked, letters A-F
+  are the badge's buttons, done by the game: `Pad.as_buttons`), `run.py` (`Host`:
+  loop, round mask, LED ring). Tests: `hosts/pi/tests/test_pi_host.py` and `test_pi_trip.py`
+  (P1: a whole trip by keys; SDL dummy driver), run by `tests/run_all.py` when pygame is there.
+  `run.load_game` keeps save, options.json and debug.txt in `~/.local/share/ace_commander/`
+  (content.py loaded with its `__file__` there); DEBUG and PERF only with `--debug`. Plan: `hosts/pi/PLAN.md`.
 
 The repo folder must be called `ace_commander`: the tests import the app as that package, and
 it installs to `/apps/ace_commander/` on the badge.
@@ -283,7 +286,9 @@ Shipyard, Hangar, Galactic chart, Local chart, System data. The Repair Shop is t
 sub-screen (D on its first page, your own ship; C there and on every page is that ship's
 stats, where C buys and D trades in; `-` opens the Shipyard). Options is not a tab: C on Status opens it over
 Status (`Docked.in_options`, `name()` gives "OPTIONS"), F goes back; A launches. Only the current
-firmware matters (Brian, 2026-11-18: both badges run it). C on Inventory sells the whole hold (`Docked.sell_all`).
+firmware matters (Brian, 2026-11-18: both badges run it). C on Inventory sells the whole hold (`Docked.sell_all`). Off the flight (docked, the title and its pages; not in flight, pause menu included) and not
+while typing, the keyboard's A-F are the badge's buttons A-F (`Pad.as_buttons`, set each frame;
+Brian 2026-11-19: "the same everywhere", badge and Pi). Build 93's B buys / S sells were dropped.
 The Repair Shop is always there (build 81: its DEBUG switch removed). Tests: `tests/test_keys.py`.
 **In-flight screens don't pause (Brian, build 62: "as Elite"; checked against the disc source).**
 Status, Inventory, Market Prices, both charts and system data are `SCREENS`: `fsub` names one while

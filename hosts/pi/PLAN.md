@@ -1,6 +1,7 @@
 # Plan: Ace Commander on a Raspberry Pi
 
-Status: **draft 1, 2026-11-18; P0 started 2026-11-19 in `hosts/pi/` (Brian chose one repo).** Written against upstream v0.3.0
+Status: **draft 1, 2026-11-18; P0 done 2026-11-19 in `hosts/pi/` (Brian chose one repo); P1 by
+keyboard done 2026-11-19 (branch `pi-p1`), frame comparison with the Pillow renders not yet.** Written against upstream v0.3.0
 (`Corteil/ace_commander` main, 8c8a37c). Sister plan: the Tufty 2350 port
 (`Corteil/tufty_ace_commarder`, `PLAN.md`), whose approach this reuses.
 
@@ -82,6 +83,29 @@ flight, tunnels, briefings. LED ring on screen. Saves under `~/.local/share`. Te
 run (SDL dummy video driver) that drives the game through the same scenes as the Tufty host test,
 and frame shots compared with upstream's Pillow renders. Done when: a full trip (launch, jump,
 fight, dock, trade, buy a ship) works by keyboard, and the tests pass.
+
+Done (2026-11-19): `hosts/pi/tests/test_pi_trip.py` (run by `tests/run_all.py`, ~3 s) plays
+a trip by keys: every docked tab and Options drawn, buy on the market (2, C held), launch (1),
+the in-flight screens 0 and 5-9 opened and closed by their keys, views 1-4, a fight (Space; the
+pirate is kept in the sights instead of steered after), a system picked on the local chart (6,
+arrows, Enter), hyperspace (H), the docking computer (C; the flight to the station is skipped by
+placing the ship), sell (3, D held), a ship bought in the Shipyard (-, down, C, C), back to the
+title (F) and quit (Esc). Host files (`run.load_game`): the save, options.json and debug.txt in
+`~/.local/share/ace_commander/`; content.py is loaded with its `__file__` there so Options >
+CONTENT applies on the Pi too; the DEBUG menu and the PERF lines only with `--debug` (or
+debug.txt / the Easter egg, as on the badge). No change to the badge's files.
+Not yet: comparing frames with `tests/render.py`'s Pillow shots; the LED ring is drawn but
+untested against the jump flashes. Brian's answer to the F3 / F4 buying (2026-11-19): B buys and S sells,
+in the game itself (build 93), so the badge's Keyboard Hexpansion has them too (on the Pi,
+B was later made the badge's B, below).
+Brian (2026-11-19, from a `--log-keys` run: he pressed A, C, D, F docked and nothing
+happened): off the flight (docked, title, menus, the pause menu) and not while typing, the
+letter keys A-F are also the badge's buttons (now done by the game itself, `ace.Pad.as_buttons`, so
+the badge's keyboard matches; not in flight, pause menu included; Brian: "when docked the letter
+keys act the same as the badge keys, apart when entering text"); then "badges b everywhere": docked, keyboard B
+is only the badge's B (next tab, find on the chart), so on the Pi C buys and D sells; then "s not required for
+selling": S no longer sells anywhere (the game's build 93 change dropped).
+Pi host only; the badge's Keyboard Hexpansion is unchanged.
 
 ### P2 - Gamepad
 pygame joystick: D-pad and buttons first, then the analogue stick (needs the `_steer` hook), with
