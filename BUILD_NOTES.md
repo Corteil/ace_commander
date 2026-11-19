@@ -1031,3 +1031,6 @@ what is now `ace.py` (renamed in build 50).
    the sights and the radar: a pirate, or anything attacking (attack / break); a hull left
    adrift after its crew bailed out (state "drift") is low risk on both now. Test in
    `tests/test_traffic.py`.
+   **v0.3.1: released** (2026-11-19, Brian: "it's only a small version bump, but go ahead
+   and release it"): builds 91-92 (Options fit eight lines; missile sights white for
+   low-risk ships, one hostile rule with the radar). Version "0.3.1".
