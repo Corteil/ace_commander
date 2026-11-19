@@ -45,6 +45,7 @@ BACKGROUND = (24, 24, 30)           # round the screen, like the badge's case
 LED_SIZE = 4                        # an LED's radius, in game pixels
 FPS = 60
 LINE_K = 0.5                        # the Elite layout's lines: half as thick as the scale
+WIRE_MIN = 3                        # ships are wireframes down to this size (badge units; the badge: 8)
 
 
 def data_dir():
@@ -203,6 +204,12 @@ class Host:
         view, the dashboard and a full-window tunnel. The badge layout calls the
         game's own. Game.step is wrapped to keep the stick (for RL and DC)."""
         ck = self.ck
+        # draw distance (Brian: "can be increased"): far ships stay wireframes until they are
+        # WIRE_MIN across, not the badge's 8 (a marker, cheap on the badge); the game's
+        # functions take it as a default, so their defaults are changed (the badge's files aren't)
+        ck.draw_ship.__defaults__ = (None, WIRE_MIN, False)
+        ck._draw_world.__defaults__ = (WIRE_MIN,)
+        ck._draw_space.__defaults__ = (WIRE_MIN,)
         self._orig = (ck.draw_world, ck.draw_hud, ck.draw_tunnel)
         ck.draw_world = self._world
         ck.draw_hud = self._hud

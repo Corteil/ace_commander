@@ -159,7 +159,10 @@ switch to the badge layout too, screenshots. Done:
   F10 switches, F11 full screen, F12 screenshot to `~/Pictures/Ace Commander/`; resizable
   window; layout and full screen kept in `pi.json` in the data folder; `--layout`,
   `--full` / `--window`. Test `hosts/pi/tests/test_pi_elite.py`.
-Not yet: Brian's look at it on the real screen; KMS without a desktop; HyperPixel Round.
+Brian tried it ("looks good"; "the draw distance for the 3D objects can be increased"): the Pi
+draws ships as wireframes down to 3 units across (`run.WIRE_MIN`; the badge's `cockpit.WIRE_MIN` 8
+makes a marker sooner, which is cheap on the badge), set through the drawing functions' defaults.
+Not yet: KMS without a desktop; HyperPixel Round.
 
 Full screen on the desktop and on KMS without a desktop; the HyperPixel Round (option B); the Elite
 layout (option C) shared with the Tufty port. Scale and layout as settings in Options.
