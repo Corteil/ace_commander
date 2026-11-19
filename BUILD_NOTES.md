@@ -1009,3 +1009,19 @@ what is now `ace.py` (renamed in build 50).
    README (ships, Shipyard, Hangar, jump ranges, stolen ships, escape pods, weapon ranges,
    CONTROLS, the name, search; the install list with ships.py and find.py), CLAUDE.md,
    DESIGN.md and the key guide (B: find on the Galactic chart row; still one page) updated.
+   **Hosts, and the Raspberry Pi P0** (2026-11-19, Brian: "yes, start step 1 and the Pi P0",
+   choosing one repo for the badge, the Pi and later the Tufty). Branch `pi-host` from main.
+   `hosts/` holds other devices' runners, export-ignored so the app store tarball is unchanged
+   (checked with git archive: 29 files, none from hosts/). `hosts/pi/`: the real ace.py on
+   stand-ins for the firmware modules (`pi_firmware.py`: Button with the firmware's parent
+   matching, the 2026 board's composite buttons, KEYBOARD_BUTTONS, a bus, the LED ring, App
+   whose minimise ends the program), `ctx_pygame.py` (the ctx calls drawn at scale onto a
+   pygame Surface, DejaVu Sans, text cached), `keys_pi.py`, `run.py` (`Host`: 480 x 480
+   round screen in the case colour, the 12 LEDs round it where the game's LED_ANGLE1 puts
+   them, 60 fps, saves under ~/.local/share/ace_commander). Played headless by the test:
+   title, NEW COMMANDER with the keyboard name page, docked, launch, flight, menu, quit.
+   **Build 91** (2026-11-19, Brian, seen on the Pi host: "the first line in Options clips
+   the edge of the display"). With CONTROLS and NAME the Options pages have eight lines: the
+   docked Options now start at y -62 (was -70), 15 px apart, size 13, the highlight 192 wide
+   (it ran past the round edge); the title Options start at -50, 16 px apart, size 13, so
+   DEBUG clears the hint lines on both.

@@ -21,4 +21,18 @@ for name in ("test_game.py", "test_app.py", "test_commander.py", "test_galaxy.py
         failed.append(name)
         print(r.stdout[-1500:])
         print(r.stderr[-3000:])
+# the Raspberry Pi host (hosts/pi), where pygame is installed
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+try:
+    import pygame  # noqa: F401
+    pi_test = os.path.join(os.path.dirname(HERE), "hosts", "pi", "tests", "test_pi_host.py")
+    r = subprocess.run([sys.executable, pi_test], capture_output=True, text=True)
+    lines = [l for l in r.stdout.strip().split("\n") if l and not l.startswith(("pygame ", "Hello from"))]
+    print("%-14s %s" % ("pi host", "ok" if r.returncode == 0 else "FAILED"), "-", lines[-1] if lines else "")
+    if r.returncode:
+        failed.append("hosts/pi")
+        print(r.stdout[-1500:])
+        print(r.stderr[-3000:])
+except ImportError:
+    print("pi host        skipped - no pygame")
 sys.exit(1 if failed else 0)
