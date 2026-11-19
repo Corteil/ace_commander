@@ -327,7 +327,7 @@ class Pad:
             table.append(("j_" + name.lower(), JOY[name]))
         for name in "ABCDEF":
             table.append((name, FB[name]))
-        for name in ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "T", "U", "V", "C", "SPACE",
+        for name in ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "T", "U", "V", "C", "B", "SPACE",
                      "BACKSPACE",
                      "UP", "DOWN", "LEFT", "RIGHT"):
             key = KEYBOARD_BUTTONS.get(name)
@@ -1233,7 +1233,7 @@ class AceCommander(app.App):
                 d.pick_item(-1)
             elif self._repeat("j_down", dt):
                 d.pick_item(1)
-            elif hit("C"):
+            elif hit("C") or hit("k_B"):
                 d.buy_item()
             elif (hit(BTN_MISSILE)) or hit("k_D"):
                 d.next_mount()      # which view a laser is fitted to
@@ -1256,10 +1256,10 @@ class AceCommander(app.App):
             elif (hit(BTN_MISSILE) or hit("k_D")) and d.ysel == 0:
                 d.open("REPAIR SHOP")       # your own ship: the Repair Shop (build 82: on D)
         elif d.name() == "SHIP STATS":
-            if d.ysel and hit("C"):
+            if d.ysel and (hit("C") or hit("k_B")):
                 d.buy_ship(False)       # the one you fly goes into the hangar
-            elif d.ysel and (hit(BTN_MISSILE) or hit("k_D")):
-                d.buy_ship(True)        # trade it in
+            elif d.ysel and (hit(BTN_MISSILE) or hit("k_D") or hit("k_S")):
+                d.buy_ship(True)        # trade it in (S: sell yours towards it)
         elif d.name() == "HANGAR":
             if hit("j_up"):
                 d.pick_owned(-1)
@@ -1267,7 +1267,7 @@ class AceCommander(app.App):
                 d.pick_owned(1)
             elif hit("C"):
                 d.fly_owned()
-            elif hit(BTN_MISSILE) or hit("k_D"):
+            elif hit(BTN_MISSILE) or hit("k_D") or hit("k_S"):
                 d.sell_owned()
         elif d.name() == "OPTIONS":
             if hit("j_up"):
@@ -1283,18 +1283,19 @@ class AceCommander(app.App):
                 d.scroll_inventory(-1)
             elif self._repeat("j_down", dt):
                 d.scroll_inventory(1)
-            elif hit("C"):
+            elif hit("C") or hit("k_S"):
                 d.sell_all()        # the whole hold at this station's prices
                 d.scroll_inventory(0)
         elif d.name() == "MARKET":
-            # the joystick picks a good; C buys and D sells; all repeat when held
+            # the joystick picks a good; C buys and D sells; all repeat when held.
+            # On a keyboard B buys and S sells too (Brian, build 93)
             if self._repeat("j_up", dt):
                 d.pick_good(-1)
             elif self._repeat("j_down", dt):
                 d.pick_good(1)
-            elif self._repeat("C", dt):
+            elif self._repeat("C", dt) or self._repeat("k_B", dt):
                 d.trade(True)
-            elif self._repeat(BTN_MISSILE, dt):
+            elif self._repeat(BTN_MISSILE, dt) or self._repeat("k_S", dt):
                 d.trade(False)
         elif confirm and d.name() == "STATUS":
             if d.options:

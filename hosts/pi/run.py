@@ -6,7 +6,7 @@
 
 Keys: arrows are the joystick, Enter confirms (the joystick pressed in), Esc
 goes back, F1-F6 are the badge's buttons A-F, and the rest of the keyboard is
-the Keyboard Hexpansion (Elite's keys). Close the window or leave from the
+the Keyboard Hexpansion (Elite's keys). Docked, B buys and S sells. Close the window or leave from the
 title screen to quit. Saves and options.json go in
 ~/.local/share/ace_commander/; --debug shows the DEBUG menu of cheats.
 

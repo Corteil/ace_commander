@@ -1034,3 +1034,11 @@ what is now `ace.py` (renamed in build 50).
    **v0.3.1: released** (2026-11-19, Brian: "it's only a small version bump, but go ahead
    and release it"): builds 91-92 (Options fit eight lines; missile sights white for
    low-risk ships, one hostile rule with the radar). Version "0.3.1".
+   **Build 93** (2026-11-19, Brian, on the Pi host: "use B to buy and S to sell"). On a
+   keyboard (the Pi's, or the Keyboard Hexpansion on the badge) B buys and S sells, docked:
+   the market (both repeat when held, as C / D), Equip ship (B), a ship's stats in the
+   Shipyard (B buys, S trades yours in), the Hangar (S sells the picked ship) and Inventory
+   (S sells the hold). The badge buttons are unchanged (C buys, D sells). `Pad` now listens
+   for the B key (it had a fixed list of letters). Tests in `tests/test_keys.py`; the Pi trip
+   test buys and sells with B and S. Key guide: Market C/B buys, D/S sells; Equip ship C/B;
+   Inventory C/S. Not yet on the badge.

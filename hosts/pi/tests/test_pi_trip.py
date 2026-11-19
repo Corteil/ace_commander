@@ -112,13 +112,13 @@ shot(h, "dock_options")
 key(h, pygame.K_F6)
 assert d.name() != "OPTIONS"
 
-# ---- buy on the market: 2, then C (F3) held ------------------------------------
+# ---- buy on the market: 2, then B held (B buys, S sells) ------------------------
 ch_key(h, "2")
 assert d.name() == "MARKET", d.name()
 cash = c.cash
-press(h, pygame.K_F3)
+press(h, pygame.K_b, "b")
 until(h, lambda: False, 15)
-let_go(h, pygame.K_F3)
+let_go(h, pygame.K_b, "b")
 h.step(40)
 bought = sum(c.cargo)
 assert bought > 0 and c.cash < cash, (bought, cash, c.cash)
@@ -217,20 +217,20 @@ assert until(h, lambda: a.mode == "docked", 800), a.mode
 shot(h, "docked_again")
 print("docking computer flew in; docked at", a.galaxy.system(c.system).name)
 
-# ---- sell: 3 opens the market on the first good in the hold, D (F4) sells ---------
+# ---- sell: 3 opens the market on the first good in the hold, S held sells ---------
 d = a.dock
 ch_key(h, "3")
 assert d.name() == "MARKET" and c.cargo[d.sel] > 0, (d.name(), d.sel)
 before = sum(c.cargo)
 cash = c.cash
-press(h, pygame.K_F4)
+press(h, pygame.K_s, "s")
 until(h, lambda: False, 20)
-let_go(h, pygame.K_F4)
+let_go(h, pygame.K_s, "s")
 h.step(40)
 assert sum(c.cargo) < before and c.cash > cash, (sum(c.cargo), c.cash)
 print("market: sold %d t" % (before - sum(c.cargo)))
 
-# ---- buy a ship: - (Shipyard), down to one for sale, C (stats), C (buy) ----------
+# ---- buy a ship: - (Shipyard), down to one for sale, C (stats), B (buy) ----------
 c.cash += 10 ** 7                   # a rich trader
 ch_key(h, "-")
 assert d.name() == "SHIPYARD", d.name()
@@ -240,7 +240,7 @@ key(h, pygame.K_F3)
 assert d.name() == "SHIP STATS", d.name()
 shot(h, "ship_stats")
 old = a._ship_name()
-key(h, pygame.K_F3)
+key(h, pygame.K_b, "b")
 assert a._ship_name() != old, ("bought", old, a._ship_name())
 shot(h, "new_ship")
 print("Shipyard: bought a", a._ship_name(), "(the", old, "is in the hangar)")

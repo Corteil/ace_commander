@@ -95,8 +95,8 @@ title (F) and quit (Esc). Host files (`run.load_game`): the save, options.json a
 CONTENT applies on the Pi too; the DEBUG menu and the PERF lines only with `--debug` (or
 debug.txt / the Easter egg, as on the badge). No change to the badge's files.
 Not yet: comparing frames with `tests/render.py`'s Pillow shots; the LED ring is drawn but
-untested against the jump flashes. **Open for Brian:** the badge's buttons are F1-F6 (A-F),
-so on the market C (buy) is F3 and D (sell) F4, Shipyard C/D likewise; maybe better keys.
+untested against the jump flashes. Brian's answer to the F3 / F4 buying (2026-11-19): B buys and S sells,
+in the game itself (build 93), so the badge's Keyboard Hexpansion has them too.
 
 ### P2 - Gamepad
 pygame joystick: D-pad and buttons first, then the analogue stick (needs the `_steer` hook), with

@@ -285,7 +285,8 @@ Shipyard, Hangar, Galactic chart, Local chart, System data. The Repair Shop is t
 sub-screen (D on its first page, your own ship; C there and on every page is that ship's
 stats, where C buys and D trades in; `-` opens the Shipyard). Options is not a tab: C on Status opens it over
 Status (`Docked.in_options`, `name()` gives "OPTIONS"), F goes back; A launches. Only the current
-firmware matters (Brian, 2026-11-18: both badges run it). C on Inventory sells the whole hold (`Docked.sell_all`).
+firmware matters (Brian, 2026-11-18: both badges run it). C on Inventory sells the whole hold (`Docked.sell_all`). On a keyboard B buys and S sells as well, docked (build 93: market,
+Equip ship, Ship stats, Hangar, Inventory).
 The Repair Shop is always there (build 81: its DEBUG switch removed). Tests: `tests/test_keys.py`.
 **In-flight screens don't pause (Brian, build 62: "as Elite"; checked against the disc source).**
 Status, Inventory, Market Prices, both charts and system data are `SCREENS`: `fsub` names one while
