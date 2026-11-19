@@ -9,6 +9,8 @@ sharp rather than a scaled-up 240 bitmap.
 """
 import math
 
+import re
+
 import pygame
 
 FONT = "DejaVuSans"     # a free font close to the badge's in width
@@ -41,6 +43,7 @@ class Ctx:
         self._fonts = {}
         self._texts = {}        # rendered text, kept: the same strings come every frame
         self.a11y = None        # the firmware's screen-reader hook: none here
+        self.labels = None      # {"C": "A", ...}: the hints name a pad's buttons (relabel)
 
     # ---- state ------------------------------------------------------------
     def save(self):
@@ -167,6 +170,8 @@ class Ctx:
 
     def text(self, s):
         s = str(s)
+        if self.labels:
+            s = relabel(s, self.labels)
         size = max(6, int(self.font_size * self.s))
         key = (s, size, self.col)
         img = self._texts.get(key)
@@ -190,6 +195,27 @@ class Ctx:
         self.surf.blit(img, (round(x), round(y)))
         self.paths = []
         return self
+
+
+# a hint's button letters: "C: buy", "C or F: back", "C, D or F: back to chart",
+# "< > or C: change" (a lone capital A-F, or a list of them, then a colon)
+_HINT = re.compile(r"(?<![A-Za-z0-9])[A-F](?:(?:, | or | / |/)[A-F])*(?=:)")
+_LETTER = re.compile(r"[A-F]")
+_relabelled = {}
+
+
+def relabel(s, labels):
+    """s with the badge's button letters in its hints named as labels has them
+    ("C: buy   D: sell" -> "A: buy   X: sell"); other text is left alone."""
+    key = (s, id(labels))
+    out = _relabelled.get(key)
+    if out is None:
+        if len(_relabelled) > 2000:
+            _relabelled.clear()
+        out = _HINT.sub(lambda m: _LETTER.sub(lambda l: labels.get(l.group(0), l.group(0)),
+                                              m.group(0)), s)
+        _relabelled[key] = out
+    return out
 
 
 def _c(v):

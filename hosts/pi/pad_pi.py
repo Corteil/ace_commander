@@ -15,9 +15,17 @@ Two maps (Brian, 2026-11-19):
   drive; B: docking computer on / off; X: hyperspace (held 1 s: galactic);
   Y: the in-flight screens in turn, then back to space; left stick click: arm
   the missile (Hardcore); right stick click: the next view.
-- Everywhere else (title, docked, the pause menu, the in-flight screens):
-  BADGE, the pad as the badge's buttons and joystick, so every screen works as
-  on the badge; Y still steps through the in-flight screens.
+- On the in-flight screens (charts, status, inventory, market, system data):
+  SCREEN_MAP. The sticks still fly (the game runs on, as in Elite) and the
+  right trigger fires; the D-pad moves the chart cursor or scrolls, A selects
+  (the badge's C), X system data (D), B back to space (F), Y the next screen,
+  Back the search on the Galactic chart (the badge's B), Start the pause menu.
+- Everywhere else (title, docked, the pause menu, after the ship is lost):
+  BADGE_MAP, the pad as the badge's buttons and joystick, so every screen works
+  as on the badge: D-pad / left stick the joystick, A = C, X = D, B = F,
+  Y = B, Start = A, bumpers E / B (previous / next tab), Back the Options (=).
+On-screen hints name the pad's buttons once the pad was the last thing used
+(labels(), drawn by ctx_pygame): "C: buy" reads "A: buy".
 """
 import math
 
@@ -38,12 +46,26 @@ BADGE_MAP = {
     "stickleft": STICK["LEFT"], "stickright": STICK["RIGHT"],
     "a": BADGE["C"],            # south: choose, buy
     "x": BADGE["D"],            # west: sell, D's things
-    "y": "screens",             # north: the in-flight screens in turn (B docked)
+    "y": BADGE["B"],            # north: the badge's B (find on the Galactic chart, next tab)
     "b": BADGE["F"],            # east: back
     "start": BADGE["A"],        # launch, the pause menu
-    "rightshoulder": BADGE["F"], "righttrigger": BADGE["F"],
-    "leftshoulder": BADGE["E"], "lefttrigger": BADGE["E"],
+    "leftshoulder": BADGE["E"],     # the tab before
+    "rightshoulder": BADGE["B"],    # the next tab
+    "back": KEYBOARD["="],      # docked: Options (the keyboard's =)
     "leftstick": STICK["SELECT"],
+}
+
+# on an in-flight screen: the screen's controls; the sticks still fly
+SCREEN_MAP = {
+    "dpup": STICK["UP"], "dpdown": STICK["DOWN"],       # the chart cursor, scrolling
+    "dpleft": STICK["LEFT"], "dpright": STICK["RIGHT"],
+    "a": BADGE["C"],            # select the target
+    "x": BADGE["D"],            # system data
+    "b": BADGE["F"],            # back to space
+    "y": "screens",             # the next screen; after the last, back to space
+    "back": BADGE["B"],         # the Galactic chart's search
+    "start": BADGE["A"],        # the pause menu
+    "righttrigger": KEYBOARD["SPACE"],  # fire (it can't hit from a screen, as Elite)
 }
 
 # flying: a button the control holds, or a special action (a name)
@@ -74,6 +96,10 @@ TRIGGER_ON = 0.5
 # Y steps through the in-flight screens in this order (the game's number keys)
 SCREEN_ORDER = (("local", "6"), ("galactic", "5"), ("status", "9"),
                 ("inventory", "0"), ("market", "8"))
+
+# the badge's buttons by the pad's names (Xbox's), for the hints
+BADGE_LABELS = {"A": "START", "B": "Y", "C": "A", "D": "X", "E": "LB", "F": "B"}
+SCREEN_LABELS = {"A": "START", "B": "BACK", "C": "A", "D": "X", "E": "LB", "F": "B"}
 
 _BUTTONS = {
     pygame.CONTROLLER_BUTTON_A: "a", pygame.CONTROLLER_BUTTON_B: "b",
@@ -156,11 +182,29 @@ class Pads:
     def _game(self):
         return self.app() if self.app is not None else None
 
-    def flying(self):
-        """Looking at space in a flight: the flight map and the sticks."""
+    def state(self):
+        """"flight" looking at space, "screen" on an in-flight screen, or
+        "badge" (anywhere else: the title, docked, the pause menu, after the
+        ship is lost)."""
         a = self._game()
-        return (a is not None and a.mode == "flight" and not a.paused
-                and getattr(a, "fsub", None) not in ("status", "inventory", "market", "chart", "data"))
+        if a is None or a.mode != "flight" or a.paused:
+            return "badge"
+        g = getattr(a, "game", None)
+        if g is None or g.over or getattr(g, "ejected", False):
+            return "badge"
+        if getattr(a, "fsub", None) in ("status", "inventory", "market", "chart", "data"):
+            return "screen"
+        return "flight"
+
+    def flying(self):
+        """Looking at space in a flight: the flight map."""
+        return self.state() == "flight"
+
+    def labels(self):
+        """The pad's names for the badge's buttons, for the on-screen hints."""
+        if self.state() == "screen":
+            return SCREEN_LABELS
+        return BADGE_LABELS
 
     # ---- buttons -----------------------------------------------------------------------
     def _press(self, b):
@@ -197,7 +241,7 @@ class Pads:
             else:
                 self._release(what)
             return
-        what = (FLIGHT_MAP if self.flying() else BADGE_MAP).get(control)
+        what = {"flight": FLIGHT_MAP, "screen": SCREEN_MAP}.get(self.state(), BADGE_MAP).get(control)
         if what is None:
             return
         if self.log:
@@ -260,7 +304,7 @@ class Pads:
                 self._tap(KEYBOARD["ESCAPE"])                   # the escape pod
         a = self._game()
         if a is not None and hasattr(a, "analog"):
-            a.analog = self.analog() if self.flying() else None
+            a.analog = self.analog() if self.state() != "badge" else None
 
     def analog(self):
         """The sticks of every pad, added together (None with no pad)."""
@@ -317,7 +361,7 @@ class Pads:
                 # off the flight the left stick is the joystick (on / off);
                 # flying it is analogue only, and lets go of any of those
                 neg, pos = ("stickleft", "stickright") if name == "leftx" else ("stickup", "stickdown")
-                flying = self.flying()
+                flying = self.state() != "badge"
                 for stick, sign in ((neg, -1), (pos, 1)):
                     held = (pid, stick) in self.on
                     push = v * sign

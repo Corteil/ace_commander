@@ -20,7 +20,7 @@ import pygame       # noqa: E402
 import run          # noqa: E402
 
 PAD = 99            # the made-up pad's instance id
-B = {"guide": pygame.CONTROLLER_BUTTON_GUIDE, "l3": pygame.CONTROLLER_BUTTON_LEFTSTICK,
+B = {"back": pygame.CONTROLLER_BUTTON_BACK, "guide": pygame.CONTROLLER_BUTTON_GUIDE, "l3": pygame.CONTROLLER_BUTTON_LEFTSTICK,
      "r3": pygame.CONTROLLER_BUTTON_RIGHTSTICK, "a": pygame.CONTROLLER_BUTTON_A, "b": pygame.CONTROLLER_BUTTON_B,
      "x": pygame.CONTROLLER_BUTTON_X, "y": pygame.CONTROLLER_BUTTON_Y,
      "start": pygame.CONTROLLER_BUTTON_START,
@@ -80,6 +80,28 @@ cash = c.cash
 tap(h, "a"); assert sum(c.cargo) == 1 and c.cash < cash, "south: buy"
 tap(h, "x"); assert sum(c.cargo) == 0 and c.cash == cash, "west: sell"
 print("docked by pad: tabs, back, buy, sell: ok")
+
+# docked: the bumpers go round the tabs, Back opens Options, the triggers do nothing
+tab = d.name()
+tap(h, "rb"); assert d.name() != tab, "right bumper: the next tab"
+tap(h, "lb"); assert d.name() == tab, "left bumper: the tab before"
+for t in (pygame.CONTROLLER_AXIS_TRIGGERLEFT, pygame.CONTROLLER_AXIS_TRIGGERRIGHT):
+    axis(h, t, 1.0); h.step(40); axis(h, t, 0.0); h.step(40)
+assert d.name() == tab, "triggers: nothing docked"
+tap(h, "back"); assert d.name() == "OPTIONS", ("Back: Options", d.name())
+tap(h, "b"); assert d.name() == "STATUS"
+# the hints name the pad's buttons once the pad was used, the badge's after a key
+texts = []
+real_text = h.ctx.text
+h.ctx.text = lambda t: (texts.append(h.ctx.labels and __import__("ctx_pygame").relabel(str(t), h.ctx.labels) or str(t)), real_text(t))[1]
+h.step(40)
+assert "START: LAUNCH" in texts and "B: title screen" in texts, texts
+h.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_LSHIFT, unicode="", mod=0))
+h.handle(pygame.event.Event(pygame.KEYUP, key=pygame.K_LSHIFT, unicode="", mod=0))
+texts.clear(); h.step(40)
+assert "A: LAUNCH" in texts and "F: title screen" in texts, texts
+h.ctx.text = real_text
+print("docked: bumpers, Back for Options, hints in the pad's names: ok")
 
 # ---- flying: Brian's flight map ---------------------------------------------------
 LX, LY = pygame.CONTROLLER_AXIS_LEFTX, pygame.CONTROLLER_AXIS_LEFTY
@@ -172,6 +194,59 @@ assert seen == ["Chart", "GalChart", "status", "inventory", "market", None], see
 assert not a.paused
 print("Y: local chart, galactic chart, status, inventory, market, space: ok")
 
+# on an in-flight screen: D-pad cursor, A selects, X data, B back, Back the search;
+# the sticks still fly and the right trigger fires; X is no hyperspace there
+tap(h, "y"); assert a.fsub == "chart" and type(a.chart).__name__ == "Chart"
+assert h.pads.state() == "screen"
+cx = a.chart.cx
+home = a.chart.sel
+for k in ("right", "down", "left", "up"):    # until the cursor is on another system
+    button(h, k, True)
+    for _ in range(40):
+        h.step(40)
+        if a.chart.sel != home:
+            break
+    button(h, k, False); h.step(40)
+    if a.chart.sel != home:
+        break
+assert a.chart.cx != cx or a.chart.sel != home, ("D-pad: the chart cursor", cx, a.chart.cx)
+assert a.chart.sel != home, "the cursor on another system"
+o = rock()
+axis(h, RX, 1.0)
+for _ in range(5):
+    h.step(40)
+axis(h, RX, 0.0); h.step(40)
+o.x = o.y = 0.0
+axis(h, LX, 1.0)
+for _ in range(5):
+    h.step(40)
+axis(h, LX, 0.0); h.step(40)
+assert o.x < -1, ("the sticks still fly on a screen", o.x)
+axis(h, RT, 1.0)
+for _ in range(3):
+    h.step(40)
+assert g.beam > 0 or g.heat > 0, "right trigger fires on a screen"
+axis(h, RT, 0.0); h.step(40)
+tap(h, "a"); assert a.target is not None, "A: select the target"
+jt = g.jump_t
+tap(h, "x"); assert a.fsub == "data" and g.jump_t == jt, ("X: system data, no jump", a.fsub)
+tap(h, "x"); assert a.fsub == "chart", "X again: back to the chart"
+tap(h, "y"); assert type(a.chart).__name__ == "GalChart", "Y: the galactic chart"
+tap(h, "back"); assert a.finder is not None or a.tdialog is not None or a.fsub == "chart", "Back: search"
+if a.finder is not None:
+    key = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode="", mod=0)
+    h.handle(key); h.step(40)
+    h.handle(pygame.event.Event(pygame.KEYUP, key=pygame.K_ESCAPE, unicode="", mod=0)); h.step(40)
+tap(h, "b"); assert a.fsub not in ("chart", "data", "status"), ("B: back to space", a.fsub)
+assert h.pads.state() == "flight"
+print("in-flight screens: cursor, select, data, search, back; still flying: ok")
+
+# the pause menu: the pad as the badge, B resumes
+tap(h, "start"); assert a.paused and h.pads.state() == "badge"
+tap(h, "down"); assert a.fmenu == 1
+tap(h, "b"); assert not a.paused, "B: resume"
+print("pause menu: D-pad, B resumes: ok")
+
 # X: hyperspace to the target (a tap); held 1 s: the galactic hyperdrive
 reach = a._jump_ok
 a.target = None
@@ -223,6 +298,14 @@ button(h, "guide", False); h.step(40)
 h.bus.send = real_send
 assert sent.count(("ButtonDownEvent", "ESCAPE")) == 1, sent
 print("Xbox button held 1 s: escape pod: ok")
+
+# after the ship is lost (or the pod is out) the pad is the badge: A is C, "continue"
+g = a.game
+was = g.over
+g.over = True
+assert h.pads.state() == "badge" and h.pads.labels()["C"] == "A"
+g.over = was
+print("ship lost: the pad is the badge again: ok")
 
 # unplugging lets go of whatever the pad held
 button(h, "a", True); h.step(40)

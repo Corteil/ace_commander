@@ -128,7 +128,15 @@ is the badge's B). Dead zone 0.12, curve 1.6. Game side (badge files, no change 
 sets it): `AceCommander.analog` (roll, pitch, yaw, speed) adds to the steering; `Game.step(...,
 yaw)` and `Game._yaw` (floats, only when yaw is not 0); CONTROLS' left / right flip turns yaw too; a
 pushed stick (> 0.5) takes over from the docking computer. Tests: `tests/test_analog.py`,
-`hosts/pi/tests/test_pi_pad.py`. Not yet tried by Brian on the real pad.
+`hosts/pi/tests/test_pi_pad.py`. First tried by Brian 2026-11-19 (every control logged fine).
+Then (Brian, same day) the docked and in-flight screen maps and the hints: docked / title / pause
+menu / after the ship is lost, `BADGE_MAP` (D-pad / left stick joystick, A = C, X = D, B = F, Y = B,
+Start = A, LB / RB = E / B the tabs, Back = Options, triggers nothing); on an in-flight screen
+`SCREEN_MAP` (sticks still fly, RT fires, D-pad cursor / scroll, A select, X system data, B back to
+space, Y next screen, Back the Galactic chart's search, Start pause menu; no hyperspace hold: Brian
+"lose the hold"). The hints name the pad's buttons (Xbox names) once the pad was the last thing used
+(`ctx_pygame.relabel`, `Pads.labels`): "C: buy  D: sell" reads "A: buy  X: sell", "A: LAUNCH"
+"START: LAUNCH"; a key press brings the badge's letters back.
 
 pygame joystick: D-pad and buttons first, then the analogue stick (needs the `_steer` hook), with
 a dead zone and a curve. Button map in one table. Done when: a whole trip works on a pad alone.

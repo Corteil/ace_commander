@@ -111,6 +111,7 @@ class Host:
         self.mask = self._round_mask(size)
         self.keys = Keys(self.bus)
         self.pads = Pads(self.bus, lambda: self.app, log_keys)
+        self.pad_last = False       # the pad was the last thing used
         self.log_keys = log_keys
         if log_keys:
             self.ace.LOG_KEYS = True    # the game prints each button it gets
@@ -134,8 +135,12 @@ class Host:
             self.keys.release_all()
             self.pads.release_all()
         elif self.pads.handle(event):
-            pass
+            if event.type in (pygame.CONTROLLERBUTTONDOWN,) or (
+                    event.type == pygame.CONTROLLERAXISMOTION and abs(event.value) > 16000):
+                self.pad_last = True        # the hints name the pad's buttons
         else:
+            if event.type == pygame.KEYDOWN:
+                self.pad_last = False       # and the badge's again
             if self.log_keys and event.type in (pygame.KEYDOWN, pygame.KEYUP):
                 print("PYGAME", "DOWN" if event.type == pygame.KEYDOWN else "UP",
                       pygame.key.name(event.key), repr(getattr(event, "unicode", "")),
@@ -152,6 +157,7 @@ class Host:
             self.running = False
             return
         self.screen.fill((0, 0, 0))
+        self.ctx.labels = self.pads.labels() if self.pad_last else None
         self.app.draw(self.ctx)
         self.screen.blit(self.mask, (0, 0))
         self.window.fill(BACKGROUND)
