@@ -1025,3 +1025,9 @@ what is now `ace.py` (renamed in build 50).
    docked Options now start at y -62 (was -70), 15 px apart, size 13, the highlight 192 wide
    (it ran past the round edge); the title Options start at -50, 16 px apart, size 13, so
    DEBUG clears the hint lines on both.
+   **Build 92** (2026-11-19, Brian: "if a ship is low risk the target box should be
+   white"). The missile sights' diamond is red only for a dangerous ship, white for a
+   low-risk one, and green once locked, as before. `cockpit.hostile(o)` is the one rule for
+   the sights and the radar: a pirate, or anything attacking (attack / break); a hull left
+   adrift after its crew bailed out (state "drift") is low risk on both now. Test in
+   `tests/test_traffic.py`.

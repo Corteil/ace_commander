@@ -432,4 +432,40 @@ every = [t for g_ in p._cheat_groups(True) for t in p._cheats(g_, True)]
 assert not any(t.startswith(("LEGAL", "ADD A TRADER", "ADD POLICE", "ANGER")) for t in every)
 os.remove(SAVE)
 print("app: legal status saved, from illegal cargo, halved by jumps, cleared by the pod: ok")
+# the missile sights (build 92): red for a dangerous ship, white for a low-risk one,
+# green once locked; the radar uses the same rule (cockpit.hostile)
+class _Rec:
+    CENTER = LEFT = RIGHT = MIDDLE = "x"
+    def __init__(self):
+        self.col = None; self.diamond = None; self.font_size = 10
+        self.text_align = self.text_baseline = None; self.line_width = 1; self._pts = []
+    def rgb(self, r, g, b): self.col = (r, g, b); return self
+    def rgba(self, r, g, b, a): self.col = (r, g, b); return self
+    def move_to(self, x, y): self._first = (x, y); self._pts = [(x, y)]; return self
+    def line_to(self, x, y): self._pts.append((x, y)); return self
+    def stroke(self):
+        p = getattr(self, "_pts", [])
+        if len(p) == 5 and p[0] == p[4] and p[1][1] == p[3][1] and p[0][0] == p[2][0]:
+            self.diamond = self.col     # the sights' diamond: closed, four corners
+        self._pts = []; return self
+    def __getattr__(self, name):
+        return lambda *a, **k: self
+def sights(g):
+    r = _Rec(); cockpit.draw_world(r, g); return r.diamond
+g = system(gov=7)
+t = game.Obj(g.types["COBRA MK III"], "ship", 0.0, 0.0, 2000.0); g.objs.append(t)
+t.role, t.state = "trader", "trade"
+g.lock = t; g.locked = False
+assert not cockpit.hostile(t) and sights(g) == cockpit.WHITE, "a trader: white"
+t.role, t.state = "pirate", "attack"
+assert cockpit.hostile(t) and sights(g) == cockpit.RED, "a pirate: red"
+t.role, t.state = "police", "patrol"
+assert not cockpit.hostile(t) and sights(g) == cockpit.WHITE, "police on patrol: white"
+t.state = "attack"
+assert sights(g) == cockpit.RED, "police after you: red"
+t.role, t.state = "pirate", "drift"
+assert not cockpit.hostile(t) and sights(g) == cockpit.WHITE, "a hull adrift: white"
+g.locked = True
+assert sights(g) == cockpit.GREEN, "locked: green, whatever it is"
+print("missile sights: red for danger, white for low risk, green locked: ok")
 print("ALL TRAFFIC TESTS PASSED")
