@@ -79,7 +79,8 @@ commander name (89); released as v0.3.0 (2026-11-18).
   modules (real `ace.py` unchanged), `ctx_pygame.py` (the ctx calls at scale), `keys_pi.py`
   (arrows = joystick, F1-F6 = badge A-F, the rest = Keyboard Hexpansion; docked, letters A-F
   are the badge's buttons, done by the game: `Pad.as_buttons`), `run.py` (`Host`:
-  loop, round mask, LED ring). Tests: `hosts/pi/tests/test_pi_host.py` and `test_pi_trip.py`
+  loop, round mask, LED ring). `pad_pi.py` (P2: a game controller as the badge, one table `MAP`). Tests:
+  `hosts/pi/tests/test_pi_host.py`, `test_pi_trip.py` and `test_pi_pad.py`
   (P1: a whole trip by keys; SDL dummy driver), run by `tests/run_all.py` when pygame is there.
   `run.load_game` keeps save, options.json and debug.txt in `~/.local/share/ace_commander/`
   (content.py loaded with its `__file__` there); DEBUG and PERF only with `--debug`. Plan: `hosts/pi/PLAN.md`.

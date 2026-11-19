@@ -7,7 +7,9 @@
 Keys: arrows are the joystick, Enter confirms (the joystick pressed in), Esc
 goes back, F1-F6 are the badge's buttons A-F (docked and on the title, the
 letters A-F are too, but not while typing), and the rest of the keyboard is
-the Keyboard Hexpansion (Elite's keys). Docked, C buys and D sells. Close the window or leave from the
+the Keyboard Hexpansion (Elite's keys). A game controller is the badge too
+(pad_pi.py: D-pad or left stick the joystick, south C, west D, north B, east F,
+Start A, shoulders and triggers E / F). Docked, C buys and D sells. Close the window or leave from the
 title screen to quit. Saves and options.json go in
 ~/.local/share/ace_commander/; --debug shows the DEBUG menu of cheats.
 
@@ -34,6 +36,7 @@ import pygame                       # noqa: E402
 import pi_firmware                  # noqa: E402
 from ctx_pygame import Ctx          # noqa: E402
 from keys_pi import Keys            # noqa: E402
+from pad_pi import Pads             # noqa: E402
 
 BACKGROUND = (24, 24, 30)           # round the screen, like the badge's case
 LED_SIZE = 4                        # an LED's radius, in game pixels
@@ -108,6 +111,7 @@ class Host:
         self.ctx = Ctx(self.screen, scale)
         self.mask = self._round_mask(size)
         self.keys = Keys(self.bus)
+        self.pads = Pads(self.bus, log_keys)
         self.log_keys = log_keys
         if log_keys:
             self.ace.LOG_KEYS = True    # the game prints each button it gets
@@ -129,6 +133,9 @@ class Host:
             self.running = False
         elif event.type in (pygame.WINDOWFOCUSLOST, pygame.WINDOWMINIMIZED):
             self.keys.release_all()
+            self.pads.release_all()
+        elif self.pads.handle(event):
+            pass
         else:
             if self.log_keys and event.type in (pygame.KEYDOWN, pygame.KEYUP):
                 print("PYGAME", "DOWN" if event.type == pygame.KEYDOWN else "UP",

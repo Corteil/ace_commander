@@ -108,6 +108,13 @@ selling": S no longer sells anywhere (the game's build 93 change dropped).
 Pi host only; the badge's Keyboard Hexpansion is unchanged.
 
 ### P2 - Gamepad
+Started 2026-11-19 (branch `pi-p2`) with Brian's 8BitDo SN30 Pro (USB, "for Android" mode; SDL
+knows it as a game controller). `pad_pi.py`: any SDL game controller, buttons by position in one
+table (`MAP`), the pad being the badge: D-pad and left stick the joystick (on at half travel, off
+below 0.35), south C, west D, north B, east F, Start A, right shoulder / trigger F, left E, stick
+press the joystick's press. Hot-plug; unplugging lets go. Test `tests/test_pi_pad.py` (made-up
+events). Not yet: Brian's verdict on the map; analogue steering (needs the `_steer` hook: ask).
+
 pygame joystick: D-pad and buttons first, then the analogue stick (needs the `_steer` hook), with
 a dead zone and a curve. Button map in one table. Done when: a whole trip works on a pad alone.
 
