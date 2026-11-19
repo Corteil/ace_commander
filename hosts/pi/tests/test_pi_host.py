@@ -73,6 +73,12 @@ key(h, pygame.K_RETURN); assert a.namer is not None, "the keyboard's name page"
 for ch in "pi":
     key(h, getattr(pygame, "K_" + ch), ch)
 assert a.namer.text == "PI"
+for ch in "face":       # A C E F are badge buttons off the flight, but not while typing
+    key(h, getattr(pygame, "K_" + ch), ch)
+assert a.namer.text == "PIFACE" and a.mode == "level", a.namer.text
+for _ in range(4):
+    key(h, pygame.K_BACKSPACE)
+assert a.namer.text == "PI"
 pygame.image.save(h.window, os.path.join(SHOTS, "pi_name.png"))
 key(h, pygame.K_RETURN); assert a.n_name == "PI"
 # F1-F6 are the badge's buttons: F3 is C, which starts from LEVEL

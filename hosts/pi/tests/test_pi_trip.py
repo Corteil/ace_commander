@@ -112,6 +112,17 @@ shot(h, "dock_options")
 key(h, pygame.K_F6)
 assert d.name() != "OPTIONS"
 
+# off the flight the letters A C D E F are the badge's buttons too (Brian):
+# C on Status opens Options, F goes back, E and the arrow go round the tabs
+ch_key(h, "9"); assert d.name() == "STATUS"
+ch_key(h, "c"); assert d.name() == "OPTIONS", "C: the badge's C"
+ch_key(h, "f"); assert d.name() == "STATUS", "F: the badge's F"
+ch_key(h, "2"); cash = c.cash
+ch_key(h, "c"); assert sum(c.cargo) == 1 and c.cash < cash, "C buys, as the badge's C"
+ch_key(h, "d"); assert sum(c.cargo) == 0 and c.cash == cash, "D sells, as the badge's D"
+ch_key(h, "e"); assert d.name() != "MARKET", "E: the tab before"
+print("docked, the letters A C D E F work as the badge's buttons")
+
 # ---- buy on the market: 2, then B held (B buys, S sells) ------------------------
 ch_key(h, "2")
 assert d.name() == "MARKET", d.name()

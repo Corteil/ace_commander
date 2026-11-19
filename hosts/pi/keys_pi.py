@@ -9,10 +9,20 @@
 - Letters, digits, symbols, Space, Backspace, Tab, Shift, Ctrl: the Keyboard
   Hexpansion's keys, so every keyboard key the game knows works as on the badge
   (Elite's keys, the search and name pages).
+- Off the flight (docked, the title, the menus; Brian, 2026-11-19), the letter
+  keys A, C, D, E and F are the badge's buttons too, as well as keyboard keys:
+  C chooses, F goes back, A launches, D and E as on the badge. Not in flight
+  (C is the docking computer, F fires, A and D steer), not on the typing pages,
+  and never B (B buys, as Elite's keyboard; the badge's B is the next tab, which
+  the arrow keys do).
 """
 import pygame
 
-from pi_firmware import (BADGE, KEYBOARD, STICK, TAB, ButtonDownEvent, ButtonUpEvent)
+from pi_firmware import (BADGE, KEYBOARD, STICK, TAB, Button, ButtonDownEvent, ButtonUpEvent)
+
+# a letter that is the keyboard's key and the badge's button at once
+AS_BUTTONS = "ACDEF"
+BOTH = {c: Button(c, "PiKey", [KEYBOARD[c], BADGE[c]]) for c in AS_BUTTONS}
 
 SPECIAL = {
     pygame.K_UP: KEYBOARD["UP"], pygame.K_DOWN: KEYBOARD["DOWN"],
@@ -34,8 +44,9 @@ class Keys:
     A key's button is remembered at key-down, so its key-up matches even if
     Shift changed the character in between."""
 
-    def __init__(self, bus):
+    def __init__(self, bus, as_buttons=None):
         self.bus = bus
+        self.as_buttons = as_buttons or (lambda: False)    # True: A C D E F are badge buttons too
         self.down = {}          # pygame key -> the Button sent for it
 
     def button(self, event):
@@ -43,7 +54,10 @@ class Keys:
         if b is not None:
             return b
         if pygame.K_a <= event.key <= pygame.K_z:
-            return KEYBOARD[chr(event.key).upper()]
+            c = chr(event.key).upper()
+            if c in BOTH and self.as_buttons():
+                return BOTH[c]
+            return KEYBOARD[c]
         if pygame.K_0 <= event.key <= pygame.K_9:
             return KEYBOARD[chr(event.key)]
         ch = getattr(event, "unicode", "")

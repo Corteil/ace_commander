@@ -97,6 +97,10 @@ debug.txt / the Easter egg, as on the badge). No change to the badge's files.
 Not yet: comparing frames with `tests/render.py`'s Pillow shots; the LED ring is drawn but
 untested against the jump flashes. Brian's answer to the F3 / F4 buying (2026-11-19): B buys and S sells,
 in the game itself (build 93), so the badge's Keyboard Hexpansion has them too.
+Brian (2026-11-19, from a `--log-keys` run: he pressed A, C, D, F docked and nothing
+happened): off the flight (docked, title, menus, the pause menu) and not while typing, the
+letter keys A, C, D, E, F are also the badge's buttons (`keys_pi.BOTH`); B stays buy.
+Pi host only; the badge's Keyboard Hexpansion is unchanged.
 
 ### P2 - Gamepad
 pygame joystick: D-pad and buttons first, then the analogue stick (needs the `_steer` hook), with

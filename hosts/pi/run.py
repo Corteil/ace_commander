@@ -5,7 +5,8 @@
     python3 hosts/pi/run.py --full      full screen, as big as fits
 
 Keys: arrows are the joystick, Enter confirms (the joystick pressed in), Esc
-goes back, F1-F6 are the badge's buttons A-F, and the rest of the keyboard is
+goes back, F1-F6 are the badge's buttons A-F (off the flight, the letters A, C,
+D, E, F are too), and the rest of the keyboard is
 the Keyboard Hexpansion (Elite's keys). Docked, B buys and S sells. Close the window or leave from the
 title screen to quit. Saves and options.json go in
 ~/.local/share/ace_commander/; --debug shows the DEBUG menu of cheats.
@@ -86,7 +87,7 @@ def load_game(d, debug=False):
 class Host:
     """The game in a pygame window: events in, update, draw, show."""
 
-    def __init__(self, scale=2, full=False, save_dir=None, debug=False):
+    def __init__(self, scale=2, full=False, save_dir=None, debug=False, log_keys=False):
         pygame.init()
         pygame.display.set_caption("Ace Commander")
         self.bus, self.leds = pi_firmware.install()
@@ -106,11 +107,22 @@ class Host:
         self.screen = pygame.Surface((size, size))
         self.ctx = Ctx(self.screen, scale)
         self.mask = self._round_mask(size)
-        self.keys = Keys(self.bus)
+        self.keys = Keys(self.bus, self._letters_are_buttons)
+        self.log_keys = log_keys
+        if log_keys:
+            self.ace.LOG_KEYS = True    # the game prints each button it gets
         self.app = self.ace.AceCommander()
         self.clock = pygame.time.Clock()
         self.running = True
         self.frames = 0
+
+    def _letters_are_buttons(self):
+        """A C D E F count as the badge's buttons too: off the flight (or in its
+        pause menu), and not while typing a name or a search."""
+        a = self.app
+        if a.namer is not None or a.finder is not None or a.tdialog is not None:
+            return False
+        return a.mode != "flight" or a.paused
 
     @staticmethod
     def _round_mask(size):
@@ -126,6 +138,12 @@ class Host:
         elif event.type in (pygame.WINDOWFOCUSLOST, pygame.WINDOWMINIMIZED):
             self.keys.release_all()
         else:
+            if self.log_keys and event.type in (pygame.KEYDOWN, pygame.KEYUP):
+                print("PYGAME", "DOWN" if event.type == pygame.KEYDOWN else "UP",
+                      pygame.key.name(event.key), repr(getattr(event, "unicode", "")),
+                      "mod", event.mod, "->", self.keys.button(event),
+                      "| mode", self.app.mode, getattr(self.app.dock, "name", lambda: "")()
+                      if getattr(self.app, "dock", None) else "", flush=True)
             self.keys.handle(event)
 
     def step(self, ms):
@@ -177,9 +195,10 @@ def main(argv=None):
     ap.add_argument("--scale", type=int, default=2, help="the badge's 240 x 240 screen times this")
     ap.add_argument("--full", action="store_true", help="full screen")
     ap.add_argument("--debug", action="store_true", help="the DEBUG menu of cheats")
+    ap.add_argument("--log-keys", action="store_true", help="print every key and the button it becomes")
     ap.add_argument("--frames", type=int, default=None, help="stop after this many frames")
     args = ap.parse_args(argv)
-    Host(args.scale, args.full, debug=args.debug).run(args.frames)
+    Host(args.scale, args.full, debug=args.debug, log_keys=args.log_keys).run(args.frames)
 
 
 if __name__ == "__main__":
