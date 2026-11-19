@@ -96,12 +96,13 @@ CONTENT applies on the Pi too; the DEBUG menu and the PERF lines only with `--de
 debug.txt / the Easter egg, as on the badge). No change to the badge's files.
 Not yet: comparing frames with `tests/render.py`'s Pillow shots; the LED ring is drawn but
 untested against the jump flashes. Brian's answer to the F3 / F4 buying (2026-11-19): B buys and S sells,
-in the game itself (build 93), so the badge's Keyboard Hexpansion has them too.
+in the game itself (build 93), so the badge's Keyboard Hexpansion has them too (on the Pi,
+B was later made the badge's B, below).
 Brian (2026-11-19, from a `--log-keys` run: he pressed A, C, D, F docked and nothing
 happened): off the flight (docked, title, menus, the pause menu) and not while typing, the
 letter keys A-F are also the badge's buttons (`keys_pi.BOTH`; Brian: "when docked the letter
-keys act the same as the badge keys, apart when entering text"); B buys on Market, Equip ship
-and Ship stats (`run.BUYS`), elsewhere it is the badge's B (next tab, find on the chart).
+keys act the same as the badge keys, apart when entering text"); then "badges b everywhere": docked, keyboard B
+is only the badge's B (next tab, find on the chart), so on the Pi C buys and S sells.
 Pi host only; the badge's Keyboard Hexpansion is unchanged.
 
 ### P2 - Gamepad

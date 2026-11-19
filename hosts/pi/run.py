@@ -7,7 +7,7 @@
 Keys: arrows are the joystick, Enter confirms (the joystick pressed in), Esc
 goes back, F1-F6 are the badge's buttons A-F (off the flight, the letters A-F
 are too, but not while typing), and the rest of the keyboard is
-the Keyboard Hexpansion (Elite's keys). Docked, B buys and S sells. Close the window or leave from the
+the Keyboard Hexpansion (Elite's keys). Docked, C buys and S sells. Close the window or leave from the
 title screen to quit. Saves and options.json go in
 ~/.local/share/ace_commander/; --debug shows the DEBUG menu of cheats.
 
@@ -38,7 +38,6 @@ from keys_pi import Keys            # noqa: E402
 BACKGROUND = (24, 24, 30)           # round the screen, like the badge's case
 LED_SIZE = 4                        # an LED's radius, in game pixels
 FPS = 60
-BUYS = ("MARKET", "EQUIP SHIP", "SHIP STATS")    # docked screens where B buys
 
 
 def data_dir():
@@ -118,14 +117,11 @@ class Host:
         self.frames = 0
 
     def _letters_are_buttons(self, letter):
-        """Letter A-F counts as the badge's button too: off the flight (or in
-        its pause menu), not while typing a name or a search, and B not where
-        it buys (build 93: Market, Equip ship, Ship stats)."""
+        """Letter A-F counts as the badge's button too (B only as the badge's
+        B): off the flight (or in its pause menu), not while typing a name or
+        a search."""
         a = self.app
         if a.namer is not None or a.finder is not None or a.tdialog is not None:
-            return False
-        if letter == "B" and a.mode == "docked" and a.dock is not None \
-                and a.dock.name() in BUYS:
             return False
         return a.mode != "flight" or a.paused
 

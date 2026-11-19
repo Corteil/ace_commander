@@ -132,13 +132,17 @@ assert a.finder is None, "Esc leaves the search"
 key(h, pygame.K_ESCAPE); ch_key(h, "9")
 print("docked, the letters A-F work as the badge's buttons (not while typing)")
 
-# ---- buy on the market: 2, then B held (B buys, S sells) ------------------------
+# ---- B is the badge's B docked, on the market too: the next tab ----------------
+ch_key(h, "2")
+cash = c.cash
+ch_key(h, "b"); assert d.name() == "EQUIP SHIP" and c.cash == cash, ("B: next tab", d.name())
+
+# ---- buy on the market: 2, then C held (C buys, S sells) ------------------------
 ch_key(h, "2")
 assert d.name() == "MARKET", d.name()
-cash = c.cash
-press(h, pygame.K_b, "b")
+press(h, pygame.K_c, "c")
 until(h, lambda: False, 15)
-let_go(h, pygame.K_b, "b")
+let_go(h, pygame.K_c, "c")
 h.step(40)
 bought = sum(c.cargo)
 assert bought > 0 and c.cash < cash, (bought, cash, c.cash)
@@ -250,7 +254,7 @@ h.step(40)
 assert sum(c.cargo) < before and c.cash > cash, (sum(c.cargo), c.cash)
 print("market: sold %d t" % (before - sum(c.cargo)))
 
-# ---- buy a ship: - (Shipyard), down to one for sale, C (stats), B (buy) ----------
+# ---- buy a ship: - (Shipyard), down to one for sale, C (stats), C (buy) ----------
 c.cash += 10 ** 7                   # a rich trader
 ch_key(h, "-")
 assert d.name() == "SHIPYARD", d.name()
@@ -260,7 +264,7 @@ key(h, pygame.K_F3)
 assert d.name() == "SHIP STATS", d.name()
 shot(h, "ship_stats")
 old = a._ship_name()
-key(h, pygame.K_b, "b")
+ch_key(h, "c")
 assert a._ship_name() != old, ("bought", old, a._ship_name())
 shot(h, "new_ship")
 print("Shipyard: bought a", a._ship_name(), "(the", old, "is in the hangar)")

@@ -13,9 +13,10 @@
   docked the letter keys on the keyboard act the same as the badge keys, apart
   when entering text"), the letter keys A-F are the badge's buttons too, as
   well as keyboard keys: C chooses, F goes back, A launches, B the next tab (on
-  the Galactic chart's cursor: find), and so on. B stays buy where it buys
-  (Market, Equip ship, Ship stats: build 93). Not in flight (C is the docking
-  computer, F fires, A and D steer) and not on the typing pages.
+  the Galactic chart's cursor: find), and so on. B is only the badge's B there
+  (Brian: "badges b everywhere"), so the game's keyboard B (buy, build 93)
+  isn't sent: C buys, S sells. Not in flight (C is the docking computer, F
+  fires, A and D steer) and not on the typing pages.
 """
 import pygame
 
@@ -24,6 +25,7 @@ from pi_firmware import (BADGE, KEYBOARD, STICK, TAB, Button, ButtonDownEvent, B
 # a letter that is the keyboard's key and the badge's button at once
 AS_BUTTONS = "ABCDEF"
 BOTH = {c: Button(c, "PiKey", [KEYBOARD[c], BADGE[c]]) for c in AS_BUTTONS}
+BOTH["B"] = BADGE["B"]      # B: the badge's B only, not the keyboard's buy
 
 SPECIAL = {
     pygame.K_UP: KEYBOARD["UP"], pygame.K_DOWN: KEYBOARD["DOWN"],
