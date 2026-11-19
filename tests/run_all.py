@@ -12,7 +12,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 failed = []
 for name in ("test_game.py", "test_app.py", "test_commander.py", "test_galaxy.py", "test_market.py",
              "test_equipment.py", "test_ships.py", "test_shipyard.py", "test_find.py", "test_equip_effects.py", "test_traffic.py", "test_witchspace.py", "test_loader.py", "test_describe.py", "test_missions.py", "test_original_ships.py", "test_original_data.py", "test_install.py",
-             "test_leds.py", "test_hardcore.py", "test_views.py", "test_keys.py",
+             "test_leds.py", "test_hardcore.py", "test_views.py", "test_keys.py", "test_analog.py",
              "test_bench.py", "test_run.py"):
     r = subprocess.run([sys.executable, os.path.join(HERE, name)], capture_output=True, text=True)
     lines = [l for l in r.stdout.strip().split("\n") if not l.startswith(("PERF", "BENCH"))]
@@ -25,7 +25,8 @@ for name in ("test_game.py", "test_app.py", "test_commander.py", "test_galaxy.py
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 try:
     import pygame  # noqa: F401
-    for pi_name, label in (("test_pi_host.py", "pi host"), ("test_pi_trip.py", "pi trip")):
+    for pi_name, label in (("test_pi_host.py", "pi host"), ("test_pi_trip.py", "pi trip"),
+                            ("test_pi_pad.py", "pi pad")):
         pi_test = os.path.join(os.path.dirname(HERE), "hosts", "pi", "tests", pi_name)
         r = subprocess.run([sys.executable, pi_test], capture_output=True, text=True)
         lines = [l for l in r.stdout.strip().split("\n") if l and not l.startswith(("pygame ", "Hello from"))]

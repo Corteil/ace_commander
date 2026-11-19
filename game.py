@@ -23,6 +23,7 @@ PLAYER_MAX = 40.0      # top speed, in Elite speed units, of the Cobra Mk III (o
 THROTTLE_RATE = 25.0   # speed units gained per second at full throttle
 PITCH_RATE = 1.0       # radians per second at full stick
 ROLL_RATE = 1.7
+YAW_RATE = 0.6         # radians per second at full yaw (a host's pad only: the badge has no yaw)
 
 # Weapon ranges as Elite's (Brian, build 78): your lasers hit any ship in
 # your sights however far off (Elite's HITCH has no distance check: anything
@@ -62,6 +63,8 @@ AUTO_FAST = 8000.0      # the docking computer uses the jump drive's speed this 
 AUTO_LINE = 2500.0      # it lines up this far out in front of the slot
 AUTO_NEAR = 400.0       # this close to a point on its way counts as there
 AUTO_LEVEL = 1000.0     # and this close to the slot it rolls to match it
+AUTO_LEAD = 0.5         # on the run in it aims at the axis this far out from the middle to you
+AUTO_SPIN = 1.0         # roll matching follows the station's spin (0: not, as before build 95)
 AIM_ASSIST = 0.05      # a shot hits anything within this slope of the crosshair
 
 MISSILE_DAMAGE = 150.0
@@ -91,6 +94,7 @@ DOCK_DIST = 500.0          # docking C (automatic): this close to the station's 
 # through the slot; anything else is a crash that hurts and bounces you off.
 # Angles are given as their cosines.
 PLAYER_R = 40.0            # your ship's size: you touch the station this far from its front face
+AUTO_IN = 40.0             # the docking computer docks with your ship this far inside the slot
 DOCK_SPEED = 20.0          # faster than this (Elite speed units, top speed 40) and it's a crash
 SLOT_CONE_A = 0.927        # A: you must be in front of the slot, within 22 degrees of its axis
 HEAD_A = 0.9               # A: and flying into it, within 26 degrees
@@ -742,6 +746,7 @@ class Game:
         self.auto_far = False  # it is far from where it is heading: the jump drive's speed
         self.auto_level = False  # it is matching the slot's roll
         self.auto_stick = (0.0, 0.0)    # its last pitch and roll
+        self.auto_yaw = 0.0     # and yaw (on the run in, rolled to the slot: build 95)
 
     def say(self, msg, t=2.0):
         self.msg = msg
@@ -1037,7 +1042,9 @@ class Game:
             self.bump_t -= dt
         if st is not None:
             if self.autodock:
-                if self.auto_phase == 2 and sp.d_station < st.bp.front + PLAYER_R + 60.0:
+                # it flies on into the slot (Brian: the station bigger before
+                # the tunnel; the chase camera closes in meanwhile: cockpit.chase_back)
+                if self.auto_phase == 2 and sp.d_station < st.bp.front - AUTO_IN:
                     if sp.hostile:
                         self._refused(sp, st)
                         return
@@ -1218,6 +1225,7 @@ class Game:
         slot. Returns (pitch, roll, throttle)."""
         st = self.space.station
         m = st.m
+        yaw = 0.0
         nx, ny, nz = m[6], m[7], m[8]       # the slot faces along the station's nose
         lz = -(st.x * nx + st.y * ny + st.z * nz)   # how far out in front of the slot you are
         line = AUTO_LINE + st.bp.front
@@ -1248,20 +1256,34 @@ class Game:
             else:       # slowing as the point comes up, so as to turn onto the station there
                 want = max(DOCK_SPEED * 0.5, min(self.max_speed, d / 60.0))
         else:
-            pitch, roll, off = self._aim(st.x, st.y, st.z)
+            # in along the slot's axis (build 95, Brian: it "did not line up to the
+            # face"): aim at a point on the axis AUTO_LEAD of the way from the
+            # station's middle out to you, so any sideways offset dies away before
+            # the face, rather than at the middle itself, which came in at a slant
+            k = max(0.0, lz) * AUTO_LEAD
+            ax, ay, az = st.x + nx * k, st.y + ny * k, st.z + nz * k
+            pitch, roll, off = self._aim(ax, ay, az)
             self.auto_far = False
             if (off < 0.15 and self.space.d_station < st.bp.front + AUTO_LEVEL) or self.auto_level:
-                # on the axis: roll to match the slot, from then on (its roof straight across the screen)
+                # rolled to the slot, it can't roll onto the point any more: it
+                # pitches and yaws onto it instead (yaw: build 95)
+                if az > 1.0:
+                    pitch = max(-1.0, min(1.0, math.atan2(ay, az) * 4.0))
+                    yaw = max(-1.0, min(1.0, math.atan2(ax, az) * 4.0 * PITCH_RATE / YAW_RATE))
+                # on the axis: roll to match the slot, from then on (its roof straight
+                # across the screen), turning with the station as it spins
                 a = math.atan2(m[4], m[3])
                 if a > math.pi / 2:
                     a -= math.pi
                 elif a < -math.pi / 2:
                     a += math.pi
-                roll = max(-1.0, min(1.0, -a * 3.0))
+                ff = AUTO_SPIN * STATION_SPIN / (ROLL_RATE * self.turn_k) if self.turn_k else 0.0
+                roll = max(-1.0, min(1.0, -a * 3.0 + ff))
                 self.auto_level = True
             want = DOCK_SPEED * 0.7
         throttle = max(-1.0, min(1.0, (want - self.speed) * 0.5))
         self.auto_stick = (pitch, roll)     # for the view from behind your ship
+        self.auto_yaw = yaw
         return pitch, roll, throttle
 
     def _ecm(self):
@@ -1344,9 +1366,11 @@ class Game:
 
     # ---- one step of the simulation ---------------------------------------
 
-    def step(self, dt, pitch, roll, throttle, fire, missile):
+    def step(self, dt, pitch, roll, throttle, fire, missile, yaw=0.0):
         """Advance by dt seconds. pitch > 0 is nose up, roll > 0 is right wing
-        down, throttle is -1..1; fire and missile are True or False."""
+        down, throttle is -1..1; fire and missile are True or False. yaw > 0
+        turns the nose right (a host's analogue pad; Elite and the badge have
+        none, so it is 0 there and costs nothing)."""
         if dt > 0.1:
             dt = 0.1
         self.time += dt
@@ -1368,9 +1392,10 @@ class Game:
             else:
                 pitch, roll, throttle = self._autopilot()
                 fire = missile = False
+                yaw = self.auto_yaw
         if self.over:
             self.jump_t = 0.0
-            pitch = roll = 0.0
+            pitch = roll = yaw = 0.0
             throttle = -1.0
             fire = missile = False
 
@@ -1397,6 +1422,8 @@ class Game:
             fwd *= JUMP_K
         self.fwd = int(fwd)
         self._rotate(pitch * PITCH_RATE * self.turn_k * dt, roll * ROLL_RATE * self.turn_k * dt, fwd)
+        if yaw:
+            self._yaw(yaw * YAW_RATE * self.turn_k * dt)
         for o in self.objs:
             if not o.dead:
                 self._think(o, dt)
@@ -1536,6 +1563,46 @@ class Game:
             o = self.objs[self.tick % n]
             if o.kind == "rock" or o.kind == "can":
                 _ortho(o.m)
+
+    def _yaw(self, c):
+        """Turn the nose right by c radians: everything turns the other way
+        about the up axis. In floats, as only a host with an analogue pad
+        yaws (the badge's _rotate is whole numbers for its garbage collector).
+        Whole-number things (dust, explosion dots) stay whole numbers."""
+        cc = math.cos(c)
+        sc = math.sin(c)
+
+        def turn(x, z):
+            return x * cc - z * sc, x * sc + z * cc
+
+        sp = self.space
+        if sp is not None:
+            sp.px, sp.pz = turn(sp.px, sp.pz)
+            sp.sx, sp.sz = turn(sp.sx, sp.sz)
+            st = sp.station
+            if st is not None:
+                st.x, st.z = turn(st.x, st.z)
+                m = st.m
+                for i in (0, 3, 6):
+                    m[i], m[i + 2] = turn(m[i], m[i + 2])
+        for o in self.objs:
+            o.x, o.z = turn(o.x, o.z)
+            m = o.m
+            for i in (0, 3, 6):
+                m[i], m[i + 2] = turn(m[i], m[i + 2])
+            v = o.aim
+            if v is not None:
+                v[0], v[2] = turn(v[0], v[2])
+        for boom in self.booms:
+            for p in boom.parts:
+                for i in (0, 3):
+                    x, z = turn(p[i], p[i + 2])
+                    p[i] = int(round(x))
+                    p[i + 2] = int(round(z))
+        for p in self.dust:
+            x, z = turn(p[0], p[2])
+            p[0] = int(round(x))
+            p[2] = int(round(z))
 
     def _think(self, o, dt):
         if o.hit > 0:

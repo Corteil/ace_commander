@@ -1055,3 +1055,34 @@ what is now `ace.py` (renamed in build 50).
    update; a key goes up as the names it went down as). In flight, pause menu included,
    they stay Elite's keys. Same on the badge's Keyboard Hexpansion and the Pi (its own
    mapping removed). Tests in `tests/test_keys.py`; key guide footer line.
+   **Build 94** (2026-11-19, Brian, for the Pi's game pad: "analog controls", left stick
+   left / right "pan"). `AceCommander.analog`: a host's analogue controls (roll, pitch, yaw
+   -1..1, speed 0..1 where the power stick sits, or None), added to the steering in
+   `_update_flight`; speed steers the throttle to that fraction of `max_speed` (at the top
+   it holds speed up, so it is the jump drive); CONTROLS' left / right flip turns yaw too; a
+   stick pushed past half takes over from the docking computer. Yaw is new (Elite has none):
+   `Game.step(..., yaw=0.0)` and `Game._yaw` turn everything about the up axis in floats,
+   only when yaw is not 0, so the badge (which never sets analog) pays only an `if`.
+   `YAW_RATE` 0.6 rad/s. Tests: `tests/test_analog.py`. The Pi's pad map is in
+   `hosts/pi/PLAN.md` (P2).
+   **Build 95** (2026-11-19, Brian, playing on the Pi with his Boa: "selected ship is not
+   displayed ... when leaving or entering the scene", "when docking the station should be
+   bigger before the tunnel scene"; chose "fly on into the slot"). (1) The ship you fly
+   always shows in the launch and docking tunnels: one too big for the slot level (Boa,
+   Python, Anaconda in a Coriolis, whose slot is 3:1) is drawn shrunk to just fit
+   (`Tunnel.fly`, `_MeInTunnel(bp, k)`: the scale in its matrix); it used to be left out.
+   (2) The docking computer flies on into the slot: docked at `game.AUTO_IN` (40) inside the
+   face (was `front + PLAYER_R + 60` outside), and the chase camera closes in on the final
+   run (`cockpit.chase_back`: from `CHASE_BACK` 760 to `CHASE_DOCK` 220 outside the face,
+   half a unit per unit, height in proportion), so the station fills the screen before the
+   tunnel; once your ship's nose is in the slot it is drawn before the station, which hides
+   it. Tests in `tests/test_equip_effects.py`. Docking by hand is unchanged.
+   Then (same day, Brian: "did not line up to the face correctly"): measured, the run in
+   came at ~3 degrees to the axis (it aimed at the station's middle) and ~3 degrees off the
+   slot's roll (lagging the spin), and the camera looked down from above. Now on the run in
+   it aims at a point on the axis halfway from the middle out to you (`AUTO_LEAD`); once
+   rolled to the slot it pitches and yaws onto it (`auto_yaw`: the new yaw, so sideways
+   error can be put right without rolling); the roll matching follows the station's spin
+   (`AUTO_SPIN`, feed-forward `STATION_SPIN / (ROLL_RATE * turn_k)`); the chase camera
+   drops onto your ship's axis as it closes in. At the face: 0 off the axis, 0 degrees off
+   the roll, the face square on. Test in `tests/test_equip_effects.py`.

@@ -536,6 +536,11 @@ class AceCommander(app.App):
         # steer by tilt as well as the joystick (TILT_DEFAULT, or the menu)
         self.use_tilt = self.tilt_ok and TILT_DEFAULT
         self.tilt_flip = 0      # CONTROLS (TILT_FLIPS): 1 pitch flipped, 2 roll, 3 both
+        # a host's analogue controls (the Pi's game pad), or None: anything with
+        # roll, pitch, yaw (-1..1, pitch as the joystick: negative is up) and
+        # speed (0..1, where the power stick sits; None: leave the speed alone).
+        # The badge never sets it.
+        self.analog = None
         self.zero = None                 # accelerometer reading taken as "level"
         self.ms = 0.0                    # smoothed frame time
         self.leds_on = False             # we have taken over the LEDs
@@ -1750,10 +1755,27 @@ class AceCommander(app.App):
             if hit(BTN_BOMB) and g.energy_bomb() and self.career and self.cmdr is not None:
                 self._extra(self.cmdr, "bomb", False)     # used up
             roll, jy = self._steer(tilt, STICK, True)
+        yaw = 0.0
+        an = self.analog
+        if an is not None:      # a host's analogue pad: added to the rest
+            roll = max(-1.0, min(1.0, roll + an.roll))
+            jy = max(-1.0, min(1.0, jy + an.pitch))
+            yaw = an.yaw
+            if an.speed is not None and not g.autodock:
+                # the stick's place is the speed; right at the top it holds
+                # speed up, so at full speed it is the jump drive (as J)
+                if an.speed >= 0.98:
+                    throttle += 1.0
+                else:
+                    want = an.speed * g.max_speed
+                    throttle += max(-1.0, min(1.0, (want - g.speed) / (game.THROTTLE_RATE * max(dt, 0.001))))
+            if g.autodock and not busy and max(abs(an.roll), abs(an.pitch), abs(an.yaw)) > 0.5:
+                g.stop_autodock()   # taking the controls, as _took_controls
         if self.tilt_flip & 1:      # the CONTROLS setting (build 87: every way of steering)
             jy = -jy
         if self.tilt_flip & 2:
             roll = -roll
+            yaw = -yaw
         if g.rules.manual_ecm:      # Hardcore: E is the ECM (or both speed buttons together)
             if not busy and (hit("k_E") or (hit(BTN_SPEED_UP) and held(BTN_SPEED_DOWN))
                              or (hit(BTN_SPEED_DOWN) and held(BTN_SPEED_UP))):
@@ -1801,7 +1823,7 @@ class AceCommander(app.App):
             g.stop_autodock()       # taking the controls switches the docking computer off
         pitch = jy if INVERT_PITCH else -jy
         t0 = _us()
-        g.step(dt, pitch, roll, max(-1.0, min(1.0, throttle)), fire, missile)
+        g.step(dt, pitch, roll, max(-1.0, min(1.0, throttle)), fire, missile, yaw)
         rules = _diff(_us(), t0) / 1000.0
         self.t_step += (rules - self.t_step) * 0.1
         self.p_rules += rules

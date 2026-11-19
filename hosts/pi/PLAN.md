@@ -108,6 +108,36 @@ selling": S no longer sells anywhere (the game's build 93 change dropped).
 Pi host only; the badge's Keyboard Hexpansion is unchanged.
 
 ### P2 - Gamepad
+Started 2026-11-19 (branch `pi-p2`) with Brian's 8BitDo SN30 Pro (USB, "for Android" mode; SDL
+knows it as a game controller). `pad_pi.py`: any SDL game controller, buttons by position in one
+table (`MAP`), the pad being the badge: D-pad and left stick the joystick (on at half travel, off
+below 0.35), south C, west D, north B, east F, Start A, right shoulder / trigger F, left E, stick
+press the joystick's press. Hot-plug; unplugging lets go. Test `tests/test_pi_pad.py` (made-up
+events).
+Brian's flight map (2026-11-19), done the same day: flying (looking at space) the pad uses
+`FLIGHT_MAP` and analogue sticks: left up / down power (the stick's place is the speed: top full,
+centre half, bottom stopped; at the top it is the jump drive too), left left / right yaw (new: the
+game had none), right up / down pitch, left / right roll; left trigger missile (the badge's D, so
+Hardcore arms first), left bumper E.C.M. (Hardcore only; otherwise automatic), right trigger fire,
+right bumper energy bomb, D-pad views (up front, down rear, left, right), right stick click next
+view, Start pause menu, Xbox button held 1 s escape pod, A held jump drive, B docking computer
+on / off, X hyperspace (held 1 s galactic), Y the in-flight screens in turn (local chart, galactic
+chart, status, inventory, market, back to space), left stick click arm the missile (Hardcore).
+Elsewhere (title, docked, pause menu, in-flight screens) `BADGE_MAP`: the pad is the badge (Y docked
+is the badge's B). Dead zone 0.12, curve 1.6. Game side (badge files, no change there unless a host
+sets it): `AceCommander.analog` (roll, pitch, yaw, speed) adds to the steering; `Game.step(...,
+yaw)` and `Game._yaw` (floats, only when yaw is not 0); CONTROLS' left / right flip turns yaw too; a
+pushed stick (> 0.5) takes over from the docking computer. Tests: `tests/test_analog.py`,
+`hosts/pi/tests/test_pi_pad.py`. First tried by Brian 2026-11-19 (every control logged fine).
+Then (Brian, same day) the docked and in-flight screen maps and the hints: docked / title / pause
+menu / after the ship is lost, `BADGE_MAP` (D-pad / left stick joystick, A = C, X = D, B = F, Y = B,
+Start = A, LB / RB = E / B the tabs, Back = Options, triggers nothing); on an in-flight screen
+`SCREEN_MAP` (sticks still fly, RT fires, D-pad cursor / scroll, A select, X system data, B back to
+space, Y next screen, Back the Galactic chart's search, Start pause menu; no hyperspace hold: Brian
+"lose the hold"). The hints name the pad's buttons (Xbox names) once the pad was the last thing used
+(`ctx_pygame.relabel`, `Pads.labels`): "C: buy  D: sell" reads "A: buy  X: sell", "A: LAUNCH"
+"START: LAUNCH"; a key press brings the badge's letters back.
+
 pygame joystick: D-pad and buttons first, then the analogue stick (needs the `_steer` hook), with
 a dead zone and a curve. Button map in one table. Done when: a whole trip works on a pad alone.
 
