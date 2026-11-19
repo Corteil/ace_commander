@@ -63,6 +63,8 @@ AUTO_FAST = 8000.0      # the docking computer uses the jump drive's speed this 
 AUTO_LINE = 2500.0      # it lines up this far out in front of the slot
 AUTO_NEAR = 400.0       # this close to a point on its way counts as there
 AUTO_LEVEL = 1000.0     # and this close to the slot it rolls to match it
+AUTO_LEAD = 0.5         # on the run in it aims at the axis this far out from the middle to you
+AUTO_SPIN = 1.0         # roll matching follows the station's spin (0: not, as before build 95)
 AIM_ASSIST = 0.05      # a shot hits anything within this slope of the crosshair
 
 MISSILE_DAMAGE = 150.0
@@ -744,6 +746,7 @@ class Game:
         self.auto_far = False  # it is far from where it is heading: the jump drive's speed
         self.auto_level = False  # it is matching the slot's roll
         self.auto_stick = (0.0, 0.0)    # its last pitch and roll
+        self.auto_yaw = 0.0     # and yaw (on the run in, rolled to the slot: build 95)
 
     def say(self, msg, t=2.0):
         self.msg = msg
@@ -1222,6 +1225,7 @@ class Game:
         slot. Returns (pitch, roll, throttle)."""
         st = self.space.station
         m = st.m
+        yaw = 0.0
         nx, ny, nz = m[6], m[7], m[8]       # the slot faces along the station's nose
         lz = -(st.x * nx + st.y * ny + st.z * nz)   # how far out in front of the slot you are
         line = AUTO_LINE + st.bp.front
@@ -1252,20 +1256,34 @@ class Game:
             else:       # slowing as the point comes up, so as to turn onto the station there
                 want = max(DOCK_SPEED * 0.5, min(self.max_speed, d / 60.0))
         else:
-            pitch, roll, off = self._aim(st.x, st.y, st.z)
+            # in along the slot's axis (build 95, Brian: it "did not line up to the
+            # face"): aim at a point on the axis AUTO_LEAD of the way from the
+            # station's middle out to you, so any sideways offset dies away before
+            # the face, rather than at the middle itself, which came in at a slant
+            k = max(0.0, lz) * AUTO_LEAD
+            ax, ay, az = st.x + nx * k, st.y + ny * k, st.z + nz * k
+            pitch, roll, off = self._aim(ax, ay, az)
             self.auto_far = False
             if (off < 0.15 and self.space.d_station < st.bp.front + AUTO_LEVEL) or self.auto_level:
-                # on the axis: roll to match the slot, from then on (its roof straight across the screen)
+                # rolled to the slot, it can't roll onto the point any more: it
+                # pitches and yaws onto it instead (yaw: build 95)
+                if az > 1.0:
+                    pitch = max(-1.0, min(1.0, math.atan2(ay, az) * 4.0))
+                    yaw = max(-1.0, min(1.0, math.atan2(ax, az) * 4.0 * PITCH_RATE / YAW_RATE))
+                # on the axis: roll to match the slot, from then on (its roof straight
+                # across the screen), turning with the station as it spins
                 a = math.atan2(m[4], m[3])
                 if a > math.pi / 2:
                     a -= math.pi
                 elif a < -math.pi / 2:
                     a += math.pi
-                roll = max(-1.0, min(1.0, -a * 3.0))
+                ff = AUTO_SPIN * STATION_SPIN / (ROLL_RATE * self.turn_k) if self.turn_k else 0.0
+                roll = max(-1.0, min(1.0, -a * 3.0 + ff))
                 self.auto_level = True
             want = DOCK_SPEED * 0.7
         throttle = max(-1.0, min(1.0, (want - self.speed) * 0.5))
         self.auto_stick = (pitch, roll)     # for the view from behind your ship
+        self.auto_yaw = yaw
         return pitch, roll, throttle
 
     def _ecm(self):
@@ -1374,7 +1392,7 @@ class Game:
             else:
                 pitch, roll, throttle = self._autopilot()
                 fire = missile = False
-                yaw = 0.0
+                yaw = self.auto_yaw
         if self.over:
             self.jump_t = 0.0
             pitch = roll = yaw = 0.0

@@ -940,7 +940,9 @@ def draw_world(ctx, g):
         me = _my_ship(g)
         if me is not None:
             back = chase_back(g)
-            up = CHASE_UP * back / CHASE_BACK       # the ship stays where it is on screen
+            # and drops in behind it, so the slot's face is seen square on
+            near = CHASE_DOCK + (_auto_in or 0.0)
+            up = CHASE_UP * max(0.0, back - near) / (CHASE_BACK - near)
             me.y = -up
             me.z = back
             _chase_shift(g, -up, back)

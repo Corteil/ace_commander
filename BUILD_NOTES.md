@@ -1077,3 +1077,12 @@ what is now `ace.py` (renamed in build 50).
    half a unit per unit, height in proportion), so the station fills the screen before the
    tunnel; once your ship's nose is in the slot it is drawn before the station, which hides
    it. Tests in `tests/test_equip_effects.py`. Docking by hand is unchanged.
+   Then (same day, Brian: "did not line up to the face correctly"): measured, the run in
+   came at ~3 degrees to the axis (it aimed at the station's middle) and ~3 degrees off the
+   slot's roll (lagging the spin), and the camera looked down from above. Now on the run in
+   it aims at a point on the axis halfway from the middle out to you (`AUTO_LEAD`); once
+   rolled to the slot it pitches and yaws onto it (`auto_yaw`: the new yaw, so sideways
+   error can be put right without rolling); the roll matching follows the station's spin
+   (`AUTO_SPIN`, feed-forward `STATION_SPIN / (ROLL_RATE * turn_k)`); the chase camera
+   drops onto your ship's axis as it closes in. At the face: 0 off the axis, 0 degrees off
+   the roll, the face square on. Test in `tests/test_equip_effects.py`.

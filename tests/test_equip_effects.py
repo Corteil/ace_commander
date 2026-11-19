@@ -185,6 +185,28 @@ assert back_last <= cockpit.CHASE_DOCK + game.AUTO_IN + 20, ("the camera closed 
 assert backs[0][1] == cockpit.CHASE_BACK, "far out: the usual chase view"
 assert abs(d_last + back_last - st.bp.front - cockpit.CHASE_DOCK) < 30, \
     ("the camera just outside the slot's face", d_last, back_last)
+# and it comes in on the slot's axis, rolled to it (build 95: pitch and yaw on the run in)
+for station in ("CORIOLIS", "DODO"):
+    for seed in range(3):
+        random.seed(seed)
+        g = game.Game(SHIPS); g.enter(4000, station, "launch", 3); g.computer = True
+        g.spawn_t = g.rock_t = 1e9
+        st = g.space.station
+        g.to_station(3000 + 400 * seed, False)
+        g.start_autodock()
+        last = None
+        for _ in range(int(150 / DT)):
+            m = st.m
+            d = g.space.d_station
+            lz = -(st.x * m[6] + st.y * m[7] + st.z * m[8])
+            a_ = math.degrees(math.atan2(m[4], m[3]))
+            a_ = (a_ + 90) % 180 - 90
+            last = (math.sqrt(max(0.0, d * d - lz * lz)), a_)
+            g.step(DT, 0.0, 0.0, 0.0, False, False); g.encounter_t = 1e9
+            if g.docked:
+                break
+        assert g.docked, (station, seed)
+        assert last[0] < 4 and abs(last[1]) < 1.5, (station, seed, "off the axis / roll", last)
 print("docking computer: into the slot, the chase camera closing in: ok")
 
 # ---- galaxies -------------------------------------------------------------
