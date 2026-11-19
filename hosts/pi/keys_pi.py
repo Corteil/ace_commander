@@ -9,23 +9,13 @@
 - Letters, digits, symbols, Space, Backspace, Tab, Shift, Ctrl: the Keyboard
   Hexpansion's keys, so every keyboard key the game knows works as on the badge
   (Elite's keys, the search and name pages).
-- Off the flight (docked, the title, the menus; Brian, 2026-11-19: "when
-  docked the letter keys on the keyboard act the same as the badge keys, apart
-  when entering text"), the letter keys A-F are the badge's buttons too, as
-  well as keyboard keys: C chooses, F goes back, A launches, B the next tab (on
-  the Galactic chart's cursor: find), and so on. B is only the badge's B there
-  (Brian: "badges b everywhere"), so the game's keyboard B (buy, build 93)
-  isn't sent: C buys, D sells. Not in flight (C is the docking computer, F
-  fires, A and D steer) and not on the typing pages.
+- Off the flight (docked, the title and its pages; not in flight, pause menu
+  included) and not while typing, the game itself makes the letter keys A-F the badge's buttons, on
+  the Pi as on the badge's Keyboard Hexpansion (ace.Pad.as_buttons).
 """
 import pygame
 
-from pi_firmware import (BADGE, KEYBOARD, STICK, TAB, Button, ButtonDownEvent, ButtonUpEvent)
-
-# a letter that is the keyboard's key and the badge's button at once
-AS_BUTTONS = "ABCDEF"
-BOTH = {c: Button(c, "PiKey", [KEYBOARD[c], BADGE[c]]) for c in AS_BUTTONS}
-BOTH["B"] = BADGE["B"]      # B: the badge's B only, not the keyboard's buy
+from pi_firmware import (BADGE, KEYBOARD, STICK, TAB, ButtonDownEvent, ButtonUpEvent)
 
 SPECIAL = {
     pygame.K_UP: KEYBOARD["UP"], pygame.K_DOWN: KEYBOARD["DOWN"],
@@ -47,9 +37,8 @@ class Keys:
     A key's button is remembered at key-down, so its key-up matches even if
     Shift changed the character in between."""
 
-    def __init__(self, bus, as_buttons=None):
+    def __init__(self, bus):
         self.bus = bus
-        self.as_buttons = as_buttons or (lambda c: False)  # True: letter c is the badge's button too
         self.down = {}          # pygame key -> the Button sent for it
 
     def button(self, event):
@@ -57,10 +46,7 @@ class Keys:
         if b is not None:
             return b
         if pygame.K_a <= event.key <= pygame.K_z:
-            c = chr(event.key).upper()
-            if c in BOTH and self.as_buttons(c):
-                return BOTH[c]
-            return KEYBOARD[c]
+            return KEYBOARD[chr(event.key).upper()]
         if pygame.K_0 <= event.key <= pygame.K_9:
             return KEYBOARD[chr(event.key)]
         ch = getattr(event, "unicode", "")

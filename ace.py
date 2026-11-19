@@ -327,7 +327,7 @@ class Pad:
             table.append(("j_" + name.lower(), JOY[name]))
         for name in "ABCDEF":
             table.append((name, FB[name]))
-        for name in ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "T", "U", "V", "C", "B", "SPACE",
+        for name in ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "T", "U", "V", "C", "SPACE",
                      "BACKSPACE",
                      "UP", "DOWN", "LEFT", "RIGHT"):
             key = KEYBOARD_BUTTONS.get(name)
@@ -368,6 +368,20 @@ class Pad:
         key = KEYBOARD_BUTTONS.get("SPACE")
         if key is not None:
             self.letters[key] = " "
+        # off the flight the keyboard's A-F are the badge's buttons (Brian,
+        # 2026-11-19: "the letter keys act the same as the badge keys, apart
+        # when entering text", "the same everywhere"): each counts as the
+        # lettered button and its system direction, as the badge's own do
+        # (A up, B right, C confirm, D down, E left, F cancel), instead of as
+        # a keyboard key. AceCommander sets as_buttons each frame.
+        self.as_buttons = False
+        self.badge_keys = {}
+        for ch, sysname in (("A", "up"), ("B", "right"), ("C", "confirm"),
+                            ("D", "down"), ("E", "left"), ("F", "cancel")):
+            key = KEYBOARD_BUTTONS.get(ch)
+            if key is not None:
+                self.badge_keys[key] = (ch, sysname)
+        self.down_names = {}    # button -> the names it went down as (for its up)
         self.typed = ""      # letters typed since the last end_frame()
         self.keyboard = False   # a keyboard key has been pressed (see AceCommander._keyboard)
         self.names = {}      # button -> the control names it counts as
@@ -402,7 +416,12 @@ class Pad:
         # badge log, build 64). hit("mod+k_H") is a shifted H.
         mod = (count.get("k_SHIFT", 0) > 0 or count.get("k_CTRL", 0) > 0
                or count.get("k_LSHIFT", 0) > 0 or count.get("k_RSHIFT", 0) > 0)
-        for n in self._names(button):
+        names = self._names(button)
+        if self.as_buttons and button in self.badge_keys:
+            names = self.badge_keys[button]     # the badge's button, not the key
+            self.keyboard = True
+        self.down_names[button] = names
+        for n in names:
             count[n] = count.get(n, 0) + 1
             self.hits.add(n)
             if mod:
@@ -422,7 +441,7 @@ class Pad:
             return
         self.pressed[button] = False
         count = self.count
-        for n in self._names(button):
+        for n in self.down_names.pop(button, None) or self._names(button):
             if count.get(n, 0) > 0:
                 count[n] -= 1
 
@@ -443,6 +462,7 @@ class Pad:
         self.pressed = {}
         self.count = {}
         self.hits = set()
+        self.down_names = {}
 
 
 class AceCommander(app.App):
@@ -907,6 +927,11 @@ class AceCommander(app.App):
             if flying and PERF_LOG:
                 self._perf(delta, _diff(_us(), t0) / 1000.0)
         pad.end_frame()
+        # the keyboard's A-F are the badge's buttons for the next frame's keys:
+        # off the flight (docked, the title, its pages), not while typing; in
+        # flight, pause menu too, they stay Elite's keys
+        pad.as_buttons = (self.mode != "flight" and self.namer is None
+                          and self.finder is None and self.tdialog is None)
 
     def choices(self):
         """The title screen's choices, in order."""
@@ -1233,7 +1258,7 @@ class AceCommander(app.App):
                 d.pick_item(-1)
             elif self._repeat("j_down", dt):
                 d.pick_item(1)
-            elif hit("C") or hit("k_B"):
+            elif hit("C"):
                 d.buy_item()
             elif (hit(BTN_MISSILE)) or hit("k_D"):
                 d.next_mount()      # which view a laser is fitted to
@@ -1256,7 +1281,7 @@ class AceCommander(app.App):
             elif (hit(BTN_MISSILE) or hit("k_D")) and d.ysel == 0:
                 d.open("REPAIR SHOP")       # your own ship: the Repair Shop (build 82: on D)
         elif d.name() == "SHIP STATS":
-            if d.ysel and (hit("C") or hit("k_B")):
+            if d.ysel and hit("C"):
                 d.buy_ship(False)       # the one you fly goes into the hangar
             elif d.ysel and (hit(BTN_MISSILE) or hit("k_D")):
                 d.buy_ship(True)        # trade it in
@@ -1287,13 +1312,12 @@ class AceCommander(app.App):
                 d.sell_all()        # the whole hold at this station's prices
                 d.scroll_inventory(0)
         elif d.name() == "MARKET":
-            # the joystick picks a good; C buys and D sells; all repeat when held.
-            # On a keyboard B buys too (Brian, build 93)
+            # the joystick picks a good; C buys and D sells; all repeat when held
             if self._repeat("j_up", dt):
                 d.pick_good(-1)
             elif self._repeat("j_down", dt):
                 d.pick_good(1)
-            elif self._repeat("C", dt) or self._repeat("k_B", dt):
+            elif self._repeat("C", dt):
                 d.trade(True)
             elif self._repeat(BTN_MISSILE, dt):
                 d.trade(False)

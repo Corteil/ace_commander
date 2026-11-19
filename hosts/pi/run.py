@@ -5,8 +5,8 @@
     python3 hosts/pi/run.py --full      full screen, as big as fits
 
 Keys: arrows are the joystick, Enter confirms (the joystick pressed in), Esc
-goes back, F1-F6 are the badge's buttons A-F (off the flight, the letters A-F
-are too, but not while typing), and the rest of the keyboard is
+goes back, F1-F6 are the badge's buttons A-F (docked and on the title, the
+letters A-F are too, but not while typing), and the rest of the keyboard is
 the Keyboard Hexpansion (Elite's keys). Docked, C buys and D sells. Close the window or leave from the
 title screen to quit. Saves and options.json go in
 ~/.local/share/ace_commander/; --debug shows the DEBUG menu of cheats.
@@ -107,7 +107,7 @@ class Host:
         self.screen = pygame.Surface((size, size))
         self.ctx = Ctx(self.screen, scale)
         self.mask = self._round_mask(size)
-        self.keys = Keys(self.bus, self._letters_are_buttons)
+        self.keys = Keys(self.bus)
         self.log_keys = log_keys
         if log_keys:
             self.ace.LOG_KEYS = True    # the game prints each button it gets
@@ -115,15 +115,6 @@ class Host:
         self.clock = pygame.time.Clock()
         self.running = True
         self.frames = 0
-
-    def _letters_are_buttons(self, letter):
-        """Letter A-F counts as the badge's button too (B only as the badge's
-        B): off the flight (or in its pause menu), not while typing a name or
-        a search."""
-        a = self.app
-        if a.namer is not None or a.finder is not None or a.tdialog is not None:
-            return False
-        return a.mode != "flight" or a.paused
 
     @staticmethod
     def _round_mask(size):

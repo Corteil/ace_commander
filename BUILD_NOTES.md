@@ -1046,3 +1046,12 @@ what is now `ace.py` (renamed in build 50).
    sells the hold; B still buys on the badge's keyboard. On the Pi host keyboard B is the
    badge's B when docked ("badges b everywhere"), so there C buys and D sells. Key guide:
    Market C/B buys, D sells.
+   Then (same day, Brian: "when docked the letter keys on the keyboard act the same as
+   the badge keys, apart when entering text", "badges b everywhere", "should be the same
+   everywhere"): build 93's B buys is dropped too. Instead the game's `Pad` makes the
+   keyboard's A-F the badge's buttons A-F (each the lettered button and its direction: A
+   up, B right, C confirm, D down, E left, F cancel) off the flight (docked, the title and
+   its pages), not while typing a name or a search (`as_buttons`, set at the end of each
+   update; a key goes up as the names it went down as). In flight, pause menu included,
+   they stay Elite's keys. Same on the badge's Keyboard Hexpansion and the Pi (its own
+   mapping removed). Tests in `tests/test_keys.py`; key guide footer line.

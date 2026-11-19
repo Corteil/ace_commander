@@ -141,9 +141,9 @@ right = [
 
     section("DOCKED", table([
         [k("1"), "Launch (badge: " + k("A") + ")"],
-        [k("2") + " " + k("8"), "Market: " + k("C") + "/" + k("B") + " buys, " + k("D") + " sells"],
+        [k("2") + " " + k("8"), "Market: " + k("C") + " buys, " + k("D") + " sells"],
         [k("3"), "Market, on the first good in your hold (to sell)"],
-        [k("4"), "Equip ship: " + k("C") + "/" + k("B") + " buys"],
+        [k("4"), "Equip ship: " + k("C") + " buys"],
         [k("5") + " " + k("6") + " " + k("7"), "Galactic chart (" + k("B") + ": find) · local chart · system data"],
         [k("9") + " / " + k("0"), "Status (" + k("C") + ": Options) / Inventory (" + k("C") + ": sell all)"],
         [k("−") + " / " + k("="), "Shipyard (Repair Shop inside) / Options"],
@@ -164,10 +164,12 @@ def page(c, doc):
     c.rect(0, A4[1] - 6 * mm, A4[0], 6 * mm, stroke=0, fill=1)
     c.setFont("Sans", 7)
     c.setFillColor(colors.HexColor("#6e7781"))
-    c.drawString(12 * mm, 12.5 * mm, "* Tab and Ctrl need the updated Keyboard Hexpansion driver "
+    c.drawString(12 * mm, 16 * mm, "* Tab and Ctrl need the updated Keyboard Hexpansion driver "
                  "(sodoku/tildagon-keebdexpansion PR #5); every other key works with either driver.")
-    c.drawString(12 * mm, 9 * mm, "Badge: buttons A–F round the screen, joystick in the "
+    c.drawString(12 * mm, 12.5 * mm, "Badge: buttons A–F round the screen, joystick in the "
                  "middle.  Keyboard: the Tildagon Keyboard Hexpansion or a USB keyboard.")
+    c.drawString(12 * mm, 9 * mm, "Off the flight (docked, the title) the keyboard's A–F are "
+                 "the badge's buttons A–F, except while typing a name or a search.")
     c.drawString(12 * mm, 5.5 * mm, "Ace Commander for the EMF Tildagon badge · build %s" % BUILD)
     c.restoreState()
 

@@ -100,7 +100,8 @@ in the game itself (build 93), so the badge's Keyboard Hexpansion has them too (
 B was later made the badge's B, below).
 Brian (2026-11-19, from a `--log-keys` run: he pressed A, C, D, F docked and nothing
 happened): off the flight (docked, title, menus, the pause menu) and not while typing, the
-letter keys A-F are also the badge's buttons (`keys_pi.BOTH`; Brian: "when docked the letter
+letter keys A-F are also the badge's buttons (now done by the game itself, `ace.Pad.as_buttons`, so
+the badge's keyboard matches; not in flight, pause menu included; Brian: "when docked the letter
 keys act the same as the badge keys, apart when entering text"); then "badges b everywhere": docked, keyboard B
 is only the badge's B (next tab, find on the chart), so on the Pi C buys and D sells; then "s not required for
 selling": S no longer sells anywhere (the game's build 93 change dropped).

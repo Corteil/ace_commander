@@ -77,8 +77,8 @@ commander name (89); released as v0.3.0 (2026-11-18).
 - `hosts/` - the same game on other devices, left out of release tarballs (`.gitattributes`).
   `hosts/pi/` (2026-11-19, P0): pygame window; `pi_firmware.py` stand-ins for the firmware
   modules (real `ace.py` unchanged), `ctx_pygame.py` (the ctx calls at scale), `keys_pi.py`
-  (arrows = joystick, F1-F6 = badge A-F, the rest = Keyboard Hexpansion; off the flight and not
-  typing, letters A-F are the badge's buttons too, B only the badge's B, so C buys), `run.py` (`Host`:
+  (arrows = joystick, F1-F6 = badge A-F, the rest = Keyboard Hexpansion; docked, letters A-F
+  are the badge's buttons, done by the game: `Pad.as_buttons`), `run.py` (`Host`:
   loop, round mask, LED ring). Tests: `hosts/pi/tests/test_pi_host.py` and `test_pi_trip.py`
   (P1: a whole trip by keys; SDL dummy driver), run by `tests/run_all.py` when pygame is there.
   `run.load_game` keeps save, options.json and debug.txt in `~/.local/share/ace_commander/`
@@ -286,8 +286,9 @@ Shipyard, Hangar, Galactic chart, Local chart, System data. The Repair Shop is t
 sub-screen (D on its first page, your own ship; C there and on every page is that ship's
 stats, where C buys and D trades in; `-` opens the Shipyard). Options is not a tab: C on Status opens it over
 Status (`Docked.in_options`, `name()` gives "OPTIONS"), F goes back; A launches. Only the current
-firmware matters (Brian, 2026-11-18: both badges run it). C on Inventory sells the whole hold (`Docked.sell_all`). On a keyboard B buys as well, docked (build 93: market, Equip ship,
-Ship stats; S was dropped: Brian, "s not required for selling").
+firmware matters (Brian, 2026-11-18: both badges run it). C on Inventory sells the whole hold (`Docked.sell_all`). Off the flight (docked, the title and its pages; not in flight, pause menu included) and not
+while typing, the keyboard's A-F are the badge's buttons A-F (`Pad.as_buttons`, set each frame;
+Brian 2026-11-19: "the same everywhere", badge and Pi). Build 93's B buys / S sells were dropped.
 The Repair Shop is always there (build 81: its DEBUG switch removed). Tests: `tests/test_keys.py`.
 **In-flight screens don't pause (Brian, build 62: "as Elite"; checked against the disc source).**
 Status, Inventory, Market Prices, both charts and system data are `SCREENS`: `fsub` names one while
