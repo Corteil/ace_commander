@@ -139,6 +139,18 @@ for w, ht, lw in ((800, 600, 320), (1280, 720, 1280 * 240 / 720)):
     pygame.image.save(h.window, os.path.join(SHOTS, "elite_%dx%d.png" % (w, ht)))
 print("4:3 and 16:9 windows: the dashboard fits: ok")
 
+# no mouse pointer over the game; no frame time counter in full screen
+assert not pygame.mouse.get_visible(), "the pointer is hidden"
+a.show_ms = True
+corner = pygame.Rect(h.window.get_width() - 60, 0, 60, 30)
+h.step(40)
+shown = lit(h.window, corner)
+h.full = True
+h.step(40)
+assert lit(h.window, corner) < shown, ("full screen: no frame time", shown, lit(h.window, corner))
+h.full = False
+print("no pointer; no frame time counter in full screen: ok")
+
 # F12: a screenshot in ~/Pictures/Ace Commander
 key(h, pygame.K_F12)
 d = os.path.join(HOME, "Pictures", "Ace Commander")

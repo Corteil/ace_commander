@@ -122,8 +122,12 @@ key(h, pygame.K_RETURN)
 assert a.mode == "menu", a.mode
 print("launch with F1 (the badge's A), fly, the menu, quit to title: ok")
 
-# leaving from the title screen ends the program
-key(h, pygame.K_ESCAPE)
-assert not h.running, "Esc on the title screen quits"
+# the title has a QUIT line (the Pi's); choosing it ends the program
+assert a.choices()[-1] == "QUIT", a.choices()
+while a.choices()[a.menu] != "QUIT":
+    key(h, pygame.K_RIGHT)
+key(h, pygame.K_RETURN)
+assert not h.running, "QUIT on the title screen quits"
+print("the title's QUIT line: ok")
 pygame.quit()
 print("ALL PI HOST TESTS PASSED")

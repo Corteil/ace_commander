@@ -1096,3 +1096,7 @@ what is now `ace.py` (renamed in build 50).
    badge) in place of the hard-coded 120s (ship and sphere culling, the enemy beam, the
    whole-view fills), and `game.DUST_X` (stardust's sideways spread, 500). At the defaults
    nothing changes: all 59 `tests/render.py` frames are pixel-identical before and after.
+   **Build 97** (2026-11-19, Brian on the Pi: "there should also be a quit option on the
+   title page"). `ace.TITLE_QUIT` (False on the badge, where F leaves): a host sets it for a
+   QUIT line at the end of the title menu, which leaves as F does. The Pi sets it. Also on
+   the Pi only: no mouse pointer over the game, and no frame time counter in full screen.

@@ -80,6 +80,7 @@ def load_game(d, debug=False):
         spec.loader.exec_module(pkg)
         ace = sys.modules[full]
     ace.SAVE_PATH = os.path.join(d, os.path.basename(ace.SAVE_PATH))
+    ace.TITLE_QUIT = True       # a computer needs a way out on the title screen (Brian)
     want = debug or os.path.exists(os.path.join(d, "debug.txt"))
     try:
         with open(ace.options_path()) as f:
@@ -152,6 +153,7 @@ class Host:
         else:
             s = self.win_scale
             self.window = pygame.display.set_mode((272 * s,) * 2, pygame.RESIZABLE)
+        pygame.mouse.set_visible(False)     # no pointer over the game (Brian)
         self._fit()
 
     def _fit(self):
@@ -246,6 +248,8 @@ class Host:
         return self._orig[0](ctx, g)
 
     def _hud(self, ctx, g, ms=None, ring=True):
+        if self.full:
+            ms = None           # no frame time counter in full screen (Brian)
         if not self._elite():
             return self._orig[1](ctx, g, ms, ring)
         ck = self.ck
