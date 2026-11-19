@@ -142,6 +142,25 @@ pygame joystick: D-pad and buttons first, then the analogue stick (needs the `_s
 a dead zone and a curve. Button map in one table. Done when: a whole trip works on a pad alone.
 
 ### P3 - Screens
+Started 2026-11-19 (branch `pi-p3`), Brian: full screen, the HUD "should match the Tufty as
+much as possible", details from Elite, radar lines whiter, no LEDs, scale with the window,
+switch to the badge layout too, screenshots. Done:
+- The Tufty's 11 view-size patches applied to the game itself (`cockpit.VIEW_HW` / `VIEW_HH`,
+  `game.DUST_X`; build 96): all 59 `tests/render.py` frames pixel-identical before and after.
+- `dash_pi.py`: the Tufty's layout (3D view over a 60-high dashboard, scanner in the middle,
+  compass and S / E lamps right of it, missiles left of it) on a canvas 240 high whose width
+  follows the window (384 on 16:10, 320 on 4:3, 427 on 16:9). Elite's gauges: left SH FU CT LT
+  AL, right SP RL DC and the energy as banks 1-4; missile lamps one per pylon, yellow armed /
+  seeking, red locked; scanner and compass lines near white (`SCAN_RGB`); a red frame round
+  the view when hit (no LEDs). RL / DC from the stick (`Game.step` wrapped, `g.pi_stick`; the
+  docking computer's `auto_stick`).
+- `run.py`: layouts "badge" (round, in its case, LED ring) and "elite" (the whole window;
+  badge screens in the middle; the tunnel across the whole window; thinner lines, `LINE_K`);
+  F10 switches, F11 full screen, F12 screenshot to `~/Pictures/Ace Commander/`; resizable
+  window; layout and full screen kept in `pi.json` in the data folder; `--layout`,
+  `--full` / `--window`. Test `hosts/pi/tests/test_pi_elite.py`.
+Not yet: Brian's look at it on the real screen; KMS without a desktop; HyperPixel Round.
+
 Full screen on the desktop and on KMS without a desktop; the HyperPixel Round (option B); the Elite
 layout (option C) shared with the Tufty port. Scale and layout as settings in Options.
 

@@ -11,6 +11,10 @@ import math
 FOCAL = 208.0    # pixels; gives a field of view of about 60 degrees
 VIEW_NAMES = ("FRONT", "REAR", "LEFT", "RIGHT")   # as game.VIEW_NAMES; this module imports no game
 NEAR = 30.0      # nothing closer than this is drawn
+# Half the 3D view's width and height in pixels, about the ctx origin. 120 and 120 is the
+# Tildagon's 240x240 view. Set both before drawing to use another size.
+VIEW_HW = 120
+VIEW_HH = 120
 TAU = 2 * math.pi
 WIRE_MIN = 8.0   # ships that look smaller than this (pixels) are drawn as a marker
 STREAK_MIN = 300  # world units: the shortest stardust streak with the jump drive on
@@ -152,7 +156,7 @@ def draw_ship(ctx, o, rgb=None, wire_min=WIRE_MIN, solid=False):
     sx = x * IFOCAL // z
     sy = -(y * IFOCAL // z)
     pr = bp.isize * IFOCAL // z     # how big it looks, in pixels
-    if sx - pr > 120 or sx + pr < -120 or sy - pr > 120 or sy + pr < -120:
+    if sx - pr > VIEW_HW or sx + pr < -VIEW_HW or sy - pr > VIEW_HH or sy + pr < -VIEW_HH:
         return False
     ctx.rgb(*(RED if o.hit > 0 else rgb or COLOUR[o.kind]))
     if pr < 3 and wire_min > 0:     # too far away to make out: a dot (wire_min 0: never)
@@ -300,13 +304,13 @@ def _enemy_beam(ctx, o):
     k = FOCAL / pz
     gx = (o.x + vx * m[0] + vy * m[3] + vz * m[6]) * k
     gy = -(o.y + vx * m[1] + vy * m[4] + vz * m[7]) * k
-    if gy > 120:
+    if gy > VIEW_HH:
         return
     ctx.line_width = 2.5
     ctx.rgb(*ORANGE)
     ctx.begin_path()
     ctx.move_to(gx, gy)
-    ctx.line_to(gx * 0.25, 126)
+    ctx.line_to(gx * 0.25, VIEW_HH + 6)
     ctx.stroke()
     ctx.line_width = 1.5
 
@@ -695,7 +699,7 @@ def draw_tunnel(ctx, f, t, rgb=GREEN, inward=False, tun=None):
     docking instead: f goes from 0 outside the mouth to 1 stopped at the
     doors."""
     tun = _tunnel(tun)
-    ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+    ctx.rgb(0, 0, 0).rectangle(-VIEW_HW, -VIEW_HH, 2 * VIEW_HW, 2 * VIEW_HH).fill()
     zs = _ZS
     last = TUNNEL_RINGS - 1
     if inward:
@@ -973,7 +977,7 @@ def draw_world(ctx, g):
 
 
 def _draw_world(ctx, g, station_wire=WIRE_MIN):
-    ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+    ctx.rgb(0, 0, 0).rectangle(-VIEW_HW, -VIEW_HH, 2 * VIEW_HW, 2 * VIEW_HH).fill()
     ctx.line_width = 1.5
 
     if g.warp > 0:      # just out of hyperspace: streaks rushing out from the centre
@@ -1086,15 +1090,15 @@ def _sphere(x, y, z, r):
     x *= k
     y *= -k
     r *= k
-    if x - r > 120 or x + r < -120 or y - r > 120 or y + r < -120:
+    if x - r > VIEW_HW or x + r < -VIEW_HW or y - r > VIEW_HH or y + r < -VIEW_HH:
         return None
     return x, y, r
 
 
 def _covers(c):
     """True if the circle (x, y, r) covers the whole screen."""
-    x = abs(c[0]) + 120
-    y = abs(c[1]) + 120
+    x = abs(c[0]) + VIEW_HW
+    y = abs(c[1]) + VIEW_HH
     return x * x + y * y < c[2] * c[2]
 
 
@@ -1106,7 +1110,7 @@ def _sun(ctx, sp, sun):
         return
     ctx.rgb(*SUN_COLOURS[sp.sun % len(SUN_COLOURS)])
     if _covers(sun):
-        ctx.rectangle(-120, -120, 240, 240).fill()
+        ctx.rectangle(-VIEW_HW, -VIEW_HH, 2 * VIEW_HW, 2 * VIEW_HH).fill()
     elif sun[2] < MAX_ARC:
         ctx.arc(sun[0], sun[1], sun[2], 0, TAU, 0).fill()
 
@@ -1118,7 +1122,7 @@ def _planet(ctx, sp, planet):
     fill, edge = PLANET_COLOURS[sp.planet % len(PLANET_COLOURS)]
     ctx.rgb(*fill)
     if _covers(planet):
-        ctx.rectangle(-120, -120, 240, 240).fill()
+        ctx.rectangle(-VIEW_HW, -VIEW_HH, 2 * VIEW_HW, 2 * VIEW_HH).fill()
         return
     if planet[2] >= MAX_ARC:
         return
@@ -1348,7 +1352,7 @@ def draw_hud(ctx, g, ms=None, ring=True):
         number(ctx, ms, 0, -114, _SMALL)
 
     if g.bomb_t > 0:    # the energy bomb: the screen flashes white
-        ctx.rgba(1, 1, 1, min(1.0, g.bomb_t * 2.0)).rectangle(-120, -120, 240, 240).fill()
+        ctx.rgba(1, 1, 1, min(1.0, g.bomb_t * 2.0)).rectangle(-VIEW_HW, -VIEW_HH, 2 * VIEW_HW, 2 * VIEW_HH).fill()
     if g.over and g.ejected:
         ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -42, 200, 100).fill()
         text(ctx, "ESCAPE POD", 0, -22, 24, YELLOW)

@@ -1090,3 +1090,9 @@ what is now `ace.py` (renamed in build 50).
    93-95 (keyboard A-F as the badge's buttons off the flight; analogue controls and yaw for
    a host's pad; your ship always in the tunnels; the docking computer flies into the slot,
    lined up with it, the station filling the screen). Version "0.3.2".
+   **Build 96** (2026-11-19, for the Pi's Elite layout, Brian: "start P3 full screen, HUD
+   should match the Tufty"). The Tufty port's view-size patches put into the game:
+   `cockpit.VIEW_HW` / `VIEW_HH` (half the 3D view's width and height, 120 / 120 on the
+   badge) in place of the hard-coded 120s (ship and sphere culling, the enemy beam, the
+   whole-view fills), and `game.DUST_X` (stardust's sideways spread, 500). At the defaults
+   nothing changes: all 59 `tests/render.py` frames are pixel-identical before and after.
