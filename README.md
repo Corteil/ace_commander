@@ -175,6 +175,18 @@ commander (`commander.json` for the game's own, `commander_elite.json` for Elite
 two files are derived from Elite (c) Acornsoft 1984, whose source has no licence: they are
 git-ignored and must not be published or put in the app store.
 
+## On a Raspberry Pi (or any computer)
+
+`hosts/pi/` runs the same game in a window with pygame (`sudo apt install python3-pygame`):
+
+```
+python3 hosts/pi/run.py           # the badge's round screen at 2x; --scale 3, --full
+```
+
+Arrows are the joystick, Enter confirms, Esc goes back, F1-F6 are the badge's buttons A-F, and
+the rest of the keyboard works as the Keyboard Hexpansion. Saves go in
+`~/.local/share/ace_commander/`. Work in progress: see `hosts/pi/PLAN.md`.
+
 ## For developers
 
 - `python3 tests/run_all.py` runs the PC test suite, with stand-ins for the badge firmware
