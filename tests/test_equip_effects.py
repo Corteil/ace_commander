@@ -149,7 +149,8 @@ g.start_autodock()
 closest = 1e9
 for _ in range(int(60 / DT)):
     m = st.m
-    if -(st.x * m[6] + st.y * m[7] + st.z * m[8]) < st.bp.front:
+    # going round (not the final run in, which ends inside the slot: AUTO_IN)
+    if -(st.x * m[6] + st.y * m[7] + st.z * m[8]) < st.bp.front and g.auto_phase < 2:
         closest = min(closest, g.space.d_station)
     g.step(DT, 0.0, 0.0, 0.0, False, False); g.encounter_t = 1e9
     if g.docked:
@@ -159,6 +160,32 @@ cone = -(st.x * m[6] + st.y * m[7] + st.z * m[8]) / g.space.d_station
 assert g.docked and closest > 2 * st.bp.radius, closest
 assert cone >= game.SLOT_CONE_A and abs(m[3]) >= game.LEVEL_A, "on the axis, roll matched"
 print("docking computer docks you from anywhere in the safe zone: ok")
+
+from ace_commander import cockpit
+# it flies on into the slot, and the chase camera closes in on the way (Brian: the
+# station bigger before the tunnel): at the docking the camera is just outside the slot's face
+random.seed(6)
+g = game.Game(SHIPS); g.enter(4000, "CORIOLIS", "launch", 3); g.computer = True
+g.spawn_t = g.rock_t = 1e9
+st = g.space.station
+g.to_station(3000, False)
+g.start_autodock()
+backs = []
+for _ in range(int(90 / DT)):
+    if g.autodock:
+        backs.append((g.space.d_station, cockpit.chase_back(g)))
+        cockpit.draw_world(CountCtx(), g)
+    g.step(DT, 0.0, 0.0, 0.0, False, False); g.encounter_t = 1e9
+    if g.docked:
+        break
+assert g.docked
+d_last, back_last = backs[-1]
+assert d_last < st.bp.front + 20, ("docks inside the slot", d_last)
+assert back_last <= cockpit.CHASE_DOCK + game.AUTO_IN + 20, ("the camera closed in", back_last)
+assert backs[0][1] == cockpit.CHASE_BACK, "far out: the usual chase view"
+assert abs(d_last + back_last - st.bp.front - cockpit.CHASE_DOCK) < 30, \
+    ("the camera just outside the slot's face", d_last, back_last)
+print("docking computer: into the slot, the chase camera closing in: ok")
 
 # ---- galaxies -------------------------------------------------------------
 gd = mod.game_data
@@ -369,6 +396,37 @@ for f in (0.0, 0.5, 0.99):
     assert e.tunnel.me.z > 0 and e.tunnel.me.x == 0.0
 e._pick_tunnel(); assert e.tunnel.me is not None, "docking too"
 print("build 40: your ship flies through the tunnel: ok")
+
+# every ship you can fly shows in both stations' tunnels: one too big for the slot
+# (a Boa in a Coriolis) is drawn shrunk to fit (Brian: the Boa was missing)
+from ace_commander import ships as ships_mod
+types = {e_[0]: game.Blueprint(e_) for e_ in mod.SHIPS}
+flyable = [n for n in types if n not in ("CORIOLIS", "DODO", "THARGOID", "THARGON", "ASTEROID",
+                                         "BOULDER", "ROCK", "SPLINTER", "CANISTER", "ESCAPE POD",
+                                         "MISSILE", "PLATE", "ALLOY PLATE", "CARGO", "SPACE STATION")
+           and n in getattr(ships_mod, "SHIP_TYPES", types)]
+for station in ("CORIOLIS", "DODO"):
+    tun = cockpit.Tunnel(0, station)
+    for n in flyable:
+        bp = types[n]
+        tun.fly(bp)
+        me = tun.me
+        assert me is not None, (station, n, "your ship always shows")
+        k = me.m[0]
+        hw = k * max(abs(v[0]) for v in bp.verts)
+        hh = k * max(abs(v[1]) for v in bp.verts)
+        room = cockpit.SHIP_SCALE * cockpit.SLOT_ROOM
+        assert hw <= room + 1e-6 and hh <= room / tun.aspect + 1e-6, (station, n, k)
+        assert k == 1.0 or not tun.fits(bp), "only too-big ships are shrunk"
+        e.tunnel = tun
+        for f in (0.0, 0.5, 0.99):
+            e.mode = "launch"; e.launch_t = f * mod.LAUNCH_TIME
+            e.draw(CountCtx())
+big = cockpit.Tunnel(0, "CORIOLIS")
+big.fly(types["BOA"]) if "BOA" in types else None
+assert "BOA" not in types or big.me.m[0] < 1.0, "a Boa in a Coriolis: shrunk"
+e.mode = "docked"; e._pick_tunnel()
+print("every ship shows in the tunnels, shrunk to fit where it's too big: ok")
 
 # ---- build 41: take off and land; the Repair Shop (DEBUG switch) -------------
 from ace_commander import docked as docked_mod

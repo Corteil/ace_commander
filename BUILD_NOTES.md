@@ -1065,3 +1065,15 @@ what is now `ace.py` (renamed in build 50).
    only when yaw is not 0, so the badge (which never sets analog) pays only an `if`.
    `YAW_RATE` 0.6 rad/s. Tests: `tests/test_analog.py`. The Pi's pad map is in
    `hosts/pi/PLAN.md` (P2).
+   **Build 95** (2026-11-19, Brian, playing on the Pi with his Boa: "selected ship is not
+   displayed ... when leaving or entering the scene", "when docking the station should be
+   bigger before the tunnel scene"; chose "fly on into the slot"). (1) The ship you fly
+   always shows in the launch and docking tunnels: one too big for the slot level (Boa,
+   Python, Anaconda in a Coriolis, whose slot is 3:1) is drawn shrunk to just fit
+   (`Tunnel.fly`, `_MeInTunnel(bp, k)`: the scale in its matrix); it used to be left out.
+   (2) The docking computer flies on into the slot: docked at `game.AUTO_IN` (40) inside the
+   face (was `front + PLAYER_R + 60` outside), and the chase camera closes in on the final
+   run (`cockpit.chase_back`: from `CHASE_BACK` 760 to `CHASE_DOCK` 220 outside the face,
+   half a unit per unit, height in proportion), so the station fills the screen before the
+   tunnel; once your ship's nose is in the slot it is drawn before the station, which hides
+   it. Tests in `tests/test_equip_effects.py`. Docking by hand is unchanged.

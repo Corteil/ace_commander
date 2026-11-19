@@ -453,9 +453,21 @@ class Tunnel:
         return hw <= room and hh <= room / self.aspect
 
     def fly(self, bp, rgb=ME_RGB):
-        """Show this ship (your own, painted rgb) flying through the tunnel, if it fits."""
-        self.me = _MeInTunnel(bp) if bp is not None and self.fits(bp) else None
+        """Show this ship (your own, painted rgb) flying through the tunnel. One
+        too big for the slot (a Boa, Python or Anaconda in a Coriolis, whose slot
+        is three times as wide as high) is drawn shrunk to just fit (Brian: the
+        ship you fly was missing from the scene)."""
         self.me_rgb = rgb
+        if bp is None:
+            self.me = None
+            return
+        k = 1.0
+        if not self.fits(bp):
+            hw = max([abs(v[0]) for v in bp.verts] or [1])
+            hh = max([abs(v[1]) for v in bp.verts] or [1])
+            room = SHIP_SCALE * SLOT_ROOM
+            k = 0.95 * min(room / hw, room / self.aspect / hh)
+        self.me = _MeInTunnel(bp, k)
 
     def park(self, bps, rnd):
         """Park these ships (blueprints) in the bay, the ones that fit the
@@ -478,11 +490,11 @@ class _MeInTunnel:
     kind = "ship"
     hit = 0.0
 
-    def __init__(self, bp):
+    def __init__(self, bp, k=1.0):
         self.bp = bp
-        self.m = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+        self.m = [k, 0.0, 0.0, 0.0, k, 0.0, 0.0, 0.0, k]      # k < 1: shrunk to fit the slot
         self.x = self.y = self.z = 0.0
-        self.hh = max([abs(v[1]) for v in bp.verts] or [0])    # how far down its hull goes
+        self.hh = k * max([abs(v[1]) for v in bp.verts] or [0])    # how far down its hull goes
 
 
 class _Parked:
@@ -822,6 +834,29 @@ def draw(ctx, g, ms=None, ring=True):
 # ship (Brian's idea): the camera sits CHASE_BACK behind you and CHASE_UP above.
 CHASE_BACK = 760
 CHASE_UP = 130
+CHASE_DOCK = 220        # docking: the camera closes in to this far outside the slot's face
+CHASE_CLOSE = 0.5       # as you dock (Brian: the station bigger before the tunnel),
+                        # coming this much closer for each unit you do
+_auto_in = None
+PLAYER_NOSE = 40        # your ship's nose is in the slot this far before its middle
+
+
+def chase_back(g):
+    """How far behind your ship the chase camera is: CHASE_BACK, closing in
+    on the docking computer's final approach so that when the ship is
+    game.AUTO_IN inside the slot (docked) the camera is CHASE_DOCK outside
+    the slot's face, the station filling the screen."""
+    global _auto_in
+    sp = g.space
+    st = sp.station if sp is not None else None
+    if st is None or getattr(g, "auto_phase", 0) != 2:
+        return float(CHASE_BACK)
+    if _auto_in is None:        # looked up once (cockpit doesn't import game at start)
+        from . import game
+        _auto_in = game.AUTO_IN
+    d = sp.d_station - st.bp.front + _auto_in     # 0 when docked
+    near = CHASE_DOCK + _auto_in
+    return max(float(near), min(float(CHASE_BACK), near + d * CHASE_CLOSE))
 _me = None      # your ship, for that view: [Obj, the Game whose blueprint it is]
 
 
@@ -860,7 +895,7 @@ class _Me:
         self.kind = "ship"
         self.x = 0.0
         self.y = -float(CHASE_UP)
-        self.z = float(CHASE_BACK)
+        self.z = float(CHASE_BACK)      # draw_world moves it in as the camera closes in
         self.m = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
         self.hit = 0.0
 
@@ -904,12 +939,22 @@ def draw_world(ctx, g):
     if getattr(g, "autodock", False):
         me = _my_ship(g)
         if me is not None:
-            _chase_shift(g, -CHASE_UP, CHASE_BACK)
+            back = chase_back(g)
+            up = CHASE_UP * back / CHASE_BACK       # the ship stays where it is on screen
+            me.y = -up
+            me.z = back
+            _chase_shift(g, -up, back)
             try:
+                sp = g.space
+                st = sp.station if sp is not None else None
+                inside = st is not None and sp.d_station < st.bp.front + PLAYER_NOSE
+                if inside:      # going into the slot: drawn first, so the station hides it
+                    draw_ship(ctx, me, getattr(g, "ship_rgb", CYAN), 0, True)
                 _draw_world(ctx, g, 0)     # the station in 3D however far off it is
-                draw_ship(ctx, me, getattr(g, "ship_rgb", CYAN), 0, True)
+                if not inside:
+                    draw_ship(ctx, me, getattr(g, "ship_rgb", CYAN), 0, True)
             finally:
-                _chase_shift(g, CHASE_UP, -CHASE_BACK)
+                _chase_shift(g, up, -back)
             return
     if g.view:      # rear, left or right: the world turned into that view (Game.enter_view)
         dust = g.dust

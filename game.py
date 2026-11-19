@@ -92,6 +92,7 @@ DOCK_DIST = 500.0          # docking C (automatic): this close to the station's 
 # through the slot; anything else is a crash that hurts and bounces you off.
 # Angles are given as their cosines.
 PLAYER_R = 40.0            # your ship's size: you touch the station this far from its front face
+AUTO_IN = 40.0             # the docking computer docks with your ship this far inside the slot
 DOCK_SPEED = 20.0          # faster than this (Elite speed units, top speed 40) and it's a crash
 SLOT_CONE_A = 0.927        # A: you must be in front of the slot, within 22 degrees of its axis
 HEAD_A = 0.9               # A: and flying into it, within 26 degrees
@@ -1038,7 +1039,9 @@ class Game:
             self.bump_t -= dt
         if st is not None:
             if self.autodock:
-                if self.auto_phase == 2 and sp.d_station < st.bp.front + PLAYER_R + 60.0:
+                # it flies on into the slot (Brian: the station bigger before
+                # the tunnel; the chase camera closes in meanwhile: cockpit.chase_back)
+                if self.auto_phase == 2 and sp.d_station < st.bp.front - AUTO_IN:
                     if sp.hostile:
                         self._refused(sp, st)
                         return
