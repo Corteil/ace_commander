@@ -1055,3 +1055,13 @@ what is now `ace.py` (renamed in build 50).
    update; a key goes up as the names it went down as). In flight, pause menu included,
    they stay Elite's keys. Same on the badge's Keyboard Hexpansion and the Pi (its own
    mapping removed). Tests in `tests/test_keys.py`; key guide footer line.
+   **Build 94** (2026-11-19, Brian, for the Pi's game pad: "analog controls", left stick
+   left / right "pan"). `AceCommander.analog`: a host's analogue controls (roll, pitch, yaw
+   -1..1, speed 0..1 where the power stick sits, or None), added to the steering in
+   `_update_flight`; speed steers the throttle to that fraction of `max_speed` (at the top
+   it holds speed up, so it is the jump drive); CONTROLS' left / right flip turns yaw too; a
+   stick pushed past half takes over from the docking computer. Yaw is new (Elite has none):
+   `Game.step(..., yaw=0.0)` and `Game._yaw` turn everything about the up axis in floats,
+   only when yaw is not 0, so the badge (which never sets analog) pays only an `if`.
+   `YAW_RATE` 0.6 rad/s. Tests: `tests/test_analog.py`. The Pi's pad map is in
+   `hosts/pi/PLAN.md` (P2).

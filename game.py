@@ -23,6 +23,7 @@ PLAYER_MAX = 40.0      # top speed, in Elite speed units, of the Cobra Mk III (o
 THROTTLE_RATE = 25.0   # speed units gained per second at full throttle
 PITCH_RATE = 1.0       # radians per second at full stick
 ROLL_RATE = 1.7
+YAW_RATE = 0.6         # radians per second at full yaw (a host's pad only: the badge has no yaw)
 
 # Weapon ranges as Elite's (Brian, build 78): your lasers hit any ship in
 # your sights however far off (Elite's HITCH has no distance check: anything
@@ -1344,9 +1345,11 @@ class Game:
 
     # ---- one step of the simulation ---------------------------------------
 
-    def step(self, dt, pitch, roll, throttle, fire, missile):
+    def step(self, dt, pitch, roll, throttle, fire, missile, yaw=0.0):
         """Advance by dt seconds. pitch > 0 is nose up, roll > 0 is right wing
-        down, throttle is -1..1; fire and missile are True or False."""
+        down, throttle is -1..1; fire and missile are True or False. yaw > 0
+        turns the nose right (a host's analogue pad; Elite and the badge have
+        none, so it is 0 there and costs nothing)."""
         if dt > 0.1:
             dt = 0.1
         self.time += dt
@@ -1368,9 +1371,10 @@ class Game:
             else:
                 pitch, roll, throttle = self._autopilot()
                 fire = missile = False
+                yaw = 0.0
         if self.over:
             self.jump_t = 0.0
-            pitch = roll = 0.0
+            pitch = roll = yaw = 0.0
             throttle = -1.0
             fire = missile = False
 
@@ -1397,6 +1401,8 @@ class Game:
             fwd *= JUMP_K
         self.fwd = int(fwd)
         self._rotate(pitch * PITCH_RATE * self.turn_k * dt, roll * ROLL_RATE * self.turn_k * dt, fwd)
+        if yaw:
+            self._yaw(yaw * YAW_RATE * self.turn_k * dt)
         for o in self.objs:
             if not o.dead:
                 self._think(o, dt)
@@ -1536,6 +1542,46 @@ class Game:
             o = self.objs[self.tick % n]
             if o.kind == "rock" or o.kind == "can":
                 _ortho(o.m)
+
+    def _yaw(self, c):
+        """Turn the nose right by c radians: everything turns the other way
+        about the up axis. In floats, as only a host with an analogue pad
+        yaws (the badge's _rotate is whole numbers for its garbage collector).
+        Whole-number things (dust, explosion dots) stay whole numbers."""
+        cc = math.cos(c)
+        sc = math.sin(c)
+
+        def turn(x, z):
+            return x * cc - z * sc, x * sc + z * cc
+
+        sp = self.space
+        if sp is not None:
+            sp.px, sp.pz = turn(sp.px, sp.pz)
+            sp.sx, sp.sz = turn(sp.sx, sp.sz)
+            st = sp.station
+            if st is not None:
+                st.x, st.z = turn(st.x, st.z)
+                m = st.m
+                for i in (0, 3, 6):
+                    m[i], m[i + 2] = turn(m[i], m[i + 2])
+        for o in self.objs:
+            o.x, o.z = turn(o.x, o.z)
+            m = o.m
+            for i in (0, 3, 6):
+                m[i], m[i + 2] = turn(m[i], m[i + 2])
+            v = o.aim
+            if v is not None:
+                v[0], v[2] = turn(v[0], v[2])
+        for boom in self.booms:
+            for p in boom.parts:
+                for i in (0, 3):
+                    x, z = turn(p[i], p[i + 2])
+                    p[i] = int(round(x))
+                    p[i + 2] = int(round(z))
+        for p in self.dust:
+            x, z = turn(p[0], p[2])
+            p[0] = int(round(x))
+            p[2] = int(round(z))
 
     def _think(self, o, dt):
         if o.hit > 0:

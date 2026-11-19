@@ -7,9 +7,8 @@
 Keys: arrows are the joystick, Enter confirms (the joystick pressed in), Esc
 goes back, F1-F6 are the badge's buttons A-F (docked and on the title, the
 letters A-F are too, but not while typing), and the rest of the keyboard is
-the Keyboard Hexpansion (Elite's keys). A game controller is the badge too
-(pad_pi.py: D-pad or left stick the joystick, south C, west D, north B, east F,
-Start A, shoulders and triggers E / F). Docked, C buys and D sells. Close the window or leave from the
+the Keyboard Hexpansion (Elite's keys). A game controller flies with analogue
+sticks and is the badge's buttons elsewhere (pad_pi.py). Docked, C buys and D sells. Close the window or leave from the
 title screen to quit. Saves and options.json go in
 ~/.local/share/ace_commander/; --debug shows the DEBUG menu of cheats.
 
@@ -111,7 +110,7 @@ class Host:
         self.ctx = Ctx(self.screen, scale)
         self.mask = self._round_mask(size)
         self.keys = Keys(self.bus)
-        self.pads = Pads(self.bus, log_keys)
+        self.pads = Pads(self.bus, lambda: self.app, log_keys)
         self.log_keys = log_keys
         if log_keys:
             self.ace.LOG_KEYS = True    # the game prints each button it gets
@@ -147,6 +146,7 @@ class Host:
 
     def step(self, ms):
         """One frame: the game's update, then its drawing, onto the window."""
+        self.pads.tick(ms / 1000.0)
         self.app.update(ms)
         if getattr(self.app, "quit", False):
             self.running = False

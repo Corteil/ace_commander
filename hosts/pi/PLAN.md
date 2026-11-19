@@ -113,7 +113,22 @@ knows it as a game controller). `pad_pi.py`: any SDL game controller, buttons by
 table (`MAP`), the pad being the badge: D-pad and left stick the joystick (on at half travel, off
 below 0.35), south C, west D, north B, east F, Start A, right shoulder / trigger F, left E, stick
 press the joystick's press. Hot-plug; unplugging lets go. Test `tests/test_pi_pad.py` (made-up
-events). Not yet: Brian's verdict on the map; analogue steering (needs the `_steer` hook: ask).
+events).
+Brian's flight map (2026-11-19), done the same day: flying (looking at space) the pad uses
+`FLIGHT_MAP` and analogue sticks: left up / down power (the stick's place is the speed: top full,
+centre half, bottom stopped; at the top it is the jump drive too), left left / right yaw (new: the
+game had none), right up / down pitch, left / right roll; left trigger missile (the badge's D, so
+Hardcore arms first), left bumper E.C.M. (Hardcore only; otherwise automatic), right trigger fire,
+right bumper energy bomb, D-pad views (up front, down rear, left, right), right stick click next
+view, Start pause menu, Xbox button held 1 s escape pod, A held jump drive, B docking computer
+on / off, X hyperspace (held 1 s galactic), Y the in-flight screens in turn (local chart, galactic
+chart, status, inventory, market, back to space), left stick click arm the missile (Hardcore).
+Elsewhere (title, docked, pause menu, in-flight screens) `BADGE_MAP`: the pad is the badge (Y docked
+is the badge's B). Dead zone 0.12, curve 1.6. Game side (badge files, no change there unless a host
+sets it): `AceCommander.analog` (roll, pitch, yaw, speed) adds to the steering; `Game.step(...,
+yaw)` and `Game._yaw` (floats, only when yaw is not 0); CONTROLS' left / right flip turns yaw too; a
+pushed stick (> 0.5) takes over from the docking computer. Tests: `tests/test_analog.py`,
+`hosts/pi/tests/test_pi_pad.py`. Not yet tried by Brian on the real pad.
 
 pygame joystick: D-pad and buttons first, then the analogue stick (needs the `_steer` hook), with
 a dead zone and a curve. Button map in one table. Done when: a whole trip works on a pad alone.
