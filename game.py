@@ -216,6 +216,7 @@ POD_SHIPS = ("ADDER", "ANACONDA", "ASP MK II", "BOA", "COBRA MK I", "COBRA MK II
              "COBRA MK III P", "FER DE LANCE", "KRAIT", "MAMBA", "PYTHON", "PYTHON P", "VIPER")
 POD_CHANCE = 0.1
 SLAVES = 3              # what a scooped escape pod holds (market.py's list)
+DUST_X = 500            # stardust spreads this far either side (500 fills the 240 wide view)
 WITCH_DUST = 3          # stardust in witchspace (10 elsewhere)
 
 # The missions (missions.py; the app sets the flags from the commander). In
@@ -690,7 +691,7 @@ class Game:
         self.tick = 0
         self.frame = 0
         # dust and explosion dots are whole numbers: see _rotate
-        self.dust = [[random.randint(-500, 500), random.randint(-500, 500),
+        self.dust = [[random.randint(-DUST_X, DUST_X), random.randint(-500, 500),
                       random.randint(100, 1500)] for _ in range(10)]
         self.speed = 14.0
         self.shield = 100.0
@@ -847,7 +848,7 @@ class Game:
             _look(st.m, ux, uy, uz)         # the slot is on the nose
         self.space = sp
         while len(self.dust) < 10:      # all the stardust again, after witchspace
-            self.dust.append([random.randint(-500, 500), random.randint(-500, 500),
+            self.dust.append([random.randint(-DUST_X, DUST_X), random.randint(-500, 500),
                               random.randint(100, 1500)])
         self.autodock = False
         self.auto_phase = 0
@@ -1475,7 +1476,7 @@ class Game:
             for p in self.dust:
                 p[2] -= ifwd
                 if p[2] < 40:
-                    p[0] = random.randint(-500, 500)
+                    p[0] = random.randint(-DUST_X, DUST_X)
                     p[1] = random.randint(-500, 500)
                     p[2] = random.randint(900, 1500)
             return
@@ -1550,8 +1551,8 @@ class Game:
             p[0] = (x * cb - y * sb + 8192) >> 14
             p[1] = (x * sb + y * cb + 8192) >> 14
             p[2] = z = z - ifwd
-            if z < 40 or z > 1600 or abs(p[0]) > 700 or abs(p[1]) > 700:
-                p[0] = random.randint(-500, 500)
+            if z < 40 or z > 1600 or abs(p[0]) > DUST_X * 7 // 5 or abs(p[1]) > 700:
+                p[0] = random.randint(-DUST_X, DUST_X)
                 p[1] = random.randint(-500, 500)
                 p[2] = random.randint(100, 1500)
         # the whole-number turning lets directions drift a little out of

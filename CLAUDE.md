@@ -81,7 +81,10 @@ commander name (89); released as v0.3.0 (2026-11-18).
   are the badge's buttons, done by the game: `Pad.as_buttons`), `run.py` (`Host`:
   loop, round mask, LED ring). `pad_pi.py` (P2: a game controller; flying `FLIGHT_MAP` with analogue sticks through
   `AceCommander.analog` and `Game` yaw, on in-flight screens `SCREEN_MAP`, elsewhere `BADGE_MAP`, the pad as the badge; hints
-  name the pad's buttons after a pad press: `ctx_pygame.relabel`). Tests:
+  name the pad's buttons after a pad press: `ctx_pygame.relabel`). P3: `dash_pi.py` (the Elite layout's dashboard, the Tufty's
+  layout with Elite's gauges, any window width); `run.Host` layouts "badge" / "elite" (F10),
+  F11 full screen, F12 screenshot, resizable, `pi.json`; flight drawn through hooks on
+  `cockpit.draw_world` / `draw_hud` / `draw_tunnel` with `cockpit.VIEW_HW` / `VIEW_HH`. Tests:
   `hosts/pi/tests/test_pi_host.py`, `test_pi_trip.py` and `test_pi_pad.py`
   (P1: a whole trip by keys; SDL dummy driver), run by `tests/run_all.py` when pygame is there.
   `run.load_game` keeps save, options.json and debug.txt in `~/.local/share/ace_commander/`

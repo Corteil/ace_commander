@@ -168,6 +168,7 @@ DOCK_KEYS = (("k_1", "LAUNCH"), ("k_2", "MARKET"), ("k_3", "SELL"),
 # been found: the Easter egg, docking at systems that spell EGG_WORD in the
 # first galaxy (see AceCommander._egg)
 DEBUG_MENU = None
+TITLE_QUIT = False      # a QUIT line on the title screen (a host sets it: the Pi; the badge has F)
 EGG_WORD = "DRAKE"      # a male duck: no system name starts with C or U for DUCKS
 EGG_STOPS = 1           # dockings elsewhere forgiven between letters (to refuel)
 PERF_SLOW = 25          # ms over the average that makes a frame count as slow
@@ -943,6 +944,8 @@ class AceCommander(app.App):
         items = ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS"]
         if self.cmdr is not None:
             items.insert(0, "CONTINUE")
+        if TITLE_QUIT:
+            items.append("QUIT")
         return items
 
     def _choose(self, item):
@@ -964,6 +967,9 @@ class AceCommander(app.App):
         elif item == "OPTIONS":
             self.omenu = 0
             self.mode = "options"
+        elif item == "QUIT":           # a host's (the Pi's): leave, as F does on the badge
+            self.pad.clear()
+            self.minimise()
         elif item == "SHIP VIEWER":
             self.zero = None
             if self.viewer is None:

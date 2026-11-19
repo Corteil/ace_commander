@@ -181,8 +181,13 @@ git-ignored and must not be published or put in the app store.
 `hosts/pi/` runs the same game in a window with pygame (`sudo apt install python3-pygame`):
 
 ```
-python3 hosts/pi/run.py           # the badge's round screen at 2x; --scale 3, --full
+python3 hosts/pi/run.py           # as last time; --layout badge|elite, --full / --window
 ```
+
+Two layouts: the badge's round screen, or a 3D view over an Elite-style dashboard (scanner,
+shields, fuel, temperatures, altitude, speed, roll, dive / climb, energy banks, missiles) that
+fills the window. F10 switches between them, F11 is full screen, F12 saves a screenshot to
+`~/Pictures/Ace Commander/`; the window can be any size.
 
 Arrows are the joystick, Enter confirms, Esc goes back, F1-F6 are the badge's buttons A-F, and
 the rest of the keyboard works as the Keyboard Hexpansion. A game pad (Xbox, PlayStation,

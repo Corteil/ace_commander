@@ -392,4 +392,11 @@ for key in ("KEY_5", "KEY_6", "KEY_7", "KEY_H"):
 tick(p, fresh=["A"]); p.fmenu = p._fitems_top().index("SETTINGS"); tick(p, fresh=["C"])
 tick(p, fresh=["KEY_6"]); assert p.paused and p.fsub == "settings", "no chart there: Settings stays"
 print("combat practice: ok")
+# the badge's title has no QUIT line (F leaves); a host can add one (TITLE_QUIT)
+a = ace_commander.AceCommander()
+assert "QUIT" not in a.choices()
+mod.TITLE_QUIT = True
+assert a.choices()[-1] == "QUIT"
+mod.TITLE_QUIT = False
+print("title QUIT only for a host: ok")
 print("ALL KEY TESTS PASSED")

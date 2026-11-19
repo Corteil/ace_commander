@@ -44,6 +44,7 @@ class Ctx:
         self._texts = {}        # rendered text, kept: the same strings come every frame
         self.a11y = None        # the firmware's screen-reader hook: none here
         self.labels = None      # {"C": "A", ...}: the hints name a pad's buttons (relabel)
+        self.line_k = scale     # line widths: times this (the Elite layout draws thinner lines)
 
     # ---- state ------------------------------------------------------------
     def save(self):
@@ -145,7 +146,7 @@ class Ctx:
     def stroke(self):
         t = self._target()
         col = self.col
-        w = max(1, round(self.line_width * self.s))
+        w = max(1, round(self.line_width * self.line_k))
         sh = self.shape
         if sh and sh[0] == "rect":
             _, x, y, rw, rh = sh
