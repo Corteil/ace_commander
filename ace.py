@@ -1979,13 +1979,13 @@ class AceCommander(app.App):
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
         text(ctx, "OPTIONS", 0, -80, 20, cockpit.WHITE)
         items = self._settings(True)
-        y = -52                 # seven lines fit (build 85: TILT)
+        y = -50                 # eight lines fit (CONTROLS, NAME)
         for i, label in enumerate(items):
             if i == self.omenu % len(items):
-                ctx.rgb(*cockpit.DIM).rectangle(-104, y - 8, 208, 16).fill()
-            text(ctx, label, 0, y, 14, cockpit.GREEN if i == self.omenu % len(items)
+                ctx.rgb(*cockpit.DIM).rectangle(-100, y - 7, 200, 15).fill()
+            text(ctx, label, 0, y, 13, cockpit.GREEN if i == self.omenu % len(items)
                  else cockpit.GREY)
-            y += 17
+            y += 16
         if self.cmdr is None:
             text(ctx, "more with a commander", 0, y + 4, 11, cockpit.GREY)
         text(ctx, "< > or C: change", 0, 82, 11, cockpit.GREY)     # below six lines

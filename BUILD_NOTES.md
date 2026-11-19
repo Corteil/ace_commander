@@ -1020,3 +1020,8 @@ what is now `ace.py` (renamed in build 50).
    round screen in the case colour, the 12 LEDs round it where the game's LED_ANGLE1 puts
    them, 60 fps, saves under ~/.local/share/ace_commander). Played headless by the test:
    title, NEW COMMANDER with the keyboard name page, docked, launch, flight, menu, quit.
+   **Build 91** (2026-11-19, Brian, seen on the Pi host: "the first line in Options clips
+   the edge of the display"). With CONTROLS and NAME the Options pages have eight lines: the
+   docked Options now start at y -62 (was -70), 15 px apart, size 13, the highlight 192 wide
+   (it ran past the round edge); the title Options start at -50, 16 px apart, size 13, so
+   DEBUG clears the hint lines on both.

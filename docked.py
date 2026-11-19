@@ -616,12 +616,12 @@ class Docked:
         text(ctx, "OPTIONS", 0, -94, 14, cockpit.GREY)
         items = self.options[0]()
         sel = self.osel % len(items)
-        y = -70                 # seven lines fit (build 85: TILT)
+        y = -62                 # eight lines fit inside the round edge (CONTROLS, NAME)
         for i, label in enumerate(items):
             if i == sel:
-                ctx.rgb(*cockpit.DIM).rectangle(-104, y - 8, 208, 16).fill()
-            text(ctx, label, 0, y, 14, cockpit.GREEN if i == sel else cockpit.GREY)
-            y += 17
+                ctx.rgb(*cockpit.DIM).rectangle(-96, y - 7, 192, 15).fill()
+            text(ctx, label, 0, y, 13, cockpit.GREEN if i == sel else cockpit.GREY)
+            y += 15
         text(ctx, "up / down: pick   C: change", 0, 66, 11, cockpit.GREY)
         text(ctx, "F: back to status", 0, 82, 11, cockpit.GREY)
 
