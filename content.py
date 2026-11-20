@@ -32,6 +32,21 @@ except Exception:
 HAVE_ELITE = _elite_ships is not None and _elite_data is not None
 OWN = not HAVE_ELITE or _want_own()     # the game's own content
 
+def _have(name):
+    """True if module name is in this folder (as .py or .mpy): the game's own
+    content can be left off a badge that only plays Elite's (tools/build_mpy.py
+    --elite-only)."""
+    import os
+    d = __file__.rsplit("/", 1)[0] if "/" in __file__ else "."
+    for ext in (".py", ".mpy"):
+        try:
+            os.stat(d + "/" + name + ext)
+            return True
+        except OSError:
+            pass
+    return False
+
+
 SHIPS = ()
 DATA = None
 if OWN:
@@ -43,7 +58,14 @@ if OWN:
         from . import original_data as DATA
     except Exception:
         pass
+    if (not SHIPS or DATA is None) and HAVE_ELITE:
+        OWN = False                 # the game's own content isn't here: Elite's after all
+        SHIPS = _elite_ships
+        DATA = _elite_data
 else:
     SHIPS = _elite_ships
     DATA = _elite_data
+# both sets are here, so Options > DATA can switch between them
+HAVE_OWN = (bool(SHIPS) and DATA is not None) if OWN else (_have("original_ships") and _have("original_data"))
+CAN_SWITCH = HAVE_ELITE and HAVE_OWN
 _elite_ships = _elite_data = None   # don't keep the unused set about

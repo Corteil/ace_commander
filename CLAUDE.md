@@ -50,7 +50,8 @@ Other devices are in `hosts/` (the Pi; the Tufty 2350 port is still its own repo
 - `game.py` - game rules, including the star system (`Space`, `Game.enter`). No badge
   imports, so it runs on a PC.
 - `cockpit.py` - flight view, HUD, radar. Built from rectangles (see Speed).
-- `viewer.py` - ship viewer. `bench.py` - the speed test (DEBUG > DISPLAY > SPEED TEST since build 72).
+- `viewer.py` - ship viewer. `bench.py` - the speed test (DEBUG > DISPLAY > SPEED TEST since build 72;
+  imported only when it is opened, since 2026-11-20).
 - `title.py` - title screen: block-letter name from rectangles, tumbling ship, one menu line.
 - `rules.py` - `GameRules`: Hardcore Mode's flags, one per assist. Rules only.
 - `screens.py` - the in-flight screens on the number row (Market Prices, Commander Status,
@@ -88,6 +89,16 @@ Other devices are in `hosts/` (the Pi; the Tufty 2350 port is still its own repo
   galaxy's seeds, name letter pairs, starting place, the market's 17 goods and the 14
   equipment prices. Both must be copied to the badge.
 - `tools/import_ships.py`, `tools/import_galaxy.py` - make those two from the Elite source.
+- `tools/build_mpy.py` - a compiled copy for the badge (2026-11-20): every module as `.mpy`
+  except `app.py` and `__init__.py`, into `build/badge/ace_commander/` (gitignored); about
+  176 KB against 496 KB of source, and no compiling at start-up. Needs the badge's own
+  mpy-cross (1.28, the Pi's firmware build); `--elite` adds your Elite files, `--elite-only`
+  leaves out the game's own content too (about 32 KB; `content.py` then falls back to Elite's
+  and Options > DATA isn't offered, `content.CAN_SWITCH`), `--copy PORT`
+  copies with mpremote, removes the `.py` each `.mpy` replaces (MicroPython imports `.py`
+  first) and checks sizes. **Not yet tried on the badge**: check it starts, how much faster
+  the loading screen is, and that tracebacks still give line numbers. Not yet known whether
+  the app store takes `.mpy` in a release.
 - `tools/badge_log.py`, `deploy.bat` - copy to the badge, restart it, save its serial output
   to `badge_log.txt`.
 - `tests/` - PC test suite with stand-ins for the badge firmware.
