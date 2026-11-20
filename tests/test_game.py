@@ -614,6 +614,82 @@ assert not g.over and g.cabin == game.FATAL_CABIN, "invincible: the heat can't k
 g.god = False; g.to_sun(0.9); g.step(DT, 0, 0, 0, False, False)
 assert g.over, "too hot: the end"
 
+# close to the sun it is drawn as bands from its true edge, a horizon across
+# the view that stays there while you skim past it (it used to vanish once the
+# sun's centre was half a radius ahead)
+import cockpit as ck
+
+
+class _Bands:
+    def __init__(self):
+        self.r = []
+
+    def rgb(self, *a):
+        return self
+
+    def rectangle(self, x, y, w, h):
+        self.r.append((x, y, w, h))
+        return self
+
+    def arc(self, *a):
+        self.r.append(None)
+        return self
+
+    def fill(self):
+        return self
+
+
+class _Sp:
+    sun = 0
+
+
+def _sun_seen(sx, sy, sz, r=24000.0):
+    """The share of the view's pixels the bands fill, and the share wrong
+    against a ray through each pixel."""
+    sp = _Sp()
+    sp.sx, sp.sy, sp.sz, sp.sr = sx * r, sy * r, sz * r, r
+    c = _Bands()
+    ck._sun_bands(c, sp)
+    on = bad = n = 0
+    for y in range(-120, 120, ck.SUN_BAND):
+        ym = y + ck.SUN_BAND / 2.0
+        for x in range(-120, 120, 2):
+            px, py, pz = x + 0.5, -ym, ck.FOCAL
+            pc = px * sp.sx + py * sp.sy + pz * sp.sz
+            t = pc > 0 and pc * pc >= (px * px + py * py + pz * pz) * (sp.sx ** 2 + sp.sy ** 2 + sp.sz ** 2 - r * r)
+            got = any(rx <= x < rx + w and ry <= y < ry + h for rx, ry, w, h in c.r)
+            n += 1
+            on += got
+            bad += t != got
+    return on / n, bad / n
+
+
+for at in ((1.15, 0, 0.5), (1.15, 0, 0.1), (0, -1.3, 0.4), (-0.8, 0.7, 0.6), (0.5, 0.2, 2.0), (0, 0, 2.5)):
+    seen, wrong = _sun_seen(*at)
+    assert seen > 0.0 and wrong < 0.01, (at, seen, wrong)
+assert _sun_seen(0, 0, -1.5)[0] == 0.0 and _sun_seen(2.0, 0, -1.0)[0] == 0.0, "behind you: none"
+assert _sun_seen(0.6, 0.6, 0.3)[0] == 1.0, "inside the sun's edge: all sun"
+# DEBUG's TO THE SUN, flying on: while the cabin is hot enough to scoop and the
+# sun's edge is in front of you, some of the view is sun
+g = fresh(9)
+g.enter(6000, "CORIOLIS", "launch")
+g.god = True
+g.to_sun(1.15, 1.6)
+g.speed = 40.0
+sp = g.space
+hot = 0
+for _ in range(1200):
+    g.step(DT, 0, 0, 0, False, False)
+    if g.cabin >= game.SCOOP_TEMP and sp.sz > 0.15 * sp.sr:
+        c = _Bands()
+        ck._sun(c, sp, ck._sphere(sp.sx, sp.sy, sp.sz, sp.sr))
+        assert c.r and None not in c.r, ("no sun while skimming", sp.sz / sp.sr)
+        hot += 1
+    if sp.sz < 0:
+        break
+assert hot > 10, hot
+print("the sun close up: bands from its true edge, there while skimming: ok")
+
 # waves are for combat practice only
 g = fresh(10)
 assert g.msg == "WAVE 1" and g.msg_t > 0

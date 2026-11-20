@@ -1108,6 +1108,15 @@ what is now `ace.py` (renamed in build 50).
    disc source (main flight loop part 15): the sun has no surface to hit; the heat kills you
    once the cabin temperature would pass 255 (`game.FATAL_CABIN`), about 0.91 sun radii from
    its centre (285 - 36 x (d / r)^2, the same formula and numbers as Elite's). Heat never
-   drained energy in the original, so it doesn't here. Inside the sun's edge the view is all
-   sun (`cockpit._draw_space`). The planet is still deadly at its surface. Elite checks the
-   heat on one frame in 32; this checks every frame. Tests in `tests/test_game.py`.
+   drained energy in the original, so it doesn't here. The planet is still deadly at its
+   surface. Elite checks the heat on one frame in 32; this checks every frame.
+   Then (Brian: "would not the edge of the sun be on the horizon if collecting fuel?"): the
+   sun vanished two seconds into the scooping band, because `_sphere` drops a sphere whose
+   centre is under half a radius ahead and circles over `MAX_ARC` are skipped. Within
+   `SUN_BANDS_K` (3) sun radii it is now drawn as bands of `SUN_BAND` (4) rows
+   (`cockpit._sun_bands`, as Elite draws its sun in lines), each filled where a ray through
+   the band's middle row meets the sphere: its true edge, a horizon across the view that
+   slides off the side as you pass; inside the edge, all sun. Within 0.5% of the pixels of a
+   per-pixel ray test. Not measured on the badge: up to 60 rectangles (about 2 ms) and
+   roughly 30 float results a band, so watch the frame time and collections near the sun;
+   a bigger `SUN_BAND` costs less. Tests in `tests/test_game.py`.
