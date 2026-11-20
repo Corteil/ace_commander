@@ -37,6 +37,7 @@ import pygame                       # noqa: E402
 
 import pi_firmware                  # noqa: E402
 from ctx_pygame import Ctx          # noqa: E402
+from controls_pi import Feed        # noqa: E402
 from keys_pi import Keys            # noqa: E402
 from pad_pi import Pads             # noqa: E402
 import dash_pi                      # noqa: E402
@@ -55,7 +56,7 @@ def data_dir():
     return d
 
 
-def load_game(d, debug=False, log_keys=False):
+def load_game(d, debug=False):
     """Import the game (ace.py) with its files in data folder d: the save,
     options.json and debug.txt. The game reads where its files are and the
     host's switches from config.py as it loads (platform layer, step 1), so
@@ -80,7 +81,6 @@ def load_game(d, debug=False, log_keys=False):
         config.title_quit = True    # a computer needs a way out on the title screen (Brian)
         config.debug_menu = want
         config.perf_log = 60 if want else 0     # the badge's timing lines, a line a second in flight
-        config.log_keys = log_keys
         config.wire_min = WIRE_MIN
         spec.loader.exec_module(pkg)
         return sys.modules[full]
@@ -91,8 +91,6 @@ def load_game(d, debug=False, log_keys=False):
     ace.SAVE_PATH = config.data(ace.SAVE_PATH.replace("\\", "/").rsplit("/", 1)[-1])
     ace.DEBUG_MENU = want
     ace.PERF_LOG = 60 if want else 0
-    if log_keys:
-        ace.LOG_KEYS = True
     return ace
 
 
@@ -111,7 +109,7 @@ class Host:
         self.bus, self.leds = pi_firmware.install()
         self.data = save_dir or data_dir()
         # the save, options.json and debug.txt under the user's data folder
-        self.ace = load_game(self.data, debug, log_keys)
+        self.ace = load_game(self.data, debug)
         self.ck = sys.modules[PKG + ".cockpit"]
         self.gm = sys.modules[PKG + ".game"]
         prefs = self._prefs()
@@ -120,8 +118,12 @@ class Host:
         self.win_scale = scale
         self._hook()
         self._open_window()
-        self.keys = Keys(self.bus)
-        self.pads = Pads(self.bus, lambda: self.app, log_keys)
+        # the keyboard and pads send the game control names (platform layer, step 2):
+        # the game hands its controls.Controls to the feed when it starts
+        self.feed = Feed(log_keys)      # with --log-keys, every key down and up is printed
+        sys.modules[PKG + ".config"].input = self.feed.attach
+        self.keys = Keys(self.feed)
+        self.pads = Pads(self.feed, lambda: self.app, log_keys)
         self.pad_last = False       # the pad was the last thing used
         self.log_keys = log_keys
         self.app = self.ace.AceCommander()

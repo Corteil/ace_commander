@@ -1131,3 +1131,18 @@ what is now `ace.py` (renamed in build 50).
    second Host in one process (the tests) still points the loaded game at its folder.
    The badge is unchanged: all 59 `tests/render.py` frames pixel-identical before and
    after. The app store package gains `config.py`. Not yet run on the badge or the Pi.
+   **Build 101** (2026-11-20, the platform layer's step 2, `hosts/NEXT_SESSION.md` B2:
+   input as control names). `ace.Pad` split in two: `controls.Controls` (no imports: the
+   names held, hit, typed, the keyboard flag, `as_buttons`), fed by `press(key, names, ch,
+   badge)` / `release(key)`; and `platform_tildagon.Input` (the badge: today's matching of
+   firmware buttons to names, moved, not rewritten; `config.log_keys` prints each event).
+   `ace.py` no longer imports `events.input`, `events.joystick`, `events.keyboard` or
+   `frontboards.common`, and loses `Pad`, `BY_NAME` and `LOG_KEYS`; it makes a `Controls`
+   and either calls `config.input(controls, host)` or makes a `platform_tildagon.Input`.
+   The Pi sends names itself: `hosts/pi/controls_pi.py` (every key and button with the
+   names, letter and badge button the badge would give it; `Feed`), so `pi_firmware.py`
+   lost its buttons and button events (204 to 108 lines). `tests/test_pi_controls.py`
+   checks all 91 Pi keys against `platform_tildagon.Input` on the test stubs. The badge
+   is unchanged: all 59 frames pixel-identical; per frame nothing new (a press costs one
+   more call). The app store package gains `controls.py` and `platform_tildagon.py`.
+   Not yet run on the badge or the Pi.
