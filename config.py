@@ -19,6 +19,11 @@ log_keys = False        # print every button / key event (to see what a keyboard
 title_quit = False      # a QUIT line on the title screen (the badge has F to leave)
 wire_min = 8.0          # ships that look smaller than this (pixels) are drawn as a marker
 
+# the game's input (platform layer, step 2): None on the badge, where
+# platform_tildagon.Input matches the firmware's button events; a host sets
+# a function input(controls, owner) that feeds controls.Controls itself
+input = None
+
 
 def app_dir():
     """The folder this file is in: the app's."""

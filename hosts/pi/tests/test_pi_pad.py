@@ -260,13 +260,13 @@ tap(h, "x")
 assert g.jump_t > 0, "X: the countdown"
 g.jump_t = 0.0
 sent = []
-real_send = h.bus.send
-h.bus.send = lambda e: (sent.append((type(e).__name__, e.button.name)), real_send(e))
+real_down = h.feed.down
+h.feed.down = lambda k: (sent.append(("ButtonDownEvent", k.name)), real_down(k))
 button(h, "x", True)
 for _ in range(30):
     h.step(40)
 button(h, "x", False); h.step(40)
-h.bus.send = real_send
+h.feed.down = real_down
 assert ("ButtonDownEvent", "SHIFT") in sent and ("ButtonDownEvent", "H") in sent, sent
 assert sent.count(("ButtonDownEvent", "H")) == 1, "held: only the galactic one, no plain jump after"
 print("X: hyperspace, held: galactic: ok")
@@ -285,7 +285,7 @@ print("A: jump drive; Start: the pause menu (the pad as the badge there): ok")
 
 # the Xbox button held 1 s: the escape pod (Esc); a short press does nothing
 sent = []
-h.bus.send = lambda e: (sent.append((type(e).__name__, e.button.name)), real_send(e))
+h.feed.down = lambda k: (sent.append(("ButtonDownEvent", k.name)), real_down(k))
 tap(h, "guide")
 assert ("ButtonDownEvent", "ESCAPE") not in sent, "a short press: nothing"
 button(h, "guide", True)
@@ -295,7 +295,7 @@ assert ("ButtonDownEvent", "ESCAPE") not in sent, "not before 1 s"
 for _ in range(15):
     h.step(40)
 button(h, "guide", False); h.step(40)
-h.bus.send = real_send
+h.feed.down = real_down
 assert sent.count(("ButtonDownEvent", "ESCAPE")) == 1, sent
 print("Xbox button held 1 s: escape pod: ok")
 

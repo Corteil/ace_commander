@@ -31,7 +31,7 @@ import math
 
 import pygame
 
-from pi_firmware import BADGE, KEYBOARD, STICK, ButtonDownEvent, ButtonUpEvent
+from controls_pi import BADGE, KEYBOARD, STICK
 
 try:
     from pygame._sdl2 import controller as sdl_controller
@@ -148,13 +148,13 @@ class Pads:
     with the last. A control lets go of what it pressed, whichever map is in
     use by then."""
 
-    def __init__(self, bus, app=None, log=False):
-        self.bus = bus
+    def __init__(self, feed, app=None, log=False):
+        self.feed = feed            # controls_pi.Feed: the game's controls
         self.app = app              # a callable giving the game (AceCommander), or None
         self.log = log
         self.pads = {}              # instance id -> Controller
         self.on = {}                # (instance id, control) -> what it pressed
-        self.count = {}             # button -> how many controls hold it
+        self.count = {}             # Key -> how many controls hold it
         self.axes = {}              # (instance id, axis name) -> -1..1 (triggers 0..1)
         self.timers = {}            # (instance id, control) -> seconds held (hold actions)
         self.done = set()           # hold actions that have fired
@@ -210,13 +210,13 @@ class Pads:
     def _press(self, b):
         self.count[b] = self.count.get(b, 0) + 1
         if self.count[b] == 1:
-            self.bus.send(ButtonDownEvent(b))
+            self.feed.down(b)
 
     def _release(self, b):
         n = self.count.get(b, 0) - 1
         self.count[b] = max(0, n)
         if n == 0:
-            self.bus.send(ButtonUpEvent(b))
+            self.feed.up(b)
 
     def _tap(self, *buttons):
         """Press and let go at once (the game counts the press next frame)."""

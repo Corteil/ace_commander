@@ -34,8 +34,19 @@ Other devices are in `hosts/` (the Pi; the Tufty 2350 port is still its own repo
 - `letters.py` - the name in block letters (rectangles), shared by `title.py` and the
   loading screen; imports nothing.
 - `ace.py` - **the real app** (it was `app.py` until build 49; older notes below that say
-  `app._dock`, `app.py` and so on mean this file): menu, input (`Pad`), frame loop (`run`),
+  `app._dock`, `app.py` and so on mean this file): menu, input (reads `controls.Controls`), frame loop (`run`),
   LEDs, pause, PERF logging.
+- `config.py` - the platform layer's settings and storage (build 100): where the save,
+  options.json and debug.txt live (`data_dir`, `data(name)`), and a host's switches (DEBUG
+  menu, PERF log, key log, title QUIT, draw distance, `input`). A host sets it before
+  importing the game. Imports nothing.
+- `controls.py` - which controls are down, by name (build 101): `held`, `hit`, `typed`,
+  `keyboard`, `as_buttons`, fed by `press(key, names, ch, badge)` / `release(key)`. It
+  replaced `Pad`; **older notes that say `Pad` mean this and `platform_tildagon.Input`.**
+- `platform_tildagon.py` - what only the badge's firmware can do (build 101: input).
+  `Input` matches the firmware's button events to control names (a button counts as each
+  of its parents; Keyboard Hexpansion quirks: TAB by name). Step 3 moves the LEDs, tilt,
+  dialogs and the frame loop here too. Imported only when `config.input` is None.
 - `game.py` - game rules, including the star system (`Space`, `Game.enter`). No badge
   imports, so it runs on a PC.
 - `cockpit.py` - flight view, HUD, radar. Built from rectangles (see Speed).
@@ -82,9 +93,11 @@ Other devices are in `hosts/` (the Pi; the Tufty 2350 port is still its own repo
 - `tests/` - PC test suite with stand-ins for the badge firmware.
 - `hosts/` - the same game on other devices, left out of release tarballs (`.gitattributes`).
   `hosts/pi/` (2026-11-19, P0): pygame window; `pi_firmware.py` stand-ins for the firmware
-  modules (real `ace.py` unchanged), `ctx_pygame.py` (the ctx calls at scale), `keys_pi.py`
+  modules the game still imports (app, eventbus, LEDs; no buttons since build 101),
+  `controls_pi.py` (each key and button with the control names the badge would give it,
+  checked by `tests/test_pi_controls.py`; `Feed`, set as `config.input`), `ctx_pygame.py` (the ctx calls at scale), `keys_pi.py`
   (arrows = joystick, F1-F6 = badge A-F, the rest = Keyboard Hexpansion; docked, letters A-F
-  are the badge's buttons, done by the game: `Pad.as_buttons`), `run.py` (`Host`:
+  are the badge's buttons, done by the game: `Controls.as_buttons`), `run.py` (`Host`:
   loop, round mask, LED ring). `pad_pi.py` (P2: a game controller; flying `FLIGHT_MAP` with analogue sticks through
   `AceCommander.analog` and `Game` yaw, on in-flight screens `SCREEN_MAP`, elsewhere `BADGE_MAP`, the pad as the badge; hints
   name the pad's buttons after a pad press: `ctx_pygame.relabel`). P3: `dash_pi.py` (the Elite layout's dashboard, the Tufty's
@@ -153,8 +166,8 @@ Source: `github.com/emfcamp/badge-2024-software`, folder `modules/`. Brian's own
   joystick is a digital 5-way switch. Only the current firmware, which has both, is
   supported (Brian, 2026-11-18): `ace.py` imports them directly, with no fallback.
 - `Buttons.get()` / `.pressed()` search every known button in Python on each call. Polling
-  about 25 controls a frame was a large hidden cost; `Pad` in `app.py` listens for
-  `ButtonDownEvent` / `ButtonUpEvent` on `system.eventbus` instead.
+  about 25 controls a frame was a large hidden cost; `platform_tildagon.Input` listens for
+  `ButtonDownEvent` / `ButtonUpEvent` on `system.eventbus` instead and feeds `controls.Controls`.
 - Frame loop (`modules/app.py`, `modules/system/scheduler/__init__.py`): the default
   `App.run` awaits `render_update`, which sleeps 50 ms after every update. `AceCommander.run`
   overrides it: sets `scheduler.render_needed`, yields once, continues. It falls back to

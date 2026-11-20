@@ -53,7 +53,8 @@ Steps, each a small PR with the badge's behaviour unchanged:
    and a storage interface (where the save, `options.json`, `debug.txt` live). `content.py`
    gets the options path from it instead of its own `__file__`. The Pi's `load_game` tricks
    went. View size was left for step 4 (it changes per frame with the Pi's layout).
-2. **Input as controls.** The platform sends the game control names (`confirm`, `j_up`, `A`-`F`,
+2. **Input as controls. Done 2026-11-20 (build 101: `controls.py`, `platform_tildagon.Input`,
+   the Pi's `controls_pi.py`), not yet run on the badge or the Pi.** The platform sends the game control names (`confirm`, `j_up`, `A`-`F`,
    `k_*`), not firmware buttons; the badge's platform does today's `Pad` matching (firmware
    `Button` parents, Keyboard Hexpansion quirks: Shift at key-down, TAB / LCTRL by name). Most of
    `pi_firmware.py` goes.
