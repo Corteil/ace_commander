@@ -183,13 +183,13 @@ game.random.seed(5)
 names = []
 for _ in range(60):
     g.objs = []; g.new = []; g.pending = 0; g.skip = 0
-    g._roll()
+    g._encounter()
     names.extend(g.group)
 assert "CONSTRICTOR" in names
 g.objs = []; g.new = []; g.add_constrictor()
 for _ in range(60):
     g.pending = 0; g.skip = 0; g.group = []
-    g._roll()
+    g._encounter()
     assert "CONSTRICTOR" not in g.group, "only one"
 # the quick setting: it comes after QUICK_WAIT seconds outside the safe zone
 g = game.Game(SHIPS, 1)

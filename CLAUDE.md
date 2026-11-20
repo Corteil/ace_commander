@@ -19,7 +19,10 @@ of phase 4 (build 33: the Equip ship screen; build 36: every item's effect). Pha
 5 are done, the system description sentence (build 52) and the disc version's two
 missions (build 54). Phase 6's ship types are done (builds 78-84: Shipyard, Hangar, jump
 ranges, stolen ships), with NPC escape pods (86), finding a system by name (88) and a
-commander name (89); released as v0.3.0 (2026-11-18).
+commander name (89); released as v0.3.0 (2026-11-18), latest release v0.3.2 (2026-11-19,
+builds 93-95). Hardcore Mode, the keyboard and the four views are merged (see below).
+Other devices are in `hosts/` (the Pi; the Tufty 2350 port is still its own repo).
+**The plan for the next session is `hosts/NEXT_SESSION.md`.**
 
 ## Files
 
@@ -38,6 +41,9 @@ commander name (89); released as v0.3.0 (2026-11-18).
 - `cockpit.py` - flight view, HUD, radar. Built from rectangles (see Speed).
 - `viewer.py` - ship viewer. `bench.py` - the speed test (DEBUG > DISPLAY > SPEED TEST since build 72).
 - `title.py` - title screen: block-letter name from rectangles, tumbling ship, one menu line.
+- `rules.py` - `GameRules`: Hardcore Mode's flags, one per assist. Rules only.
+- `screens.py` - the in-flight screens on the number row (Market Prices, Commander Status,
+  Inventory; the game keeps running), imported the first time one is opened.
 - `commander.py` - the saved commander (level, kills, rank, star system, fuel). Rules only,
   no badge imports. Saved to `commander.json` next to the app (gitignored).
 - `galaxy.py` - the 256 star systems, worked out from three seeds. Rules only.
@@ -98,7 +104,9 @@ it installs to `/apps/ace_commander/` on the badge.
 - **On Brian's Raspberry Pi the badge is plugged in and Claude can reach it:** copy files
   with `mpremote connect auto fs cp ... :/apps/ace_commander/`, `mpremote connect auto reset`,
   and log with `python3 tools/badge_log.py SECONDS PORT` (only one program can hold the port).
-  On 2026-11-14 the badge was `/dev/ttyACM1`. Brian has two badges: serial
+  On 2026-11-19 the badge was `/dev/ttyACM0`, the Tufty 2350 `/dev/ttyACM1` and a Raspberry
+  Pi Debug Probe `/dev/ttyACM2`. **Copy, reset or open a REPL on the badge or the Tufty only
+  after Brian says OK.** Brian has two badges: serial
   `7c4fad337ac00000` (the usual one) and `64e83372252c0000` (build 34 put on it
   2026-11-14 over an older build; it keeps its own `commander.json`). Both run
   MicroPython 1.28; check `/dev/serial/by-id/` to see which is plugged in. To test over the REPL (`mpremote run x.py`),
@@ -118,7 +126,10 @@ it installs to `/apps/ace_commander/` on the badge.
 
 ## Tests
 
-`python tests/run_all.py` from the repo folder (needs `ship_data.py`). `tests/render.py`
+`python tests/run_all.py` from the repo folder (28 test files in `tests/`, plus the
+Pi host's when pygame is installed; without the Elite files the
+game's own content is used, but some tests need Elite's, so generate them first with the
+two `tools/import_*.py` from a clone of the disc source; they stay gitignored). `tests/render.py`
 draws real frames to `tests/shots/*.png` with Pillow, which is how layout was checked.
 `tests/badge_stubs.py` copies the firmware's button matching rules, so joystick-versus-button
 logic is tested for real. Also compile with the badge's own compiler, which the firmware
@@ -182,12 +193,18 @@ eventbus gives buttons only to focused apps), or the badge freezes (build 89).
 3. The in-flight menu has a DEBUG page of cheats (`DEBUG_MENU` in `app.py`, on by default
    while the game is being built; `Game.god` is the invincibility flag). Add a cheat there for
    each new thing that is slow to reach by playing, and turn it off before publishing.
-   Its title shows the build (build 54), read from `metadata.json` by `app.build()`, so
-   bump `version` in `metadata.json` and `tildagon.toml` for every build.
+   Its title shows the version from `metadata.json` (`ace.build()`). Since the releases,
+   `version` in `metadata.json` and `tildagon.toml` changes only for a release ("0.3.2");
+   each build is numbered and described in `BUILD_NOTES.md` instead (build 99 on 2026-11-20).
 4. Level names are EASY / NORMAL / HARD (kept for release, build 58); their numbers are
    `commander.py` (`RANK_DIVISOR`) and `game.py` (`LEVELS`).
 
 ## Not yet confirmed on the badge
+
+This list dates from the early builds and may be out of date: later confirmations are in
+`BUILD_NOTES.md`. Newest unconfirmed (2026-11-20): build 98 (the docking computer's view
+shows the ship you bought) and build 99 (the sun's heat kills as in Elite; its edge drawn as
+a horizon while skimming; frame time near the sun not measured).
 
 - Tilt axis directions (`TILT_PITCH_SIGN`, `TILT_ROLL_SIGN`, `TILT_SWAP_AXES`).
 - The local chart and hyperspace (build 20): cursor speed (`CURSOR_SPEED` in `chart.py`),
@@ -225,7 +242,7 @@ and quit). Docked, on the market: joystick up / down picks a good, C buys, D sel
 buttons repeat); on Equip ship: joystick picks an item, C buys. In tilt steering a tap on D re-zeroes and a hold fires the missile. Hostile ships red on the radar. Hit flash on the LEDs, not a ring
 on screen. Enemy lasers run from the ship's gun to the bottom of the screen (the cockpit).
 
-## Hardcore Mode (branch `hardcore-mode`, started 2026-11-16, not merged)
+## Hardcore Mode, keyboard and views (started 2026-11-16, merged in PRs #21 and #22)
 
 Brian's plan ("Ace Commander: Hardcore Mode & Keyboard Support"): switch the assists to manual and
 control them from the keyboard (Tildagon Keyboard Hexpansion, and the Tufty's Keebdeck). Standard mode
@@ -322,7 +339,6 @@ back. Practice flies with an ECM (build 73; automatic, or by hand in Hardcore). 
 if level and HARDCORE are unchanged. SPEED TEST left the title screen (Brian: keep it, hidden) for
 DEBUG > DISPLAY (off flight only; F returns to that page).
 Not built yet: a HARDCORE marker on the HUD.
-All 21 test files pass with Elite's files; without them 9 of 18 did when this was started.
 
 ## Licensing
 
@@ -345,8 +361,9 @@ Elite, written from scratch, not as a port: no original code is used. The README
 - After writing files into this folder from a cloud session, **verify by checksum**. Once, a
   write reported success but delivered a stale cached copy of the same staging path. Staging
   each build under a fresh path avoided it.
-- Git inside the sandbox cannot delete its own lock and temp files unless Brian grants delete
-  permission, so a commit made there leaves `.git/*.lock` and `tmp_obj_*` behind. So far
-  Brian has run commits and pushes himself.
+- Git on Brian's PC through the file bridge cannot delete its own lock and temp files unless
+  Brian grants delete permission, so a commit made there leaves `.git/*.lock` and `tmp_obj_*`
+  behind. From a cloud session or the Pi, Claude commits, pushes and opens pull requests
+  itself (on a branch; `gh` there has no GraphQL, so use `gh api repos/...`).
 - Say plainly what was tested only on a PC. Several early builds would have crashed on the
   badge (missing `super().__init__()`) while passing every PC test.
