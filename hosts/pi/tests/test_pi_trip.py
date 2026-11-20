@@ -82,8 +82,11 @@ a = h.app
 ace = h.ace
 assert not ace.DEBUG_MENU, "no DEBUG menu on the Pi unless asked for"
 assert ace.options_path().startswith(save_dir) and ace.SAVE_PATH.startswith(save_dir)
-assert sys.modules[run.PKG + ".content"].__file__.startswith(save_dir), \
-    "content.py reads options.json from the data folder"
+cfg = sys.modules[run.PKG + ".config"]
+assert cfg.data("options.json").startswith(save_dir), \
+    "content.py reads options.json from the data folder (config.py)"
+assert cfg.title_quit and ace.TITLE_QUIT and cfg.wire_min == run.WIRE_MIN
+assert sys.modules[run.PKG + ".cockpit"].WIRE_MIN == run.WIRE_MIN, "the Pi's draw distance"
 
 # ---- a new commander, docked ---------------------------------------------------
 until(h, lambda: False, 5)

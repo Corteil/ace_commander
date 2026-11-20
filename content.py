@@ -3,17 +3,16 @@ ship_data.py and game_data.py made from your own copy of the Elite source
 (tools/import_ships.py, tools/import_galaxy.py), or the game's own,
 original_ships.py and original_data.py. The game's own is used when the
 Elite files aren't there, or when Options > CONTENT: OWN is saved in
-options.json beside this file (it applies from the next start).
+options.json in the data folder (config.py; it applies from the next start).
 """
 import json
+
+from . import config
 
 
 def _want_own():
     try:
-        d = __file__.rsplit("/", 1)[0]
-        if not d.startswith("/") and ":" not in d:
-            d = "/" + d         # the badge gives a path relative to /
-        with open(d + "/options.json") as f:
+        with open(config.data("options.json")) as f:
             o = json.loads(f.read())
         return bool(o.get("own", o.get("own_ships")))
     except Exception:
