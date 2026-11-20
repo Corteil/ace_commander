@@ -605,8 +605,14 @@ g.step(DT, 0, 0, 0, False, False)
 assert not g.scooping and g.msg_t <= 0, "a full tank takes nothing"
 g.refuel = tank; g.to_sun(1.6); g.sun_t = 0.0; g.step(DT, 0, 0, 0, False, False)
 assert g.cabin < game.SCOOP_TEMP and not got, "not close enough"
-g.to_sun(0.9); g.step(DT, 0, 0, 0, False, False)
-assert g.over, "into the sun is the end"
+# as Elite: the sun has no surface to hit; past a cabin temperature of 255
+# (about 0.91 sun radii from its centre) the heat is the end
+g.to_sun(0.95); g.speed = 0.0; g.step(DT, 0, 0, 0, False, False)
+assert not g.over and g.cabin == 252, "inside the sun's edge, very hot but alive"
+g.god = True; g.to_sun(0.9); g.step(DT, 0, 0, 0, False, False)
+assert not g.over and g.cabin == game.FATAL_CABIN, "invincible: the heat can't kill"
+g.god = False; g.to_sun(0.9); g.step(DT, 0, 0, 0, False, False)
+assert g.over, "too hot: the end"
 
 # waves are for combat practice only
 g = fresh(10)
@@ -745,7 +751,14 @@ g.docked = False; g._hurt(1e6); g.to_station(100)
 g.step(DT, 0, 0, 0, False, False)
 assert not g.docked
 
-# flying into the planet or the sun is the end, except for the invincible
+# flying into the planet, or deep into the sun's heat, is the end, except for
+# the invincible; as Elite, just under the sun's edge isn't hot enough yet
+g = fresh(7)
+g.enter(6000, "CORIOLIS", "launch")
+sp = g.space
+sp.sx, sp.sy, sp.sz = 0.0, 0.0, sp.sr - 10
+g.step(DT, 0, 0, 0, False, False)
+assert not g.over, "just under the sun's edge"
 for which in ("planet", "sun"):
     g = fresh(7)
     g.enter(6000, "CORIOLIS", "launch")
@@ -753,7 +766,7 @@ for which in ("planet", "sun"):
     if which == "planet":
         sp.px, sp.py, sp.pz = 0.0, 0.0, sp.pr - 10
     else:
-        sp.sx, sp.sy, sp.sz = 0.0, 0.0, sp.sr - 10
+        sp.sx, sp.sy, sp.sz = 0.0, 0.0, sp.sr * 0.9
     g.god = True; g.step(DT, 0, 0, 0, False, False)
     assert not g.over
     g.god = False; g.step(DT, 0, 0, 0, False, False)

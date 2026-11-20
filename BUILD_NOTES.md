@@ -1104,3 +1104,10 @@ what is now `ace.py` (renamed in build 50).
    computer's view from behind still showed the old ship). `cockpit._my_ship` cached your
    ship's blueprint per `Game`, and the same `Game` is kept between flights (`_fit` only
    calls `set_ship`); it now also checks `g.ship_name`. Test in `tests/test_shipyard.py`.
+   **Build 99** (2026-11-20, Brian: "make it the same as Elite"). The sun's heat as in the
+   disc source (main flight loop part 15): the sun has no surface to hit; the heat kills you
+   once the cabin temperature would pass 255 (`game.FATAL_CABIN`), about 0.91 sun radii from
+   its centre (285 - 36 x (d / r)^2, the same formula and numbers as Elite's). Heat never
+   drained energy in the original, so it doesn't here. Inside the sun's edge the view is all
+   sun (`cockpit._draw_space`). The planet is still deadly at its surface. Elite checks the
+   heat on one frame in 32; this checks every frame. Tests in `tests/test_game.py`.

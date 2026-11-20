@@ -1137,6 +1137,8 @@ def _draw_space(ctx, sp, wire=WIRE_MIN):
     """The sun (filled), the planet (an outline, filled black if it is in
     front of the sun) and the station, in its government's colour."""
     sun = _sphere(sp.sx, sp.sy, sp.sz, sp.sr)
+    if sp.sx * sp.sx + sp.sy * sp.sy + sp.sz * sp.sz < sp.sr * sp.sr:
+        sun = (0.0, 0.0, 1e9)       # inside the sun (as Elite, the heat kills a little deeper in)
     planet = _sphere(sp.px, sp.py, sp.pz, sp.pr)
     # whichever is nearer is drawn last, over the other
     sun_near = (sp.sx * sp.sx + sp.sy * sp.sy + sp.sz * sp.sz
