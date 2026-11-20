@@ -1107,7 +1107,81 @@ def _covers(c):
 MAX_ARC = 2000      # pixels: circles bigger than this that don't cover the screen are left out
 
 
+# Close to the sun (fuel skimming) it is drawn as bands across the screen, as
+# Elite draws its sun in lines: each band from the sphere's true edge, so it
+# lies across the view like a horizon and stays there as you fly past (the
+# circle _sphere gives is only right far off, and is dropped once the sun's
+# centre is beside you).
+SUN_BANDS_K = 3.0       # in sun radii from its centre: nearer than this, bands
+SUN_BAND = 4            # pixels: each band's height (fewer bands, less float garbage)
+
+
+def _sun_bands(ctx, sp):
+    """The sun from close by: a band of each SUN_BAND rows, filled where a ray
+    through the band's middle row meets the sphere. Inside it, all sun."""
+    cx, cy, cz = sp.sx, sp.sy, sp.sz
+    d2 = cx * cx + cy * cy + cz * cz
+    r2 = sp.sr * sp.sr
+    hw, hh = VIEW_HW, VIEW_HH
+    if d2 <= r2:        # inside the sun's edge (the heat kills a little deeper in)
+        ctx.rectangle(-hw, -hh, 2 * hw, 2 * hh).fill()
+        return
+    d = math.sqrt(d2)
+    cx /= d
+    cy /= d
+    cz /= d
+    k = 1.0 - r2 / d2   # cos^2 of the sun's angular radius: on the edge (p.c)^2 = k |p|^2
+    # all of it behind the view: its edge more than 50 degrees off straight ahead
+    if cz < 0.64 and math.acos(cz) - math.asin(sp.sr / d) > 0.87:
+        return
+    a = cx * cx - k
+    f = FOCAL
+    y = -hh
+    while y < hh:
+        ym = y + SUN_BAND * 0.5
+        # the ray through (x, ym) on screen is (x, -ym, f): (x cx + b)^2 >= k (x^2 + e)
+        b = f * cz - ym * cy
+        e = ym * ym + f * f
+        bb = 2.0 * cx * b
+        c = b * b - k * e
+        x0 = x1 = None
+        if a > 1e-9 or a < -1e-9:
+            disc = bb * bb - 4.0 * a * c
+            if disc >= 0.0:
+                q = math.sqrt(disc)
+                r1 = (-bb - q) / (2.0 * a)
+                r2_ = (-bb + q) / (2.0 * a)
+                if r1 > r2_:
+                    r1, r2_ = r2_, r1
+                if a < 0.0:
+                    x0, x1 = r1, r2_                      # between the roots
+                elif cx * (r1 - 1.0) + b > 0.0:           # outside them: the sun's side
+                    x0, x1 = -hw, r1
+                else:
+                    x0, x1 = r2_, hw
+            elif a > 0.0:
+                x0, x1 = -hw, hw
+        elif bb != 0.0:         # a straight edge
+            xe = -c / bb
+            if bb > 0.0:
+                x0, x1 = xe, hw
+            else:
+                x0, x1 = -hw, xe
+        if x0 is not None:
+            if x0 < -hw:
+                x0 = -hw
+            if x1 > hw:
+                x1 = hw
+            if x1 > x0 and cx * (x0 + x1) * 0.5 + b > 0.0:    # not the cone behind you
+                ctx.rectangle(int(x0), y, int(x1 - x0) + 1, SUN_BAND).fill()
+        y += SUN_BAND
+
+
 def _sun(ctx, sp, sun):
+    if sp.sx * sp.sx + sp.sy * sp.sy + sp.sz * sp.sz < SUN_BANDS_K * SUN_BANDS_K * sp.sr * sp.sr:
+        ctx.rgb(*SUN_COLOURS[sp.sun % len(SUN_COLOURS)])
+        _sun_bands(ctx, sp)
+        return
     if sun is None:
         return
     ctx.rgb(*SUN_COLOURS[sp.sun % len(SUN_COLOURS)])

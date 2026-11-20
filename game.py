@@ -136,6 +136,8 @@ DODO_TECH = 10             # systems with this tech level or more have a Dodo st
 # year every SUN_CHECK seconds. Flying into the sun is the end, as before.
 COOL_CABIN = 30
 SUN_HEAT = 36.0
+FATAL_CABIN = 255           # as Elite (main flight loop part 15): past this the heat kills you,
+                            # about 0.91 sun radii from its centre; the sun has no surface to hit
 SCOOP_TEMP = 224
 SUN_CHECK = 1.0
 
@@ -1029,7 +1031,7 @@ class Game:
 
     def _space(self, dt):
         """The station turns; reaching it docks you, and flying into the
-        planet or the sun is the end."""
+        planet, or too deep into the sun's heat (_sun), is the end."""
         sp = self.space
         st = sp.station
         if st is not None:
@@ -1062,19 +1064,23 @@ class Game:
                 if self._approach(sp, st, dt):
                     return
         self._sun(sp, dt)
+        if self.over:
+            return
         if not self.god:
-            for x, y, z, r in ((sp.px, sp.py, sp.pz, sp.pr), (sp.sx, sp.sy, sp.sz, sp.sr)):
-                if x * x + y * y + z * z < r * r:
-                    self._hurt(1e6)
-                    return
+            if sp.px * sp.px + sp.py * sp.py + sp.pz * sp.pz < sp.pr * sp.pr:
+                self._hurt(1e6)
+                return
 
     def _sun(self, sp, dt):
         """The cabin temperature near the sun, and skimming fuel from it."""
         k = (sp.sx * sp.sx + sp.sy * sp.sy + sp.sz * sp.sz) / (sp.sr * sp.sr)
         t = 285.0 - SUN_HEAT * k
         self.cabin = int(t) if t > COOL_CABIN else COOL_CABIN
-        if self.cabin > 255:
-            self.cabin = 255
+        if t > FATAL_CABIN:
+            self.cabin = FATAL_CABIN
+            if not self.god and not self.over:
+                self._hurt(1e6)         # too hot: as Elite, the end
+                return
         if self.cabin < SCOOP_TEMP:
             self.scooping = False       # out of the band: stops at once
         self.sun_t -= dt
