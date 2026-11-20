@@ -13,7 +13,7 @@ failed = []
 for name in ("test_game.py", "test_app.py", "test_commander.py", "test_galaxy.py", "test_market.py",
              "test_equipment.py", "test_ships.py", "test_shipyard.py", "test_find.py", "test_equip_effects.py", "test_traffic.py", "test_witchspace.py", "test_loader.py", "test_describe.py", "test_missions.py", "test_original_ships.py", "test_original_data.py", "test_install.py",
              "test_leds.py", "test_hardcore.py", "test_views.py", "test_keys.py", "test_analog.py",
-             "test_bench.py", "test_run.py"):
+             "test_bench.py", "test_run.py", "test_build_mpy.py"):
     r = subprocess.run([sys.executable, os.path.join(HERE, name)], capture_output=True, text=True)
     lines = [l for l in r.stdout.strip().split("\n") if not l.startswith(("PERF", "BENCH"))]
     print("%-14s %s" % (name, "ok" if r.returncode == 0 else "FAILED"), "-", lines[-1] if lines else "")
