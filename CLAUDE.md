@@ -94,7 +94,7 @@ Other devices are in `hosts/` (the Pi; the Tufty 2350 port is still its own repo
   `hosts/pi/tests/test_pi_host.py`, `test_pi_trip.py` and `test_pi_pad.py`
   (P1: a whole trip by keys; SDL dummy driver), run by `tests/run_all.py` when pygame is there.
   `run.load_game` keeps save, options.json and debug.txt in `~/.local/share/ace_commander/`
-  (content.py loaded with its `__file__` there); DEBUG and PERF only with `--debug`. Plan: `hosts/pi/PLAN.md`.
+  (it sets `config.py` before importing the game, build 100); DEBUG and PERF only with `--debug`. Plan: `hosts/pi/PLAN.md`.
 
 The repo folder must be called `ace_commander`: the tests import the app as that package, and
 it installs to `/apps/ace_commander/` on the badge.
@@ -236,8 +236,8 @@ and launching and no errors in the log.
 
 ## Controls (Brian's choices)
 
-Joystick steers by default. C or joystick press fires, D missile, B energy bomb (not built
-yet, says so), F/E speed up/down, A in-flight menu (status, settings with steering
+Joystick steers by default. C or joystick press fires, D missile, B energy bomb (once fitted;
+it is used up), F/E speed up/down, A in-flight menu (status, settings with steering
 and quit). Docked, on the market: joystick up / down picks a good, C buys, D sells (held
 buttons repeat); on Equip ship: joystick picks an item, C buys. In tilt steering a tap on D re-zeroes and a hold fires the missile. Hostile ships red on the radar. Hit flash on the LEDs, not a ring
 on screen. Enemy lasers run from the ship's gun to the bottom of the screen (the cockpit).
