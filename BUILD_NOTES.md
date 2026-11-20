@@ -248,7 +248,7 @@ what is now `ace.py` (renamed in build 50).
    flight loop). The safe zone is `SAFE_K` (2) planet radii round the station
    (`Space.safe_r`; Elite's is a box of 2 radii, all its planets one size), replacing the
    fixed `SAFE_DIST`. Outside it, once the last ships have gone, every `ENCOUNTER_EVERY`
-   (20) s a roll (`Game._roll`): certain in an anarchy, else `PIRATE_ROLL` (47%) and a
+   (20) s a roll (`Game._encounter`, was `_roll`): certain in an anarchy, else `PIRATE_ROLL` (47%) and a
    number 0-7 at least the government, so a corporate state about 6%. Then a lone bounty
    hunter (`HUNTER_CHANCE`, 39%: `HUNTERS`) or a pack of 1 to `PACK_MOST` (4) `PIRATES`,
    capped by the level's `max_hostile`, small types more likely (two random bytes ANDed);
@@ -543,7 +543,7 @@ what is now `ace.py` (renamed in build 50).
    saves; it saves again if a mission moves on). Mission 1: docked in galaxy 1 or 2 with
    256 kills (`KILLS_1`, divided by the level's `RANK_DIVISOR` like the ranks: EASY 51,
    NORMAL 128, HARD 256) starts it; at Orarra (galaxy 2, 144,33) the encounter roll's lone
-   bounty hunter (`Game._roll`, `Game.hunt`) is the Constrictor (`role` "constrictor",
+   bounty hunter (`Game._encounter`, was `_roll`, `Game.hunt`) is the Constrictor (`role` "constrictor",
    `Obj.ecm`) if none is about, and every lone hunter there attacks (`Game.orarra`). Only
    the military laser hurts it, at `CONSTRICTOR_LASER` (1/4); its ECM destroys your
    missiles within `ECM_RANGE`; the energy bomb kills it, as in the original. Killing it

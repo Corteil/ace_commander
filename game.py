@@ -2320,7 +2320,7 @@ class Game:
         if self.plans and random.random() < PLANS_THARGOID:
             self.add_thargoid()     # they know you have the plans
         if hostile == 0 and self.pending == 0:
-            self._roll()
+            self._encounter()
 
     def add_trader(self, dest=None):
         """A trader somewhere round you, making for the station or the
@@ -2468,7 +2468,7 @@ class Game:
             if count < MAX_OBJECTS - 3:
                 self._spawn_rocks()
 
-    def _roll(self):
+    def _encounter(self):
         """Every ENCOUNTER_EVERY seconds: maybe pirates or a bounty hunter,
         more likely the more dangerous the government (see ENCOUNTER_EVERY)."""
         if self.skip > 0:

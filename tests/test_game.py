@@ -743,7 +743,7 @@ def odds(gov, n=4000):
     hits = 0
     for _ in range(n):
         g.group = []; g.pending = 0; g.skip = 0
-        g._roll()
+        g._encounter()
         hits += bool(g.group)
     return hits / n
 o = [odds(gov) for gov in range(8)]
@@ -764,7 +764,7 @@ for level in (0, 2):
     g.set_level(level)
     for _ in range(3000):
         g.group = []; g.skip = 0
-        g._roll()
+        g._encounter()
         if len(g.group) == 1 and g.group[0] in game.HUNTERS and g.skip == 1:
             hunters += 1
         else:
@@ -777,9 +777,9 @@ for level in (0, 2):
 assert sorted(packs) == [1, 2, 3, 4] and 0.3 < hunters / 6000 < 0.48, (packs, hunters)
 assert kinds["SIDEWINDER"] > 2 * kinds["COBRA MK III P"], kinds
 g.set_level(2); g.group = []; g.skip = 2
-g._roll(); g._roll()
+g._encounter(); g._encounter()
 assert not g.group and g.skip == 0, "skipped"
-g._roll(); assert g.group
+g._encounter(); assert g.group
 
 # over time: far more pirates in an anarchy than in a corporate state, a roll
 # every ENCOUNTER_EVERY seconds once the last ones have gone; none in the safe zone
