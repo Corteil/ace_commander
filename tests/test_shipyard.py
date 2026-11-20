@@ -278,5 +278,16 @@ c.legal = 0; k._hot(); assert c.legal == 0, "a clean ship: jumps clear the recor
 assert "STOLEN: OFF" in k._ship_items_c()
 k._ship_config_c("STOLEN: OFF"); assert c.stolen and commander.load(SAVE).stolen
 print("a hot ship: offender while flown, spotted, new transponder, DEBUG STOLEN: ok")
+# the docking computer's view from behind shows the ship you fly now, after
+# buying another one (Brian, 2026-11-20: it showed the old one, because the
+# same Game is kept between flights and the view cached its blueprint per Game)
+from ace_commander import cockpit
+g = game.Game(mod.SHIPS, 1)
+g.set_ship(ships.COBRA)
+assert cockpit._my_ship(g).bp is g.types[ships.COBRA]
+other = [n for n in ships.TYPES if n != ships.COBRA and n in g.types][0]
+g.set_ship(other)
+assert cockpit._my_ship(g).bp is g.types[other], "the view behind still shows the old ship"
+print("docking computer view: the new ship after buying one: ok")
 os.remove(SAVE)
 print("ALL SHIPYARD TESTS PASSED")

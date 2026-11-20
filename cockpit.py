@@ -861,7 +861,8 @@ def chase_back(g):
     d = sp.d_station - st.bp.front + _auto_in     # 0 when docked
     near = CHASE_DOCK + _auto_in
     return max(float(near), min(float(CHASE_BACK), near + d * CHASE_CLOSE))
-_me = None      # your ship, for that view: [Obj, the Game whose blueprint it is]
+_me = None      # your ship, for that view: [Obj, the Game whose blueprint it is,
+                # bank, pitch, the ship's name (a new ship bought keeps the same Game)]
 
 
 def _chase_shift(g, dy, dz):
@@ -906,11 +907,12 @@ class _Me:
 
 def _my_ship(g):
     global _me
-    if _me is None or _me[1] is not g:
-        bp = g.types.get(getattr(g, "ship_name", "COBRA MK III"))   # the ship you fly
+    name = getattr(g, "ship_name", "COBRA MK III")      # the ship you fly
+    if _me is None or _me[1] is not g or _me[4] != name:
+        bp = g.types.get(name)
         if bp is None:
             return None
-        _me = [_Me(bp), g, 0.0, 0.0]
+        _me = [_Me(bp), g, 0.0, 0.0, name]
     # bank and pitch with the docking computer's stick, eased, so you can see it fly
     p, r = getattr(g, "auto_stick", (0.0, 0.0))
     _me[2] += (r * 0.5 - _me[2]) * 0.2
