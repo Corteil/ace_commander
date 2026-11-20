@@ -19,7 +19,7 @@ import app
 # in the order they are imported: each after the ones it needs
 STEPS = ("ship_data", "game_data", "config", "content", "commander", "galaxy", "market", "ships", "equipment", "rules", "game",
          "cockpit", "chart", "find", "screens", "title", "viewer", "describe", "missions", "briefing",
-         "docked", "ace")
+         "docked", "controls", "platform_tildagon", "ace")
 OPTIONAL = ("ship_data", "game_data")   # made from your own copy of Elite: may be missing
 GREEN = (0.3, 1, 0.4)      # the title screen's menu line
 GREY = (0.6, 0.6, 0.6)

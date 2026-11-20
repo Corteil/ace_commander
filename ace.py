@@ -51,20 +51,14 @@ import random
 import time
 
 import app
-from events.input import BUTTON_TYPES, ButtonDownEvent, ButtonUpEvent
 from system.eventbus import eventbus
 
-from . import briefing, cockpit, commander, docked, game, missions, rules, ships, title, viewer
+from . import briefing, cockpit, commander, controls, docked, game, missions, rules, ships, title, viewer
 
 try:
     import imu
 except ImportError:
     imu = None
-
-try:
-    from events.keyboard import KEYBOARD_BUTTONS
-except ImportError:
-    KEYBOARD_BUTTONS = {}
 
 from . import config      # where the files are, and a host's switches (config.py)
 from . import content     # Elite's ships and galaxy, or the game's own (content.py)
@@ -89,11 +83,6 @@ EDGE_IN = 100           # a streak or speck this far from the middle (pixels) is
 EDGE_OUT = 140
 REPEAT_WAIT = 0.45      # seconds a market button is held before it starts repeating
 REPEAT_EVERY = 0.09     # then once every this many seconds
-
-# the joystick's directions and buttons A-F, told apart from each other (only
-# the current firmware is supported: Brian, 2026-11-18)
-from events.joystick import JOYSTICK_BUTTON_TYPES as JOY
-from frontboards.common import FRONTBOARD_BUTTON_TYPES as FB
 
 try:    # lets the flight screen skip the 50 ms pause the badge adds to every frame
     from system.scheduler import scheduler
@@ -128,7 +117,6 @@ TILT_SWAP_AXES = False  # True if the badge's x axis should pitch, y roll
 TILT_FLIPS = ("NORMAL", "UP/DOWN FLIPPED", "L/R FLIPPED", "BOTH FLIPPED")
 
 INVERT_PITCH = False    # False: joystick up raises the nose. True: up dives.
-LOG_KEYS = config.log_keys  # True: print every button / key event to serial (to see what a keyboard sends)
 SHOW_FRAME_TIME = True  # small frame time (ms) at the top of the flight screen, to start with
 DEBUG_ROWS = 7          # DEBUG page lines shown at once, the chosen one in the middle
 USE_LEDS = True         # flash the badge's LEDs red when hit (else a ring on screen)
@@ -141,10 +129,6 @@ DOCK_TIME = 3.0         # seconds of flying in through the station's tunnel on d
 DOCK_HOLD = (1.0, 2.0)  # then the view of the bay stays this long, chosen at random
 EJECT_TIME = 3.0        # seconds of the ESCAPE POD screen before the docking scene (C skips it)
 DOCK_NAMES = {"A": "MANUAL", "B": "ASSISTED", "C": "AUTOMATIC"}
-
-# keyboard keys not in the firmware's KEYBOARD_BUTTONS, by the name a driver
-# would give them, and the control name Pad gives them
-BY_NAME = {"TAB": "k_TAB", "LSHIFT": "k_LSHIFT", "RSHIFT": "k_RSHIFT"}
 
 # the in-flight screens (Elite's f4-f9 and the charts): shown instead of the
 # space view while the game runs on, not pages of the pause menu
@@ -311,163 +295,6 @@ def _tilt(v):
     return a if v > 0 else -a
 
 
-class Pad:
-    """Which controls are down, kept up to date from button events.
-
-    The firmware's own Buttons.get() searches every known button each time it
-    is asked, which is slow when a game asks about twenty things a frame. This
-    does the matching once per press and then answers from a set.
-
-    Controls are named: "up" / "confirm" / ... for any button of that kind,
-    "j_up" ... for the joystick only, "A" to "F" for the lettered buttons and
-    "k_W" ... for keyboard keys.
-    """
-
-    def __init__(self, owner):
-        table = [(name.lower(), BUTTON_TYPES[name])
-                 for name in ("UP", "DOWN", "LEFT", "RIGHT", "CONFIRM", "CANCEL")]
-        for name in ("UP", "DOWN", "LEFT", "RIGHT"):
-            table.append(("j_" + name.lower(), JOY[name]))
-        for name in "ABCDEF":
-            table.append((name, FB[name]))
-        for name in ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "T", "U", "V", "C", "SPACE",
-                     "BACKSPACE",
-                     "UP", "DOWN", "LEFT", "RIGHT"):
-            key = KEYBOARD_BUTTONS.get(name)
-            if key is not None:
-                table.append(("k_" + name, key))
-                if name in ("UP", "DOWN", "LEFT", "RIGHT"):
-                    # the cursor keys count as the joystick too, so every menu,
-                    # tab and chart that reads "j_up" ... takes them (Brian)
-                    table.append(("j_" + name.lower(), key))
-        # the views are Elite's f0 (front), f1 (rear), f2 (left), f3 (right), on the number
-        # keys 1 to 4 as the keyboard plan has it (top row 1-0 are f0-f9). The names in
-        # KEYBOARD_BUTTONS are not checked on a real keyboard yet.
-        for n in range(4):
-            key = KEYBOARD_BUTTONS.get(str(n + 1))
-            if key is not None:
-                table.append(("k_view%d" % n, key))
-        # the rest of Elite's keys (Brian chose Elite's scheme, 2026-11-16): the
-        # number row is f0-f9 ("k_1" ... "k_0"), H hyperspace (Ctrl+H the galactic
-        # hyperdrive, as Elite), J the jump drive, + / - speed ("=" and "_" too,
-        # the same keys without shift)
-        for name in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "H", "J", "SHIFT", "CTRL",
-                     "ESCAPE"):
-            key = KEYBOARD_BUTTONS.get(name)
-            if key is not None:
-                table.append(("k_" + name, key))
-        for name, control in (("+", "k_faster"), ("=", "k_faster"),
-                              ("-", "k_slower"), ("_", "k_slower")):
-            key = KEYBOARD_BUTTONS.get(name)
-            if key is not None:
-                table.append((control, key))
-        self.table = table
-        # the letters a keyboard types, for finding a system by name (build 88)
-        self.letters = {}
-        for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
-            key = KEYBOARD_BUTTONS.get(ch)
-            if key is not None:
-                self.letters[key] = ch
-        key = KEYBOARD_BUTTONS.get("SPACE")
-        if key is not None:
-            self.letters[key] = " "
-        # off the flight the keyboard's A-F are the badge's buttons (Brian,
-        # 2026-11-19: "the letter keys act the same as the badge keys, apart
-        # when entering text", "the same everywhere"): each counts as the
-        # lettered button and its system direction, as the badge's own do
-        # (A up, B right, C confirm, D down, E left, F cancel), instead of as
-        # a keyboard key. AceCommander sets as_buttons each frame.
-        self.as_buttons = False
-        self.badge_keys = {}
-        for ch, sysname in (("A", "up"), ("B", "right"), ("C", "confirm"),
-                            ("D", "down"), ("E", "left"), ("F", "cancel")):
-            key = KEYBOARD_BUTTONS.get(ch)
-            if key is not None:
-                self.badge_keys[key] = (ch, sysname)
-        self.down_names = {}    # button -> the names it went down as (for its up)
-        self.typed = ""      # letters typed since the last end_frame()
-        self.keyboard = False   # a keyboard key has been pressed (see AceCommander._keyboard)
-        self.names = {}      # button -> the control names it counts as
-        self.pressed = {}    # button -> True while it is down
-        self.count = {}      # control name -> how many buttons hold it down
-        self.hits = set()    # control names pressed since the last end_frame()
-        eventbus.on(ButtonDownEvent, self._down, owner)
-        eventbus.on(ButtonUpEvent, self._up, owner)
-
-    def _names(self, button):
-        names = self.names.get(button)
-        if names is None:
-            names = tuple(n for n, kind in self.table if kind in button)
-            # keys the firmware's KEYBOARD_BUTTONS lacks, matched by name in case
-            # a keyboard driver sends them anyway: Tab (Elite's energy bomb)
-            if getattr(button, "name", None) in BY_NAME:
-                names += (BY_NAME[button.name],)
-            self.names[button] = names
-        return names
-
-    def _down(self, event):
-        button = event.button
-        if LOG_KEYS:
-            print("KEY DOWN", repr(button))
-        if self.pressed.get(button):
-            return      # already down (key repeat)
-        self.pressed[button] = True
-        count = self.count
-        # Shift or Ctrl held at the moment this went down: the Keyboard
-        # Hexpansion sends Shift down, H down, Shift up, H up within one frame,
-        # so asking held("k_SHIFT") on the next update is too late (Brian's
-        # badge log, build 64). hit("mod+k_H") is a shifted H.
-        mod = (count.get("k_SHIFT", 0) > 0 or count.get("k_CTRL", 0) > 0
-               or count.get("k_LSHIFT", 0) > 0 or count.get("k_RSHIFT", 0) > 0)
-        names = self._names(button)
-        if self.as_buttons and button in self.badge_keys:
-            names = self.badge_keys[button]     # the badge's button, not the key
-            self.keyboard = True
-        self.down_names[button] = names
-        for n in names:
-            count[n] = count.get(n, 0) + 1
-            self.hits.add(n)
-            if mod:
-                self.hits.add("mod+" + n)
-            if n[:2] == "k_":
-                self.keyboard = True
-        ch = self.letters.get(button)
-        if ch is not None:
-            self.typed += ch
-            self.keyboard = True
-
-    def _up(self, event):
-        button = event.button
-        if LOG_KEYS:
-            print("KEY UP", repr(button))
-        if not self.pressed.get(button):
-            return
-        self.pressed[button] = False
-        count = self.count
-        for n in self.down_names.pop(button, None) or self._names(button):
-            if count.get(n, 0) > 0:
-                count[n] -= 1
-
-    def held(self, name):
-        return self.count.get(name, 0) > 0
-
-    def hit(self, name):
-        """True if the control was pressed since the last frame."""
-        return name in self.hits
-
-    def end_frame(self):
-        if self.hits:
-            self.hits = set()
-        if self.typed:
-            self.typed = ""
-
-    def clear(self):
-        self.pressed = {}
-        self.count = {}
-        self.hits = set()
-        self.down_names = {}
-
-
 class AceCommander(app.App):
     def __init__(self, host=None):
         """host: the app object the badge's scheduler knows, when this one is
@@ -475,7 +302,15 @@ class AceCommander(app.App):
         go through it. None: this is that object."""
         super().__init__()
         self.host = host if host is not None else self
-        self.pad = Pad(self.host)
+        # which controls are down, by name (controls.py), fed by the platform:
+        # on the badge platform_tildagon.Input matches the firmware's button
+        # events; another device sets config.input to feed it itself
+        self.pad = controls.Controls()
+        if config.input is not None:
+            config.input(self.pad, self.host)
+        else:
+            from . import platform_tildagon
+            platform_tildagon.Input(self.host, self.pad)
         # menu (the title screen) | level | docked | launch | flight | viewer | bench
         self.mode = "menu"
         self.bench = None

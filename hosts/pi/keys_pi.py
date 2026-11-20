@@ -15,7 +15,7 @@
 """
 import pygame
 
-from pi_firmware import (BADGE, KEYBOARD, STICK, TAB, ButtonDownEvent, ButtonUpEvent)
+from controls_pi import BADGE, KEYBOARD, STICK, TAB
 
 SPECIAL = {
     pygame.K_UP: KEYBOARD["UP"], pygame.K_DOWN: KEYBOARD["DOWN"],
@@ -33,13 +33,13 @@ SPECIAL = {
 
 
 class Keys:
-    """pygame key events in, the game's button events out (on the stand-in bus).
-    A key's button is remembered at key-down, so its key-up matches even if
+    """pygame key events in, the game's controls out (through controls_pi.Feed).
+    A key's Key is remembered at key-down, so its key-up matches even if
     Shift changed the character in between."""
 
-    def __init__(self, bus):
-        self.bus = bus
-        self.down = {}          # pygame key -> the Button sent for it
+    def __init__(self, feed):
+        self.feed = feed
+        self.down = {}          # pygame key -> the Key sent for it
 
     def button(self, event):
         b = SPECIAL.get(event.key)
@@ -61,18 +61,18 @@ class Keys:
             if b is None:
                 return False
             self.down[event.key] = b
-            self.bus.send(ButtonDownEvent(b))
+            self.feed.down(b)
             return True
         if event.type == pygame.KEYUP:
             b = self.down.pop(event.key, None)
             if b is None:
                 return False
-            self.bus.send(ButtonUpEvent(b))
+            self.feed.up(b)
             return True
         return False
 
     def release_all(self):
         """Window lost focus: let go of every key, as the badge would."""
         for b in self.down.values():
-            self.bus.send(ButtonUpEvent(b))
+            self.feed.up(b)
         self.down = {}
