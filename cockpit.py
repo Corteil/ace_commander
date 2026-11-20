@@ -8,6 +8,11 @@ text is kept for messages that only show now and then.
 """
 import math
 
+try:
+    from . import config
+except ImportError:     # imported on its own (tests/test_game.py)
+    import config
+
 FOCAL = 208.0    # pixels; gives a field of view of about 60 degrees
 VIEW_NAMES = ("FRONT", "REAR", "LEFT", "RIGHT")   # as game.VIEW_NAMES; this module imports no game
 NEAR = 30.0      # nothing closer than this is drawn
@@ -16,7 +21,7 @@ NEAR = 30.0      # nothing closer than this is drawn
 VIEW_HW = 120
 VIEW_HH = 120
 TAU = 2 * math.pi
-WIRE_MIN = 8.0   # ships that look smaller than this (pixels) are drawn as a marker
+WIRE_MIN = config.wire_min   # ships that look smaller than this (pixels) are drawn as a marker
 STREAK_MIN = 300  # world units: the shortest stardust streak with the jump drive on
 
 RADAR_Y = 88

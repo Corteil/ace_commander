@@ -1120,3 +1120,14 @@ what is now `ace.py` (renamed in build 50).
    per-pixel ray test. Not measured on the badge: up to 60 rectangles (about 2 ms) and
    roughly 30 float results a band, so watch the frame time and collections near the sun;
    a bigger `SUN_BAND` costs less. Tests in `tests/test_game.py`.
+   **Build 100** (2026-11-20, the platform layer's step 1, `hosts/NEXT_SESSION.md` B1:
+   settings and storage). New `config.py` (imports nothing): `data_dir` (the save,
+   options.json and debug.txt; None = the app's folder, as on the badge) with `data(name)`,
+   and a host's switches `debug_menu`, `perf_log`, `log_keys`, `title_quit`, `wire_min`.
+   `content.py`, `ace.py` and `cockpit.py` read them as they load; `app.py` loads it first.
+   The Pi's `load_game` sets config before importing the game, so its tricks are gone
+   (content.py under a false `__file__`, SAVE_PATH / TITLE_QUIT / DEBUG_MENU / PERF_LOG /
+   LOG_KEYS overwritten after import, and `__defaults__` changed for WIRE_MIN); only a
+   second Host in one process (the tests) still points the loaded game at its folder.
+   The badge is unchanged: all 59 `tests/render.py` frames pixel-identical before and
+   after. The app store package gains `config.py`. Not yet run on the badge or the Pi.

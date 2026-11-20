@@ -66,6 +66,7 @@ try:
 except ImportError:
     KEYBOARD_BUTTONS = {}
 
+from . import config      # where the files are, and a host's switches (config.py)
 from . import content     # Elite's ships and galaxy, or the game's own (content.py)
 SHIPS = content.SHIPS
 game_data = content.DATA
@@ -127,13 +128,13 @@ TILT_SWAP_AXES = False  # True if the badge's x axis should pitch, y roll
 TILT_FLIPS = ("NORMAL", "UP/DOWN FLIPPED", "L/R FLIPPED", "BOTH FLIPPED")
 
 INVERT_PITCH = False    # False: joystick up raises the nose. True: up dives.
-LOG_KEYS = False        # True: print every button / key event to serial (to see what a keyboard sends)
+LOG_KEYS = config.log_keys  # True: print every button / key event to serial (to see what a keyboard sends)
 SHOW_FRAME_TIME = True  # small frame time (ms) at the top of the flight screen, to start with
 DEBUG_ROWS = 7          # DEBUG page lines shown at once, the chosen one in the middle
 USE_LEDS = True         # flash the badge's LEDs red when hit (else a ring on screen)
 FAST_FRAMES = True      # on the title screen, in flight and in the viewer, don't wait
                         # 50 ms between frames
-PERF_LOG = 60           # print a PERF line to the console every this many flight
+PERF_LOG = config.perf_log  # print a PERF line to the console every this many flight
                         # frames (0 = never)
 LAUNCH_TIME = 2.5       # seconds of launch tunnel (C skips it)
 DOCK_TIME = 3.0         # seconds of flying in through the station's tunnel on docking (C skips it)
@@ -167,13 +168,14 @@ DOCK_KEYS = (("k_1", "LAUNCH"), ("k_2", "MARKET"), ("k_3", "SELL"),
 # is in the app's folder (always on a PC, where the tests run), or once it has
 # been found: the Easter egg, docking at systems that spell EGG_WORD in the
 # first galaxy (see AceCommander._egg)
-DEBUG_MENU = None
-TITLE_QUIT = False      # a QUIT line on the title screen (a host sets it: the Pi; the badge has F)
+DEBUG_MENU = config.debug_menu
+TITLE_QUIT = config.title_quit  # a QUIT line on the title screen (a host sets it: the Pi; the badge has F)
 EGG_WORD = "DRAKE"      # a male duck: no system name starts with C or U for DUCKS
 EGG_STOPS = 1           # dockings elsewhere forgiven between letters (to refuel)
 PERF_SLOW = 25          # ms over the average that makes a frame count as slow
 
-# the app's folder; the commander is saved there
+# the app's folder (metadata.json); the commander is saved in the data folder
+# (config.py: the app's folder on the badge)
 try:
     APP_DIR = __file__.rsplit("/", 1)[0]
     if not APP_DIR.startswith("/") and ":" not in APP_DIR:
@@ -183,7 +185,7 @@ except Exception:
 # each data set keeps its own commander: their galaxy, systems and market
 # only make sense in it (content.py, Options > DATA)
 DATA_TAG = "own" if ORIGINAL_SHIPS else "elite"
-SAVE_PATH = APP_DIR + ("/commander.json" if ORIGINAL_SHIPS else "/commander_elite.json")
+SAVE_PATH = config.data("commander.json" if ORIGINAL_SHIPS else "commander_elite.json")
 
 
 def _debug_wanted():
@@ -191,7 +193,7 @@ def _debug_wanted():
     if sys.implementation.name != "micropython":
         return True
     try:
-        open(APP_DIR + "/debug.txt").close()
+        open(config.data("debug.txt")).close()
         return True
     except OSError:
         pass

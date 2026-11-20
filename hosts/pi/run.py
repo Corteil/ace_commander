@@ -55,41 +55,44 @@ def data_dir():
     return d
 
 
-def load_game(d, debug=False):
+def load_game(d, debug=False, log_keys=False):
     """Import the game (ace.py) with its files in data folder d: the save,
-    options.json and debug.txt. content.py reads options.json beside its own
-    file at import time (CONTENT: OWN or ELITE), so it is loaded first with
-    its __file__ in d; ace.py then writes options.json beside the save, in d
-    too. The badge's files don't change. The DEBUG menu is on only with
-    --debug, debug.txt in d, or the Easter egg (options.json's "debug"), as on
-    the badge (on a PC the game would otherwise always show it); its PERF
-    timing lines are printed only with the DEBUG menu."""
-    full = PKG + ".ace"
-    if full in sys.modules:
-        ace = sys.modules[full]
-    else:
-        spec = importlib.util.find_spec(PKG)
-        pkg = importlib.util.module_from_spec(spec)
-        sys.modules[PKG] = pkg
-        cspec = importlib.util.spec_from_file_location(PKG + ".content",
-                                                       os.path.join(REPO, "content.py"))
-        content = importlib.util.module_from_spec(cspec)
-        content.__file__ = os.path.join(d, "content.py")    # its options.json: in d
-        sys.modules[PKG + ".content"] = content
-        cspec.loader.exec_module(content)
-        spec.loader.exec_module(pkg)
-        ace = sys.modules[full]
-    ace.SAVE_PATH = os.path.join(d, os.path.basename(ace.SAVE_PATH))
-    ace.TITLE_QUIT = True       # a computer needs a way out on the title screen (Brian)
+    options.json and debug.txt. The game reads where its files are and the
+    host's switches from config.py as it loads (platform layer, step 1), so
+    config is set first. The badge's files don't change. The DEBUG menu is on
+    only with --debug, debug.txt in d, or the Easter egg (options.json's
+    "debug"), as on the badge (on a PC the game would otherwise always show
+    it); its PERF timing lines are printed only with the DEBUG menu. Ships
+    stay wireframes further out than on the badge (WIRE_MIN)."""
     want = debug or os.path.exists(os.path.join(d, "debug.txt"))
     try:
-        with open(ace.options_path()) as f:
+        with open(os.path.join(d, "options.json")) as f:
             want = want or bool(json.load(f).get("debug"))
     except (OSError, ValueError):
         pass
+    full = PKG + ".ace"
+    if full not in sys.modules:
+        spec = importlib.util.find_spec(PKG)
+        pkg = importlib.util.module_from_spec(spec)
+        sys.modules[PKG] = pkg
+        config = importlib.import_module(PKG + ".config")
+        config.data_dir = d
+        config.title_quit = True    # a computer needs a way out on the title screen (Brian)
+        config.debug_menu = want
+        config.perf_log = 60 if want else 0     # the badge's timing lines, a line a second in flight
+        config.log_keys = log_keys
+        config.wire_min = WIRE_MIN
+        spec.loader.exec_module(pkg)
+        return sys.modules[full]
+    # loaded already (a second Host in one process, the tests): point it at d
+    ace = sys.modules[full]
+    config = sys.modules[PKG + ".config"]
+    config.data_dir = d
+    ace.SAVE_PATH = config.data(ace.SAVE_PATH.replace("\\", "/").rsplit("/", 1)[-1])
     ace.DEBUG_MENU = want
-    if not want:
-        ace.PERF_LOG = 0        # the badge's timing lines, a line a second in flight
+    ace.PERF_LOG = 60 if want else 0
+    if log_keys:
+        ace.LOG_KEYS = True
     return ace
 
 
@@ -108,7 +111,7 @@ class Host:
         self.bus, self.leds = pi_firmware.install()
         self.data = save_dir or data_dir()
         # the save, options.json and debug.txt under the user's data folder
-        self.ace = load_game(self.data, debug)
+        self.ace = load_game(self.data, debug, log_keys)
         self.ck = sys.modules[PKG + ".cockpit"]
         self.gm = sys.modules[PKG + ".game"]
         prefs = self._prefs()
@@ -121,8 +124,6 @@ class Host:
         self.pads = Pads(self.bus, lambda: self.app, log_keys)
         self.pad_last = False       # the pad was the last thing used
         self.log_keys = log_keys
-        if log_keys:
-            self.ace.LOG_KEYS = True    # the game prints each button it gets
         self.app = self.ace.AceCommander()
         self.clock = pygame.time.Clock()
         self.running = True
@@ -206,12 +207,6 @@ class Host:
         view, the dashboard and a full-window tunnel. The badge layout calls the
         game's own. Game.step is wrapped to keep the stick (for RL and DC)."""
         ck = self.ck
-        # draw distance (Brian: "can be increased"): far ships stay wireframes until they are
-        # WIRE_MIN across, not the badge's 8 (a marker, cheap on the badge); the game's
-        # functions take it as a default, so their defaults are changed (the badge's files aren't)
-        ck.draw_ship.__defaults__ = (None, WIRE_MIN, False)
-        ck._draw_world.__defaults__ = (WIRE_MIN,)
-        ck._draw_space.__defaults__ = (WIRE_MIN,)
         self._orig = (ck.draw_world, ck.draw_hud, ck.draw_tunnel)
         ck.draw_world = self._world
         ck.draw_hud = self._hud
