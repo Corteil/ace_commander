@@ -1100,3 +1100,7 @@ what is now `ace.py` (renamed in build 50).
    title page"). `ace.TITLE_QUIT` (False on the badge, where F leaves): a host sets it for a
    QUIT line at the end of the title menu, which leaves as F does. The Pi sets it. Also on
    the Pi only: no mouse pointer over the game, and no frame time counter in full screen.
+   **Build 98** (2026-11-20, Brian on the badge: after buying a new ship the docking
+   computer's view from behind still showed the old ship). `cockpit._my_ship` cached your
+   ship's blueprint per `Game`, and the same `Game` is kept between flights (`_fit` only
+   calls `set_ship`); it now also checks `g.ship_name`. Test in `tests/test_shipyard.py`.
