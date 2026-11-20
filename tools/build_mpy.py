@@ -8,6 +8,7 @@ doesn't touch the repo's files.
 
     python3 tools/build_mpy.py                  # build into build/badge/ace_commander
     python3 tools/build_mpy.py --elite          # with your own Elite files (your badge only)
+    python3 tools/build_mpy.py --elite-only     # Elite's files instead of the game's own
     python3 tools/build_mpy.py --copy auto      # and copy it to the badge (mpremote)
 
 - It must use the badge's own mpy-cross (MicroPython 1.28 on 2026-11-20): an
@@ -17,6 +18,10 @@ doesn't touch the repo's files.
   only: don't put that on a badge).
 - app.py (the loading screen the launcher starts) and __init__.py stay
   source: tiny, and the launcher is known to work with them.
+- --elite-only leaves out the game's own content (original_ships.py,
+  original_data.py: about 32 KB built) for a badge that only plays Elite's;
+  Options > DATA then isn't offered, and content.py falls back to Elite's if
+  options.json still asks for the game's own.
 - Only what a release holds goes in (git ls-files less .gitattributes'
   export-ignore), less README.md and LICENSE. Elite's files only with --elite, and never in a release.
 - MicroPython imports x.py before x.mpy when both are there, so --copy also
@@ -39,6 +44,7 @@ PI_MPY_CROSS = os.path.expanduser(
 BADGE_VERSION = "v1.28"
 KEEP_SOURCE = ("app.py", "__init__.py")
 ELITE = ("ship_data.py", "game_data.py")
+OWN_CONTENT = ("original_ships.py", "original_data.py")
 BADGE_DIR = ":/apps/ace_commander/"
 
 
@@ -85,6 +91,9 @@ def build(args):
     shutil.rmtree(out, ignore_errors=True)
     os.makedirs(out)
     files = release_files()
+    if args.elite_only:
+        args.elite = True
+        files = [f for f in files if f not in OWN_CONTENT]
     if args.elite:
         missing = [f for f in ELITE if not os.path.exists(os.path.join(REPO, f))]
         if missing:
@@ -146,6 +155,8 @@ def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--out", default=OUT, help="the folder to build into (emptied first)")
     p.add_argument("--elite", action="store_true", help="include your own ship_data.py and game_data.py")
+    p.add_argument("--elite-only", action="store_true",
+                   help="Elite's files and not the game's own content (implies --elite)")
     p.add_argument("--mpy-cross", help="the badge's mpy-cross")
     p.add_argument("--any-compiler", action="store_true",
                    help="allow an mpy-cross that isn't the badge's version (size check only)")

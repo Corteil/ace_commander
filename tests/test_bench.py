@@ -41,7 +41,9 @@ with contextlib.redirect_stdout(out):
         assert frames < 2000
 c = CountCtx(); a.draw(c)
 lines = out.getvalue().strip().split("\n")
-n = len(mod.bench.TESTS)
+from ace_commander import bench as bench_mod     # imported when the speed test was opened
+assert "bench" not in vars(mod), "ace.py imports the speed test only when it is opened"
+n = len(bench_mod.TESTS)
 assert lines[0].startswith("BENCH start") and lines[-1] == "BENCH done" and len(lines) == n + 2, lines
 assert len(c.texts) == n
 for s, (x, y), size in c.texts:
@@ -49,7 +51,7 @@ for s, (x, y), size in c.texts:
 for i, (name, avg, drawn) in enumerate(a.bench.results):
     assert abs(avg - (50 + i)) < 1e-6, (name, avg)   # skipped frames don't pollute the next test
     assert 0 <= drawn < 50, drawn
-assert abs(frames - n * (mod.bench.FRAMES + mod.bench.SKIP)) <= 1, frames
+assert abs(frames - n * (bench_mod.FRAMES + bench_mod.SKIP)) <= 1, frames
 print("\n".join(lines[1:4]), "...")
 print("frames:", frames, " distinct kinds of frame drawn:", len(kinds))
 tick(a, fresh=["CANCEL"]); assert a.mode == "odebug" and a.od_page == "DISPLAY" and a.bench is None

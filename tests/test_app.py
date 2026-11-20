@@ -390,6 +390,24 @@ tick(a, fresh=["C"]); assert a.mode == "menu"
 tick(a, fresh=["F"]); assert App.minimised == 1
 print("no ships at all: ok")
 
+# ---- Elite's files but not the game's own (tools/build_mpy.py --elite-only) ---------------
+if os.path.exists(os.path.join(REPO, "ship_data.py")) and os.path.exists(os.path.join(REPO, "game_data.py")):
+    shutil.rmtree(tmp, ignore_errors=True)
+    shutil.copytree(REPO, os.path.join(tmp, "ace_commander"),
+                    ignore=shutil.ignore_patterns("original_ships.py", "original_data.py", "__pycache__",
+                                                  ".git", "tests", "options.json", "commander*.json"))
+    with open(os.path.join(tmp, "ace_commander", "options.json"), "w") as f:
+        json.dump({"own": True}, f)     # still asks for the game's own, which isn't there
+    pkg, mod = load()
+    cont = sys.modules["ace_commander.content"]
+    assert "noship" in pkg.__file__ and not cont.OWN and not mod.ORIGINAL_SHIPS, "Elite's after all"
+    assert len(mod.SHIPS) == 31 and not cont.HAVE_OWN and not mod.HAVE_ELITE_SHIPS
+    a = pkg.AceCommander()
+    c = frame(a); fits(c)
+    assert not any(t[0].startswith("DATA:") for t in c.texts)
+    assert not any(i.startswith("DATA:") for i in a._settings(a.cmdr)), "nothing to switch to"
+    print("Elite's files only: the game's own asked for but missing, Elite's used, no DATA switch: ok")
+
 # the station tunnels: every ring is the slot, level; spacings differ
 cockpit = sys.modules["ace_commander.cockpit"]
 spacings = set()

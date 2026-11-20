@@ -54,7 +54,7 @@ import app
 from events.input import BUTTON_TYPES, ButtonDownEvent, ButtonUpEvent
 from system.eventbus import eventbus
 
-from . import bench, briefing, cockpit, commander, docked, game, missions, rules, ships, title, viewer
+from . import briefing, cockpit, commander, docked, game, missions, rules, ships, title, viewer
 
 try:
     import imu
@@ -71,7 +71,7 @@ from . import content     # Elite's ships and galaxy, or the game's own (content
 SHIPS = content.SHIPS
 game_data = content.DATA
 ORIGINAL_SHIPS = content.OWN        # the game's own content, not Elite's
-HAVE_ELITE_SHIPS = content.HAVE_ELITE   # Elite's files are there: Options can switch
+HAVE_ELITE_SHIPS = content.CAN_SWITCH   # both Elite's files and the game's own are here: Options can switch
 missions.use(game_data)
 GOODS = getattr(game_data, "GOODS", None)   # the market's goods, if game_data.py has them
 EQUIP = getattr(game_data, "EQUIPMENT", None)   # and the equipment
@@ -2213,6 +2213,7 @@ class AceCommander(app.App):
             self.show_ms = not self.show_ms
             return "FRAME TIME " + ("ON" if self.show_ms else "OFF")
         if item == "SPEED TEST":
+            from . import bench     # only when asked for: a DEBUG page (DISPLAY > SPEED TEST)
             self.bench = bench.Bench()      # F comes back to this page
             self.mode = "bench"
             return None
