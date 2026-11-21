@@ -58,7 +58,7 @@ Steps, each a small PR with the badge's behaviour unchanged:
    `k_*`), not firmware buttons; the badge's platform does today's `Pad` matching (firmware
    `Button` parents, Keyboard Hexpansion quirks: Shift at key-down, TAB / LCTRL by name). Most of
    `pi_firmware.py` goes.
-3. **`platform_tildagon.py`. Done 2026-11-21 (build 103), not yet run on the badge.** LEDs (`tildagonos`, pattern disable / enable), tilt (`imu`),
+3. **`platform_tildagon.py`. Done 2026-11-21 (build 103), tested OK on the badge.** LEDs (`tildagonos`, pattern disable / enable), tilt (`imu`),
    `TextDialog` (registered to the loader host), hexpansion keyboard detection, `settings`
    (badge name), the scheduler frame loop: moved out of `ace.py`, not rewritten. `ace.py` loses
    its firmware imports; `app.py` (the loader) still imports module by module.

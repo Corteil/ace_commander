@@ -1172,5 +1172,6 @@ what is now `ace.py` (renamed in build 50).
    `minimise`; `App` is the game's base class (the firmware's `app.App`). The Pi's
    `hosts/pi/platform_pi.py` replaces `pi_firmware.py` (no stand-in modules at all now;
    its LED ring goes dark when the game lets go, as the badge's pattern takes over). The
-   badge is unchanged: all 59 frames pixel-identical; the release gains no file. Not yet
-   run on the badge.
+   badge is unchanged: all 59 frames pixel-identical; the release gains no file. Run on
+   the badge (as .mpy) and played by Brian, 2026-11-21: LEDs, tilt, text entry, the
+   keyboard pages, frame rate and leaving all OK.
