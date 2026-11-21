@@ -305,7 +305,7 @@ own_dir = tempfile.mkdtemp(prefix="ace_pi_own_")
 with open(os.path.join(own_dir, "options.json"), "w") as f:
     json.dump({"own": True}, f)
 out = subprocess.run([sys.executable, "-c", (
-    "import sys; sys.path.insert(0, %r); import run, pi_firmware; pi_firmware.install(); ace = run.load_game(%r); "
+    "import sys; sys.path.insert(0, %r); import run; ace = run.load_game(%r); "
     "print(ace.ORIGINAL_SHIPS, ace.SAVE_PATH, ace.DEBUG_MENU)") % (PI, own_dir)],
     capture_output=True, text=True, check=True).stdout.split()
 assert out == ["True", os.path.join(own_dir, "commander.json"), "False"], out

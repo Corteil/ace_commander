@@ -16,7 +16,7 @@ title screen to quit (Esc there does nothing). Saves and options.json go in
 ~/.local/share/ace_commander/; --debug shows the DEBUG menu of cheats.
 
 The game itself is the badge app in the folder above, run unchanged on
-stand-ins for the badge's firmware (pi_firmware.py); see hosts/README.md.
+the Pi's own platform (platform_pi.py: LEDs, no tilt, leaving); see hosts/README.md.
 """
 import argparse
 import importlib.util
@@ -35,7 +35,7 @@ for p in (HERE, os.path.dirname(REPO)):
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import pygame                       # noqa: E402
 
-import pi_firmware                  # noqa: E402
+import platform_pi                  # noqa: E402
 from ctx_pygame import Ctx          # noqa: E402
 from controls_pi import Feed        # noqa: E402
 from keys_pi import Keys            # noqa: E402
@@ -79,6 +79,7 @@ def load_game(d, debug=False):
         sys.modules[PKG] = pkg
         config = importlib.import_module(PKG + ".config")
         config.data_dir = d
+        config.platform = platform_pi   # LEDs, tilt, text entry, leaving (platform layer, step 3)
         config.title_quit = True    # a computer needs a way out on the title screen (Brian)
         config.title_cancel = False # Esc on the title doesn't quit: QUIT does (Brian, 2026-11-21)
         config.debug_menu = want
@@ -108,7 +109,7 @@ class Host:
     def __init__(self, scale=2, full=None, save_dir=None, debug=False, log_keys=False, layout=None):
         pygame.init()
         pygame.display.set_caption("Ace Commander")
-        self.bus, self.leds = pi_firmware.install()
+        self.leds = platform_pi.LEDS    # the ring the game writes, drawn round the screen
         self.data = save_dir or data_dir()
         # the save, options.json and debug.txt under the user's data folder
         self.ace = load_game(self.data, debug)
@@ -340,7 +341,7 @@ class Host:
         """One frame: the game's update, then its drawing, onto the window."""
         self.pads.tick(ms / 1000.0)
         self.app.update(ms)
-        if getattr(self.app, "quit", False):
+        if self.app.platform.quit:
             self.running = False
             return
         if self.window.get_size() != getattr(self, "_size", None):
@@ -377,7 +378,7 @@ class Host:
         step = -30.0 if self.ace.LED_CLOCKWISE else 30.0
         for i in range(1, 13):
             a = math.radians(self.ace.LED_ANGLE1 + (i - 1) * step)    # anticlockwise from 3 o'clock
-            rgb = self.leds.values[i]
+            rgb = self.leds[i]
             col = rgb if any(rgb) else (40, 40, 48)
             pygame.draw.circle(self.window, col, (cx + r * math.cos(a), cy - r * math.sin(a)),
                                LED_SIZE * self.scale)

@@ -23,7 +23,7 @@ bs.install()
 leds, bus = bs.install_leds()
 import ace_commander
 mod = ace_commander.ace
-assert mod.tildagonos is not None
+assert mod.PLATFORM.tildagonos is not None
 a = ace_commander.AceCommander()
 tick(a); tick(a, fresh=["DOWN"]); tick(a, fresh=["UP"])
 assert bus.events == [] and leds.writes == 0, "menu leaves the LEDs alone"
@@ -133,7 +133,7 @@ bs.choose(a, "COMBAT PRACTICE"); tick(a)
 leds.fail = True
 a.game._hurt(5.0)
 tick(a)
-assert not a.leds_on
+assert not a.platform.leds_on
 assert arcs(a) == 1, "ring is the fallback"
 leds.fail = False
 print("LED failure falls back to the ring: ok")
@@ -328,7 +328,7 @@ print("OPTIONS page: steering, LEDs, docking, Constrictor; saved: ok")
 bs.install()
 import ace_commander
 mod = ace_commander.ace
-assert mod.tildagonos is None
+assert mod.PLATFORM.tildagonos is None
 a = ace_commander.AceCommander()
 bs.choose(a, "COMBAT PRACTICE"); tick(a)
 a.game._hurt(5.0); tick(a)

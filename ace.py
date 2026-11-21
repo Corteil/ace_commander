@@ -43,24 +43,21 @@ game's own ships, original_ships.py.
 If something moves the wrong way, or you want other buttons, change the
 constants below.
 """
-import asyncio
 import json
 import gc
 import math
 import random
 import time
 
-import app
-from system.eventbus import eventbus
-
 from . import briefing, cockpit, commander, controls, docked, game, missions, rules, ships, title, viewer
 
-try:
-    import imu
-except ImportError:
-    imu = None
-
 from . import config      # where the files are, and a host's switches (config.py)
+# what only the device can do (LEDs, tilt, text entry, the frame loop; platform
+# layer, step 3): the badge's firmware, or a host's own (config.platform)
+if config.platform is None:
+    from . import platform_tildagon as PLATFORM
+else:
+    PLATFORM = config.platform
 from . import content     # Elite's ships and galaxy, or the game's own (content.py)
 SHIPS = content.SHIPS
 game_data = content.DATA
@@ -83,17 +80,6 @@ EDGE_IN = 100           # a streak or speck this far from the middle (pixels) is
 EDGE_OUT = 140
 REPEAT_WAIT = 0.45      # seconds a market button is held before it starts repeating
 REPEAT_EVERY = 0.09     # then once every this many seconds
-
-try:    # lets the flight screen skip the 50 ms pause the badge adds to every frame
-    from system.scheduler import scheduler
-except Exception:
-    scheduler = None
-
-try:    # the badge's LEDs, used to flash red when you're hit
-    from tildagonos import tildagonos
-    from system.patterndisplay.events import PatternDisable, PatternEnable
-except Exception:
-    tildagonos = None
 
 # Flight buttons (letters as printed on the badge)
 BTN_SPEED_UP = "F"
@@ -243,14 +229,8 @@ def cmdr_name(c=None):
 
 def badge_name():
     """The badge owner's name from the badge's settings, or DEFAULT_NAME."""
-    try:
-        import settings
-        n = settings.get("name")
-        if isinstance(n, str) and n.strip():
-            return n.strip()[:16]
-    except Exception:
-        pass
-    return DEFAULT_NAME
+    n = PLATFORM.owner_name()
+    return n[:16] if n else DEFAULT_NAME
 _build = None
 
 
@@ -296,11 +276,11 @@ def _tilt(v):
     return a if v > 0 else -a
 
 
-class AceCommander(app.App):
+class AceCommander(PLATFORM.App):
     def __init__(self, host=None):
         """host: the app object the badge's scheduler knows, when this one is
         started by the loading screen (app.py); button events, foreground checks and minimise
-        go through it. None: this is that object."""
+        go through it. None: this is that object (a PC: the tests)."""
         super().__init__()
         self.host = host if host is not None else self
         # which controls are down, by name (controls.py), fed by the platform:
@@ -310,8 +290,8 @@ class AceCommander(app.App):
         if config.input is not None:
             config.input(self.pad, self.host)
         else:
-            from . import platform_tildagon
-            platform_tildagon.Input(self.host, self.pad)
+            PLATFORM.Input(self.host, self.pad)
+        self.platform = PLATFORM.Platform(self)     # LEDs, tilt, text entry, the frame loop
         # menu (the title screen) | level | docked | launch | flight | viewer | bench
         self.mode = "menu"
         self.bench = None
@@ -371,7 +351,7 @@ class AceCommander(app.App):
         self.d_t = None         # how long D has been down, when steering by tilt
         self.viewer = None
         self.paused = False
-        self.tilt_ok = imu is not None   # the accelerometer is there and working
+        self.tilt_ok = self.platform.tilt_ok    # the accelerometer is there and working
         # steer by tilt as well as the joystick (TILT_DEFAULT, or the menu)
         self.use_tilt = self.tilt_ok and TILT_DEFAULT
         self.tilt_flip = 0      # CONTROLS (TILT_FLIPS): 1 pitch flipped, 2 roll, 3 both
@@ -382,7 +362,6 @@ class AceCommander(app.App):
         self.analog = None
         self.zero = None                 # accelerometer reading taken as "level"
         self.ms = 0.0                    # smoothed frame time
-        self.leds_on = False             # we have taken over the LEDs
         self.jump_leds = [0.0] * 13      # each ring LED's white jump flash, 0-255 (1 to 12)
         self.jump_lit = False            # the last write was a jump flash
         self.jump_rgb = DUST_RGB         # their colour at full brightness
@@ -404,13 +383,12 @@ class AceCommander(app.App):
         if c is not None and c.hardcore is None:    # a save from before build 74:
             c.hardcore = self.old_hardcore          # HARDCORE was an option then
             self.saved = json.dumps(c.to_dict())
-        self.led_level = None            # (r, g, b) last written, 0-255 each
         self.glow = 0.0                  # the station's colour fading on the LEDs after launch
         # smoothed time, in ms, spent in the game rules and in drawing calls
         self.t_step = 0.0
         self.t_world = 0.0
         self.t_hud = 0.0
-        self.fast = FAST_FRAMES and scheduler is not None
+        self.fast = FAST_FRAMES and self.platform.fast
         # totals for the PERF line
         self.p_n = 0
         self.p_frame = 0.0
@@ -426,33 +404,12 @@ class AceCommander(app.App):
     # ---- frame loop -------------------------------------------------------
 
     async def run(self, render_update):
-        """The badge's own loop waits 50 ms after every update before the next
-        one, which caps any app at about 14 frames a second. On the title
-        screen, in flight and in the viewer this asks for a redraw directly and
-        carries on as soon as it has been drawn. The other screens, and
-        anything unexpected, use the normal path."""
-        last = _ms()
-        while True:
-            now = _ms()
-            self.update(_diff(now, last))
-            last = now
-            if self.fast and (self.mode == "flight" or self.mode == "viewer"
-                              or self.mode == "launch" or self.mode == "docking"
-                              or (self.mode == "menu" and self.title is not None)):
-                try:
-                    scheduler.render_needed.set()
-                    await asyncio.sleep(0)      # the renderer and other tasks run here
-                    if scheduler.app_is_foregrounded(self.host):
-                        continue
-                except Exception:
-                    self.fast = False           # firmware differs: stay on the normal path
-            await render_update()
+        """The frame loop: the platform's (on the badge, it skips the firmware's
+        50 ms wait between frames where it can; self.fast)."""
+        await self.platform.run(render_update)
 
     def minimise(self):
-        if self.host is not self:
-            self.host.minimise()        # the scheduler only knows the loading screen
-        else:
-            super().minimise()
+        self.platform.minimise()
 
     # ---- LEDs -------------------------------------------------------------
 
@@ -461,28 +418,10 @@ class AceCommander(app.App):
         self._leds_rgb(level, 0, 0)
 
     def _leds_rgb(self, r, g, b):
-        """Set the ring of 12 LEDs to (r, g, b), 0-255 each, taking them over
-        from the badge's own pattern first. Only writes when the colour changes."""
-        if tildagonos is None or not self.use_leds:
-            return
-        try:
-            if not self.leds_on:
-                eventbus.emit(PatternDisable())
-                try:
-                    tildagonos.set_led_power(True)
-                except Exception:
-                    pass
-                self.leds_on = True
-                self.led_level = None
-            rgb = (r, g, b)
-            if rgb != self.led_level:
-                self.led_level = rgb
-                leds = tildagonos.leds
-                for i in range(1, 13):      # the front ring is LEDs 1 to 12
-                    leds[i] = rgb
-                leds.write()
-        except Exception:
-            self.leds_on = False
+        """Set the ring of 12 LEDs to (r, g, b), 0-255 each (the platform takes
+        them over first, and writes only when the colour changes)."""
+        if self.use_leds:
+            self.platform.leds_rgb(r, g, b)
 
     def _led_at(self, x, y):
         """The ring LED (1 to 12) nearest the edge in screen direction (x, y),
@@ -529,34 +468,12 @@ class AceCommander(app.App):
     def _leds_each(self, values, rgb=DUST_RGB):
         """Each ring LED in colour rgb at its own level (values[1] to [12],
         0-255)."""
-        if tildagonos is None or not self.use_leds:
-            return
-        try:
-            if not self.leds_on:
-                eventbus.emit(PatternDisable())
-                try:
-                    tildagonos.set_led_power(True)
-                except Exception:
-                    pass
-                self.leds_on = True
-            leds = tildagonos.leds
-            r, gr, b = rgb
-            for i in range(1, 13):
-                v = int(values[i])
-                leds[i] = (r * v // 255, gr * v // 255, b * v // 255)
-            leds.write()
-            self.led_level = None       # the next whole-ring colour is written afresh
-        except Exception:
-            self.leds_on = False
+        if self.use_leds:
+            self.platform.leds_each(values, rgb)
 
     def _leds_release(self):
         """Hand the LEDs back to the badge's own pattern."""
-        if self.leds_on:
-            self.leds_on = False
-            try:
-                eventbus.emit(PatternEnable())
-            except Exception:
-                pass
+        self.platform.leds_release()
 
     def _leds_flight(self):
         g = self.game
@@ -618,14 +535,13 @@ class AceCommander(app.App):
         held = self.pad.held
         jx = jy = 0.0
         if tilt and self.tilt_ok:
-            try:
-                ax, ay, _ = imu.acc_read()
-            except Exception:
+            pl = self.platform
+            if not pl.tilt():   # the sensor failed
                 self.tilt_ok = False
                 self.use_tilt = False
             else:
-                ax /= 9.81
-                ay /= 9.81
+                ax = pl.tx
+                ay = pl.ty
                 if self.zero is None:
                     self.zero = (ax, ay)
                 dx = ax - self.zero[0]
@@ -1748,7 +1664,7 @@ class AceCommander(app.App):
         if cmdr and self.cmdr is not None:
             items.append("DOCKING: " + DOCK_NAMES["A" if self._manual_docking() else self.cmdr.docking])
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
-        if tildagonos is not None:
+        if self.platform.leds:
             items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))
         if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose data, from the next start
             items.append("DATA: " + ("OWN" if self.own_ships else "ELITE")
@@ -2664,18 +2580,7 @@ class AceCommander(app.App):
         """True if a keyboard is fitted: its hexpansion's driver (KeyboardApp)
         is running, or its header names a keyboard; else if a keyboard key
         has been pressed."""
-        try:
-            from system.hexpansion.app import _hexpansion_manager as m
-            if m is not None:
-                for a in m.hexpansion_apps.values():
-                    if a is not None and type(a).__name__ == "KeyboardApp":
-                        return True
-                for h in m.hexpansion_headers.values():
-                    if h is not None and "KEYB" in str(getattr(h, "friendly_name", "")).upper():
-                        return True
-        except Exception:
-            pass
-        return self.pad.keyboard
+        return self.platform.keyboard_fitted() or self.pad.keyboard
 
     def _names(self):
         from . import find
@@ -2691,16 +2596,11 @@ class AceCommander(app.App):
         self.find_chart = chart
         names = self._names()
         if not self._keyboard():
-            try:
-                from app_components.dialog import TextDialog
-                TextDialog = find.small_dialog(TextDialog)     # smaller text (build 90)
-                # registered to the host (app.py's loader): the firmware's
-                # eventbus gives the buttons only to the focused app, and the
-                # game itself never is (build 89 fix: it froze the badge)
-                self.tdialog = TextDialog("FIND SYSTEM", self.host)
+            # the badge's own text entry (platform_tildagon.text_dialog), or
+            # None (no firmware dialog, a PC): the keyboard page
+            self.tdialog = self.platform.text_dialog("FIND SYSTEM")
+            if self.tdialog is not None:
                 return
-            except Exception:
-                self.tdialog = None     # no firmware dialog (a PC): the keyboard page
         self.finder = find.Find(self.galaxy, names)
 
     def _found(self, i):
@@ -2753,14 +2653,10 @@ class AceCommander(app.App):
         self.name_done = done
         sug = badge_name().upper()[:find.NAME_MAX]
         if not self._keyboard():
-            try:
-                from app_components.dialog import TextDialog
-                TextDialog = find.small_dialog(TextDialog)     # smaller text (build 90)
-                self.ndialog = TextDialog("NAME? (none: %s)" % sug, self.host)     # see _open_find
+            self.ndialog = self.platform.text_dialog("NAME? (none: %s)" % sug)     # see _open_find
+            if self.ndialog is not None:
                 self.ndialog.text = current.lower()
                 return
-            except Exception:
-                self.ndialog = None
         self.namer = find.NameEntry(sug, current)
 
     def _name_entered(self, name):
@@ -2933,7 +2829,7 @@ class AceCommander(app.App):
             cockpit.draw_world(ctx, self.game)
             t1 = _us()
             cockpit.draw_hud(ctx, self.game, self.ms if self.show_ms else None,
-                             not self.leds_on)
+                             not self.platform.leds_on)
             if self.paused:
                 self._draw_fmenu(ctx)
             else:
