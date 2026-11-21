@@ -243,6 +243,7 @@ class Host:
             self._alone(m, self.pad is None)
             m.practice_upgrades = True  # practice waves drop upgrade canisters (build 113)
             m.laser_leds = False        # no laser colour on the LED border (Brian, build 113)
+            m.more_hints = True         # a square screen: hints on the charts and title (build 129)
             self.ctx.labels = controls_tufty.LABELS     # hints name the Tufty's buttons
             m.platform = platform_tufty
             m.input = self.feed.attach

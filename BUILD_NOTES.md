@@ -1434,3 +1434,10 @@ what is now `ace.py` (renamed in build 50).
    that closes the Tufty's picker was still held next frame and counted as the badge's A
    (launch when docked). Now any Tufty button or Pad button held when it closes is ignored
    until let go (`host_tufty.stale` / `stale_pad`).
+   **Build 129** (Brian: "hints should reflect the selected controls, there's enough room in the
+   Pi / Tufty versions to show hints on most screens"). `config.more_hints` (the Tufty; the
+   Pi's Elite layout, set in `run.Host._fit`; off on the badge and the Pi's round badge
+   layout, which have no room): a hint line on both charts (`chart._hint`: docked before C
+   "C: cursor  < > screens  F: status", then "C: target  D: data  B: find  F: back", the
+   local chart without B; its texts move up a little) and on the title screen ("< > choose
+   C: select"). The Tufty's own buttons name "< >" as "A/C" (`LABELS["< >"]`, `relabel`).

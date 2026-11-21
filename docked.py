@@ -164,6 +164,7 @@ class Docked:
             self.data = self.gal.system(self.target if self.target is not None else c.system)
         if self.view is not None:
             self.view.active = False
+            self.view.docked = True
 
     def use_cursor(self, on):
         """On a chart: C gives the joystick to the cursor, F gives it back to the tabs."""

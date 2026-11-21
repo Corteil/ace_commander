@@ -258,6 +258,9 @@ def relabel(s, labels):
         else:
             parts.append(ch)
     out = "".join(parts)
+    arrows = labels.get("< >")      # the joystick's left / right, as buttons (build 129)
+    if arrows is not None and "< >" in out:
+        out = out.replace("< >", arrows)
     if len(_relabelled) > 300:
         _relabelled.clear()
     _relabelled[key] = out

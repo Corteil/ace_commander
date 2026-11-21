@@ -175,6 +175,11 @@ class Host:
     def _fit(self):
         """Work the layout out for the window's size (after opening or resizing)."""
         w, h = self.window.get_size()
+        # the Elite layout's screen is square, its corners show: hints on the charts and
+        # the title screen (build 129); the badge layout's round screen hasn't room
+        cfg = sys.modules.get(PKG + ".config")
+        if cfg is not None:
+            cfg.more_hints = self.layout == "elite"
         if self.layout == "elite":
             s = h / 240.0
             self.scale = s

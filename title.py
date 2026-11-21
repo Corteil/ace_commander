@@ -8,6 +8,7 @@ tumbles. Every few seconds it flies off past the camera and the next ship
 comes in from the distance.
 """
 from .viewer import _rotation
+from . import config
 
 FOCAL = 300.0
 CAM_DIST = 380.0     # where the ship sits while it tumbles
@@ -125,3 +126,6 @@ class Title:
         ctx.text_align = ctx.CENTER
         ctx.text_baseline = ctx.MIDDLE
         ctx.rgb(0.3, 1, 0.4).move_to(0, 84).text("< %s >" % label)
+        if config.more_hints:   # the corners show (the Tufty, the Pi's Elite layout)
+            ctx.font_size = 10
+            ctx.rgb(0.6, 0.6, 0.6).move_to(0, 108).text("< > choose   C: select")

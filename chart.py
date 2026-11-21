@@ -6,7 +6,7 @@ nearest to it.
 They are only on screen while the game is paused or docked, so they can
 afford a few pieces of text and some float maths.
 """
-from . import cockpit
+from . import cockpit, config
 
 # The galaxy chart is twice as wide as it is tall for the same distance, so on
 # the local chart a step across is 5 pixels and a step down is 2.5. That makes
@@ -46,6 +46,7 @@ class _Cursor:
         self.verb = verb    # what C does with a system in range: "JUMP" or "TARGET"
         self.marked = None  # in flight: the target, labelled TARGET when selected
         self.active = True  # the joystick moves the cursor (docked: only after C)
+        self.docked = False # on a docked tab (the hints: before C the joystick changes tabs)
         self.dots = []
         self.sel = None     # the dot nearest the cursor
         self.info = None    # its galaxy.System
@@ -169,6 +170,17 @@ class _Cursor:
                 text(ctx, "%s  TOO FAR" % _ly(s[3]), 0, line_y, 12, cockpit.RED)
         text(ctx, "RANGE %s" % _ly(self.fuel), 0, fuel_y, 10, cockpit.YELLOW)
 
+    def _hint(self, ctx, y):
+        """A hint line, only where the screen's corners show (config.more_hints:
+        the Tufty, the Pi's Elite layout); the host names its own buttons."""
+        if self.docked and not self.active:
+            s = "C: cursor   < > screens   F: status"
+        elif hasattr(self, "number"):
+            s = "C: target  D: data  B: find  F: back"
+        else:
+            s = "C: target   D: data   F: back"
+        cockpit.text(ctx, s, 0, y, 10, cockpit.GREY)
+
 
 class Chart(_Cursor):
     """The local chart, centred on where you are: a system (here), or a
@@ -208,7 +220,11 @@ class Chart(_Cursor):
         if s is not None:
             ok = self.target() is not None or s[2] == self.here
             self._box(ctx, s[0], s[1], 5, cockpit.GREEN if ok else cockpit.RED)
-        self._texts(ctx, -100, 97, 110)
+        if config.more_hints:
+            self._texts(ctx, -100, 88, 100)
+            self._hint(ctx, 113)
+        else:
+            self._texts(ctx, -100, 97, 110)
         self._cursor(ctx, 4, 5)
 
 
@@ -254,4 +270,6 @@ class GalChart(_Cursor):
             self._box(ctx, s[0], s[1], 4, cockpit.GREEN if ok else cockpit.RED)
         cockpit.text(ctx, "GALAXY %d" % self.number, 0, -96, 10, cockpit.GREY)
         self._texts(ctx, -76, 74, 92)
+        if config.more_hints:
+            self._hint(ctx, 108)
         self._cursor(ctx, 3, 4)

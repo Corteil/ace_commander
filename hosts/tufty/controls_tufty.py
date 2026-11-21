@@ -55,8 +55,9 @@ PAD_TYPING = {"U": "UP", "D": "DOWN", "A": "B", "R": "B", "B": "C", "L": "C", "+
 TYPING_HINTS = ("UP/DOWN letter   B next", "C back   A done")
 PAD_TYPING_HINTS = ("UP/DOWN letter   A next", "B back   + done")
 # the hints' badge letters named as the Tufty's buttons (ctx_tufty), Pad or not
-LABELS = {"C": "B"}         # (in flight A + C switches UP / DOWN: the game says which)
-LABELS_OFF = {"C": "B", "F": "A+C"}
+# "< >" (the joystick's left / right) is the A and C buttons (build 129)
+LABELS = {"C": "B", "< >": "A/C"}   # (in flight A + C switches UP / DOWN: the game says which)
+LABELS_OFF = {"C": "B", "F": "A+C", "< >": "A/C"}
 # and each Qw/ST Pad button (qwstpad's names): the D-pad is the joystick
 PAD_MAP = {"U": STICK["UP"], "D": STICK["DOWN"], "L": STICK["LEFT"], "R": STICK["RIGHT"],
            "A": BADGE["C"], "B": BADGE["D"], "X": BADGE["F"], "Y": BADGE["E"],

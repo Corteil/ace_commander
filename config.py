@@ -28,6 +28,9 @@ practice_upgrades = True    # combat practice: each wave cleared drops an upgrad
                         # (it can't be destroyed), the next of game.UPGRADES when scooped,
                         # and the next wave comes after a countdown (game.WAVE_WAIT; every
                         # device, Brian; build 113)
+more_hints = False      # the screen is square, so its corners show (the Tufty, the Pi's
+                        # Elite layout): hint lines where the badge's round screen has no
+                        # room, the charts and the title screen (Brian, build 129)
 laser_leds = True       # your laser lights the LEDs in its colour (off on the Tufty and the
                         # Pi, whose "LEDs" are drawn on the screen; build 113)
 wire_min = 8.0          # ships that look smaller than this (pixels) are drawn as a marker

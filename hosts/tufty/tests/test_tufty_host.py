@@ -114,7 +114,7 @@ assert a.choices() == ["COMBAT PRACTICE"], a.choices()
 assert not any(l.startswith("GAMEPAD") for l in a._cheats("DISPLAY", False)), "no Pad found: no line"
 cfg = sys.modules["ace_commander.config"]
 assert cfg.auto_missiles and cfg.practice_missile == 1.0, "missiles by themselves, in every canister"
-assert h.ctx.labels == {"C": "B", "F": "A+C"}, "off the flight: B, and A+C for back"
+assert h.ctx.labels == controls_tufty.LABELS_OFF, "off the flight: B, and A+C for back"
 press("B")
 assert a.mode == "practice", a.mode
 badge.down.add(buttons["A"]); badge.down.add(buttons["C"])     # A + C: back (the badge's F)
@@ -147,7 +147,7 @@ for _ in range(3):
 assert fired, "B fires"
 badge.down.discard(buttons["B"])
 frames(2)
-assert h.ctx.labels == {"C": "B"}, "in flight: B named; the game says what A + C does"
+assert h.ctx.labels == controls_tufty.LABELS, "in flight: B named; the game says what A + C does"
 s0 = g.speed
 badge.down.add(buttons["A"]); badge.down.add(buttons["C"])     # A + C: UP / DOWN to speed
 frames(3)
@@ -243,8 +243,12 @@ frames(2)
 pad_press("D"); frames(1)
 assert h.pad_last and h.ctx.labels == controls_tufty.PAD_LABELS_OFF, h.ctx.labels
 press("UP"); frames(1)
-assert not h.pad_last and h.ctx.labels == {"C": "B", "F": "A+C"}, h.ctx.labels
+assert not h.pad_last and h.ctx.labels == controls_tufty.LABELS_OFF, h.ctx.labels
 a.menu = 0
+# "< >" is the Tufty's A / C with its own buttons (build 129)
+from ctx_tufty import relabel   # noqa: E402
+assert relabel("< > screens   F: status", controls_tufty.LABELS_OFF) == "A/C screens   A+C: status"
+assert relabel("C: cursor   < > screens", controls_tufty.PAD_LABELS_OFF) == "A: cursor   < > screens"
 # the Pad's Y off the flight is the badge's B (search on the Galactic chart: build 125)
 assert controls_tufty.PAD_MAP_OFF["Y"] is controls_tufty.BADGE["B"]
 assert controls_tufty.PAD_MAP["Y"] is controls_tufty.BADGE["E"], "in flight Y still slows down"
@@ -259,6 +263,7 @@ d = a.dock
 d.open("GALACTIC CHART")
 pad_press("A")              # the chart's cursor (the badge's C)
 assert d.name() == "GALACTIC CHART" and d.cursor, (d.name(), d.cursor)
+shot("tufty_galactic")      # build 129: a hint line (the Pad's names: "A: target ... Y: find")
 pad_press("Y")              # the Pad's Y: search (the badge's B on the Galactic chart)
 assert a.tdialog is not None, "Y opens the search"
 h.pad.down.add("+")         # done (nothing typed: no match), held as a real press is
