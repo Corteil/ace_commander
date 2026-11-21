@@ -37,4 +37,13 @@ try:
             print(r.stderr[-3000:])
 except ImportError:
     print("pi host, trip  skipped - no pygame")
+# the Tufty 2350 host (hosts/tufty), on Badgeware v3 stand-ins drawn with Pillow
+tufty_test = os.path.join(os.path.dirname(HERE), "hosts", "tufty", "tests", "test_tufty_host.py")
+r = subprocess.run([sys.executable, tufty_test], capture_output=True, text=True)
+lines = [l for l in r.stdout.strip().split("\n") if l and not l.startswith("PERF")]
+print("%-14s %s" % ("tufty host", "ok" if r.returncode == 0 else "FAILED"), "-", lines[-1] if lines else "")
+if r.returncode:
+    failed.append("hosts/tufty/tests/test_tufty_host.py")
+    print(r.stdout[-1500:])
+    print(r.stderr[-3000:])
 sys.exit(1 if failed else 0)
