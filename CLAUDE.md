@@ -201,6 +201,15 @@ Source: `github.com/emfcamp/badge-2024-software`, folder `modules/`. Brian's own
 - IMU: `imu.acc_read()` gives m/s^2. `imu.mag_read()` works on the 2026 board.
 - Keyboard: `events.keyboard.KEYBOARD_BUTTONS` (letters, `SPACE`, `ENTER`, arrows...).
 - `ctx` draws straight into the framebuffer; `display.end_frame` then sends it to the screen.
+- **Garbage costs more than drawing (measured 2026-11-21, build 106).** Every float is a new
+  object on the badge. `gc.threshold()` is -1; a collection takes about 103 ms with 440 KB in
+  use and comes every 10-15 flight frames (the PERF line's 140-160 ms "slow" frames), so each
+  KB of garbage a frame costs roughly 1.5 ms a frame on average. Filling even a full-screen
+  polygon or big circle adds only 1-1.5 ms to a frame, a stroked 48-point ring about 3 ms; a
+  frame with nothing drawn is about 17.6 ms (`display.end_frame`). So in the frame path prefer
+  whole numbers and lists made once over floats and new tuples. Measure on the badge from the
+  REPL (`mpremote connect PORT resume run x.py`, `import system.scheduler` first) with
+  `gc.mem_alloc()` round a call with `gc.disable()`, and `display.get_ctx()` / `end_frame`.
 - A screen-reader hook prints every changed `ctx.text` string to serial, another reason to
   avoid per-frame text.
 

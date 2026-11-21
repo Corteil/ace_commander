@@ -1220,5 +1220,30 @@ what is now `ace.py` (renamed in build 50).
    Pi's `hosts/pi/layout_pi.py` (`PiLayout`, following F10 and the window's size) replaced
    its hooks on the three functions and its wrapper round `Game.step`. Unchanged: all 59
    badge frames and five seeded Pi frames (both layouts, flight and tunnel, the roll and
-   dive meters moving) pixel-identical. The release gains `layout.py`. Not yet run on the
-   badge.
+   dive meters moving) pixel-identical. The release gains `layout.py`. Played by Brian on the
+   badge: as before (the slower frames near the planet were the planet's own: build 106).
+   **Build 106** (2026-11-21, Brian: build 105's frame time was 10-15 ms slower near the
+   planet). It wasn't build 105: on the badge its layout wrappers cost under 1 ms, and an
+   A/B flight with PERF lines (build 104's files put back, then 105 again) showed both at
+   104-117 ms frames near the planet, about half of them 150-195 ms. Measured on the badge
+   from the REPL: filling the planet's shape costs 1-1.5 ms; the cost was garbage, the
+   floats of `_globe`'s rows (6-8 KB a frame near the planet), bringing the 103 ms
+   collection every few frames (CLAUDE.md, firmware facts). Now `_globe` goes round the
+   edge: the circle of directions at the sphere's angular radius round its centre's,
+   `GLOBE_N` (96; 48 or 24 for a smaller one) from a table in whole numbers (`GLOBE_ONE`
+   4096), each put on the screen with whole-number division; directions more than 60
+   degrees off ahead (z under `GLOBE_ZMIN`, half) are cut off, where nothing is on the
+   screen (its corners are 39 degrees off), so no point lands more than about 361 pixels out
+   and nothing needs cutting to the screen (a first try cut just in front of you: points
+   13000 pixels out, and cutting them back took 20 ms); where the edge passes the cut the
+   shape is closed by an arc off the screen from the same table (`_far_arc`, the way round
+   that is inside the sphere's image). The rows (`_globe_row`, `_globe_draw`) went; the
+   ellipse case is the same code. `_poly` / `_poly_clipped` stroke only the lines that are
+   the sphere's edge (`_EL`), in whole numbers (`_clip_side`, Cohen-Sutherland `_clip_seg`).
+   On the badge near the planet: garbage 7.5 -> 1.4 KB a frame, about 7.5 ms. A sweep of 1500
+   positions (down to 0.5% of a radius up, beside and behind you) matches a ray test
+   everywhere. PERF lines now split the drawing: `(world, space, hud)`, space being the sun,
+   planet and station (`cockpit.T_SPACE`, timed only while PERF lines are printed). Brian's
+   flight: 62-73 ms frames near the planet (from 104-117), slow frames 5-7 per 60 as in plain
+   flight; he saw about 50 ms at half the AL gauge and 60 closer. Still in the game near the
+   planet: space 15-28 ms, against 7.5 ms for the planet at the REPL (not yet explained).

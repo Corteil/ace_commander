@@ -15,6 +15,20 @@ except ImportError:     # imported on its own (tests/test_game.py)
     import config
     from layout import BADGE as _BADGE
 
+try:
+    from time import ticks_us as _tus, ticks_diff as _tdiff
+except ImportError:     # off the badge
+    from time import perf_counter as _pc
+
+    def _tus():
+        return int(_pc() * 1000000)
+
+    def _tdiff(a, b):
+        return a - b
+# microseconds spent drawing the sun, planet and station since the game last
+# read it, while PERF lines are printed (config.perf_log); None: not timed
+T_SPACE = [0] if config.perf_log else None
+
 FOCAL = 208.0    # pixels; gives a field of view of about 60 degrees
 VIEW_NAMES = ("FRONT", "REAR", "LEFT", "RIGHT")   # as game.VIEW_NAMES; this module imports no game
 NEAR = 30.0      # nothing closer than this is drawn
@@ -1063,7 +1077,12 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
 
     sp = g.space
     if sp is not None:
-        _draw_space(ctx, sp, station_wire)
+        if T_SPACE is not None:     # PERF: how long the sun, planet and station take
+            t = _tus()
+            _draw_space(ctx, sp, station_wire)
+            T_SPACE[0] += _tdiff(_tus(), t)
+        else:
+            _draw_space(ctx, sp, station_wire)
 
     # stardust, so speed and turning can be seen (close to you, so drawn over the
     # planet and sun); with the jump drive on, each speck is a streak back to
@@ -1170,87 +1189,47 @@ def _sphere(x, y, z, r):
 # across near the side of the view, worse close by, where _sphere drops it
 # (centre under half a radius ahead) and the planet vanished. So unless it is
 # tiny (GLOBE_MIN pixels, where the circle is within a pixel), each is one
-# filled shape through its true edge, worked out row by row every GLOBE_STEP
-# rows (and at its exact top and bottom), as Elite draws its sun in lines: a
-# horizon across the view that stays as you fly past. The planet's bright ring
-# is stroked along the same edge (but not along the screen's edge).
+# filled shape through its true edge: a horizon across the view that stays as
+# you fly past, the planet's bright ring stroked along it (not along the
+# screen's edge).
+#
+# Build 106: the edge is the circle of directions at the sphere's angular
+# radius round its centre's; GLOBE_N directions round it from a table, in
+# whole numbers (GLOBE_ONE = 1), each put on the screen; the part far to the
+# side or behind you cut off (z under GLOBE_ZMIN) and the shape closed off
+# the screen there. Before, near the planet it was worked out row by row
+# in floats: on the badge every float is a new object, and the 6-8 KB of them
+# a frame brought the 100 ms pause to collect them every few frames (the PERF
+# lines: up to 117 ms frames there).
 GLOBE_MIN = 6.0         # pixels: a smaller sphere is drawn as a circle
-GLOBE_STEP = 6          # pixels between rows worked out close by (more rows: smoother, slower)
-GLOBE_ROWS = 28         # at most this many rows
-GLOBE_FAR = 1500.0      # pixels: an ellipse longer than this (half) is drawn by rows instead
 # the badge swapped the sphere's colour and space's when the shape reached a few
 # thousand pixels off the screen (its drawing's numbers overflow; the old
 # circles stopped at 2000): past this the shape is cut to just round the screen
-GLOBE_SAFE = 600.0
-CLIP_M = 4.0            # pixels round the screen the cut shape reaches
-SUN_BAND = GLOBE_STEP   # the old name (build 99)
-# wholly in front of you a sphere's edge is an exact ellipse (the badge took
-# 20-35 ms to work out the rows, against about 2 ms for this): its points from
-# a table of cosines and sines round it
-GLOBE_N = 48
-_GCS = tuple((math.cos(i * TAU / GLOBE_N), math.sin(i * TAU / GLOBE_N)) for i in range(GLOBE_N))
-_EX = [0.0] * GLOBE_N   # the ellipse's points, worked out once for the fill and the ring
-_EY = [0.0] * GLOBE_N
-_GY = []                # the rows of the shape being drawn: y, x0, left is the edge, x1, right is
-_GX0 = []
-_GE0 = []
-_GX1 = []
-_GE1 = []
-
-
-_GR = [0.0, False, 0.0, False]     # _globe_row's answer: x0, left is the edge, x1, right is
-_GK = [0.0] * 7                     # its constants for this sphere: see _globe
-
-
-def _globe_row(y, top):
-    """Where the row y meets the sphere's image (_GK): True, with _GR the
-    ends and whether each is the sphere's edge (not the screen's); or False.
-    top: y is the shape's top or bottom, where the two ends meet."""
-    hw = VIEW_HW
-    fcz, cy, cx2, a, k, ff, cx = _GK
-    # the ray through (x, y) on screen is (x, -y, f): on the edge (x cx + b)^2 = k (x^2 + e)
-    b = fcz - y * cy
-    bb = cx2 * b
-    c = b * b - k * (y * y + ff)
-    x0 = -hw
-    x1 = hw
-    e0 = e1 = False
-    if a > 1e-9 or a < -1e-9:
-        disc = bb * bb - 4.0 * a * c
-        if disc < 0.0 and top:
-            disc = 0.0
-        if disc >= 0.0:
-            q = math.sqrt(disc)
-            r1 = (-bb - q) / (2.0 * a)
-            r2 = (-bb + q) / (2.0 * a)
-            if r1 > r2:
-                r1, r2 = r2, r1
-            if a < 0.0:
-                x0, x1, e0, e1 = r1, r2, True, True     # between the roots
-            elif cx * (r1 - 1.0) + b > 0.0:           # outside them: the sphere's side
-                x1, e1 = r1, True
-            else:
-                x0, e0 = r2, True
-        elif a < 0.0:
-            return False
-    elif bb != 0.0:         # a straight edge
-        xe = -c / bb
-        if bb > 0.0:
-            x0, e0 = xe, True
-        else:
-            x1, e1 = xe, True
-    if x0 < -hw:
-        x0, e0 = -hw, False
-    if x1 > hw:
-        x1, e1 = hw, False
-    if x1 < x0 or cx * (x0 + x1) * 0.5 + b <= 0.0:     # off the screen, or the cone behind you
-        return False
-    r = _GR
-    r[0] = x0
-    r[1] = e0
-    r[2] = x1
-    r[3] = e1
-    return True
+GLOBE_SAFE = 600
+CLIP_M = 4              # pixels round the screen the cut shape reaches
+SUN_BAND = 4            # the old name (build 99)
+GLOBE_N = 96            # directions round the edge (fewer for a small sphere)
+GLOBE_ONE = 4096        # 1 in the whole numbers
+# the cut: directions more than 60 degrees off straight ahead (z under half),
+# where nothing is on the screen (its corners are 39 degrees off): every point
+# then lands within about 360 pixels of the middle, so nothing needs cutting to
+# the screen (an earlier cut just in front of you reached 13000 pixels out, and
+# cutting that back took the badge 20 ms)
+GLOBE_ZMIN = GLOBE_ONE // 2
+_GCS = tuple((int(math.cos(i * TAU / GLOBE_N) * GLOBE_ONE), int(math.sin(i * TAU / GLOBE_N) * GLOBE_ONE))
+             for i in range(GLOBE_N))
+_GPX = [0] * GLOBE_N    # each edge direction (whole numbers)
+_GPY = [0] * GLOBE_N
+_GPZ = [0] * GLOBE_N
+_EX = [0] * (GLOBE_N + 40)      # the shape on the screen (whole pixels)
+_EY = [0] * (GLOBE_N + 40)
+_EL = [False] * (GLOBE_N + 40)  # the line from this point to the next is the sphere's edge
+_CAX = [0] * (GLOBE_N + 48)     # the shape cut to the screen, side by side (_poly_clipped)
+_CAY = [0] * (GLOBE_N + 48)
+_CBX = [0] * (GLOBE_N + 48)
+_CBY = [0] * (GLOBE_N + 48)
+_SEG = [0, 0, 0, 0]             # a line cut to the screen (_clip_seg)
+_FAR_ARC = 12                   # points along the far closing arc
 
 
 def _globe(ctx, cx, cy, cz, rad, fill, edge=None):
@@ -1273,255 +1252,298 @@ def _globe(ctx, cx, cy, cz, rad, fill, edge=None):
     cx /= d
     cy /= d
     cz /= d
-    k = 1.0 - r2 / d2   # cos^2 of the sphere's angular radius: on the edge (p.c)^2 = k |p|^2
+    sa = rad / d                        # sin and cos of its angular radius
+    ca = math.sqrt(1.0 - sa * sa)
     # all of it behind the view: its edge more than 50 degrees off straight ahead
-    if cz < 0.64 and math.acos(cz) - math.asin(rad / d) > 0.87:
+    if cz < 0.64 and math.acos(cz) - math.asin(sa) > 0.87:
         return
-    f = FOCAL
-    sa = rad / d                        # sin of its angular radius
-    q = cz * cz - sa * sa               # cos^2 of the centre's angle off ahead - sin^2 of that
-    if q > 0.02 and cz > 0.0:           # wholly in front: an ellipse
-        ca = math.sqrt(1.0 - sa * sa)
-        st = math.sqrt(1.0 - cz * cz)   # sin of the centre's angle off straight ahead
-        # its far and near ends along the line out from the middle of the view,
-        # tan(angle +- radius); the half width across it
-        t2 = (st * ca + cz * sa) / (cz * ca - st * sa)
-        t1 = (st * ca - cz * sa) / (cz * ca + st * sa)
-        ea = f * (t2 - t1) * 0.5
-        if ea < GLOBE_FAR:
-            eb = f * sa / math.sqrt(q)
-            m = f * (t1 + t2) * 0.5
-            if st > 1e-6:
-                ux = cx / st
-                uy = -cy / st           # screen y is down
-            else:
-                ux, uy = 1.0, 0.0
-            ox = ux * m
-            oy = uy * m
-            ax = ux * ea                # the long axis and the short one, on screen
-            ay = uy * ea
-            bx = -uy * eb
-            by = ux * eb
-            n = 1 if ea > 80.0 else 2 if ea > 20.0 else 4   # fewer points for a smaller one
-            xs, ys = _EX, _EY
-            j = 0
-            for i in range(0, GLOBE_N, n):
-                co, si = _GCS[i]
-                xs[j] = ox + ax * co + bx * si
-                ys[j] = oy + ay * co + by * si
-                j += 1
-            if (ox < 0.0 and -ox or ox) + ea < GLOBE_SAFE and (oy < 0.0 and -oy or oy) + ea < GLOBE_SAFE:
-                _poly(ctx, xs, ys, j, fill, edge)
-            else:   # reaching far off the screen: cut to just round it first
-                _poly_clipped(ctx, xs, ys, j, fill, edge)
-            return
-    a = cx * cx - k
-    # close by: row by row, over the rows it covers only
-    gk = _GK
-    gk[0] = f * cz
-    gk[1] = cy
-    gk[2] = 2.0 * cx
-    gk[3] = a
-    gk[4] = k
-    gk[5] = f * f
-    gk[6] = cx
-    # the shape's top and bottom, where a row just touches it:
-    # (cy^2 + a) y^2 - 2 f cz cy y + f^2 (cz^2 + a) = 0
-    ends = []
-    qa = cy * cy + a
-    qb = -2.0 * f * cz * cy
-    qc = f * f * (cz * cz + a)
-    if qa > 1e-12 or qa < -1e-12:
-        disc = qb * qb - 4.0 * qa * qc
-        if disc >= 0.0:
-            q = math.sqrt(disc)
-            for y in ((-qb - q) / (2.0 * qa), (-qb + q) / (2.0 * qa)):
-                if -hh < y < hh:
-                    ends.append(y)
-    ends.sort()
-    gy, gx0, ge0, gx1, ge1 = _GY, _GX0, _GE0, _GX1, _GE1
-    del gy[:], gx0[:], ge0[:], gx1[:], ge1[:]
-    y0 = -hh
-    y1 = hh
-    if not _globe_row(-hh, False) and ends:
-        y0 = ends[0]            # it starts below the top of the screen
-    if not _globe_row(hh, False) and ends:
-        y1 = ends[-1]           # and ends above the bottom
-    step = (y1 - y0) / GLOBE_ROWS
-    if step < GLOBE_STEP:
-        step = GLOBE_STEP
-    y = y0
-    ei = 0
-    while ei < len(ends) and ends[ei] < y0:
-        ei += 1
-    last = False
-    while True:
-        top = False
-        if ei < len(ends) and ends[ei] <= y:
-            yy = ends[ei]
-            ei += 1
-            top = True
-            if y < yy + 1.0:
-                y = yy + 1.0    # the next row a little past it (on it, rounding may miss)
-        else:
-            if y > y1:
-                if last:
-                    break
-                y = y1          # the last row exactly at its bottom (or the screen's)
-            last = y >= y1
-            yy = y
-            y += step
-        if yy > hh:
+    # two directions across the centre's, to go round it by
+    if cy < 0.9 and cy > -0.9:
+        ux, uy, uz = cz, 0.0, -cx       # (0, 1, 0) x c
+    else:
+        ux, uy, uz = 0.0, -cz, cy       # (1, 0, 0) x c
+    k = 1.0 / math.sqrt(ux * ux + uy * uy + uz * uz)
+    ux *= k
+    uy *= k
+    uz *= k
+    vx = cy * uz - cz * uy              # c x u
+    vy = cz * ux - cx * uz
+    vz = cx * uy - cy * ux
+    one = GLOBE_ONE
+    # in whole numbers from here: no new object per point
+    ccx = int(cx * ca * one)
+    ccy = int(cy * ca * one)
+    ccz = int(cz * ca * one)
+    sux = int(ux * sa * one)
+    suy = int(uy * sa * one)
+    suz = int(uz * sa * one)
+    svx = int(vx * sa * one)
+    svy = int(vy * sa * one)
+    svz = int(vz * sa * one)
+    # fewer directions for a smaller one (its size on the screen, about)
+    size = FOCAL * sa / (cz if cz > 0.2 else 0.2)
+    n = 1 if size > 60.0 else 2 if size > 25.0 else 4
+    m = GLOBE_N // n
+    px, py, pz = _GPX, _GPY, _GPZ
+    gcs = _GCS
+    seen = 0
+    j = 0
+    for i in range(0, GLOBE_N, n):
+        co, si = gcs[i]
+        z = ccz + ((suz * co + svz * si) >> 12)
+        px[j] = ccx + ((sux * co + svx * si) >> 12)
+        py[j] = ccy + ((suy * co + svy * si) >> 12)
+        pz[j] = z
+        if z >= GLOBE_ZMIN:
+            seen += 1
+        j += 1
+    if seen == 0:
+        # its edge all behind you: all of the view, or none of it
+        if cz >= ca:
+            ctx.rgb(*fill).rectangle(-hw, -hh, 2 * hw, 2 * hh).fill()
+        return
+    f = int(FOCAL)
+    zmin = GLOBE_ZMIN
+    xs, ys, el = _EX, _EY, _EL
+    q = 0
+    if seen == m:       # all in front of you: the edge goes all the way round
+        for i in range(m):
+            z = pz[i]
+            xs[i] = f * px[i] // z
+            ys[i] = -f * py[i] // z
+            el[i] = True
+        q = m
+    else:
+        # round the edge, cut where it passes behind you, the shape closed by
+        # an arc far off the screen between where it went out and came back
+        out_x = out_y = 0
+        for i in range(m):
+            i2 = i + 1 if i + 1 < m else 0
+            z1 = pz[i]
+            z2 = pz[i2]
+            in1 = z1 >= zmin
+            in2 = z2 >= zmin
+            if in1:
+                xs[q] = f * px[i] // z1
+                ys[q] = -f * py[i] // z1
+                el[q] = True
+                q += 1
+            if in1 != in2:      # crossing the cut: the point on it
+                x = px[i] + (px[i2] - px[i]) * (zmin - z1) // (z2 - z1)
+                y = py[i] + (py[i2] - py[i]) * (zmin - z1) // (z2 - z1)
+                sx = f * x // zmin
+                sy = -f * y // zmin
+                if in1:         # going out: from here round the far arc
+                    xs[q] = sx
+                    ys[q] = sy
+                    el[q] = False
+                    q += 1
+                    out_x = sx
+                    out_y = sy
+                else:           # coming back: the far arc to here first
+                    q = _far_arc(xs, ys, el, q, out_x, out_y, sx, sy, cx, cy, cz, ca) \
+                        if q > 0 else q
+                    xs[q] = sx
+                    ys[q] = sy
+                    el[q] = True
+                    q += 1
+        # if the edge started out behind you, the arc to its first point is left
+        if pz[0] < zmin and q > 0:
+            # the shape's first point came in from the cut; the last went out
+            q = _far_arc(xs, ys, el, q, out_x, out_y, xs[0], ys[0], cx, cy, cz, ca)
+    if q < 3:
+        return
+    big = False
+    lim = GLOBE_SAFE
+    for i in range(q):
+        if xs[i] > lim or xs[i] < -lim or ys[i] > lim or ys[i] < -lim:
+            big = True
             break
-        if not _globe_row(yy, top):
-            if gy:              # past it (its image is all one piece)
-                break
-            continue
-        r = _GR
-        gy.append(yy)
-        gx0.append(r[0])
-        ge0.append(r[1])
-        gx1.append(r[2])
-        ge1.append(r[3])
-        if yy >= hh:
-            break
-    if gy:
-        _globe_draw(ctx, fill, edge)
+    if big:     # reaching far off the screen: cut to just round it first
+        _poly_clipped(ctx, xs, ys, q, fill, edge, el)
+    else:
+        _poly(ctx, xs, ys, q, fill, edge, el)
 
 
-def _poly(ctx, xs, ys, n, fill, edge):
+def _far_arc(xs, ys, el, q, x0, y0, x1, y1, cx, cy, cz, ca):
+    """Points along an arc off the screen from (x0, y0) to (x1, y1), going
+    round the way that is inside the sphere's image (centre direction cx, cy,
+    cz, cos of its angular radius ca), after the q points in xs, ys. Returns
+    the new count. The arc's points come from the table (_GCS): a few floats
+    once a frame to find where it starts and ends, and which way round."""
+    n = GLOBE_N
+    i0 = int(math.atan2(y0, x0) * n / TAU) % n
+    i1 = int(math.atan2(y1, x1) * n / TAU) % n
+    r = math.sqrt(x0 * x0 + y0 * y0)
+    r1 = math.sqrt(x1 * x1 + y1 * y1)
+    if r1 > r:
+        r = r1
+    steps = (i1 - i0) % n               # anticlockwise on the screen, i0 to i1
+    if steps == 0:
+        steps = n
+    co, si = _GCS[(i0 + steps // 2) % n]
+    # its middle as a direction: (x, -y, f) for (x, y) r out on the screen
+    dx = co / GLOBE_ONE
+    dy = -si / GLOBE_ONE
+    dz = FOCAL / r
+    if (dx * cx + dy * cy + dz * cz) < ca * math.sqrt(dx * dx + dy * dy + dz * dz):
+        steps -= n                      # the other way round
+    ri = int(r) + 2
+    di = 1 if steps > 0 else -1
+    every = (steps if steps > 0 else -steps) // _FAR_ARC + 1
+    i = i0
+    gcs = _GCS
+    for k in range(0, steps if steps > 0 else -steps, every):
+        co, si = gcs[i % n]
+        xs[q] = ri * co >> 12
+        ys[q] = ri * si >> 12
+        el[q] = False
+        q += 1
+        i += di * every
+    return q
+
+
+def _poly(ctx, xs, ys, n, fill, edge, el):
     """Fill the closed shape through the first n points of xs, ys, and
-    stroke it in edge (None: not)."""
+    stroke in edge (None: not) the lines from each point el marks to the next."""
     ctx.rgb(*fill)
     ctx.begin_path()
     ctx.move_to(xs[0], ys[0])
     for i in range(1, n):
         ctx.line_to(xs[i], ys[i])
     ctx.fill()
-    if edge is not None:
-        ctx.rgb(*edge)
-        ctx.begin_path()
-        ctx.move_to(xs[0], ys[0])
-        for i in range(1, n):
-            ctx.line_to(xs[i], ys[i])
-        ctx.line_to(xs[0], ys[0])
-        ctx.stroke()
-
-
-def _clip_side(xs, ys, axis, lim, sign):
-    """The shape cut by one side of the box: keep sign * coordinate <= lim
-    (Sutherland-Hodgman). Returns the new xs, ys."""
-    ox = []
-    oy = []
-    n = len(xs)
-    if not n:
-        return ox, oy
-    px, py = xs[-1], ys[-1]
-    pin = sign * (px if axis == 0 else py) <= lim
+    if edge is None:
+        return
+    ctx.rgb(*edge)
+    ctx.begin_path()
+    drawing = False
     for i in range(n):
-        x, y = xs[i], ys[i]
+        j = i + 1 if i + 1 < n else 0
+        if el[i]:
+            if not drawing:
+                ctx.move_to(xs[i], ys[i])
+                drawing = True
+            ctx.line_to(xs[j], ys[j])
+        else:
+            drawing = False
+    ctx.stroke()
+
+
+def _clip_side(sx, sy, n, dx, dy, axis, lim, sign):
+    """Cut the shape in sx, sy (n points) by one side of the box, keeping
+    sign * coordinate <= lim (Sutherland-Hodgman), into dx, dy. Whole
+    numbers only. Returns how many points that leaves."""
+    if n == 0:
+        return 0
+    m = 0
+    px = sx[n - 1]
+    py = sy[n - 1]
+    pin = sign * (px if axis == 0 else py) <= lim
+    edge = sign * lim
+    for i in range(n):
+        x = sx[i]
+        y = sy[i]
         cin = sign * (x if axis == 0 else y) <= lim
         if cin != pin:      # crossing the side: where
             if axis == 0:
-                t = (sign * lim - px) / (x - px)
-                ox.append(sign * lim)
-                oy.append(py + (y - py) * t)
+                dx[m] = edge
+                dy[m] = py + (y - py) * (edge - px) // (x - px)
             else:
-                t = (sign * lim - py) / (y - py)
-                ox.append(px + (x - px) * t)
-                oy.append(sign * lim)
+                dx[m] = px + (x - px) * (edge - py) // (y - py)
+                dy[m] = edge
+            m += 1
         if cin:
-            ox.append(x)
-            oy.append(y)
-        px, py, pin = x, y, cin
-    return ox, oy
+            dx[m] = x
+            dy[m] = y
+            m += 1
+        px = x
+        py = y
+        pin = cin
+    return m
+
+
+def _code(x, y, lx, ly):
+    """Which sides of the box |x| <= lx, |y| <= ly the point is beyond (bits)."""
+    c = 0
+    if x < -lx:
+        c = 1
+    elif x > lx:
+        c = 2
+    if y < -ly:
+        c |= 4
+    elif y > ly:
+        c |= 8
+    return c
 
 
 def _clip_seg(x0, y0, x1, y1, lx, ly):
     """The part of the line from (x0, y0) to (x1, y1) inside the box |x| <= lx,
-    |y| <= ly (Liang-Barsky), as (x0, y0, x1, y1), or None."""
-    t0, t1 = 0.0, 1.0
-    dx = x1 - x0
-    dy = y1 - y0
-    for p, q in ((-dx, x0 + lx), (dx, lx - x0), (-dy, y0 + ly), (dy, ly - y0)):
-        if p == 0.0:
-            if q < 0.0:
-                return None
+    |y| <= ly (Cohen-Sutherland, whole numbers): True with it in _SEG, or
+    False if none of it is."""
+    c0 = _code(x0, y0, lx, ly)
+    c1 = _code(x1, y1, lx, ly)
+    while True:
+        if not (c0 | c1):
+            seg = _SEG
+            seg[0] = x0
+            seg[1] = y0
+            seg[2] = x1
+            seg[3] = y1
+            return True
+        if c0 & c1:
+            return False
+        c = c0 or c1
+        if c & 8:
+            x = x0 + (x1 - x0) * (ly - y0) // (y1 - y0)
+            y = ly
+        elif c & 4:
+            x = x0 + (x1 - x0) * (-ly - y0) // (y1 - y0)
+            y = -ly
+        elif c & 2:
+            y = y0 + (y1 - y0) * (lx - x0) // (x1 - x0)
+            x = lx
         else:
-            t = q / p
-            if p < 0.0:
-                if t > t1:
-                    return None
-                if t > t0:
-                    t0 = t
-            else:
-                if t < t0:
-                    return None
-                if t < t1:
-                    t1 = t
-    return x0 + dx * t0, y0 + dy * t0, x0 + dx * t1, y0 + dy * t1
+            y = y0 + (y1 - y0) * (-lx - x0) // (x1 - x0)
+            x = -lx
+        if c == c0:
+            x0 = x
+            y0 = y
+            c0 = _code(x0, y0, lx, ly)
+        else:
+            x1 = x
+            y1 = y
+            c1 = _code(x1, y1, lx, ly)
 
 
-def _poly_clipped(ctx, xs, ys, n, fill, edge):
+def _poly_clipped(ctx, xs, ys, n, fill, edge, el):
     """As _poly, for a shape reaching far off the screen: the fill cut to the
     screen plus CLIP_M, the outline's lines cut to it too (so never drawn
-    along the cut)."""
-    lx = VIEW_HW + CLIP_M
-    ly = VIEW_HH + CLIP_M
-    cx, cy = xs[:n], ys[:n]
-    cx, cy = _clip_side(cx, cy, 0, lx, 1.0)
-    cx, cy = _clip_side(cx, cy, 0, lx, -1.0)
-    cx, cy = _clip_side(cx, cy, 1, ly, 1.0)
-    cx, cy = _clip_side(cx, cy, 1, ly, -1.0)
-    if len(cx) >= 3:
+    along the cut). Whole numbers, into lists made once."""
+    lx = VIEW_HW + int(CLIP_M)
+    ly = VIEW_HH + int(CLIP_M)
+    m = _clip_side(xs, ys, n, _CAX, _CAY, 0, lx, 1)
+    m = _clip_side(_CAX, _CAY, m, _CBX, _CBY, 0, lx, -1)
+    m = _clip_side(_CBX, _CBY, m, _CAX, _CAY, 1, ly, 1)
+    m = _clip_side(_CAX, _CAY, m, _CBX, _CBY, 1, ly, -1)
+    if m >= 3:
+        cx = _CBX
+        cy = _CBY
         ctx.rgb(*fill)
         ctx.begin_path()
         ctx.move_to(cx[0], cy[0])
-        for i in range(1, len(cx)):
+        for i in range(1, m):
             ctx.line_to(cx[i], cy[i])
         ctx.fill()
     if edge is None:
         return
     ctx.rgb(*edge)
     ctx.begin_path()
+    seg = _SEG
     for i in range(n):
         j = i + 1 if i + 1 < n else 0
-        seg = _clip_seg(xs[i], ys[i], xs[j], ys[j], lx, ly)
-        if seg is not None:
+        if el[i] and _clip_seg(xs[i], ys[i], xs[j], ys[j], lx, ly):
             ctx.move_to(seg[0], seg[1])
             ctx.line_to(seg[2], seg[3])
-    ctx.stroke()
-
-
-def _globe_draw(ctx, fill, edge):
-    """Fill the rows in _GY.. as one shape (down the left ends, up the right),
-    then stroke its edge in edge (None: not)."""
-    gy, gx0, ge0, gx1, ge1 = _GY, _GX0, _GE0, _GX1, _GE1
-    n = len(gy)
-    ctx.rgb(*fill)
-    ctx.begin_path()
-    ctx.move_to(gx0[0], gy[0])
-    for i in range(1, n):
-        ctx.line_to(gx0[i], gy[i])
-    for i in range(n - 1, -1, -1):
-        ctx.line_to(gx1[i], gy[i])
-    ctx.fill()
-    if edge is None:
-        return
-    ctx.rgb(*edge)
-    ctx.begin_path()
-    hh = VIEW_HH
-    if gy[0] > -hh and ge0[0] and ge1[0]:           # its top, where that is on screen
-        ctx.move_to(gx0[0], gy[0])
-        ctx.line_to(gx1[0], gy[0])
-    for xs, es in ((gx0, ge0), (gx1, ge1)):
-        for i in range(1, n):
-            if es[i - 1] and es[i]:
-                ctx.move_to(xs[i - 1], gy[i - 1])
-                ctx.line_to(xs[i], gy[i])
-    if gy[-1] < hh and ge0[-1] and ge1[-1]:         # and its bottom
-        ctx.move_to(gx0[-1], gy[-1])
-        ctx.line_to(gx1[-1], gy[-1])
     ctx.stroke()
 
 
