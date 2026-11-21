@@ -18,6 +18,8 @@ perf_log = 60           # a PERF line on the console every this many flight fram
 log_keys = False        # print every button / key event (to see what a keyboard sends)
 title_quit = False      # a QUIT line on the title screen (the badge has F to leave)
 title_cancel = True     # cancel (F, Esc) on the title screen leaves the game
+practice_only = False   # the title screen offers only COMBAT PRACTICE (a device with too
+                        # few buttons for the rest: the Tufty without its Pad; build 111)
 wire_min = 8.0          # ships that look smaller than this (pixels) are drawn as a marker
 
 # the game's input (platform layer, step 2): None on the badge, where

@@ -89,9 +89,10 @@ class Host:
     def _held(self):
         keys = set()
         b = self.badge
+        m = controls_tufty.TUFTY_MAP if self.pad is not None else controls_tufty.ALONE
         for name, const in self.buttons.items():
             if b.held(const):
-                keys.add(controls_tufty.TUFTY_MAP[name])
+                keys.add(m[name])
         if self.pad is not None:
             try:
                 for k, v in self.pad.read_buttons().items():
@@ -134,6 +135,7 @@ class Host:
         elif name == "config":
             _mkdirs(self.data_dir)
             m.data_dir = self.data_dir
+            m.practice_only = self.pad is None      # the five buttons alone: practice only
             m.platform = platform_tufty
             m.input = self.feed.attach
         elif name == "cockpit":

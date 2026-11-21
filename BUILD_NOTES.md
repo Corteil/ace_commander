@@ -1309,3 +1309,11 @@ what is now `ace.py` (renamed in build 50).
    installed as `~/.local/share/icons/ace-commander.png`, the old one kept as
    `ace-commander-title-old.png`). On the badge the ship turns in steps (the loader draws
    only between imports). Not yet on the badge.
+   **Build 111** (2026-11-21, Brian: the Tufty's own buttons "need to act as cursor keys, A
+   left, B select, up up, down down; act as the joystick in flight, B = fire; should only work
+   for combat practice"). Without a Pad (`host_tufty` finds none at start) the Tufty's five
+   buttons use `controls_tufty.ALONE`: A / C / UP / DOWN are the joystick (cursor keys off the
+   flight, steering in flight), B is the badge's C (select, fire), and `config.practice_only`
+   (new, off on the badge and the Pi) leaves only COMBAT PRACTICE on the title screen
+   (`ace.choices`). With a Pad, everything as before. Test: both, in
+   `hosts/tufty/tests/test_tufty_host.py`. On the Tufty, not yet tried by Brian.

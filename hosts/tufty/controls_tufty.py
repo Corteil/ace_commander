@@ -27,8 +27,15 @@ class Key:
 BADGE = {c: Key(c, (_DIRECTION[c], c)) for c in "ABCDEF"}
 STICK = {n: Key("JOY" + n, (n.lower(), "j_" + n.lower())) for n in ("UP", "DOWN", "LEFT", "RIGHT")}
 STICK["SELECT"] = Key("JOYSELECT", ("confirm",))
-# the badge button each Tufty button stands for (its five: A, B, C, UP, DOWN)
+# the badge button each Tufty button stands for (its five: A, B, C, UP, DOWN), with
+# a Pad plugged in (the Pad then does the steering and the rest)
 TUFTY_MAP = {"A": BADGE["A"], "B": BADGE["B"], "C": BADGE["C"], "UP": BADGE["F"], "DOWN": BADGE["E"]}
+# without a Pad (Brian, build 111): the five buttons alone, and only combat practice
+# (config.practice_only). A / C / UP / DOWN are the joystick: cursor keys off the
+# flight (A left, C right), steering in flight; B is the badge's C: select off
+# the flight, fire in flight
+ALONE = {"A": STICK["LEFT"], "C": STICK["RIGHT"], "UP": STICK["UP"], "DOWN": STICK["DOWN"],
+         "B": BADGE["C"]}
 # and each Qw/ST Pad button (qwstpad's names): the D-pad is the joystick
 PAD_MAP = {"U": STICK["UP"], "D": STICK["DOWN"], "L": STICK["LEFT"], "R": STICK["RIGHT"],
            "A": BADGE["C"], "B": BADGE["D"], "X": BADGE["F"], "Y": BADGE["E"],

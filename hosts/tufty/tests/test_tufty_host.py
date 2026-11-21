@@ -25,29 +25,47 @@ import sim_badgeware as bw      # noqa: E402
 import host_tufty               # noqa: E402
 import platform_tufty           # noqa: E402
 
-data = tempfile.mkdtemp(prefix="ace_tufty_")
+class FakePad:
+    """A Qw/ST Pad: read_buttons() as qwstpad's, from the names held."""
+
+    def __init__(self):
+        self.down = set()
+
+    def read_buttons(self):
+        return {k: (k in self.down) for k in ("U", "D", "L", "R", "A", "B", "X", "Y", "+", "-")}
+
+
 screen = bw.Screen()
 badge = bw.Badge()
 buttons = dict(bw.BUTTONS)
-h = host_tufty.Host(screen, badge, bw.color, bw.shape, bw.font, bw.rect, buttons, None, data)
-# the loading screen: a module a frame, the name and a bar drawn meanwhile
-assert h.app is None
-h.update()
-assert h.app is None and h.done == 1 and h.letters is not None
-h.update()
-screen.img.save(os.path.join(SHOTS, "tufty_loading.png"))
-px = screen.img.load()
-assert any(px[x, y] != (0, 0, 0) for x in range(80, 240, 2) for y in range(10, 60, 2)), "the name"
-for _ in range(len(host_tufty.STEPS)):
+
+
+DATA = tempfile.mkdtemp(prefix="ace_tufty_")    # one for both hosts: the game fixes its save
+                                                # path when its module first loads
+
+
+def make(pad):
+    """A Tufty host, loaded (through its loading screen) and its game started."""
+    global h
+    data = DATA
+    h = host_tufty.Host(screen, badge, bw.color, bw.shape, bw.font, bw.rect, buttons, pad, data)
+    assert h.app is None
     h.update()
-assert h.loaded is not None and h.app is None and h.error is None, h.error
-h.update()
-assert h.app is None, "held for LOAD_HOLD, to see the ship"
-h.t_load -= host_tufty.LOAD_HOLD
-h.update()
-assert h.app is not None, "then the game takes over"
-a = h.app
-assert a.platform.__class__ is platform_tufty.Platform, "the Tufty's platform"
+    assert h.app is None and h.done == 1 and h.letters is not None
+    h.update()
+    screen.img.save(os.path.join(SHOTS, "tufty_loading.png"))
+    px = screen.img.load()
+    assert any(px[x, y] != (0, 0, 0) for x in range(80, 240, 2) for y in range(10, 60, 2)), "the name"
+    for _ in range(len(host_tufty.STEPS)):
+        h.update()
+    assert h.loaded is not None and h.app is None and h.error is None, h.error
+    h.update()
+    assert h.app is None, "held for LOAD_HOLD, to see the ship"
+    h.t_load -= host_tufty.LOAD_HOLD
+    h.update()
+    assert h.app is not None, "then the game takes over"
+    assert h.app.platform.__class__ is platform_tufty.Platform, "the Tufty's platform"
+    return h, h.app, data
 
 
 def frames(n=1):
@@ -78,6 +96,40 @@ def lit(x0, y0, x1, y1):
     return n
 
 
+# ---- the Tufty's buttons alone (no Pad, build 111): combat practice only; A / C /
+# UP / DOWN are cursor keys off the flight and the joystick in flight, B selects
+# and fires
+h, a, data = make(None)
+frames(5)
+assert a.choices() == ["COMBAT PRACTICE"], a.choices()
+press("B")
+assert a.mode == "practice", a.mode
+press("B")
+assert a.mode == "flight", a.mode
+g = a.game
+g.spawn_t = g.rock_t = 1e9
+frames(3)
+m0 = list(g.space.station.m) if g.space and g.space.station else None
+badge.down.add(buttons["UP"])
+frames(5)
+badge.down.discard(buttons["UP"])
+assert g.stick_pitch != 0.0, "UP steers (the joystick)"
+badge.down.add(buttons["A"])
+frames(3)
+assert g.stick_roll != 0.0, "A rolls"
+badge.down.discard(buttons["A"])
+g.heat = 0.0
+badge.down.add(buttons["B"])
+frames(2)
+assert g.beam > 0, "B fires"
+badge.down.discard(buttons["B"])
+frames(2)
+shot("tufty_practice")
+print("Tufty buttons alone: combat practice only, cursor keys, joystick, B fires: ok")
+
+# ---- with a Pad: the whole game
+pad = FakePad()
+h, a, data = make(pad)
 frames(5)
 assert a.mode == "menu" and lit(0, 0, 320, 240) > 200, "the title draws"
 shot("tufty_title")

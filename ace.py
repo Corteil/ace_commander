@@ -697,6 +697,11 @@ class AceCommander(PLATFORM.App):
 
     def choices(self):
         """The title screen's choices, in order."""
+        if config.practice_only:        # too few buttons for the rest (config.py)
+            items = ["COMBAT PRACTICE"]
+            if TITLE_QUIT:
+                items.append("QUIT")
+            return items
         items = ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS"]
         if self.cmdr is not None:
             items.insert(0, "CONTINUE")
