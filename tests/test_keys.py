@@ -105,6 +105,14 @@ tick(a, fresh=["KEY_F"]); assert a.paused, "in the pause menu too F is the keybo
 tick(a, fresh=["A"]); assert not a.paused
 print("keyboard A-F as the badge's buttons off the flight: ok")
 
+# and Enter and Esc as C and F (build 102)
+a = docked(); d = a.dock; c = a.cmdr
+tick(a); tick(a, fresh=["CONFIRM"]); assert d.name() == "OPTIONS", "Enter on Status: Options"
+tick(a, fresh=["KEY_ESCAPE"]); assert d.name() == "STATUS", "Esc: back"
+tick(a, fresh=["KEY_2"]); cash, held = c.cash, sum(c.cargo)
+tick(a, fresh=["CONFIRM"]); assert sum(c.cargo) == held + 1 and c.cash < cash, "Enter buys"
+print("keyboard Enter and Esc as C and F off the flight: ok")
+
 # typing a name: the letters are letters
 a = docked()
 tick(a, fresh=["F"]); assert a.mode == "menu"

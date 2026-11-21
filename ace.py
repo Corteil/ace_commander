@@ -154,6 +154,7 @@ DOCK_KEYS = (("k_1", "LAUNCH"), ("k_2", "MARKET"), ("k_3", "SELL"),
 # first galaxy (see AceCommander._egg)
 DEBUG_MENU = config.debug_menu
 TITLE_QUIT = config.title_quit  # a QUIT line on the title screen (a host sets it: the Pi; the badge has F)
+TITLE_CANCEL = config.title_cancel  # cancel on the title leaves (the Pi turns it off: QUIT does)
 EGG_WORD = "DRAKE"      # a male duck: no system name starts with C or U for DUCKS
 EGG_STOPS = 1           # dockings elsewhere forgiven between letters (to refuel)
 PERF_SLOW = 25          # ms over the average that makes a frame count as slow
@@ -677,7 +678,7 @@ class AceCommander(app.App):
         if self._update_name(cancel, confirm):
             pass                # the name being entered takes the input
         elif self.mode == "menu":
-            if cancel:
+            if cancel and TITLE_CANCEL:
                 pad.clear()
                 self.minimise()
             elif SHIPS:     # nothing to choose without ship_data.py

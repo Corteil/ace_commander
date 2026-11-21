@@ -85,7 +85,7 @@ assert ace.options_path().startswith(save_dir) and ace.SAVE_PATH.startswith(save
 cfg = sys.modules[run.PKG + ".config"]
 assert cfg.data("options.json").startswith(save_dir), \
     "content.py reads options.json from the data folder (config.py)"
-assert cfg.title_quit and ace.TITLE_QUIT and cfg.wire_min == run.WIRE_MIN
+assert cfg.title_quit and ace.TITLE_QUIT and not ace.TITLE_CANCEL and cfg.wire_min == run.WIRE_MIN
 assert sys.modules[run.PKG + ".cockpit"].WIRE_MIN == run.WIRE_MIN, "the Pi's draw distance"
 
 # ---- a new commander, docked ---------------------------------------------------
@@ -134,6 +134,13 @@ key(h, pygame.K_ESCAPE)
 assert a.finder is None, "Esc leaves the search"
 key(h, pygame.K_ESCAPE); ch_key(h, "9")
 print("docked, the letters A-F work as the badge's buttons (not while typing)")
+# and Enter and Esc as C and F (build 102)
+key(h, pygame.K_RETURN); assert d.name() == "OPTIONS", ("Enter: the badge's C", d.name())
+key(h, pygame.K_ESCAPE); assert d.name() == "STATUS", ("Esc: the badge's F", d.name())
+ch_key(h, "2"); cash = c.cash; held = sum(c.cargo)
+key(h, pygame.K_RETURN); assert sum(c.cargo) == held + 1 and c.cash < cash, "Enter buys, as C"
+ch_key(h, "d"); ch_key(h, "9")
+print("docked, Enter and Esc work as C and F")
 
 # ---- B is the badge's B docked, on the market too: the next tab ----------------
 ch_key(h, "2")
@@ -283,7 +290,12 @@ for _ in range(4):                  # F: back a screen at a time, to the title
     key(h, pygame.K_F6)
 assert a.mode == "menu", a.mode
 key(h, pygame.K_ESCAPE)
-assert not h.running
+assert h.running and a.mode == "menu", "Esc on the title doesn't quit on the Pi"
+a.menu = 0
+key(h, pygame.K_UP)                 # up from the first line wraps to the last: QUIT
+assert a.choices()[a.menu] == "QUIT", a.choices()[a.menu]
+key(h, pygame.K_RETURN)
+assert not h.running, "QUIT leaves"
 pygame.quit()
 
 # Options > CONTENT: OWN saved in the Pi's options.json picks the game's own
