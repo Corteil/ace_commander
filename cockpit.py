@@ -10,14 +10,17 @@ import math
 
 try:
     from . import config
+    from .layout import BADGE as _BADGE
 except ImportError:     # imported on its own (tests/test_game.py)
     import config
+    from layout import BADGE as _BADGE
 
 FOCAL = 208.0    # pixels; gives a field of view of about 60 degrees
 VIEW_NAMES = ("FRONT", "REAR", "LEFT", "RIGHT")   # as game.VIEW_NAMES; this module imports no game
 NEAR = 30.0      # nothing closer than this is drawn
 # Half the 3D view's width and height in pixels, about the ctx origin. 120 and 120 is the
-# Tildagon's 240x240 view. Set both before drawing to use another size.
+# Tildagon's 240x240 view. draw_world and draw_tunnel set them from the layout
+# (layout.py, config.layout) and draw_hud puts them back.
 VIEW_HW = 120
 VIEW_HH = 120
 TAU = 2 * math.pi
@@ -697,7 +700,26 @@ _STARS = _scatter(40)
 _ZS = [None] * TUNNEL_RINGS
 
 
+def _layout():
+    """The flight layout (layout.py): the host's in config.layout, or the badge's."""
+    return config.layout or _BADGE
+
+
 def draw_tunnel(ctx, f, t, rgb=GREEN, inward=False, tun=None):
+    """A tunnel (_draw_tunnel) where the layout puts it."""
+    global VIEW_HW, VIEW_HH
+    lay = _layout()
+    lay.tunnel(ctx)
+    VIEW_HW = lay.tunnel_hw
+    VIEW_HH = lay.tunnel_hh
+    try:
+        _draw_tunnel(ctx, f, t, rgb, inward, tun)
+    finally:
+        VIEW_HW = VIEW_HH = 120
+        lay.done(ctx)
+
+
+def _draw_tunnel(ctx, f, t, rgb=GREEN, inward=False, tun=None):
     """The launch: flying out along the station's tunnel (tun, a Tunnel). f
     goes from 0 at the start to 1 at the mouth; t is the time in seconds
     (unused: the tunnel doesn't turn); rgb is the station's colour, for the mouth. With inward,
@@ -977,6 +999,17 @@ def _streak_tail(view, tail):
 
 
 def draw_world(ctx, g):
+    """The 3D view (_world) where the layout puts it: the view's size is
+    VIEW_HW x VIEW_HH until draw_hud has drawn the HUD."""
+    global VIEW_HW, VIEW_HH
+    lay = _layout()
+    lay.view(ctx)
+    VIEW_HW = lay.view_hw
+    VIEW_HH = lay.view_hh
+    _world(ctx, g)
+
+
+def _world(ctx, g):
     """Space, ships, explosions and laser beams; from behind your ship while
     the docking computer flies."""
     if getattr(g, "autodock", False):
@@ -1658,6 +1691,19 @@ def _vbar(ctx, x, frac, rgb):
 
 
 def draw_hud(ctx, g, ms=None, ring=True):
+    """The HUD: the layout's own (a dashboard), or the round one (_hud); then
+    back to the 240 canvas for the pause menu."""
+    global VIEW_HW, VIEW_HH
+    lay = _layout()
+    try:
+        if not lay.hud(ctx, g, ms, ring):
+            _hud(ctx, g, ms, ring)
+    finally:
+        VIEW_HW = VIEW_HH = 120
+        lay.done(ctx)
+
+
+def _hud(ctx, g, ms=None, ring=True):
     """Crosshair, gauges, radar and numbers. ring: flash a red ring when hit
     (for badges where the LEDs can't be used for that)."""
     # crosshair (not in the docking computer's view from behind your ship)

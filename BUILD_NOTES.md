@@ -1209,3 +1209,16 @@ what is now `ace.py` (renamed in build 50).
    radius of its surface, AL alone, centred under the frame time (Brian), full at 1 radius, red in its last
    tenth (`_planet_gauge`). Played by Brian on the badge (as .mpy): all working, no colour
    swap, frame time about 50-56 ms near the planet.
+   **Build 105** (2026-11-21, the platform layer's step 4 begun, `hosts/NEXT_SESSION.md` B4).
+   New `layout.py` (imports nothing): `Layout`, how flight sits on the screen: the 3D view's
+   and the tunnels' half sizes (`view_hw` / `view_hh`, `tunnel_hw` / `tunnel_hh`) and
+   `view(ctx)`, `tunnel(ctx)`, `hud(ctx, g, ms, ring)` (True if it drew its own HUD; False:
+   the round one) and `done(ctx)`. `cockpit.draw_world`, `draw_hud` and `draw_tunnel` ask
+   `config.layout` (`layout.BADGE` when None) and set `VIEW_HW` / `VIEW_HH` from it, then put
+   them back; the bodies are `_world`, `_hud`, `_draw_tunnel`, unchanged. `Game` keeps the
+   stick last given to `step` (`stick_pitch`, `stick_roll`: two floats, no new object). The
+   Pi's `hosts/pi/layout_pi.py` (`PiLayout`, following F10 and the window's size) replaced
+   its hooks on the three functions and its wrapper round `Game.step`. Unchanged: all 59
+   badge frames and five seeded Pi frames (both layouts, flight and tunnel, the roll and
+   dive meters moving) pixel-identical. The release gains `layout.py`. Not yet run on the
+   badge.

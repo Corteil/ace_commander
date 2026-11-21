@@ -41,6 +41,7 @@ from controls_pi import Feed        # noqa: E402
 from keys_pi import Keys            # noqa: E402
 from pad_pi import Pads             # noqa: E402
 import dash_pi                      # noqa: E402
+from layout_pi import PiLayout      # noqa: E402
 
 BACKGROUND = (24, 24, 30)           # round the screen, like the badge's case
 LED_SIZE = 4                        # an LED's radius, in game pixels
@@ -119,7 +120,9 @@ class Host:
         self.full = prefs.get("full", False) if full is None else full
         self.layout = layout or prefs.get("layout") or ("elite" if self.full else "badge")
         self.win_scale = scale
-        self._hook()
+        # flight laid out for the window (platform layer, step 4): the game asks it
+        self.flight = PiLayout(self, self.ck)
+        sys.modules[PKG + ".config"].layout = self.flight
         self._open_window()
         # the keyboard and pads send the game control names (platform layer, step 2):
         # the game hands its controls.Controls to the feed when it starts
@@ -183,6 +186,7 @@ class Host:
             self.ctx = Ctx(self.screen, s)
             self.mask = self._round_mask(size)
             self.gm.DUST_X = 500
+        self.flight.fit()
 
     def toggle_layout(self):
         self.layout = "badge" if self.layout == "elite" else "elite"
@@ -205,27 +209,7 @@ class Host:
         pygame.draw.circle(m, (0, 0, 0, 0), (size // 2, size // 2), size // 2)
         return m
 
-    # ---- the Elite layout's flight screen: hooks round the game's drawing -----------------
-    def _hook(self):
-        """The game draws flight with cockpit.draw_world and draw_hud, and the tunnels
-        with draw_tunnel (as the Tufty port does): in the Elite layout ours draw the
-        view, the dashboard and a full-window tunnel. The badge layout calls the
-        game's own. Game.step is wrapped to keep the stick (for RL and DC)."""
-        ck = self.ck
-        self._orig = (ck.draw_world, ck.draw_hud, ck.draw_tunnel)
-        ck.draw_world = self._world
-        ck.draw_hud = self._hud
-        ck.draw_tunnel = self._tunnel
-        G = self.gm.Game
-        if not getattr(G.step, "_pi_wrapped", False):
-            step = G.step
-
-            def stepped(g, dt, pitch, roll, throttle, fire, missile, yaw=0.0):
-                g.pi_stick = (pitch, roll)
-                return step(g, dt, pitch, roll, throttle, fire, missile, yaw)
-            stepped._pi_wrapped = True
-            G.step = stepped
-
+    # ---- the Elite layout's flight screen (layout_pi.PiLayout asks these) ----------------
     def _elite(self):
         return self.layout == "elite"
 
@@ -237,43 +221,6 @@ class Host:
     def _clip(self, y0, h):
         s = self.scale
         self.window.set_clip(pygame.Rect(0, round(y0 * s), self.window.get_width(), round(h * s)))
-
-    def _world(self, ctx, g):
-        if not self._elite():
-            return self._orig[0](ctx, g)
-        ck = self.ck
-        self._clip(0, dash_pi.VIEW_H)
-        self._at(ctx, dash_pi.VIEW_H / 2.0)
-        ck.VIEW_HW, ck.VIEW_HH = self.lw / 2.0, dash_pi.VIEW_H / 2.0
-        return self._orig[0](ctx, g)
-
-    def _hud(self, ctx, g, ms=None, ring=True):
-        if self.full:
-            ms = None           # no frame time counter in full screen (Brian)
-        if not self._elite():
-            return self._orig[1](ctx, g, ms, ring)
-        ck = self.ck
-        self._clip(0, dash_pi.VIEW_H)
-        self._at(ctx, dash_pi.VIEW_H / 2.0)
-        dash_pi.draw_view_overlay(ctx, ck, g, self.dash_layout, ms)
-        self._clip(dash_pi.VIEW_H, dash_pi.DASH_H)
-        self._at(ctx, dash_pi.VIEW_H + dash_pi.DASH_H / 2.0)
-        stick = g.auto_stick if getattr(g, "autodock", False) else getattr(g, "pi_stick", (0.0, 0.0))
-        dash_pi.draw_dashboard(ctx, ck, g, self.dash_layout, stick)
-        self.window.set_clip(None)
-        self._at(ctx, 120)                  # the pause menu: over the middle of the window
-        ck.VIEW_HW, ck.VIEW_HH = 120, 120
-
-    def _tunnel(self, ctx, *args):
-        if not self._elite():
-            return self._orig[2](ctx, *args)
-        ck = self.ck
-        self.window.set_clip(None)
-        self._at(ctx, 120)
-        ck.VIEW_HW, ck.VIEW_HH = self.lw / 2.0, 120     # the whole window
-        r = self._orig[2](ctx, *args)
-        ck.VIEW_HW, ck.VIEW_HH = 120, 120
-        return r
 
     # ---- screenshots (F12) --------------------------------------------------------------
     def shots_dir(self):
@@ -348,7 +295,6 @@ class Host:
             self._size = self.window.get_size()
             self._fit()
         self.ctx.labels = self.pads.labels() if self.pad_last else None
-        self.ck.VIEW_HW, self.ck.VIEW_HH = 120, 120
         if self._elite():
             self.window.set_clip(None)
             self.window.fill((0, 0, 0))
