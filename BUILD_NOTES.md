@@ -1377,3 +1377,7 @@ what is now `ace.py` (renamed in build 50).
    E (slower), no roll or pitch meanwhile; A + B / B + C are gone, so B alone fires at once.
    Off the flight A + C is still back. A or C alone waits `PAIR_WAIT`. Hints in flight: F is
    A+C+UP, E is A+C+DOWN.
+   **Build 119** (Brian: "hold A + C will turn the up and down buttons into speed control
+   buttons"): a toggle, not a shift. In flight each press of A + C switches UP / DOWN between
+   pitch and speed (`host_tufty.speed_mode`; "UP/DOWN: SPEED" / "UP/DOWN: PITCH" said), staying
+   so once let go; a new flight starts in pitch. Off the flight A + C is back.

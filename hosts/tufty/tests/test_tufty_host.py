@@ -145,22 +145,31 @@ for _ in range(3):
 assert fired, "B fires"
 badge.down.discard(buttons["B"])
 frames(2)
-assert h.ctx.labels == {"C": "B", "F": "A+C+UP", "E": "A+C+DOWN"}, "in flight: the shift"
+assert h.ctx.labels == {"C": "B"}, "in flight: B named; the game says what A + C does"
 s0 = g.speed
-r0 = g.stick_roll
-badge.down.add(buttons["A"]); badge.down.add(buttons["C"])     # A + C held: a shift
-frames(2)
-assert g.speed == s0 and g.stick_roll == 0.0, "A + C alone: no roll, no speed change"
+badge.down.add(buttons["A"]); badge.down.add(buttons["C"])     # A + C: UP / DOWN to speed
+frames(3)
+badge.down.discard(buttons["A"]); badge.down.discard(buttons["C"])
+frames(1)
+assert h.speed_mode and g.msg == "UP/DOWN: SPEED" and g.speed == s0, (h.speed_mode, g.msg)
 badge.down.add(buttons["UP"])
 frames(10)
 badge.down.discard(buttons["UP"])
-assert g.speed > s0 + 1 and g.stick_pitch == 0.0, ("A + C + UP: faster, no pitch", s0, g.speed)
+assert g.speed > s0 + 1 and g.stick_pitch == 0.0, ("UP: faster, no pitch", s0, g.speed)
 s1 = g.speed
 badge.down.add(buttons["DOWN"])
 frames(10)
 badge.down.discard(buttons["DOWN"])
+assert g.speed < s1 - 1, ("DOWN: slower", s1, g.speed)
+badge.down.add(buttons["A"]); badge.down.add(buttons["C"])     # A + C again: pitch
+frames(3)
 badge.down.discard(buttons["A"]); badge.down.discard(buttons["C"])
-assert g.speed < s1 - 1, ("A + C + DOWN: slower", s1, g.speed)
+frames(1)
+assert not h.speed_mode and g.msg == "UP/DOWN: PITCH"
+badge.down.add(buttons["UP"])
+frames(3)
+badge.down.discard(buttons["UP"])
+assert g.stick_pitch != 0.0, "UP pitches again"
 frames(2)
 shot("tufty_practice")
 print("Tufty buttons alone: combat practice only, cursor keys, joystick, B fires: ok")

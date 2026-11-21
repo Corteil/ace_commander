@@ -72,6 +72,9 @@ class Host:
         self.pad = pad
         self.real_pad = pad     # the Pad found at start (DEBUG > GAMEPAD can switch it off)
         self.waits = {}         # button -> when it went down alone (PAIR_WAIT), on self.clock
+        self.speed_mode = False     # in flight, UP / DOWN change speed (A + C toggles it)
+        self.speed_game = None      # the flight it was set in
+        self.both_down = False      # A + C held last frame (the toggle goes on the press)
         self.clock = 0          # ms of frames so far (the frame times update() is given)
         self.data_dir = data_dir
         self.feed = controls_tufty.Feed()
@@ -101,16 +104,24 @@ class Host:
         flying = a is not None and a.mode == "flight" and not a.paused
         self.ctx.labels = controls_tufty.LABELS if flying else controls_tufty.LABELS_OFF
         one, two = controls_tufty.SHIFT
-        if one in held and two in held:     # A + C: a shift in flight, back off it
+        both = one in held and two in held
+        if a is None or a.game is not self.speed_game:  # a new flight: UP / DOWN pitch again
+            self.speed_mode = False
+            self.speed_game = a.game if a is not None else None
+        if both:                            # A + C: the speed toggle in flight, back off it
             held.discard(one)
             held.discard(two)
-            if flying:
-                for name, key in controls_tufty.SHIFTED.items():
-                    if name in held:
-                        keys.add(key)
-                        held.discard(name)
-            else:
+            if flying and not self.both_down:
+                self.speed_mode = not self.speed_mode
+                a.game.say("UP/DOWN: SPEED" if self.speed_mode else "UP/DOWN: PITCH", 1.5)
+            elif not flying:
                 keys.add(controls_tufty.BACK)
+        self.both_down = both
+        if flying and self.speed_mode:      # UP / DOWN are the speed buttons
+            for name, key in controls_tufty.SHIFTED.items():
+                if name in held:
+                    keys.add(key)
+                    held.discard(name)
         # A or C held alone waits PAIR_WAIT ms for the other (on the frame clock)
         waits = self.waits
         for name in (one, two):
