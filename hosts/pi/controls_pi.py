@@ -27,6 +27,8 @@ _DIRECTION = {"A": "up", "B": "right", "C": "confirm", "D": "down", "E": "left",
 # keys the game reads by their own name ("k_W"), and the number keys' extra names
 _NAMED = ("W", "S", "A", "D", "E", "Q", "F", "M", "P", "N", "T", "U", "V", "C", "SPACE", "BACKSPACE",
           "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "H", "J", "SHIFT", "CTRL", "ESCAPE")
+# off the flight Enter and Esc are the badge's C and F too (Brian, build 102)
+_AS_BADGE = {"ENTER": ("C", "confirm"), "ESCAPE": ("F", "cancel")}
 _SPEED = {"+": "k_faster", "=": "k_faster", "-": "k_slower", "_": "k_slower"}
 
 
@@ -48,7 +50,7 @@ def _keyboard(k):
     if k in _SPEED:
         names.append(_SPEED[k])
     ch = " " if k == "SPACE" else (k if len(k) == 1 and k.isalnum() else None)
-    badge = (k, _DIRECTION[k]) if k in _DIRECTION else None
+    badge = (k, _DIRECTION[k]) if k in _DIRECTION else _AS_BADGE.get(k)
     return Key(k, "Keyboard", names, ch, badge)
 
 

@@ -847,7 +847,9 @@ CHASE_DOCK = 220        # docking: the camera closes in to this far outside the 
 CHASE_CLOSE = 0.5       # as you dock (Brian: the station bigger before the tunnel),
                         # coming this much closer for each unit you do
 _auto_in = None
-PLAYER_NOSE = 40        # your ship's nose is in the slot this far before its middle
+CHASE_SHRINK = 600      # docking: your ship shrinks over this last stretch to the slot's face
+                        # to fit the slot (the Cobra is 256 across, a Coriolis slot 60), as
+                        # in the tunnel scene, and is seen going in (Brian, build 102)
 
 
 def chase_back(g):
@@ -867,7 +869,24 @@ def chase_back(g):
     near = CHASE_DOCK + _auto_in
     return max(float(near), min(float(CHASE_BACK), near + d * CHASE_CLOSE))
 _me = None      # your ship, for that view: [Obj, the Game whose blueprint it is,
-                # bank, pitch, the ship's name (a new ship bought keeps the same Game)]
+                # bank, pitch, the ship's name (a new ship bought keeps the same Game),
+                # its scale to fit the slot (k_fit), the station blueprint that's for]
+
+
+def _slot_fit(ship, station):
+    """The scale that fits ship (a blueprint), level, through station's slot:
+    the small rectangle on its front face, long side across (the docking
+    computer rolls it so), SLOT_ROOM of it. 1 if it fits as it is."""
+    f = station.front
+    xs = [abs(v[0]) for v in station.verts if v[2] >= f - 1 and max(abs(v[0]), abs(v[1])) < f * 0.5]
+    ys = [abs(v[1]) for v in station.verts if v[2] >= f - 1 and max(abs(v[0]), abs(v[1])) < f * 0.5]
+    if not xs:
+        return 1.0
+    a, b = max(xs), max(ys)
+    across, high = max(a, b), min(a, b)
+    hw = max([abs(v[0]) for v in ship.verts] or [1])
+    hh = max([abs(v[1]) for v in ship.verts] or [1])
+    return min(1.0, SLOT_ROOM * across / hw, SLOT_ROOM * high / hh)
 
 
 def _chase_shift(g, dy, dz):
@@ -917,15 +936,28 @@ def _my_ship(g):
         bp = g.types.get(name)
         if bp is None:
             return None
-        _me = [_Me(bp), g, 0.0, 0.0, name]
+        _me = [_Me(bp), g, 0.0, 0.0, name, 1.0, None]
     # bank and pitch with the docking computer's stick, eased, so you can see it fly
     p, r = getattr(g, "auto_stick", (0.0, 0.0))
     _me[2] += (r * 0.5 - _me[2]) * 0.2
     _me[3] += (p * 0.25 - _me[3]) * 0.2
     b, a = _me[2], _me[3]
     cb, sb, ca, sa = math.cos(b), math.sin(b), math.cos(a), math.sin(a)
+    # on the docking computer's run in: shrinking to fit the slot by its face
+    k = 1.0
+    sp = g.space
+    st = sp.station if sp is not None else None
+    if st is not None and getattr(g, "auto_phase", 0) == 2:
+        if _me[6] is not st.bp:
+            _me[5] = _slot_fit(_me[0].bp, st.bp)
+            _me[6] = st.bp
+        d = (sp.d_station - st.bp.front) / CHASE_SHRINK     # 1 at the start, 0 at the face
+        k = _me[5] + (1.0 - _me[5]) * _ease(d)
     # side, roof, nose: rolled by b (right wing down), then nose up by a
-    _me[0].m = [cb, -sb, 0.0, sb * ca, cb * ca, sa, -sb * sa, -cb * sa, ca]
+    # (y is up: the nose rises, the roof leans back; Brian, build 102: it was
+    # drawn nose up while the computer pitched down); all scaled by k
+    kc, ks = k * ca, k * sa
+    _me[0].m = [k * cb, -k * sb, 0.0, sb * kc, cb * kc, -ks, sb * ks, cb * ks, kc]
     return _me[0]
 
 
@@ -958,14 +990,10 @@ def draw_world(ctx, g):
             me.z = back
             _chase_shift(g, -up, back)
             try:
-                sp = g.space
-                st = sp.station if sp is not None else None
-                inside = st is not None and sp.d_station < st.bp.front + PLAYER_NOSE
-                if inside:      # going into the slot: drawn first, so the station hides it
-                    draw_ship(ctx, me, getattr(g, "ship_rgb", CYAN), 0, True)
                 _draw_world(ctx, g, 0)     # the station in 3D however far off it is
-                if not inside:
-                    draw_ship(ctx, me, getattr(g, "ship_rgb", CYAN), 0, True)
+                # then your ship over it: shrunk to fit the slot by its face
+                # (_my_ship), so going in it is seen inside the slot's opening
+                draw_ship(ctx, me, getattr(g, "ship_rgb", CYAN), 0, True)
             finally:
                 _chase_shift(g, up, -back)
             return

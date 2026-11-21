@@ -87,6 +87,11 @@ class Input:
             key = KEYBOARD_BUTTONS.get(ch)
             if key is not None:
                 self.badge_keys[key] = (ch, sysname)
+        # and Enter and Esc are C and F there (Brian, build 102)
+        for name, as_badge in (("ENTER", ("C", "confirm")), ("ESCAPE", ("F", "cancel"))):
+            key = KEYBOARD_BUTTONS.get(name)
+            if key is not None:
+                self.badge_keys[key] = as_badge
         self.names = {}      # button -> the control names it counts as
         eventbus.on(ButtonDownEvent, self._down, owner)
         eventbus.on(ButtonUpEvent, self._up, owner)
