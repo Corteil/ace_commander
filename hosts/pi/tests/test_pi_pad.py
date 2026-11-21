@@ -233,6 +233,10 @@ tap(h, "x"); assert a.fsub == "data" and g.jump_t == jt, ("X: system data, no ju
 tap(h, "x"); assert a.fsub == "chart", "X again: back to the chart"
 tap(h, "y"); assert type(a.chart).__name__ == "GalChart", "Y: the galactic chart"
 tap(h, "back"); assert a.finder is not None or a.tdialog is not None or a.fsub == "chart", "Back: search"
+if a.tdialog is not None:           # the pad in use: the letter picker (build 124); B cancels
+    assert getattr(a.tdialog, "driven", False)
+    tap(h, "b")
+    assert a.tdialog is None, "B cancels the search"
 if a.finder is not None:
     key = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode="", mod=0)
     h.handle(key); h.step(40)
@@ -314,5 +318,18 @@ h.handle(pygame.event.Event(pygame.CONTROLLERDEVICEREMOVED, instance_id=PAD)); h
 assert not a.pad.held("k_J") and PAD not in h.pads.pads, "unplugged: let go"
 assert a.analog is None, "no pad: no analogue controls"
 print("unplugging lets go: ok")
+# text entry with the pad in use (build 124): the letter picker; with the keyboard, its page
+h.pad_last = True
+got = []
+a._open_name("", got.append)
+assert a.ndialog is not None and getattr(a.ndialog, "driven", False), "the pad: the picker"
+a.ndialog._result = "PI"
+h.step(40)
+assert got == ["PI"]
+h.pad_last = False
+a._open_name("", got.append)
+assert a.ndialog is None and a.namer is not None, "the keyboard: its own typing page"
+a.namer = None
+print("text entry: the picker with the pad, the keyboard's page without: ok")
 pygame.quit()
 print("ALL PI PAD TESTS PASSED")

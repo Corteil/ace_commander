@@ -23,7 +23,7 @@ sys.modules["ace_commander"] = importlib.util.module_from_spec(spec)
 
 import sim_badgeware as bw      # noqa: E402
 import host_tufty               # noqa: E402
-import dialog_tufty             # noqa: E402
+from ace_commander import picker as dialog_tufty  # noqa: E402  (the letter picker: picker.py)
 import platform_tufty           # noqa: E402
 
 class FakePad:

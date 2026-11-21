@@ -1405,3 +1405,14 @@ what is now `ace.py` (renamed in build 50).
    **Build 123** (Brian: "buttons for the gamepad so it can be used as well"): typing on the
    Qw/ST Pad too (`controls_tufty.PAD_TYPING`): the D-pad's up / down the letter, A or right
    keeps it, B or left goes back, + is done.
+   **Build 124** (Brian: "also build for the Pi version when using the game pad, plus for the
+   badge as an option"). The letter picker is the game's own now, `picker.py` (`LetterPicker`;
+   the Tufty's `dialog_tufty` just makes one). Where the game drives it (`driven`:
+   `ace._drive_picker`, from its controls): the joystick's up / down the letter (held, it
+   repeats), C or right keeps it, left goes back, A done, F cancels; while it is open the game
+   doesn't clear its controls (so holding works), only when it closes. The badge: Options >
+   TEXT ENTRY: BADGE / PICKER (`use_picker`, options.json "picker"; `platform_tildagon`'s
+   `picker_choice` and `text_dialog`); BADGE (its firmware dialog) stays the default. The Pi:
+   with the game pad used last (`platform_pi.pad_in_use`, from `run.Host.pad_last`) text entry
+   is the picker (pad: D-pad up / down, south or right keep, left back, Start done, east
+   cancel), with the keyboard its typing pages as before. Not yet on the badge.

@@ -367,6 +367,8 @@ class AceCommander(PLATFORM.App):
         self.jump_lit = False            # the last write was a jump flash
         self.jump_rgb = DUST_RGB         # their colour at full brightness
         self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
+        self.use_picker = False          # TEXT ENTRY: the letter picker (picker.py) rather than
+                                         # the badge's own dialog (build 124, an option)
         self.old_hardcore = False        # options.json's HARDCORE from before build 74
         self.own_ships = ORIGINAL_SHIPS  # DATA: OWN / ELITE, from the next start
         self.omenu = 0                   # the chosen line on the Options page
@@ -1684,6 +1686,8 @@ class AceCommander(PLATFORM.App):
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
         if self.platform.leds:
             items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))
+        if getattr(self.platform, "picker_choice", False):    # the badge: its own or the picker
+            items.append("TEXT ENTRY: " + ("PICKER" if self.use_picker else "BADGE"))
         if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose data, from the next start
             items.append("DATA: " + ("OWN" if self.own_ships else "ELITE")
                          + ("" if self.own_ships == ORIGINAL_SHIPS else " (RESTART)"))
@@ -1742,6 +1746,9 @@ class AceCommander(PLATFORM.App):
             if not self.use_leds:
                 self._leds_release()
             self._save_options()
+        elif item.startswith("TEXT ENTRY"):
+            self.use_picker = not self.use_picker
+            self._save_options()
 
     def _load_options(self):
         try:
@@ -1754,6 +1761,8 @@ class AceCommander(PLATFORM.App):
                 self.use_tilt = d["tilt"] and self.tilt_ok
             if isinstance(d.get("leds"), bool):
                 self.use_leds = d["leds"]
+            if isinstance(d.get("picker"), bool):
+                self.use_picker = d["picker"]
             k = d.get("tilt_flip")
             if isinstance(k, int) and not isinstance(k, bool) and 0 <= k < len(TILT_FLIPS):
                 self.tilt_flip = k
@@ -1774,7 +1783,7 @@ class AceCommander(PLATFORM.App):
         try:
             with open(options_path(), "w") as f:
                 f.write(json.dumps({"tilt": self.use_tilt, "tilt_flip": self.tilt_flip,
-                                    "leds": self.use_leds,
+                                    "leds": self.use_leds, "picker": self.use_picker,
                                     "practice_level": self.p_level,
                                     "practice_hardcore": self.p_hardcore,
                                     "own": self.own_ships, "egg": self.egg,
@@ -2613,6 +2622,8 @@ class AceCommander(PLATFORM.App):
         """True if a keyboard is fitted: its hexpansion's driver (KeyboardApp)
         is running, or its header names a keyboard; else if a keyboard key
         has been pressed."""
+        if getattr(self.platform, "pad_in_use", False):    # the Pi: its game pad used last
+            return False
         return self.platform.keyboard_fitted() or self.pad.keyboard
 
     def _names(self):
@@ -2649,6 +2660,7 @@ class AceCommander(PLATFORM.App):
         """While a search is open: True (it takes all the input)."""
         if self.tdialog is not None:
             dl = self.tdialog
+            driven = self._drive_picker(dl)
             found = self._names().matches(dl.text)
             dl.message = self._names().names[found[0]] if found else (
                 "NO MATCH" if dl.text else "FIND SYSTEM")
@@ -2657,7 +2669,8 @@ class AceCommander(PLATFORM.App):
                 self._found(None)
             elif r is not None:
                 self._found(found[0] if found else None)
-            self.pad.clear()        # the dialog has the buttons
+            if r is not None or not driven:
+                self.pad.clear()    # the dialog has the buttons (or the one that closed it)
             return True
         if self.finder is None:
             return False
@@ -2675,6 +2688,36 @@ class AceCommander(PLATFORM.App):
             self._found(f.chosen())
         elif cancel:
             self._found(None)
+        return True
+
+    def _drive_picker(self, dl):
+        """The letter picker (picker.py) on the game's own controls, where the
+        game drives it (the badge's TEXT ENTRY: PICKER, the Pi's pad): the
+        joystick's up / down the letter (held, it repeats), C or right keeps
+        it, left goes back, A is done, F cancels. False for any other dialog."""
+        if not getattr(dl, "driven", False):
+            return False
+        hit = self.pad.hit
+        held = self.pad.held
+        if hit("j_up"):
+            dl.press("UP")
+        elif hit("j_down"):
+            dl.press("DOWN")
+        elif hit("confirm") or hit("j_right"):
+            dl.press("B")
+        elif hit("j_left") or hit("k_BACKSPACE"):
+            dl.press("C")
+        elif hit("A"):
+            dl.press("A")
+        elif hit("cancel"):
+            dl.cancel()
+        ms = int(self.dt * 1000)
+        if held("j_up"):
+            dl.hold("UP", ms)
+        elif held("j_down"):
+            dl.hold("DOWN", ms)
+        else:
+            dl.let_go()
         return True
 
     def _open_name(self, current, done):
@@ -2702,13 +2745,15 @@ class AceCommander(PLATFORM.App):
         """While the name is being entered: True (it takes all the input)."""
         from . import find
         if self.ndialog is not None:
+            driven = self._drive_picker(self.ndialog)
             r = getattr(self.ndialog, "_result", None)
             if r is False:
                 self._name_entered(None)
             elif r is not None:
                 n = r.strip().upper()[:find.NAME_MAX]
                 self._name_entered(n or badge_name().upper()[:find.NAME_MAX])
-            self.pad.clear()        # the dialog has the buttons
+            if r is not None or not driven:
+                self.pad.clear()    # the dialog has the buttons (or the one that closed it)
             return True
         if self.namer is None:
             return False

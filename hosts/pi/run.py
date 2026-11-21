@@ -135,6 +135,7 @@ class Host:
         self.pad_last = False       # the pad was the last thing used
         self.log_keys = log_keys
         self.app = self.ace.AceCommander()
+        self.app.platform.host = self       # its text entry asks whether the pad is in use
         self.clock = pygame.time.Clock()
         self.running = True
         self.frames = 0
