@@ -142,7 +142,9 @@ Other devices are in `hosts/`: the Pi, and the Tufty 2350 since build 109 (`host
   `shape.custom([vec2, ...])`, one outline a call; pixel fonts picked by size), `host_tufty.py`
   and `app/__init__.py` (`run(update)`; Badgeware's names are builtins found by plain name, not
   `getattr(builtins)`). Saves in `/state/ace_commander/` (the app folder is read-only).
-  `build_tufty.py [--elite] [--copy /media/pi/TUFTY]` makes `build/tufty/ace_commander/`; copy it
+  `build_tufty.py [--elite] [--mpy] [--copy /media/pi/TUFTY]` makes `build/tufty/ace_commander/`
+  (`--mpy`: compiled with MicroPython 1.29's mpy-cross in `~/.local/share/venvs/mpycross129`,
+  not the badge's 1.28); a loading screen with a tumbling Kestrel, held 3 s; copy it
   with the TUFTY drive (`mpremote ... exec 'launch("/system/apps/mass_storage")'`, then
   `udisksctl unmount -b /dev/sda` and reset; stop any serial logger on the port first). Test:
   `hosts/tufty/tests/test_tufty_host.py` on strict v3 stand-ins (`sim_badgeware.py`).

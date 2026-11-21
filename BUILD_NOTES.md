@@ -1289,3 +1289,11 @@ what is now `ace.py` (renamed in build 50).
    8-11, HUD 31-33: the dashboard; almost no slow frames: ~8 MB of RAM). Not yet tried: the Pad
    in detail, saving and loading, search and name entry (no keyboard: the keyboard page can't
    be typed into with the Pad).
+   Then (Brian): a loading screen as the badge's (a module a frame, `host_tufty.STEPS`: the
+   name, a bar, the module, LOADING where the menu line will be; LOAD FAILED and the reason
+   instead of a crash), with one of the game's own ships tumbling on it (the Kestrel, from
+   `original_ships`, loaded second), held at least `LOAD_HOLD` (3 s) to see it.
+   `build_tufty.py --mpy` compiles every module but the two `__init__.py` with MicroPython
+   1.29's mpy-cross (mpy v6.3, as the Tufty's `sys.implementation._mpy` 7942; installed in
+   `~/.local/share/venvs/mpycross129`): 557 KB -> 215 KB, about 340 KB less on the TUFTY drive,
+   and the game loads in 1.5 s (a LOADED line on serial).

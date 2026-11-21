@@ -30,6 +30,22 @@ screen = bw.Screen()
 badge = bw.Badge()
 buttons = dict(bw.BUTTONS)
 h = host_tufty.Host(screen, badge, bw.color, bw.shape, bw.font, bw.rect, buttons, None, data)
+# the loading screen: a module a frame, the name and a bar drawn meanwhile
+assert h.app is None
+h.update()
+assert h.app is None and h.done == 1 and h.letters is not None
+h.update()
+screen.img.save(os.path.join(SHOTS, "tufty_loading.png"))
+px = screen.img.load()
+assert any(px[x, y] != (0, 0, 0) for x in range(80, 240, 2) for y in range(10, 60, 2)), "the name"
+for _ in range(len(host_tufty.STEPS)):
+    h.update()
+assert h.loaded is not None and h.app is None and h.error is None, h.error
+h.update()
+assert h.app is None, "held for LOAD_HOLD, to see the ship"
+h.t_load -= host_tufty.LOAD_HOLD
+h.update()
+assert h.app is not None, "then the game takes over"
 a = h.app
 assert a.platform.__class__ is platform_tufty.Platform, "the Tufty's platform"
 
