@@ -1247,3 +1247,15 @@ what is now `ace.py` (renamed in build 50).
    flight: 62-73 ms frames near the planet (from 104-117), slow frames 5-7 per 60 as in plain
    flight; he saw about 50 ms at half the AL gauge and 60 closer. Still in the game near the
    planet: space 15-28 ms, against 7.5 ms for the planet at the REPL (not yet explained).
+   **Build 107** (2026-11-21, the platform layer's step 4 finished). `Layout.dust_x`: how far
+   the stardust spreads (500 on the badge); `cockpit.draw_world` gives it to the game
+   (`Game.dust_x`, which `reset`, `enter` and `_rotate` use instead of the module's
+   `DUST_X`), so the Pi no longer overwrites `game.DUST_X` (`PiLayout.fit`: 800 at 384
+   wide). `Layout.leds`: False if no LEDs can be seen round the screen; `cockpit.draw_hud`
+   then shows being hit on the screen (the round HUD's red ring, or the layout's own: the
+   Pi's dashboard frame) whatever the device's LEDs do (`PiLayout`: True in the badge layout,
+   which draws the ring, False in the Elite one). The shared Elite dashboard waits for the
+   Tufty (step 5). Badge: all 59 frames pixel-identical. Seeded Pi frames: the stardust
+   starts at 500 wide until the first frame (it was 800 from the start), so the specks and
+   the random choices after them (the ships parked in the bay) differ. Not yet run on the
+   badge.

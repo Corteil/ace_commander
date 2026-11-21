@@ -55,7 +55,8 @@ Other devices are in `hosts/` (the Pi; the Tufty 2350 port is still its own repo
   Imported only when `config.platform` is None.
 - `layout.py` - how flight is laid out (build 105, platform layer step 4; imports nothing):
   `Layout` (the badge's: round 240 screen, all 3D view, the round HUD) with the view's and
-  tunnels' half sizes and `view` / `tunnel` / `hud` / `done`, which `cockpit.draw_world`,
+  tunnels' half sizes, `dust_x` (the stardust's spread: `Game.dust_x`), `leds` (False: being
+  hit shows on the screen) and `view` / `tunnel` / `hud` / `done`, which `cockpit.draw_world`,
   `draw_hud` and `draw_tunnel` call; a host sets `config.layout` (the Pi: `layout_pi.PiLayout`).
   Menus and docked screens stay on the 240 canvas.
 - `game.py` - game rules, including the star system (`Space`, `Game.enter`). No badge

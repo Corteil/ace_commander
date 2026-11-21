@@ -16,6 +16,8 @@ class PiLayout:
     view_hh = 120
     tunnel_hw = 120
     tunnel_hh = 120
+    dust_x = 500
+    leds = True             # the badge layout draws the ring round the screen
 
     def __init__(self, host, ck):
         self.host = host        # run.Host: the window, its scale and its layout
@@ -28,8 +30,12 @@ class PiLayout:
             self.view_hw = self.tunnel_hw = h.lw / 2.0
             self.view_hh = dash_pi.VIEW_H / 2.0
             self.tunnel_hh = 120
+            self.dust_x = int(500 * max(240.0, h.lw) / 240)     # across the wider view
+            self.leds = False   # no ring drawn: its dashboard flashes a red frame when hit
         else:
             self.view_hw = self.view_hh = self.tunnel_hw = self.tunnel_hh = 120
+            self.dust_x = 500
+            self.leds = True
 
     def view(self, ctx):
         h = self.host

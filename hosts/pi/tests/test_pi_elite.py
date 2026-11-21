@@ -83,7 +83,8 @@ dash = pygame.Rect(0, int(dash_pi.VIEW_H * s) + 4, 1920, int(dash_pi.DASH_H * s)
 view = pygame.Rect(0, 0, 1920, int(dash_pi.VIEW_H * s))
 assert lit(h.window, dash) > 400, "the dashboard draws"
 pygame.image.save(h.window, os.path.join(SHOTS, "elite_flight.png"))
-assert h.gm.DUST_X == 800, ("stardust across the wider view", h.gm.DUST_X)
+assert h.flight.dust_x == 800 and h.gm.DUST_X == 500, ("stardust across the wider view", h.flight.dust_x)
+assert g.dust_x == 800, ("the game takes the layout's spread", g.dust_x)
 print("flight: view over the dashboard: ok")
 
 # the dashboard follows the game: RL with the stick, the energy banks with the hull

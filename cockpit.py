@@ -1020,6 +1020,7 @@ def draw_world(ctx, g):
     lay.view(ctx)
     VIEW_HW = lay.view_hw
     VIEW_HH = lay.view_hh
+    g.dust_x = lay.dust_x       # the stardust spreads across this view (game.py)
     _world(ctx, g)
 
 
@@ -1717,6 +1718,8 @@ def draw_hud(ctx, g, ms=None, ring=True):
     back to the 240 canvas for the pause menu."""
     global VIEW_HW, VIEW_HH
     lay = _layout()
+    if not lay.leds:            # no LEDs to be seen: show being hit on the screen
+        ring = True
     try:
         if not lay.hud(ctx, g, ms, ring):
             _hud(ctx, g, ms, ring)

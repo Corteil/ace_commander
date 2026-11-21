@@ -62,10 +62,11 @@ Steps, each a small PR with the badge's behaviour unchanged:
    `TextDialog` (registered to the loader host), hexpansion keyboard detection, `settings`
    (badge name), the scheduler frame loop: moved out of `ace.py`, not rewritten. `ace.py` loses
    its firmware imports; `app.py` (the loader) still imports module by module.
-4. **Layout object for drawing. Started 2026-11-21 (build 105: `layout.py`, `config.layout`,
-   the Pi's `layout_pi.PiLayout` instead of its drawing hooks, `Game.stick_pitch` /
-   `stick_roll` instead of wrapping `Game.step`). Still to do: `DUST_X` (the Pi sets
-   `game.DUST_X`), the shared Elite dashboard (with the Tufty, step 5) and a hit signal.** Screen size and shape, view rectangle, which HUD (round badge,
+4. **Layout object for drawing. Done 2026-11-21 (builds 105 and 107: `layout.py`,
+   `config.layout`, the Pi's `layout_pi.PiLayout` instead of its drawing hooks,
+   `Game.stick_pitch` / `stick_roll` instead of wrapping `Game.step`, `Layout.dust_x` instead
+   of the Pi setting `game.DUST_X`, `Layout.leds` for the hit signal). The shared Elite
+   dashboard moves to step 5, with the Tufty.** Screen size and shape, view rectangle, which HUD (round badge,
    Elite dashboard), line thickness, draw distance. `draw_hud` asks the layout instead of hosts
    replacing functions. Menus and docked screens stay on the 240-unit canvas (they work centred
    on any screen). One shared Elite dashboard for the Pi and the Tufty (merge `dash_pi.py` and
