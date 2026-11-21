@@ -77,7 +77,7 @@ def frames(n=1):
 
 def press(name, n=2):
     badge.down.add(buttons[name])
-    frames(1)
+    frames(3)               # (in flight B alone waits PAIR_WAIT ms for a partner)
     badge.down.discard(buttons[name])
     frames(n)
 
@@ -112,7 +112,7 @@ assert a.choices() == ["COMBAT PRACTICE"], a.choices()
 assert not any(l.startswith("GAMEPAD") for l in a._cheats("DISPLAY", False)), "no Pad found: no line"
 cfg = sys.modules["ace_commander.config"]
 assert cfg.auto_missiles and cfg.practice_missile == 1.0, "missiles by themselves, in every canister"
-assert h.ctx.labels == {"C": "B", "F": "A+C", "E": "UP+DOWN"}, "the hints name the Tufty's buttons"
+assert h.ctx.labels == {"C": "B"}, "off the flight the hints name the Tufty's B, no pairs"
 press("B")
 assert a.mode == "practice", a.mode
 press("B")
@@ -132,20 +132,21 @@ assert g.stick_roll != 0.0, "A rolls"
 badge.down.discard(buttons["A"])
 g.heat = 0.0
 badge.down.add(buttons["B"])
-frames(2)
+frames(3)                   # (in flight B alone waits PAIR_WAIT ms for a partner)
 assert g.beam > 0, "B fires"
 badge.down.discard(buttons["B"])
 frames(2)
+assert h.ctx.labels == {"C": "B", "F": "B+C", "E": "A+B"}, "in flight the hints name the pairs"
 s0 = g.speed
-badge.down.add(buttons["A"]); badge.down.add(buttons["C"])
+badge.down.add(buttons["B"]); badge.down.add(buttons["C"])
 frames(10)
-badge.down.discard(buttons["A"]); badge.down.discard(buttons["C"])
-assert g.speed > s0 + 1, ("A + C together: faster", s0, g.speed)
+badge.down.discard(buttons["B"]); badge.down.discard(buttons["C"])
+assert g.speed > s0 + 1, ("B + C together: faster", s0, g.speed)
 s1 = g.speed
-badge.down.add(buttons["UP"]); badge.down.add(buttons["DOWN"])
+badge.down.add(buttons["A"]); badge.down.add(buttons["B"])
 frames(10)
-badge.down.discard(buttons["UP"]); badge.down.discard(buttons["DOWN"])
-assert g.speed < s1 - 1, ("UP + DOWN together: slower", s1, g.speed)
+badge.down.discard(buttons["A"]); badge.down.discard(buttons["B"])
+assert g.speed < s1 - 1, ("A + B together: slower", s1, g.speed)
 frames(2)
 shot("tufty_practice")
 print("Tufty buttons alone: combat practice only, cursor keys, joystick, B fires: ok")

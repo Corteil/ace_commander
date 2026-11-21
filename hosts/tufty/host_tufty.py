@@ -71,6 +71,8 @@ class Host:
         self.buttons = buttons
         self.pad = pad
         self.real_pad = pad     # the Pad found at start (DEBUG > GAMEPAD can switch it off)
+        self.b_since = None     # when B went down alone (PAIR_WAIT), on self.clock
+        self.clock = 0          # ms of frames so far (the frame times update() is given)
         self.data_dir = data_dir
         self.feed = controls_tufty.Feed()
         self.ctx = Ctx(screen, color, shape, font, SCREEN_W // 2, SCREEN_H // 2)
@@ -95,11 +97,25 @@ class Host:
         for name, const in self.buttons.items():
             if b.held(const):
                 held.add(name)
-        for one, two, key in controls_tufty.PAIRS:     # two together: speed (and back)
+        a = self.app
+        flying = a is not None and a.mode == "flight" and not a.paused
+        self.ctx.labels = controls_tufty.LABELS if flying else controls_tufty.LABELS_OFF
+        paired = False
+        for one, two, key in (controls_tufty.PAIRS if flying else ()):  # in flight: speed
             if one in held and two in held:
                 keys.add(key)
                 held.discard(one)
                 held.discard(two)
+                paired = True
+        # B is in both pairs: alone, it waits PAIR_WAIT ms for a partner before it
+        # counts (so a pair pressed a little unevenly doesn't fire or select first)
+        if flying and "B" in held and not paired:
+            if self.b_since is None:
+                self.b_since = self.clock
+            if self.clock - self.b_since < controls_tufty.PAIR_WAIT:
+                held.discard("B")
+        elif "B" not in held:
+            self.b_since = None
         for name in held:
             keys.add(m[name])
         if self.pad is not None:
@@ -227,6 +243,7 @@ class Host:
             ms = 1
         elif ms > 100:
             ms = 100
+        self.clock += ms
         self.feed.set_held(self._held())
         self.app.update(ms)
         if self.app.platform.quit:

@@ -1361,3 +1361,9 @@ what is now `ace.py` (renamed in build 50).
    auto missiles, a missile in every canister: `host_tufty.set_gamepad` / `_alone`; in a
    flight at once), ON as with it. `/state/ace_commander/debug.txt` made on the Tufty, so its
    DEBUG menu shows (`ace._debug_wanted`); that folder already held its save and options.
+   **Build 116** (2026-11-21, Brian: "change the speed on the Tufty: A+B to slow down and B+C
+   to speed up", "only in flight mode"). `controls_tufty.PAIRS`: A + B the badge's E (slower),
+   B + C its F (faster), in flight only (not paused); off the flight every button counts at
+   once, alone. In flight B alone waits `PAIR_WAIT` (60 ms, on the host's frame clock) for its
+   partner, so an uneven pair doesn't fire first. The hints: `LABELS` in flight (C is B, F is
+   B+C, E is A+B), `LABELS_OFF` off it (C is B).
