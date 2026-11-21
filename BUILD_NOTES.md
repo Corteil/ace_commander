@@ -1257,5 +1257,21 @@ what is now `ace.py` (renamed in build 50).
    which draws the ring, False in the Elite one). The shared Elite dashboard waits for the
    Tufty (step 5). Badge: all 59 frames pixel-identical. Seeded Pi frames: the stardust
    starts at 500 wide until the first frame (it was 800 from the start), so the specks and
-   the random choices after them (the ships parked in the bay) differ. Not yet run on the
-   badge.
+   the random choices after them (the ships parked in the bay) differ. Played by Brian on the
+   badge (as .mpy): fine.
+   **Build 108** (2026-11-21, Brian: "a stutter in the space dust", "more notable at speed").
+   Not build 107 (the stardust moves identically to 106, checked frame by frame on a PC).
+   A diagnostic noting memory in use on every slow PERF frame showed all of them were
+   collections (each right after one: ~452 KB in use, climbing to 470-510 between). The
+   badge's heap grows only when a collection can't free enough and hands back empty areas
+   (MicroPython's split heap), so with the game's ~450 KB it had ~60 KB of room: a 100-150 ms
+   collection every 10-15 frames, the stardust jumping furthest at speed. A try that moved
+   the game on by only an average frame after a long one ("no catch-up") didn't help and was
+   dropped. `platform_tildagon.Platform._grow_heap`, once at start: if the heap has under
+   `HEAP_ROOM` (512 KB) free and the system would keep `SYSTEM_KEEP` (300 KB), it allocates
+   16 KB chunks until one makes the firmware add an area (seen as the system's largest
+   free block shrinking), keeps that chunk as an anchor so the area isn't handed back, and
+   lets the rest go. Prints a HEAP line with the PERF lines. On the badge: "HEAP 499 KB, 71
+   free, system 1344: grown, now 558 free, system 848"; slow frames 0-1 per 60 (from 5-7),
+   average frame 40-53 ms (from 46-58), each collection 165-180 ms, every ~4-5 s. Brian: the
+   stutter is much better and the frame rate improved. The release is unchanged in files.
