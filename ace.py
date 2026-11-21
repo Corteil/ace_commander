@@ -790,6 +790,9 @@ class AceCommander(PLATFORM.App):
             self.game = g = game.Game(SHIPS, level)
             self.banked = 0
             self.banked_cash = 0
+        g.auto_missile = config.auto_missiles       # a device with no missile button
+        if config.practice_missile is not None:
+            g.pickup_missile = config.practice_missile
         elif g.over or career != self.career or g.level != level \
                 or (not career and g.rules.hardcore != self.p_hardcore):   # practice: HARDCORE changed
             g.set_level(level)

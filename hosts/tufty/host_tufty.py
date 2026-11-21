@@ -89,7 +89,7 @@ class Host:
     def _held(self):
         keys = set()
         b = self.badge
-        m = controls_tufty.TUFTY_MAP if self.pad is not None else controls_tufty.ALONE
+        m = controls_tufty.TUFTY
         for name, const in self.buttons.items():
             if b.held(const):
                 keys.add(m[name])
@@ -135,7 +135,11 @@ class Host:
         elif name == "config":
             _mkdirs(self.data_dir)
             m.data_dir = self.data_dir
-            m.practice_only = self.pad is None      # the five buttons alone: practice only
+            alone = self.pad is None    # the five buttons alone (Brian, builds 111-112):
+            m.practice_only = alone     # only combat practice,
+            m.auto_missiles = alone     # missiles by themselves (no missile button)
+            m.practice_missile = 1.0 if alone else None     # and one in every canister
+            self.ctx.labels = controls_tufty.LABELS if alone else None  # hints: Tufty's buttons
             m.platform = platform_tufty
             m.input = self.feed.attach
         elif name == "cockpit":

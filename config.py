@@ -20,6 +20,10 @@ title_quit = False      # a QUIT line on the title screen (the badge has F to le
 title_cancel = True     # cancel (F, Esc) on the title screen leaves the game
 practice_only = False   # the title screen offers only COMBAT PRACTICE (a device with too
                         # few buttons for the rest: the Tufty without its Pad; build 111)
+auto_missiles = False   # a missile goes as soon as a ship is locked, one a ship (no missile
+                        # button: the Tufty without its Pad; build 112)
+practice_missile = None # how often a scooped canister in combat practice holds a missile
+                        # too (None: game.PICKUP_MISSILE; build 112)
 wire_min = 8.0          # ships that look smaller than this (pixels) are drawn as a marker
 
 # the game's input (platform layer, step 2): None on the badge, where

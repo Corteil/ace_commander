@@ -52,6 +52,7 @@ class Ctx:
         self._cx = 0.0
         self._cy = 0.0
         self._stack = []
+        self.labels = None      # {"C": "B", ...}: the hints' badge letters renamed (relabel)
         self._fonts = []
         for size, name in FONTS:
             f = getattr(font, name, None)
@@ -206,6 +207,8 @@ class Ctx:
 
     def text(self, s):
         s = str(s)
+        if self.labels:
+            s = relabel(s, self.labels)
         f = self._pick_font()
         scr = self.screen
         if f is not None and f is not self._font:
@@ -231,3 +234,31 @@ class Ctx:
 def _builtin_vec2():
     import builtins
     return builtins.vec2
+
+
+_relabelled = {}
+
+
+def relabel(s, labels):
+    """s with the badge's button letters in its hints named as labels has them
+    ("C: again   F: title screen" -> "B: again   HOME: title screen"): a letter
+    A-F standing alone before a ':' or a '/' (as in "C/D: buy"). Other text is
+    left alone. MicroPython's re has no lookbehind, so a scan; cached."""
+    key = (s, id(labels))
+    out = _relabelled.get(key)
+    if out is not None:
+        return out
+    parts = []
+    n = len(s)
+    for i in range(n):
+        ch = s[i]
+        if (ch in labels and (i == 0 or not s[i - 1].isalpha()) and i + 1 < n
+                and s[i + 1] in ":/"):
+            parts.append(labels[ch])
+        else:
+            parts.append(ch)
+    out = "".join(parts)
+    if len(_relabelled) > 300:
+        _relabelled.clear()
+    _relabelled[key] = out
+    return out

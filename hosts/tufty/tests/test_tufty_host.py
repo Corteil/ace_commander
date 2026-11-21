@@ -82,6 +82,13 @@ def press(name, n=2):
     frames(n)
 
 
+def pad_press(name, n=2):
+    h.pad.down.add(name)
+    frames(1)
+    h.pad.down.discard(name)
+    frames(n)
+
+
 def shot(name):
     screen.img.save(os.path.join(SHOTS, name + ".png"))
 
@@ -102,11 +109,15 @@ def lit(x0, y0, x1, y1):
 h, a, data = make(None)
 frames(5)
 assert a.choices() == ["COMBAT PRACTICE"], a.choices()
+cfg = sys.modules["ace_commander.config"]
+assert cfg.auto_missiles and cfg.practice_missile == 1.0, "missiles by themselves, in every canister"
+assert h.ctx.labels == {"C": "B", "F": "HOME"}, "the hints name the Tufty's buttons"
 press("B")
 assert a.mode == "practice", a.mode
 press("B")
 assert a.mode == "flight", a.mode
 g = a.game
+assert g.auto_missile and g.pickup_missile == 1.0
 g.spawn_t = g.rock_t = 1e9
 frames(3)
 m0 = list(g.space.station.m) if g.space and g.space.station else None
@@ -133,17 +144,16 @@ h, a, data = make(pad)
 frames(5)
 assert a.mode == "menu" and lit(0, 0, 320, 240) > 200, "the title draws"
 shot("tufty_title")
-# NEW COMMANDER: C chooses (the Tufty's C is the badge's C), C again on its page
-choose = a.choices().index("NEW COMMANDER")
-for _ in range(choose):
-    press("DOWN")       # the Tufty's DOWN is the badge's E: left, the line before...
-a.menu = choose         # (moving lines with E / F wraps; set it to be sure)
-press("C")
-press("C")
+assert "NEW COMMANDER" in a.choices() and not a.ctx_labels if hasattr(a, "ctx_labels") else True
+assert h.ctx.labels is None, "with the Pad the hints keep the badge's letters"
+# NEW COMMANDER: the Tufty's B selects (the badge's C), as without the Pad
+a.menu = a.choices().index("NEW COMMANDER")
+press("B")
+press("B")
 assert a.mode == "docked", a.mode
 assert h.ace.SAVE_PATH.startswith(data) and os.path.exists(h.ace.SAVE_PATH), "saved in the data folder"
 shot("tufty_docked")
-press("A")              # A launches
+pad_press("+")          # the Pad's + is the badge's A: launch
 for _ in range(200):
     frames(1)
     if a.mode == "flight":

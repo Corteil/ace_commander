@@ -71,6 +71,7 @@ MISSILE_DAMAGE = 150.0
 JUMP_COUNT = 5.0           # seconds of countdown before a hyperspace jump
 WARP_TIME = 1.2            # seconds the streaks last on arriving
 LOCK_TIME = 2.0            # seconds a ship must stay in the sights before a missile locks
+AUTO_LOCK_TIME = 4.0   # the lock with auto_missile (no missile button: Brian, build 112)
 MISSILE_SPEED = 1100.0     # world units per second
 PMISSILE_SPEED = 1700.0
 TURN_RATE = 1.1            # how fast enemy ships can turn, radians per second
@@ -729,6 +730,10 @@ class Game:
         self.lock_t = 0.0      # how long it has been there
         self.locked = False    # long enough: a missile can be fired at it
         self.armed = False     # Hardcore: a missile is armed (see arm_missile)
+        if not hasattr(self, "auto_missile"):
+            self.auto_missile = False   # fire one at each ship once it is locked (ace sets it)
+            self.pickup_missile = PICKUP_MISSILE    # practice canisters' missile odds (ace sets it)
+        self.auto_done = None  # the last ship auto_missile fired at
         self.jump_t = 0.0      # > 0 while the hyperspace countdown runs
         self.warp = 0.0        # > 0 while the streaks of a jump are drawn
         self.jumped = False    # set when a jump happens; whoever started it clears it
@@ -1912,7 +1917,7 @@ class Game:
         sometimes holds a missile too (while there is room on the rack)."""
         self.shield = 100.0
         if (self.missile_bp and self.missiles < self.max_missiles
-                and random.random() < PICKUP_MISSILE):
+                and random.random() < self.pickup_missile):
             self.missiles += 1
             self.say("MISSILE + SHIELDS")
         else:
@@ -1962,7 +1967,7 @@ class Game:
                 self.locked = False
             elif not self.locked:
                 self.lock_t += dt
-                if self.lock_t >= LOCK_TIME:
+                if self.lock_t >= (AUTO_LOCK_TIME if self.auto_missile else LOCK_TIME):
                     self.locked = True
 
         if fire and self.laser is None:
@@ -2004,6 +2009,11 @@ class Game:
                 if best.energy <= 0:
                     self._kill(best, self.laser == "mining")
 
+        if (self.auto_missile and self.locked and self.missiles > 0 and self.lock is not None
+                and self.lock is not self.auto_done and not self.lock.dead
+                and not fire and self.beam <= 0):
+            missile = True      # no missile button: one goes at each locked ship, once the
+            self.auto_done = self.lock      # laser has stopped (Brian, build 112)
         if missile and self.missiles > 0:
             t = self.lock
             if self.rules.missile_lock_required and not self.armed:

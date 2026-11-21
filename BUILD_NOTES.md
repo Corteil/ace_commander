@@ -1317,3 +1317,16 @@ what is now `ace.py` (renamed in build 50).
    (new, off on the badge and the Pi) leaves only COMBAT PRACTICE on the title screen
    (`ace.choices`). With a Pad, everything as before. Test: both, in
    `hosts/tufty/tests/test_tufty_host.py`. On the Tufty, not yet tried by Brian.
+   **Build 112** (2026-11-21, Brian: "the buttons should be the same for both modes, the labels
+   need renaming in badge only mode, auto missiles and more drops of missiles", then "the lock
+   time should be increased and if the laser is firing the launch is delayed"). The Tufty's
+   buttons are always `controls_tufty.TUFTY` (A / C / UP / DOWN the joystick, B the badge's C),
+   Pad or not. Without the Pad the host also sets `config.auto_missiles` (new: `Game.auto_missile`
+   fires one missile at each ship once locked, after `AUTO_LOCK_TIME` 4 s rather than
+   `LOCK_TIME` 2 s, and not while the laser fires: it goes when you let go) and
+   `config.practice_missile` 1.0 (new: `Game.pickup_missile`, every scooped canister in combat
+   practice holds a missile; `PICKUP_MISSILE` 0.5 otherwise), and the hints name the Tufty's
+   buttons (`ctx_tufty.relabel`, `controls_tufty.LABELS`: C is B, F is HOME). All off on the
+   badge and the Pi. `tests/test_install.py` now writes the release as ustar, as `git archive`
+   does (Python's default PAX added ~40 KB and tipped it past its 600 KB bar: the release is
+   573 KB). Equipment upgrades for practice: to think about (Brian).

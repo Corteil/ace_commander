@@ -522,4 +522,39 @@ finally:
     cockpit.draw_ship = real
 assert [c for c in calls if c[0] is st][0][1] == cockpit.WIRE_MIN, "the cockpit view as before"
 print("builds 46, 48: the station a wireframe at any distance, to scale, in the docking computer's view: ok")
+
+# ---- auto missiles (build 112: a device with no missile button) ---------------------
+g = fresh(21)
+g.auto_missile = True
+g.missiles = 4
+t = put(g, "SIDEWINDER", "ship", 0, 0, 3000)
+t.speed = 0.0
+for _ in range(int(3.5 / DT)):        # in the sights 3.5 s: not yet locked (AUTO_LOCK_TIME 4)
+    t.x, t.y, t.z = 0.0, 0.0, 3000.0
+    g.step(DT, 0.0, 0.0, 0.0, False, False)
+assert not g.locked and g.missiles == 4, "the longer lock with auto missiles"
+for _ in range(int(1.0 / DT)):        # locked now, but the laser is firing: it waits
+    t.x, t.y, t.z = 0.0, 0.0, 3000.0
+    t.energy = 1e9
+    g.heat = 0.0
+    g.step(DT, 0.0, 0.0, 0.0, True, False)
+assert g.locked and g.missiles == 4, ("no launch while the laser fires", g.locked, g.missiles)
+for _ in range(int(0.6 / DT)):        # the laser stops: one missile goes
+    t.x, t.y, t.z = 0.0, 0.0, 3000.0
+    g.step(DT, 0.0, 0.0, 0.0, False, False)
+assert g.missiles == 3, ("one launch once the laser stops", g.missiles)
+for _ in range(int(1.0 / DT)):        # and only one at that ship
+    t.x, t.y, t.z = 0.0, 0.0, 3000.0
+    g.step(DT, 0.0, 0.0, 0.0, False, False)
+assert g.missiles == 3, ("only one a ship", g.missiles)
+g2 = fresh(22)
+assert not g2.auto_missile, "off unless a host asks"
+t2 = put(g2, "SIDEWINDER", "ship", 0, 0, 3000)
+t2.speed = 0.0
+for _ in range(int(5.0 / DT)):
+    t2.x, t2.y, t2.z = 0.0, 0.0, 3000.0
+    g2.step(DT, 0.0, 0.0, 0.0, False, False)
+assert g2.locked and g2.missiles == game.MAX_MISSILES, "without it nothing fires by itself"
+print("auto missiles: a longer lock, wait for the laser, one a ship: ok")
+
 print("ALL EQUIPMENT EFFECT TESTS PASSED")

@@ -27,15 +27,16 @@ class Key:
 BADGE = {c: Key(c, (_DIRECTION[c], c)) for c in "ABCDEF"}
 STICK = {n: Key("JOY" + n, (n.lower(), "j_" + n.lower())) for n in ("UP", "DOWN", "LEFT", "RIGHT")}
 STICK["SELECT"] = Key("JOYSELECT", ("confirm",))
-# the badge button each Tufty button stands for (its five: A, B, C, UP, DOWN), with
-# a Pad plugged in (the Pad then does the steering and the rest)
-TUFTY_MAP = {"A": BADGE["A"], "B": BADGE["B"], "C": BADGE["C"], "UP": BADGE["F"], "DOWN": BADGE["E"]}
-# without a Pad (Brian, build 111): the five buttons alone, and only combat practice
-# (config.practice_only). A / C / UP / DOWN are the joystick: cursor keys off the
-# flight (A left, C right), steering in flight; B is the badge's C: select off
-# the flight, fire in flight
-ALONE = {"A": STICK["LEFT"], "C": STICK["RIGHT"], "UP": STICK["UP"], "DOWN": STICK["DOWN"],
+# the Tufty's five buttons, with or without the Pad (Brian, builds 111-112): A / C /
+# UP / DOWN are the joystick, cursor keys off the flight (A left, C right) and the
+# steering in flight; B is the badge's C, select off the flight and fire in flight.
+# Without the Pad only combat practice is offered (config.practice_only), missiles go
+# by themselves (config.auto_missiles) and the hints name these buttons (LABELS)
+TUFTY = {"A": STICK["LEFT"], "C": STICK["RIGHT"], "UP": STICK["UP"], "DOWN": STICK["DOWN"],
          "B": BADGE["C"]}
+# the hints' badge letters, named as the Tufty's buttons alone have them (ctx_tufty):
+# C is B; F (back, leave) is the HOME button, which leaves for the launcher
+LABELS = {"C": "B", "F": "HOME"}
 # and each Qw/ST Pad button (qwstpad's names): the D-pad is the joystick
 PAD_MAP = {"U": STICK["UP"], "D": STICK["DOWN"], "L": STICK["LEFT"], "R": STICK["RIGHT"],
            "A": BADGE["C"], "B": BADGE["D"], "X": BADGE["F"], "Y": BADGE["E"],
