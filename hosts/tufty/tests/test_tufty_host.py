@@ -129,9 +129,9 @@ g.spawn_t = g.rock_t = 1e9
 frames(3)
 m0 = list(g.space.station.m) if g.space and g.space.station else None
 badge.down.add(buttons["UP"])
-frames(5)
-badge.down.discard(buttons["UP"])
+frames(5)                   # (alone, UP waits PAIR_WAIT ms for DOWN)
 assert g.stick_pitch != 0.0, "UP steers (the joystick)"
+badge.down.discard(buttons["UP"])
 badge.down.add(buttons["A"])
 frames(3)
 assert g.stick_roll != 0.0, "A rolls"
@@ -170,6 +170,16 @@ badge.down.add(buttons["UP"])
 frames(3)
 badge.down.discard(buttons["UP"])
 assert g.stick_pitch != 0.0, "UP pitches again"
+badge.down.add(buttons["UP"]); badge.down.add(buttons["DOWN"])     # UP + DOWN: the pause menu
+frames(3)
+badge.down.discard(buttons["UP"]); badge.down.discard(buttons["DOWN"])
+frames(2)
+assert a.paused, "UP + DOWN opens the pause menu"
+badge.down.add(buttons["UP"]); badge.down.add(buttons["DOWN"])
+frames(3)
+badge.down.discard(buttons["UP"]); badge.down.discard(buttons["DOWN"])
+frames(2)
+assert not a.paused, "and closes it"
 frames(2)
 shot("tufty_practice")
 print("Tufty buttons alone: combat practice only, cursor keys, joystick, B fires: ok")

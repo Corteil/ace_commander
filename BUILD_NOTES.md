@@ -1381,3 +1381,9 @@ what is now `ace.py` (renamed in build 50).
    buttons"): a toggle, not a shift. In flight each press of A + C switches UP / DOWN between
    pitch and speed (`host_tufty.speed_mode`; "UP/DOWN: SPEED" / "UP/DOWN: PITCH" said), staying
    so once let go; a new flight starts in pitch. Off the flight A + C is back.
+   **Build 120** (Brian: "both up/down need to be held for the pause menu"): in flight, paused
+   or not, UP + DOWN held is the badge's A (`controls_tufty.MENU_PAIR`, `MENU`): the pause menu,
+   and closing it; UP or DOWN alone waits `PAIR_WAIT` there. In the menu UP / DOWN move, B
+   chooses, A + C goes back. (Brian also saw the Pad still working in the menus with DEBUG >
+   GAMEPAD off; on the PC stand-in the Pad isn't read at all once off, and Badgeware doesn't
+   read the Pad by itself: not yet explained.)

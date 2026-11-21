@@ -103,6 +103,12 @@ class Host:
         a = self.app
         flying = a is not None and a.mode == "flight" and not a.paused
         self.ctx.labels = controls_tufty.LABELS if flying else controls_tufty.LABELS_OFF
+        in_flight = a is not None and a.mode == "flight"    # paused or not
+        up, down = controls_tufty.MENU_PAIR
+        if in_flight and up in held and down in held:     # UP + DOWN: the pause menu
+            keys.add(controls_tufty.MENU)
+            held.discard(up)
+            held.discard(down)
         one, two = controls_tufty.SHIFT
         both = one in held and two in held
         if a is None or a.game is not self.speed_game:  # a new flight: UP / DOWN pitch again
@@ -122,9 +128,9 @@ class Host:
                 if name in held:
                     keys.add(key)
                     held.discard(name)
-        # A or C held alone waits PAIR_WAIT ms for the other (on the frame clock)
+        # A or C (and in flight UP or DOWN) held alone waits PAIR_WAIT ms for its partner
         waits = self.waits
-        for name in (one, two):
+        for name in ((one, two, up, down) if in_flight else (one, two)):
             if name in held:
                 if name not in waits:
                     waits[name] = self.clock

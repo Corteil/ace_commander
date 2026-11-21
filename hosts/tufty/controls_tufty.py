@@ -42,6 +42,10 @@ TUFTY = {"A": STICK["LEFT"], "C": STICK["RIGHT"], "UP": STICK["UP"], "DOWN": STI
 SHIFT = ("A", "C")
 SHIFTED = {"UP": BADGE["F"], "DOWN": BADGE["E"]}    # in flight, in speed mode
 BACK = BADGE["F"]                                   # off the flight, A + C
+# UP + DOWN held together in flight (Brian, build 120): the badge's A, the pause menu
+# (open, and close again from inside it); UP or DOWN alone waits PAIR_WAIT ms there too
+MENU_PAIR = ("UP", "DOWN")
+MENU = BADGE["A"]
 PAIR_WAIT = 60
 # the hints' badge letters named as the Tufty's buttons (ctx_tufty), Pad or not
 LABELS = {"C": "B"}         # (in flight A + C switches UP / DOWN: the game says which)
