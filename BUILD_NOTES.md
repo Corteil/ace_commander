@@ -1207,4 +1207,5 @@ what is now `ace.py` (renamed in build 50).
    so the ring is never drawn along the cut); the largest coordinate in a 1500-position sweep
    is now 590. And (Brian) the altitude gauge near the planet: within `PLANET_GAUGE_ALT` (1)
    radius of its surface, AL alone, centred under the frame time (Brian), full at 1 radius, red in its last
-   tenth (`_planet_gauge`).
+   tenth (`_planet_gauge`). Played by Brian on the badge (as .mpy): all working, no colour
+   swap, frame time about 50-56 ms near the planet.
