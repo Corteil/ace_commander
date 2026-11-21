@@ -791,7 +791,7 @@ class AceCommander(PLATFORM.App):
             self.game = g = game.Game(SHIPS, level)
             self.banked = 0
             self.banked_cash = 0
-        g.auto_missile = config.auto_missiles       # a device with no missile button
+        g.auto_missile = config.auto_missiles and not career    # no missile button: practice
         g.practice_upgrades = config.practice_upgrades and not career
         if config.practice_missile is not None:
             g.pickup_missile = config.practice_missile
@@ -2262,7 +2262,7 @@ class AceCommander(PLATFORM.App):
             self.show_ms = not self.show_ms
         elif item.startswith("GAMEPAD"):
             self.platform.set_gamepad(not self.platform.gamepad)
-            g.auto_missile = config.auto_missiles       # at once, in this flight too
+            g.auto_missile = config.auto_missiles and not self.career  # at once, this flight too
             if config.practice_missile is not None:
                 g.pickup_missile = config.practice_missile
             else:

@@ -196,10 +196,14 @@ assert h.ctx.labels is not None, "with the Pad too the hints name the Tufty's bu
 assert any(l.startswith("GAMEPAD: ON") for l in a._cheats("DISPLAY", False)), a._cheats("DISPLAY", False)
 a._odebug("GAMEPAD: ON")
 cfg = sys.modules["ace_commander.config"]
-assert h.pad is None and cfg.practice_only and cfg.auto_missiles and a.choices() == ["COMBAT PRACTICE"]
+assert h.pad_off and cfg.auto_missiles and not cfg.practice_only and "NEW COMMANDER" in a.choices(), \
+    "GAMEPAD OFF: practice as without the Pad; the Pad and the whole game still off the flight"
 assert any(l.startswith("GAMEPAD: OFF") for l in a._cheats("DISPLAY", False))
+pad.down.add("D"); frames(3); pad.down.discard("D"); frames(2)
+assert a.menu == 1, ("the Pad still works on the title screen", a.menu)
+a.menu = 0
 a._odebug("GAMEPAD: OFF")
-assert h.pad is pad and not cfg.practice_only and not cfg.auto_missiles and "NEW COMMANDER" in a.choices()
+assert not h.pad_off and not cfg.auto_missiles and "NEW COMMANDER" in a.choices()
 # NEW COMMANDER: the Tufty's B selects (the badge's C), as without the Pad
 a.menu = a.choices().index("NEW COMMANDER")
 press("B")

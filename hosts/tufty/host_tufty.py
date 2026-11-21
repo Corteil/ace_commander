@@ -70,7 +70,8 @@ class Host:
         self.rect = rect
         self.buttons = buttons
         self.pad = pad
-        self.real_pad = pad     # the Pad found at start (DEBUG > GAMEPAD can switch it off)
+        self.real_pad = pad     # the Pad found at start
+        self.pad_off = False    # DEBUG > GAMEPAD OFF: the Pad ignored in combat practice
         self.waits = {}         # button -> when it went down alone (PAIR_WAIT), on self.clock
         self.speed_mode = False     # in flight, UP / DOWN change speed (A + C toggles it)
         self.speed_game = None      # the flight it was set in
@@ -141,7 +142,8 @@ class Host:
                 del waits[name]     # let go: the next press waits afresh
         for name in held:
             keys.add(m[name])
-        if self.pad is not None:
+        practising = a is not None and a.mode == "flight" and not a.career
+        if self.pad is not None and not (self.pad_off and practising):  # (GAMEPAD OFF: practice)
             try:
                 for k, v in self.pad.read_buttons().items():
                     if v and k in controls_tufty.PAD_MAP:
@@ -208,10 +210,15 @@ class Host:
         config.practice_missile = 1.0 if alone else None    # and one in every canister
 
     def set_gamepad(self, on):
-        """DEBUG > DISPLAY > GAMEPAD: use the Pad, or play as without it."""
+        """DEBUG > DISPLAY > GAMEPAD (Brian, builds 115, 121): OFF plays combat
+        practice as without the Pad (its buttons ignored there, missiles by
+        themselves, one in every canister); the Pad still works everywhere
+        else, and the whole game stays on the title screen."""
         on = bool(on) and self.real_pad is not None
-        self.pad = self.real_pad if on else None
-        self._alone(_module("config"), not on)
+        self.pad_off = not on
+        config = _module("config")
+        config.auto_missiles = not on               # (practice only: ace)
+        config.practice_missile = None if on else 1.0
         if self.app is not None or self.loaded is not None:
             (self.app or self.loaded).platform.gamepad = on
 

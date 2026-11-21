@@ -1384,6 +1384,9 @@ what is now `ace.py` (renamed in build 50).
    **Build 120** (Brian: "both up/down need to be held for the pause menu"): in flight, paused
    or not, UP + DOWN held is the badge's A (`controls_tufty.MENU_PAIR`, `MENU`): the pause menu,
    and closing it; UP or DOWN alone waits `PAIR_WAIT` there. In the menu UP / DOWN move, B
-   chooses, A + C goes back. (Brian also saw the Pad still working in the menus with DEBUG >
-   GAMEPAD off; on the PC stand-in the Pad isn't read at all once off, and Badgeware doesn't
-   read the Pad by itself: not yet explained.)
+   chooses, A + C goes back.
+   **Build 121** (Brian: "the gamepad should still operate outside of combat practice"): DEBUG >
+   GAMEPAD OFF now plays only combat practice as without the Pad (`host_tufty.pad_off`: the Pad
+   ignored in a practice flight, auto missiles, a missile in every canister); the Pad works
+   everywhere else and the title keeps the whole game (only a Tufty with no Pad at all is
+   practice only). Auto missiles are practice only on every device (`ace._start_flight`).
