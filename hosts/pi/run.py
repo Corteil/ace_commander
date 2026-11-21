@@ -11,8 +11,8 @@ Keys: arrows are the joystick, Enter confirms (the joystick pressed in), Esc
 goes back, F1-F6 are the badge's buttons A-F (docked and on the title, the
 letters A-F are too, but not while typing), and the rest of the keyboard is
 the Keyboard Hexpansion (Elite's keys). A game controller flies with analogue
-sticks and is the badge's buttons elsewhere (pad_pi.py). Docked, C buys and D sells. Close the window or leave from the
-title screen to quit. Saves and options.json go in
+sticks and is the badge's buttons elsewhere (pad_pi.py). Docked, C buys and D sells. Close the window or choose QUIT on the
+title screen to quit (Esc there does nothing). Saves and options.json go in
 ~/.local/share/ace_commander/; --debug shows the DEBUG menu of cheats.
 
 The game itself is the badge app in the folder above, run unchanged on
@@ -63,7 +63,8 @@ def load_game(d, debug=False):
     config is set first. The badge's files don't change. The DEBUG menu is on
     only with --debug, debug.txt in d, or the Easter egg (options.json's
     "debug"), as on the badge (on a PC the game would otherwise always show
-    it); its PERF timing lines are printed only with the DEBUG menu. Ships
+    it); its PERF timing lines are printed only with the DEBUG menu. Esc on
+    the title screen doesn't quit: its QUIT line does. Ships
     stay wireframes further out than on the badge (WIRE_MIN)."""
     want = debug or os.path.exists(os.path.join(d, "debug.txt"))
     try:
@@ -79,6 +80,7 @@ def load_game(d, debug=False):
         config = importlib.import_module(PKG + ".config")
         config.data_dir = d
         config.title_quit = True    # a computer needs a way out on the title screen (Brian)
+        config.title_cancel = False # Esc on the title doesn't quit: QUIT does (Brian, 2026-11-21)
         config.debug_menu = want
         config.perf_log = 60 if want else 0     # the badge's timing lines, a line a second in flight
         config.wire_min = WIRE_MIN

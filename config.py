@@ -17,6 +17,7 @@ debug_menu = None
 perf_log = 60           # a PERF line on the console every this many flight frames (0: never)
 log_keys = False        # print every button / key event (to see what a keyboard sends)
 title_quit = False      # a QUIT line on the title screen (the badge has F to leave)
+title_cancel = True     # cancel (F, Esc) on the title screen leaves the game
 wire_min = 8.0          # ships that look smaller than this (pixels) are drawn as a marker
 
 # the game's input (platform layer, step 2): None on the badge, where

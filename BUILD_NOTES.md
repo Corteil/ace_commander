@@ -1146,3 +1146,16 @@ what is now `ace.py` (renamed in build 50).
    is unchanged: all 59 frames pixel-identical; per frame nothing new (a press costs one
    more call). The app store package gains `controls.py` and `platform_tildagon.py`.
    Not yet run on the badge or the Pi.
+   **Build 102** (2026-11-21, Brian's requests). The Pi: Esc (cancel) on the title screen
+   no longer quits, only its QUIT line does (`config.title_cancel`, default True: the badge's
+   F still leaves); the DEBUG menu stays behind `--debug`, now in both desktop shortcuts.
+   Off the flight (not while typing) a keyboard's Enter and Esc count as the badge's C and F,
+   as A-F already did (`platform_tildagon.Input.badge_keys`, `controls_pi._AS_BADGE`): Enter
+   buys on the Market, Esc goes back. Docking computer chase view: your ship's pitch was
+   drawn the wrong way (nose up while the computer pitched down; `cockpit._my_ship`); on the
+   run in it now shrinks over the last `CHASE_SHRINK` (600) to fit the slot (`_slot_fit`:
+   a Cobra is 256 across, a Coriolis slot 60) and is drawn over the station, so it is seen
+   going in; the computer slows to `AUTO_CRAWL` (0.25) of DOCK_SPEED inside `AUTO_SLOW`
+   (300) of the face and docks `AUTO_IN` 70 inside (40 before; 100 missed on a Dodo, too
+   near its middle). The tunnel scene is unchanged (DOCK_TIME). Run on the badge (as
+   .mpy) and played by Brian: all OK.

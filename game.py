@@ -94,7 +94,11 @@ DOCK_DIST = 500.0          # docking C (automatic): this close to the station's 
 # through the slot; anything else is a crash that hurts and bounces you off.
 # Angles are given as their cosines.
 PLAYER_R = 40.0            # your ship's size: you touch the station this far from its front face
-AUTO_IN = 40.0             # the docking computer docks with your ship this far inside the slot
+AUTO_IN = 70.0             # the docking computer docks with your ship this far inside the slot
+                           # (build 102: 40 before, so it is seen going in; 100 was too near
+                           # a Dodo's middle, where it wobbled round and missed)
+AUTO_SLOW = 300.0          # and this close to the slot's face it slows to AUTO_CRAWL of
+AUTO_CRAWL = 0.25          # DOCK_SPEED, so the view from behind shows it going in (build 102)
 DOCK_SPEED = 20.0          # faster than this (Elite speed units, top speed 40) and it's a crash
 SLOT_CONE_A = 0.927        # A: you must be in front of the slot, within 22 degrees of its axis
 HEAD_A = 0.9               # A: and flying into it, within 26 degrees
@@ -1288,6 +1292,8 @@ class Game:
                 roll = max(-1.0, min(1.0, -a * 3.0 + ff))
                 self.auto_level = True
             want = DOCK_SPEED * 0.7
+            if self.space.d_station < st.bp.front + AUTO_SLOW:
+                want = DOCK_SPEED * AUTO_CRAWL      # the last stretch into the slot, slowly
         throttle = max(-1.0, min(1.0, (want - self.speed) * 0.5))
         self.auto_stick = (pitch, roll)     # for the view from behind your ship
         self.auto_yaw = yaw
