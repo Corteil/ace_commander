@@ -47,6 +47,7 @@ BACKGROUND = (24, 24, 30)           # round the screen, like the badge's case
 LED_SIZE = 4                        # an LED's radius, in game pixels
 FPS = 60
 LINE_K = 0.5                        # the Elite layout's lines: half as thick as the scale
+LOAD_HOLD = 3000                    # ms the loading screen shows (as the Tufty's hold)
 WIRE_MIN = 3                        # ships are wireframes down to this size (badge units; the badge: 8)
 
 
@@ -293,20 +294,61 @@ class Host:
             self._size = self.window.get_size()
             self._fit()
         self.ctx.labels = self.pads.labels() if self.pad_last else None
+        self._paint(self.app.draw)
+        self.frames += 1
+
+    def _paint(self, draw):
+        """Draw a frame with draw(ctx) on the 240 canvas, framed for the layout:
+        the middle of the window (Elite), or the round screen in its case."""
         if self._elite():
             self.window.set_clip(None)
             self.window.fill((0, 0, 0))
             self._at(self.ctx, 120)         # the badge's screens: in the middle
-            self.app.draw(self.ctx)
+            draw(self.ctx)
             self.window.set_clip(None)
         else:
             self.screen.fill((0, 0, 0))
-            self.app.draw(self.ctx)
+            draw(self.ctx)
             self.screen.blit(self.mask, (0, 0))
             self.window.fill(BACKGROUND)
             self.window.blit(self.screen, self.screen_rect)
             self._draw_leds()
-        self.frames += 1
+
+    def loading(self, hold=LOAD_HOLD):
+        """The loading screen the badge and the Tufty show, for hold ms (the Pi
+        loads at once, so the bar fills over that time): the name, one of the
+        game's own ships turning (letters.draw_ship) and LOADING (build 110).
+        Any key or pad button skips it; closing the window quits."""
+        try:
+            L = importlib.import_module(PKG + ".letters")
+            ship = L.load_ship(importlib.import_module(PKG + ".original_ships").SHIPS)
+        except Exception:
+            return
+        t0 = pygame.time.get_ticks()
+
+        def draw(ctx):
+            t = (pygame.time.get_ticks() - t0) / 1000.0
+            ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+            L.draw_name(ctx)
+            if ship is not None:
+                title = L.draw_ship(ctx, ship, t)
+                _text(ctx, title, 0, L.SHIP_Y + L.SHIP_SIZE + 8, 10, (0.6, 0.6, 0.6))
+            f = min(1.0, t * 1000.0 / hold)
+            ctx.rgb(0.15, 0.3, 0.18).rectangle(-70, L.BAR_Y, 140, 8).fill()
+            ctx.rgb(0.3, 1, 0.4).rectangle(-70, L.BAR_Y, 140 * f, 8).fill()
+            _text(ctx, "LOADING", 0, 84, 13, (0.3, 1, 0.4))
+        while self.running and pygame.time.get_ticks() - t0 < hold:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                elif event.type in (pygame.KEYDOWN, pygame.JOYBUTTONDOWN, pygame.CONTROLLERBUTTONDOWN):
+                    return
+            if self.window.get_size() != getattr(self, "_size", None):
+                self._size = self.window.get_size()
+                self._fit()
+            self._paint(draw)
+            self.show()
+            self.clock.tick(FPS)
 
     def show(self, ms=0):
         """Put the frame on the screen (the screenshot note on top of it)."""
@@ -327,7 +369,9 @@ class Host:
             pygame.draw.circle(self.window, col, (cx + r * math.cos(a), cy - r * math.sin(a)),
                                LED_SIZE * self.scale)
 
-    def run(self, frames=None):
+    def run(self, frames=None, loading=True):
+        if loading and frames is None:
+            self.loading()
         last = pygame.time.get_ticks()
         while self.running:
             for event in pygame.event.get():
@@ -341,6 +385,13 @@ class Host:
             if frames is not None and self.frames >= frames:
                 break
         pygame.quit()
+
+
+def _text(ctx, s, x, y, size, rgb):
+    ctx.font_size = size
+    ctx.text_align = ctx.CENTER
+    ctx.text_baseline = ctx.MIDDLE
+    ctx.rgb(*rgb).move_to(x, y).text(s)
 
 
 def main(argv=None):
@@ -360,3 +411,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
+

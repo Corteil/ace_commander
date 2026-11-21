@@ -1297,3 +1297,15 @@ what is now `ace.py` (renamed in build 50).
    1.29's mpy-cross (mpy v6.3, as the Tufty's `sys.implementation._mpy` 7942; installed in
    `~/.local/share/venvs/mpycross129`): 557 KB -> 215 KB, about 340 KB less on the TUFTY drive,
    and the game loads in 1.5 s (a LOADED line on serial).
+   **Build 110** (2026-11-21, Brian: the Tufty's loading screen "should have a ship on it from
+   one of our ships", then the icons, and "change the loader for each system"). `letters.py`
+   draws the loading screens' ship (`load_ship`, `draw_ship`: the Kestrel, the game's own
+   design in the Cobra Mk III role, turning, its name under it; `SHIP_Y`, `SHIP_SIZE`,
+   `BAR_Y`), shared by the badge's `app.py` (which loads `original_ships` straight after
+   `letters`; a build without them shows none), the Tufty's host (held 3 s) and the Pi's
+   new loading screen (`run.Host.loading`, 3 s, any key skips it; not in the tests or with
+   `--frames`). `tools/make_icons.py` draws the Kestrel as the icons: the Tufty's 24 x 24
+   pixel art (`hosts/tufty/app/icon.png`) and the Pi's 256 x 256 (`hosts/pi/icon.png`,
+   installed as `~/.local/share/icons/ace-commander.png`, the old one kept as
+   `ace-commander-title-old.png`). On the badge the ship turns in steps (the loader draws
+   only between imports). Not yet on the badge.

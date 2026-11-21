@@ -37,13 +37,6 @@ OPTIONAL = ("ship_data", "game_data")   # made from your own copy of Elite: may 
 GREEN = (0.3, 1, 0.4)
 GREY = (0.6, 0.6, 0.6)
 DIM = (0.15, 0.3, 0.18)
-# the loading screen's ship, tumbling: one of the game's own designs (Brian), the
-# one you start in (the Kestrel, in Elite's Cobra Mk III role), from original_ships
-LOAD_SHIP = "COBRA MK III"
-SHIP_RGB = (0.3, 0.85, 1.0)
-SHIP_Y = -18            # its middle, on the 240 canvas (between the name and the bar)
-SHIP_SIZE = 32.0        # half its span on the screen, about
-BAR_Y = 42              # the bar, and the module being loaded under it
 LOAD_HOLD = 3000        # ms the loading screen stays at least, to see the ship (Brian)
 DATA_DIR = "/state/ace_commander"
 SCREEN_W, SCREEN_H = 320, 240
@@ -136,11 +129,8 @@ class Host:
             m = None
         if name == "letters":
             self.letters = m
-        elif name == "original_ships" and m is not None:
-            for e in m.SHIPS:
-                if e[0] == LOAD_SHIP:
-                    self.ship = e
-                    break
+        elif name == "original_ships" and m is not None and self.letters is not None:
+            self.ship = self.letters.load_ship(m.SHIPS)
         elif name == "config":
             _mkdirs(self.data_dir)
             m.data_dir = self.data_dir
@@ -166,50 +156,21 @@ class Host:
         ctx.oy = SCREEN_H // 2
         if self.letters is not None:
             self.letters.draw_name(ctx)
+        L = self.letters
         if self.ship is not None:
-            self._draw_ship(ctx, _diff(_ms(), self.t_load) / 1000.0)
+            title = L.draw_ship(ctx, self.ship, _diff(_ms(), self.t_load) / 1000.0)
+            _text(ctx, title, 0, L.SHIP_Y + L.SHIP_SIZE + 8, 10, GREY)
+        bar = L.BAR_Y if L is not None else 42
         n = len(STEPS)
-        ctx.rgb(*DIM).rectangle(-70, BAR_Y, 140, 6).fill()
-        ctx.rgb(*GREEN).rectangle(-70, BAR_Y, 140 * self.done // n, 6).fill()
+        ctx.rgb(*DIM).rectangle(-70, bar, 140, 6).fill()
+        ctx.rgb(*GREEN).rectangle(-70, bar, 140 * self.done // n, 6).fill()
         if self.error:
             _text(ctx, "LOAD FAILED", 0, 60, 14, (1, 0.3, 0.2))
             _text(ctx, self.error[:40], 0, 84, 10, GREY)
         else:
             if self.done < n:
-                _text(ctx, STEPS[self.done], 0, BAR_Y + 16, 10, GREY)
+                _text(ctx, STEPS[self.done], 0, bar + 16, 10, GREY)
             _text(ctx, "LOADING", 0, 84, 13, GREEN)
-
-    def _draw_ship(self, ctx, t):
-        """The loading screen's ship as a wireframe, turning about two axes."""
-        import math
-        e = self.ship
-        verts = e[1]
-        span = 1.0
-        for v in verts:
-            for c in v:
-                if c > span:
-                    span = c
-                elif -c > span:
-                    span = -c
-        k = SHIP_SIZE / span
-        ca, sa = math.cos(t * 0.9), math.sin(t * 0.9)       # turning round
-        cb, sb = math.cos(0.45), math.sin(0.45)             # tipped towards you
-        pts = []
-        for x, y, z in verts:
-            x, z = x * ca + z * sa, -x * sa + z * ca
-            y, z = y * cb - z * sb, y * sb + z * cb
-            d = 1.0 + z * k / 400.0                         # a little perspective
-            pts.append((x * k / d, SHIP_Y - y * k / d))
-        ctx.rgb(*SHIP_RGB)
-        ctx.begin_path()
-        for edge in e[2]:
-            a = pts[edge[0]]
-            b = pts[edge[1]]
-            ctx.move_to(a[0], a[1])
-            ctx.line_to(b[0], b[1])
-        ctx.stroke()
-        title = e[5] if len(e) > 5 else e[0]
-        _text(ctx, title, 0, SHIP_Y + SHIP_SIZE + 8, 10, GREY)
 
     def update(self):
         """One frame, for Badgeware's run(update): None to carry on, True to
