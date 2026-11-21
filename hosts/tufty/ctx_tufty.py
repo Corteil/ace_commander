@@ -9,14 +9,19 @@ rectangle, arc, fill, stroke, text, save, restore, and font_size, line_width,
 text_align, text_baseline. Badgeware v3 (picovector, bw-1.29): screen.pen =
 color.rgb(r, g, b, a); screen.rectangle(x, y, w, h); screen.line(x0, y0, x1, y1);
 screen.circle(x, y, r); screen.shape(shape...) for wide lines and filled
-outlines (shape.custom with a flat array('f') of x, y pairs: any outline, no
-point objects); screen.text(s, (x, y), scale). Its fonts are all pixel fonts,
+outlines (shape.custom with one outline, a list of vec2 points; the Tufty's
+v3.1.1 takes neither a list of outlines nor a flat array('f') yet); screen.text(s, x, y) (plain x, y, as
+its own apps: a (x, y) point was ignored and the text went to the top left). Its fonts are all pixel fonts,
 so each text size picks a font (FONTS, heights measured on the Tufty) at scale 1.
 Moved from Corteil/tufty_ace_commarder's ctx_badgeware.py (Badgeware v2) in
 build 109 and brought to v3.
 """
 import math
-from array import array
+
+try:
+    _vec2 = vec2            # Badgeware's (a builtin there)
+except NameError:           # a PC (the tests): the stand-in sets it
+    _vec2 = None
 
 # (largest game text size, font name): measured line heights on the Tufty,
 # 2026-11-21: desert 10, sins 12, badgeware 14, smart 16, badgewaremax 20, ignore 28
@@ -119,19 +124,15 @@ class Ctx:
             self._fill_rect(sh[1], sh[2], sh[3], sh[4])
         elif sh is not None and sh[0] == "arc":
             self._pen()
-            self.screen.circle(int(ox + sh[1] + 0.5), int(oy + sh[2] + 0.5), int(sh[3] + 0.5))
+            v = _vec2 if _vec2 is not None else _builtin_vec2()
+            self.screen.circle(v(ox + sh[1], oy + sh[2]), int(sh[3] + 0.5))    # as its examples
         else:
-            shapes = []
+            v = _vec2 if _vec2 is not None else _builtin_vec2()
             for sub in self._path:
-                if len(sub) >= 6:       # at least a triangle
-                    flat = array("f", sub)
-                    for i in range(0, len(flat), 2):
-                        flat[i] += ox
-                        flat[i + 1] += oy
-                    shapes.append(flat)
-            if shapes:
-                self._pen()
-                self.screen.shape(self.shape_mod.custom(shapes))
+                if len(sub) >= 6:       # at least a triangle; one outline per shape
+                    pts = [v(ox + sub[i], oy + sub[i + 1]) for i in range(0, len(sub), 2)]
+                    self._pen()
+                    self.screen.shape(self.shape_mod.custom(pts))
         self._shape = None
         self._path = []
         return self
@@ -222,6 +223,11 @@ class Ctx:
         elif self.text_baseline in ("bottom", "alphabetic"):
             y -= h
         self._pen()
-        scr.text(s, (int(x + 0.5), int(y + 0.5)))
+        scr.text(s, int(x + 0.5), int(y + 0.5))
         self._path = []
         return self
+
+
+def _builtin_vec2():
+    import builtins
+    return builtins.vec2

@@ -21,7 +21,7 @@ missions (build 54). Phase 6's ship types are done (builds 78-84: Shipyard, Hang
 ranges, stolen ships), with NPC escape pods (86), finding a system by name (88) and a
 commander name (89); released as v0.3.0 (2026-11-18), latest release v0.3.2 (2026-11-19,
 builds 93-95). Hardcore Mode, the keyboard and the four views are merged (see below).
-Other devices are in `hosts/` (the Pi; the Tufty 2350 port is still its own repo).
+Other devices are in `hosts/`: the Pi, and the Tufty 2350 since build 109 (`hosts/tufty/`).
 **The plan for the next session is `hosts/NEXT_SESSION.md`.**
 
 ## Files
@@ -132,6 +132,22 @@ Other devices are in `hosts/` (the Pi; the Tufty 2350 port is still its own repo
   (P1: a whole trip by keys; SDL dummy driver), run by `tests/run_all.py` when pygame is there.
   `run.load_game` keeps save, options.json and debug.txt in `~/.local/share/ace_commander/`
   (it sets `config.py` before importing the game, build 100); DEBUG and PERF only with `--debug`. Plan: `hosts/pi/PLAN.md`.
+  `hosts/tufty/` (build 109, from `Corteil/tufty_ace_commarder`, which it replaces): the Tufty
+  2350 on Badgeware v3 (bw-1.29.0, MicroPython 1.29, ~8 MB RAM), on the same platform layer:
+  `platform_tufty.py` (the LED ring in `LEDS`, painted as a border round the view and the case
+  lights), `controls_tufty.py` (Tufty A/B/C = badge A/B/C, UP/DOWN = F/E; Qw/ST Pad on I2C0
+  GP4/GP5 at 0x21: D-pad = joystick, A=C, B=D, X=F, Y=E, + = A, - = B), `layout_tufty.py` with
+  `dash_tufty.py` (a 320 x 180 view over a 320 x 60 dashboard), `ctx_tufty.py` (the ctx calls
+  on Badgeware v3's `screen`: plain x, y everywhere except `screen.circle(vec2, r)` and
+  `shape.custom([vec2, ...])`, one outline a call; pixel fonts picked by size), `host_tufty.py`
+  and `app/__init__.py` (`run(update)`; Badgeware's names are builtins found by plain name, not
+  `getattr(builtins)`). Saves in `/state/ace_commander/` (the app folder is read-only).
+  `build_tufty.py [--elite] [--copy /media/pi/TUFTY]` makes `build/tufty/ace_commander/`; copy it
+  with the TUFTY drive (`mpremote ... exec 'launch("/system/apps/mass_storage")'`, then
+  `udisksctl unmount -b /dev/sda` and reset; stop any serial logger on the port first). Test:
+  `hosts/tufty/tests/test_tufty_host.py` on strict v3 stand-ins (`sim_badgeware.py`).
+  API reference: `~/Code/tufty2350` and `~/Code/picovector-micropython` (newer than the Tufty's
+  v3.1.1 in places: check calls on the Tufty).
 
 The repo folder must be called `ace_commander`: the tests import the app as that package, and
 it installs to `/apps/ace_commander/` on the badge.

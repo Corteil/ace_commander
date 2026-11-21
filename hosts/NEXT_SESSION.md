@@ -72,6 +72,9 @@ Steps, each a small PR with the badge's behaviour unchanged:
    on any screen). One shared Elite dashboard for the Pi and the Tufty (merge `dash_pi.py` and
    `dash_tufty.py`), a hit signal for screens with no LEDs.
 5. **Move the Tufty** into `hosts/tufty/` on the shared code; its patches and vendored copy go.
+   **Done 2026-11-21 (build 109), runs on the Tufty** (about 60 ms a frame). Still open: the
+   shared Elite dashboard (Brian unsure: try it), a text entry the Pad can use (search, name),
+   the dashboard's cost (about 32 ms of the frame).
 
 Checks for every step: `tests/render.py` frames pixel-identical before and after (59 frames,
 the build 96 method: render to a scratch folder, change, render, compare with PIL

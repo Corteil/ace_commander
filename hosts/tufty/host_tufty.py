@@ -154,13 +154,14 @@ def _pad():
 
 
 def start(ns):
-    """ns: the app's globals. Badgeware's names come from there or builtins."""
-    import builtins
+    """ns: the app's globals. Badgeware's names come from there or builtins
+    (it sets builtins.BUTTON_A and so on: MicroPython keeps those in an override
+    table that a plain name finds but getattr(builtins, ...) doesn't, so eval)."""
 
     def get(name):
         if name in ns:
             return ns[name]
-        return getattr(builtins, name)
+        return eval(name)
     try:
         get("badge").mode(get("HIRES"))     # 320 x 240
     except Exception:

@@ -47,9 +47,21 @@ class Shape:
         self.data = data
 
 
+class Vec2:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+
+import builtins             # noqa: E402
+builtins.vec2 = Vec2        # a builtin on the Tufty
+
+
 class _Shapes:
-    def custom(self, paths):
-        return Shape("custom", [list(p) for p in paths])
+    def custom(self, points):
+        # strict, as the Tufty's v3.1.1: one outline, a list of vec2 points
+        if not isinstance(points, list) or not all(isinstance(q, Vec2) for q in points):
+            raise TypeError("expected a list of vec2 points")
+        return Shape("custom", [[c for q in points for c in (q.x, q.y)]])
 
     def line(self, x0, y0, x1, y1, w):
         return Shape("line", (x0, y0, x1, y1, w))
@@ -94,7 +106,8 @@ class Screen:
     def line(self, x0, y0, x1, y1):
         self._draw(lambda d, dx, dy, c: d.line((x0 + dx, y0 + dy, x1 + dx, y1 + dy), fill=c))
 
-    def circle(self, x, y, r):
+    def circle(self, c, r):
+        x, y = c.x, c.y
         self._draw(lambda d, dx, dy, c: d.ellipse((x - r + dx, y - r + dy, x + r + dx, y + r + dy), fill=c))
 
     def shape(self, s):
@@ -110,8 +123,7 @@ class Screen:
         h = self.font.h
         return len(s) * h * 0.6, h
 
-    def text(self, s, at):
-        x, y = at
+    def text(self, s, x, y):
         h = self.font.h
         self._draw(lambda d, dx, dy, c: d.text((x + dx, y + dy), s, fill=c))
 
