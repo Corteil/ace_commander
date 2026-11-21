@@ -9,6 +9,11 @@ draws them, so a host never replaces the game's drawing functions:
 
     view_hw, view_hh        the 3D view's half width and height (canvas units)
     tunnel_hw, tunnel_hh    the launch and docking tunnels' (often the whole screen)
+    dust_x                  how far either side the stardust spreads (500 fills a
+                            240 wide view; wider for a wider one)
+    leds                    True if LEDs can be seen round the screen: if not, being
+                            hit is shown on the screen (the round HUD's red ring),
+                            even where the device has LEDs (build 107)
     view(ctx)               before the 3D view: put ctx's origin at its middle
                             (and clip to it, if the screen has more than the view)
     tunnel(ctx)             the same before a tunnel
@@ -29,6 +34,8 @@ class Layout:
     view_hh = 120
     tunnel_hw = 120
     tunnel_hh = 120
+    dust_x = 500
+    leds = True         # its ring of 12 round the screen
 
     def view(self, ctx):
         pass

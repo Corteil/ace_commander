@@ -51,6 +51,22 @@ assert seen == [255, 160, 80, 0], seen
 assert leds.writes == 1 + len(seen), leds.writes
 print("hit flash on LEDs, fading", seen, ": ok")
 
+# a layout whose LEDs can't be seen (build 107): being hit shows on the screen too
+from ace_commander import config, layout
+class NoLeds(layout.Layout):
+    leds = False
+config.layout = NoLeds()
+g._hurt(10.0); tick(a)
+assert arcs(a) == 1, "the red ring, as without LEDs"
+config.layout = None
+for _ in range(12):
+    tick(a)
+g._hurt(10.0); tick(a)
+assert arcs(a) == 0, "the badge's own layout: the LEDs do it"
+for _ in range(12):
+    tick(a)
+print("no LEDs to be seen in the layout: the ring on the screen: ok")
+
 # your laser: each type its own colour, on screen and on the LEDs, at each shot
 from ace_commander import cockpit
 seen = {}

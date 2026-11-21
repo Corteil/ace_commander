@@ -176,7 +176,6 @@ class Host:
             self.ctx = Ctx(self.window, s)
             self.ctx.line_k = max(1.0, s * LINE_K)
             self.screen = self.window
-            self.gm.DUST_X = int(500 * max(240.0, self.lw) / 240)      # stardust across the wider view
         else:
             s = min(w, h) / 272.0                   # the screen and its case, as the badge
             self.scale = s
@@ -185,7 +184,6 @@ class Host:
             self.screen = pygame.Surface((size, size))
             self.ctx = Ctx(self.screen, s)
             self.mask = self._round_mask(size)
-            self.gm.DUST_X = 500
         self.flight.fit()
 
     def toggle_layout(self):
