@@ -1145,6 +1145,11 @@ GLOBE_MIN = 6.0         # pixels: a smaller sphere is drawn as a circle
 GLOBE_STEP = 6          # pixels between rows worked out close by (more rows: smoother, slower)
 GLOBE_ROWS = 28         # at most this many rows
 GLOBE_FAR = 1500.0      # pixels: an ellipse longer than this (half) is drawn by rows instead
+# the badge swapped the sphere's colour and space's when the shape reached a few
+# thousand pixels off the screen (its drawing's numbers overflow; the old
+# circles stopped at 2000): past this the shape is cut to just round the screen
+GLOBE_SAFE = 600.0
+CLIP_M = 4.0            # pixels round the screen the cut shape reaches
 SUN_BAND = GLOBE_STEP   # the old name (build 99)
 # wholly in front of you a sphere's edge is an exact ellipse (the badge took
 # 20-35 ms to work out the rows, against about 2 ms for this): its points from
@@ -1272,20 +1277,10 @@ def _globe(ctx, cx, cy, cz, rad, fill, edge=None):
                 xs[j] = ox + ax * co + bx * si
                 ys[j] = oy + ay * co + by * si
                 j += 1
-            ctx.rgb(*fill)
-            ctx.begin_path()
-            ctx.move_to(xs[0], ys[0])
-            for i in range(1, j):
-                ctx.line_to(xs[i], ys[i])
-            ctx.fill()
-            if edge is not None:
-                ctx.rgb(*edge)
-                ctx.begin_path()
-                ctx.move_to(xs[0], ys[0])
-                for i in range(1, j):
-                    ctx.line_to(xs[i], ys[i])
-                ctx.line_to(xs[0], ys[0])
-                ctx.stroke()
+            if (ox < 0.0 and -ox or ox) + ea < GLOBE_SAFE and (oy < 0.0 and -oy or oy) + ea < GLOBE_SAFE:
+                _poly(ctx, xs, ys, j, fill, edge)
+            else:   # reaching far off the screen: cut to just round it first
+                _poly_clipped(ctx, xs, ys, j, fill, edge)
             return
     a = cx * cx - k
     # close by: row by row, over the rows it covers only
@@ -1359,6 +1354,110 @@ def _globe(ctx, cx, cy, cz, rad, fill, edge=None):
             break
     if gy:
         _globe_draw(ctx, fill, edge)
+
+
+def _poly(ctx, xs, ys, n, fill, edge):
+    """Fill the closed shape through the first n points of xs, ys, and
+    stroke it in edge (None: not)."""
+    ctx.rgb(*fill)
+    ctx.begin_path()
+    ctx.move_to(xs[0], ys[0])
+    for i in range(1, n):
+        ctx.line_to(xs[i], ys[i])
+    ctx.fill()
+    if edge is not None:
+        ctx.rgb(*edge)
+        ctx.begin_path()
+        ctx.move_to(xs[0], ys[0])
+        for i in range(1, n):
+            ctx.line_to(xs[i], ys[i])
+        ctx.line_to(xs[0], ys[0])
+        ctx.stroke()
+
+
+def _clip_side(xs, ys, axis, lim, sign):
+    """The shape cut by one side of the box: keep sign * coordinate <= lim
+    (Sutherland-Hodgman). Returns the new xs, ys."""
+    ox = []
+    oy = []
+    n = len(xs)
+    if not n:
+        return ox, oy
+    px, py = xs[-1], ys[-1]
+    pin = sign * (px if axis == 0 else py) <= lim
+    for i in range(n):
+        x, y = xs[i], ys[i]
+        cin = sign * (x if axis == 0 else y) <= lim
+        if cin != pin:      # crossing the side: where
+            if axis == 0:
+                t = (sign * lim - px) / (x - px)
+                ox.append(sign * lim)
+                oy.append(py + (y - py) * t)
+            else:
+                t = (sign * lim - py) / (y - py)
+                ox.append(px + (x - px) * t)
+                oy.append(sign * lim)
+        if cin:
+            ox.append(x)
+            oy.append(y)
+        px, py, pin = x, y, cin
+    return ox, oy
+
+
+def _clip_seg(x0, y0, x1, y1, lx, ly):
+    """The part of the line from (x0, y0) to (x1, y1) inside the box |x| <= lx,
+    |y| <= ly (Liang-Barsky), as (x0, y0, x1, y1), or None."""
+    t0, t1 = 0.0, 1.0
+    dx = x1 - x0
+    dy = y1 - y0
+    for p, q in ((-dx, x0 + lx), (dx, lx - x0), (-dy, y0 + ly), (dy, ly - y0)):
+        if p == 0.0:
+            if q < 0.0:
+                return None
+        else:
+            t = q / p
+            if p < 0.0:
+                if t > t1:
+                    return None
+                if t > t0:
+                    t0 = t
+            else:
+                if t < t0:
+                    return None
+                if t < t1:
+                    t1 = t
+    return x0 + dx * t0, y0 + dy * t0, x0 + dx * t1, y0 + dy * t1
+
+
+def _poly_clipped(ctx, xs, ys, n, fill, edge):
+    """As _poly, for a shape reaching far off the screen: the fill cut to the
+    screen plus CLIP_M, the outline's lines cut to it too (so never drawn
+    along the cut)."""
+    lx = VIEW_HW + CLIP_M
+    ly = VIEW_HH + CLIP_M
+    cx, cy = xs[:n], ys[:n]
+    cx, cy = _clip_side(cx, cy, 0, lx, 1.0)
+    cx, cy = _clip_side(cx, cy, 0, lx, -1.0)
+    cx, cy = _clip_side(cx, cy, 1, ly, 1.0)
+    cx, cy = _clip_side(cx, cy, 1, ly, -1.0)
+    if len(cx) >= 3:
+        ctx.rgb(*fill)
+        ctx.begin_path()
+        ctx.move_to(cx[0], cy[0])
+        for i in range(1, len(cx)):
+            ctx.line_to(cx[i], cy[i])
+        ctx.fill()
+    if edge is None:
+        return
+    ctx.rgb(*edge)
+    ctx.begin_path()
+    for i in range(n):
+        j = i + 1 if i + 1 < n else 0
+        seg = _clip_seg(xs[i], ys[i], xs[j], ys[j], lx, ly)
+        if seg is not None:
+            ctx.move_to(seg[0], seg[1])
+            ctx.line_to(seg[2], seg[3])
+    ctx.stroke()
 
 
 def _globe_draw(ctx, fill, edge):
@@ -1507,6 +1606,24 @@ def _sun_gauges(ctx, g, sp):
         ctx.rgb(*(RED if g.fuel < full // 4 else GREEN)).rectangle(-58, -85, f, 4).fill()
 
 
+PLANET_GAUGE_ALT = 1.0  # planet radii above its surface: nearer, the altitude gauge shows
+
+
+def _planet_gauge(ctx, sp):
+    """Near the planet (Brian, build 104): the altitude above it (AL), where the
+    sun's AL goes, full PLANET_GAUGE_ALT radii up and empty at the surface,
+    red in its last tenth. Nothing further out."""
+    d = math.sqrt(sp.px * sp.px + sp.py * sp.py + sp.pz * sp.pz) - sp.pr
+    if d >= PLANET_GAUGE_ALT * sp.pr:
+        return
+    ctx.rgba(0, 0, 0, 0.6).rectangle(0, -99, 74, 10).fill()      # readable against the planet
+    text(ctx, "AL", 66, -92, 9, GREY)
+    ctx.rgb(*DIM).rectangle(8, -94, 50, 4).fill()
+    a = int(50 * d / (PLANET_GAUGE_ALT * sp.pr))
+    a = 0 if a < 0 else 50 if a > 50 else a
+    ctx.rgb(*(RED if a < 5 else CYAN)).rectangle(8, -94, a, 4).fill()
+
+
 def _compass(ctx, sp):
     ctx.rgb(0.38, 0.38, 0.48)
     for px, py in _COMPASS:
@@ -1612,6 +1729,8 @@ def draw_hud(ctx, g, ms=None, ring=True):
             _compass(ctx, sp)
         if g.cabin > COOL_CABIN:
             _sun_gauges(ctx, g, sp)
+        elif not sp.witch:
+            _planet_gauge(ctx, sp)
 
     # combat practice: wave (yellow) and score (white), as one centred row of
     # digits; a commander's flight has neither

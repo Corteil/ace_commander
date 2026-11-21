@@ -1199,3 +1199,12 @@ what is now `ace.py` (renamed in build 50).
    it covers, constants once per frame). Then: a dot 0.7 ms, approaching 1.2 ms, big or
    huge 3 ms, skimming the planet 9 ms, close to the sun 17 ms (build 99's sun used about
    60 rows).
+   Brian's play test: good, but the colours of the planet (and the sun) and space swapped
+   now and then: the shapes reached up to 2700 pixels off the screen, where the badge's
+   drawing overflows (no such fault on a PC; the old circles stopped at `MAX_ARC` 2000). Past
+   `GLOBE_SAFE` (600) the ellipse is now cut to the screen plus `CLIP_M` (4) first
+   (`_poly_clipped`: Sutherland-Hodgman for the fill, Liang-Barsky for each line of the ring,
+   so the ring is never drawn along the cut); the largest coordinate in a 1500-position sweep
+   is now 590. And (Brian) the altitude gauge near the planet: within `PLANET_GAUGE_ALT` (1)
+   radius of its surface, AL alone where the sun's AL goes, full at 1 radius, red in its last
+   tenth (`_planet_gauge`).

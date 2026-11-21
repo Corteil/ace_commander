@@ -478,6 +478,14 @@ g.fuel_scoops = False; d.cmdr.extras.remove("scoops")
 debug(d, "TO THE STATION"); tick(d, fresh=["A"]); tick(d)
 tx = texts(d)
 assert g.cabin == game.COOL_CABIN and "CT" not in tx and "FU" not in tx, "the gauges go away from the sun"
+assert "AL" not in tx, "at the station (3 planet radii out): no altitude"
+# close to the planet (build 104): the altitude gauge alone
+sp = g.space
+keep = (sp.px, sp.py, sp.pz)
+sp.px, sp.py, sp.pz = 0.0, -1.4 * sp.pr, 0.5 * sp.pr
+tx = texts(d)
+assert "AL" in tx and "CT" not in tx and "FU" not in tx, tx
+sp.px, sp.py, sp.pz = keep
 tick(d, fresh=["A"])
 debug(d, "REFILL MISSILES")
 debug(d, "INVINCIBLE"); assert not g.god
