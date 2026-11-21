@@ -1220,8 +1220,8 @@ what is now `ace.py` (renamed in build 50).
    Pi's `hosts/pi/layout_pi.py` (`PiLayout`, following F10 and the window's size) replaced
    its hooks on the three functions and its wrapper round `Game.step`. Unchanged: all 59
    badge frames and five seeded Pi frames (both layouts, flight and tunnel, the roll and
-   dive meters moving) pixel-identical. The release gains `layout.py`. Not yet run on the
-   badge.
+   dive meters moving) pixel-identical. The release gains `layout.py`. Played by Brian on the
+   badge: as before (the slower frames near the planet were the planet's own: build 106).
    **Build 106** (2026-11-21, Brian: build 105's frame time was 10-15 ms slower near the
    planet). It wasn't build 105: on the badge its layout wrappers cost under 1 ms, and an
    A/B flight with PERF lines (build 104's files put back, then 105 again) showed both at
