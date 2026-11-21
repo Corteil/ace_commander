@@ -618,30 +618,33 @@ g.spawn_t = g.rock_t = 1e9
 sp = g.space
 assert sp is not None and sp.station.z == -game.LAUNCH_DIST and sp.pz > 0 and sp.safe
 assert g.kills == 0 and g.pending == 0
-c = CountCtx(); e.draw(c)
-assert c.calls.get("arc", 0) == 2 and not c.texts[1:], "the planet ahead: a disc and its outline"
-g.space.sx, g.space.sy, g.space.sz = 0.0, 0.0, 400000.0      # put the sun behind the planet
-c = CountCtx(); e.draw(c)
-assert c.calls.get("arc", 0) == 3, "the sun, then the planet's disc over it and its outline"
-# a planet behind the sun is hidden by it: no black disc over the sun
-class ArcLog(CountCtx):
+# (build 104: the sun and the planet are filled shapes to their true edge, so
+# what is checked is the colours, in order)
+class RgbLog(CountCtx):
     def __init__(self):
         CountCtx.__init__(self); object.__setattr__(self, "log", [])
     def rgb(self, *a):
-        self.log.append(("rgb", a)); return CountCtx.__getattr__(self, "rgb")(*a)
-    def arc(self, *a):
-        self.log.append(("arc",)); return CountCtx.__getattr__(self, "arc")(*a)
+        self.log.append(a); return CountCtx.__getattr__(self, "rgb")(*a)
+from ace_commander import cockpit as ck
+fill, edge = ck.PLANET_COLOURS[g.space.planet % len(ck.PLANET_COLOURS)]
+sun_rgb = ck.SUN_COLOURS[g.space.sun % len(ck.SUN_COLOURS)]
+lg = RgbLog(); e.draw(lg)
+assert not lg.texts[1:], lg.texts
+k = lg.log.index(fill)
+assert lg.log[k + 1] == edge, "the planet ahead: filled, and its outline"
+g.space.sx, g.space.sy, g.space.sz = 0.0, 0.0, 400000.0      # put the sun behind the planet
+lg = RgbLog(); e.draw(lg)
+k = lg.log.index(sun_rgb)
+assert lg.log[k + 1] == fill and lg.log[k + 2] == edge, "the sun, then the planet over it and its outline"
+# a planet behind the sun is hidden by it: the sun drawn over it
 sp_ = g.space
 keep = (sp_.sx, sp_.sy, sp_.sz, sp_.px, sp_.py, sp_.pz)
 sp_.px, sp_.py, sp_.pz = 0.0, 0.0, 900000.0             # the planet far behind...
 sp_.sx, sp_.sy, sp_.sz = 0.0, 0.0, 300000.0             # ...the sun
-lg = ArcLog(); e.draw(lg)
-colours = [x[1] for x in lg.log if x[0] == "rgb"]
-from ace_commander import cockpit as ck
-fill, edge = ck.PLANET_COLOURS[g.space.planet % len(ck.PLANET_COLOURS)]
-k = colours.index(fill)
-assert lg.calls.get("arc", 0) == 3 and colours[k + 1] == edge, colours[:8]
-assert colours[k + 2] == ck.SUN_COLOURS[g.space.sun % len(ck.SUN_COLOURS)], "the sun last, over it"
+lg = RgbLog(); e.draw(lg)
+k = lg.log.index(fill)
+assert lg.log[k + 1] == edge, lg.log[:8]
+assert lg.log[k + 2] == sun_rgb, "the sun last, over it"
 from ace_commander import cockpit as ck
 
 sp_.sx, sp_.sy, sp_.sz, sp_.px, sp_.py, sp_.pz = keep

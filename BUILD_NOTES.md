@@ -1176,12 +1176,20 @@ what is now `ace.py` (renamed in build 50).
    the badge (as .mpy) and played by Brian, 2026-11-21: LEDs, tilt, text entry, the
    keyboard pages, frame rate and leaving all OK.
    **Build 104** (2026-11-21, Brian: "is the planet horizon the same as the sun? the horizon
-   just pops out of view"). It wasn't: the planet was always a circle from `_sphere`, which
-   drops it once its centre is under half a radius ahead (and circles over `MAX_ARC`), so
-   skimming low past it the planet vanished. Within `PLANET_BANDS_K` (2) planet radii it is
-   now drawn as the sun is close by: `cockpit._bands` (the sun's band code, made general for
-   any sphere; `_sun_bands` calls it), its true edge as a horizon that slides away as you
-   pass. Not round the station (3 radii out), so no extra cost there. The bands have no
-   bright outline, and at the switch (2 radii) the edge hops a few pixels: the circle is only
-   an approximation there. All 59 frames unchanged; a test in `tests/test_game.py`. Not yet
-   run on the badge: watch the frame time skimming the planet.
+   just pops out of view"; after a first try with bands near the planet: "looks rough
+   compared to the full planet, and it should not lose the bright ring", "should not see the
+   transfer", "make the same for the sun as well"). The planet was always a circle round its
+   centre's image (`_sphere`), dropped once the centre was under half a radius ahead, so
+   skimming past it vanished. And a sphere in perspective isn't that circle: measured, 12
+   pixels out at 40 pixels across near the side of the view, worse close by, so no switch
+   between the circle and the true edge could go unseen. Now the sun and the planet are both
+   drawn to their true edge unless tiny (`GLOBE_MIN` 6 pixels across in radius, where the
+   circle is within a pixel): `cockpit._globe` works out each row's ends every `GLOBE_STEP`
+   (4) rows (closer for a small one) and at the exact top and bottom, then fills one shape
+   down the left ends and up the right (`_globe_draw`), and for the planet strokes its bright
+   ring along the true edge, not along the screen's. The sun's build 99 bands went
+   (`_sun_bands` is kept as a name), and `_covers` / `MAX_ARC`. Tests: `tests/test_game.py`
+   checks the shapes against a ray through each pixel; `test_commander.py` checks the draw
+   order by colour. Frames with the planet in view changed by its truer edge, nothing else.
+   Not yet run on the badge: the planet is now a shape of up to about 60 rows instead of one
+   circle whenever it is bigger than a dot, so watch the frame time with it in view.

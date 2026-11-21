@@ -1130,43 +1130,89 @@ def _sphere(x, y, z, r):
     return x, y, r
 
 
-def _covers(c):
-    """True if the circle (x, y, r) covers the whole screen."""
-    x = abs(c[0]) + VIEW_HW
-    y = abs(c[1]) + VIEW_HH
-    return x * x + y * y < c[2] * c[2]
+# The sun and the planet are drawn to their true edge (build 104, Brian: the
+# planet's horizon "just pops out of view", then "should not see the transfer"
+# and "make the same for the sun"). A sphere seen in perspective is not the
+# circle _sphere gives round its centre's image: 12 pixels out at 40 pixels
+# across near the side of the view, worse close by, where _sphere drops it
+# (centre under half a radius ahead) and the planet vanished. So unless it is
+# tiny (GLOBE_MIN pixels, where the circle is within a pixel), each is one
+# filled shape through its true edge, worked out row by row every GLOBE_STEP
+# rows (and at its exact top and bottom), as Elite draws its sun in lines: a
+# horizon across the view that stays as you fly past. The planet's bright ring
+# is stroked along the same edge (but not along the screen's edge).
+GLOBE_MIN = 6.0         # pixels: a smaller sphere is drawn as a circle
+GLOBE_STEP = 4          # pixels between rows worked out (more rows: smoother, more float garbage)
+SUN_BAND = GLOBE_STEP   # the old name (build 99)
+_GY = []                # the rows of the shape being drawn: y, x0, left is the edge, x1, right is
+_GX0 = []
+_GE0 = []
+_GX1 = []
+_GE1 = []
 
 
-MAX_ARC = 2000      # pixels: circles bigger than this that don't cover the screen are left out
+def _globe_row(y, cx, cy, cz, a, k, top):
+    """Where the row y meets the sphere's image: (x0, edge0, x1, edge1), edgeN
+    True if that end is the sphere's edge (not the screen's), or None. top:
+    y is the shape's top or bottom, where the two ends meet."""
+    hw = VIEW_HW
+    f = FOCAL
+    # the ray through (x, y) on screen is (x, -y, f): on the edge (x cx + b)^2 = k (x^2 + e)
+    b = f * cz - y * cy
+    e = y * y + f * f
+    bb = 2.0 * cx * b
+    c = b * b - k * e
+    x0 = -hw
+    x1 = hw
+    e0 = e1 = False
+    if a > 1e-9 or a < -1e-9:
+        disc = bb * bb - 4.0 * a * c
+        if disc < 0.0 and top:
+            disc = 0.0
+        if disc >= 0.0:
+            q = math.sqrt(disc)
+            r1 = (-bb - q) / (2.0 * a)
+            r2 = (-bb + q) / (2.0 * a)
+            if r1 > r2:
+                r1, r2 = r2, r1
+            if a < 0.0:
+                x0, x1, e0, e1 = r1, r2, True, True     # between the roots
+            elif cx * (r1 - 1.0) + b > 0.0:           # outside them: the sphere's side
+                x1, e1 = r1, True
+            else:
+                x0, e0 = r2, True
+        elif a < 0.0:
+            return None
+    elif bb != 0.0:         # a straight edge
+        xe = -c / bb
+        if bb > 0.0:
+            x0, e0 = xe, True
+        else:
+            x1, e1 = xe, True
+    if x0 < -hw:
+        x0, e0 = -hw, False
+    if x1 > hw:
+        x1, e1 = hw, False
+    if x1 < x0 or cx * (x0 + x1) * 0.5 + b <= 0.0:     # off the screen, or the cone behind you
+        return None
+    return x0, e0, x1, e1
 
 
-# Close to the sun (fuel skimming) it is drawn as bands across the screen, as
-# Elite draws its sun in lines: each band from the sphere's true edge, so it
-# lies across the view like a horizon and stays there as you fly past (the
-# circle _sphere gives is only right far off, and is dropped once the sun's
-# centre is beside you).
-SUN_BANDS_K = 3.0       # in sun radii from its centre: nearer than this, bands
-SUN_BAND = 4            # pixels: each band's height (fewer bands, less float garbage)
-# the planet the same way (build 104, Brian: its horizon "just pops out of view",
-# for the same reason the sun's did); within 2 radii only, so not round the
-# station (3 radii out), where the circle is right and costs less
-PLANET_BANDS_K = 2.0
-
-
-def _sun_bands(ctx, sp):
-    """The sun from close by (see _bands)."""
-    _bands(ctx, sp.sx, sp.sy, sp.sz, sp.sr)
-
-
-def _bands(ctx, cx, cy, cz, rad):
-    """A sphere (centre cx, cy, cz, radius rad) from close by: a band of each
-    SUN_BAND rows, filled where a ray through the band's middle row meets the
-    sphere, in the colour already set. Inside it, all of it."""
+def _globe(ctx, cx, cy, cz, rad, fill, edge=None):
+    """A sphere (centre cx, cy, cz, radius rad) to its true edge: filled in
+    fill, its outline in edge (None: none). Inside it, all of it."""
+    hw, hh = VIEW_HW, VIEW_HH
     d2 = cx * cx + cy * cy + cz * cz
     r2 = rad * rad
-    hw, hh = VIEW_HW, VIEW_HH
     if d2 <= r2:        # inside the edge (the sun's heat kills a little deeper in)
-        ctx.rectangle(-hw, -hh, 2 * hw, 2 * hh).fill()
+        ctx.rgb(*fill).rectangle(-hw, -hh, 2 * hw, 2 * hh).fill()
+        return
+    if cz > 0.0 and rad * FOCAL < GLOBE_MIN * cz:     # tiny: the circle is right
+        c = _sphere(cx, cy, cz, rad)
+        if c is not None:
+            ctx.rgb(*fill).arc(c[0], c[1], c[2], 0, TAU, 0).fill()
+            if edge is not None:
+                ctx.rgb(*edge).arc(c[0], c[1], c[2], 0, TAU, 0).stroke()
         return
     d = math.sqrt(d2)
     cx /= d
@@ -1178,81 +1224,103 @@ def _bands(ctx, cx, cy, cz, rad):
         return
     a = cx * cx - k
     f = FOCAL
+    # rows GLOBE_STEP apart; closer for a small one, so it stays round
+    step = rad * f / d / 6.0
+    if step > GLOBE_STEP:
+        step = GLOBE_STEP
+    elif step < 1.0:
+        step = 1.0
+    # the shape's top and bottom, where a row just touches it:
+    # (cy^2 + a) y^2 - 2 f cz cy y + f^2 (cz^2 + a) = 0
+    ends = []
+    qa = cy * cy + a
+    qb = -2.0 * f * cz * cy
+    qc = f * f * (cz * cz + a)
+    if qa > 1e-12 or qa < -1e-12:
+        disc = qb * qb - 4.0 * qa * qc
+        if disc >= 0.0:
+            q = math.sqrt(disc)
+            for y in ((-qb - q) / (2.0 * qa), (-qb + q) / (2.0 * qa)):
+                if -hh < y < hh:
+                    ends.append(y)
+    ends.sort()
+    gy, gx0, ge0, gx1, ge1 = _GY, _GX0, _GE0, _GX1, _GE1
+    del gy[:], gx0[:], ge0[:], gx1[:], ge1[:]
     y = -hh
-    while y < hh:
-        ym = y + SUN_BAND * 0.5
-        # the ray through (x, ym) on screen is (x, -ym, f): (x cx + b)^2 >= k (x^2 + e)
-        b = f * cz - ym * cy
-        e = ym * ym + f * f
-        bb = 2.0 * cx * b
-        c = b * b - k * e
-        x0 = x1 = None
-        if a > 1e-9 or a < -1e-9:
-            disc = bb * bb - 4.0 * a * c
-            if disc >= 0.0:
-                q = math.sqrt(disc)
-                r1 = (-bb - q) / (2.0 * a)
-                r2_ = (-bb + q) / (2.0 * a)
-                if r1 > r2_:
-                    r1, r2_ = r2_, r1
-                if a < 0.0:
-                    x0, x1 = r1, r2_                      # between the roots
-                elif cx * (r1 - 1.0) + b > 0.0:           # outside them: the sun's side
-                    x0, x1 = -hw, r1
-                else:
-                    x0, x1 = r2_, hw
-            elif a > 0.0:
-                x0, x1 = -hw, hw
-        elif bb != 0.0:         # a straight edge
-            xe = -c / bb
-            if bb > 0.0:
-                x0, x1 = xe, hw
-            else:
-                x0, x1 = -hw, xe
-        if x0 is not None:
-            if x0 < -hw:
-                x0 = -hw
-            if x1 > hw:
-                x1 = hw
-            if x1 > x0 and cx * (x0 + x1) * 0.5 + b > 0.0:    # not the cone behind you
-                ctx.rectangle(int(x0), y, int(x1 - x0) + 1, SUN_BAND).fill()
-        y += SUN_BAND
+    ei = 0
+    while True:
+        top = False
+        if ei < len(ends) and ends[ei] <= y:
+            yy = ends[ei]
+            ei += 1
+            top = True
+        else:
+            yy = y
+            y += step
+        if yy > hh:
+            break
+        row = _globe_row(yy, cx, cy, cz, a, k, top)
+        if row is None:
+            if gy:
+                _globe_draw(ctx, fill, edge)
+                del gy[:], gx0[:], ge0[:], gx1[:], ge1[:]
+            continue
+        gy.append(yy)
+        gx0.append(row[0])
+        ge0.append(row[1])
+        gx1.append(row[2])
+        ge1.append(row[3])
+        if yy >= hh:
+            break
+    if gy:
+        _globe_draw(ctx, fill, edge)
 
 
-def _sun(ctx, sp, sun):
-    if sp.sx * sp.sx + sp.sy * sp.sy + sp.sz * sp.sz < SUN_BANDS_K * SUN_BANDS_K * sp.sr * sp.sr:
-        ctx.rgb(*SUN_COLOURS[sp.sun % len(SUN_COLOURS)])
-        _sun_bands(ctx, sp)
-        return
-    if sun is None:
-        return
-    ctx.rgb(*SUN_COLOURS[sp.sun % len(SUN_COLOURS)])
-    if _covers(sun):
-        ctx.rectangle(-VIEW_HW, -VIEW_HH, 2 * VIEW_HW, 2 * VIEW_HH).fill()
-    elif sun[2] < MAX_ARC:
-        ctx.arc(sun[0], sun[1], sun[2], 0, TAU, 0).fill()
-
-
-def _planet(ctx, sp, planet):
-    """The planet: a disc in its colour with a brighter outline; close by,
-    bands to its true edge (_bands), a horizon that stays as you fly past."""
-    fill, edge = PLANET_COLOURS[sp.planet % len(PLANET_COLOURS)]
-    if (sp.px * sp.px + sp.py * sp.py + sp.pz * sp.pz
-            < PLANET_BANDS_K * PLANET_BANDS_K * sp.pr * sp.pr):
-        ctx.rgb(*fill)
-        _bands(ctx, sp.px, sp.py, sp.pz, sp.pr)
-        return
-    if planet is None:
-        return
+def _globe_draw(ctx, fill, edge):
+    """Fill the rows in _GY.. as one shape (down the left ends, up the right),
+    then stroke its edge in edge (None: not)."""
+    gy, gx0, ge0, gx1, ge1 = _GY, _GX0, _GE0, _GX1, _GE1
+    n = len(gy)
     ctx.rgb(*fill)
-    if _covers(planet):
-        ctx.rectangle(-VIEW_HW, -VIEW_HH, 2 * VIEW_HW, 2 * VIEW_HH).fill()
+    ctx.begin_path()
+    ctx.move_to(gx0[0], gy[0])
+    for i in range(1, n):
+        ctx.line_to(gx0[i], gy[i])
+    for i in range(n - 1, -1, -1):
+        ctx.line_to(gx1[i], gy[i])
+    ctx.fill()
+    if edge is None:
         return
-    if planet[2] >= MAX_ARC:
-        return
-    x, y, r = planet
-    ctx.arc(x, y, r, 0, TAU, 0).fill()
-    ctx.rgb(*edge).arc(x, y, r, 0, TAU, 0).stroke()
+    ctx.rgb(*edge)
+    ctx.begin_path()
+    hh = VIEW_HH
+    if gy[0] > -hh and ge0[0] and ge1[0]:           # its top, where that is on screen
+        ctx.move_to(gx0[0], gy[0])
+        ctx.line_to(gx1[0], gy[0])
+    for xs, es in ((gx0, ge0), (gx1, ge1)):
+        for i in range(1, n):
+            if es[i - 1] and es[i]:
+                ctx.move_to(xs[i - 1], gy[i - 1])
+                ctx.line_to(xs[i], gy[i])
+    if gy[-1] < hh and ge0[-1] and ge1[-1]:         # and its bottom
+        ctx.move_to(gx0[-1], gy[-1])
+        ctx.line_to(gx1[-1], gy[-1])
+    ctx.stroke()
+
+
+def _sun(ctx, sp, sun=None):
+    _globe(ctx, sp.sx, sp.sy, sp.sz, sp.sr, SUN_COLOURS[sp.sun % len(SUN_COLOURS)])
+
+
+def _sun_bands(ctx, sp):
+    """The sun (the old name, build 99)."""
+    _sun(ctx, sp)
+
+
+def _planet(ctx, sp, planet=None):
+    """The planet: filled in its colour with a brighter outline, to its true edge."""
+    fill, edge = PLANET_COLOURS[sp.planet % len(PLANET_COLOURS)]
+    _globe(ctx, sp.px, sp.py, sp.pz, sp.pr, fill, edge)
 
 
 def _draw_space(ctx, sp, wire=WIRE_MIN):
