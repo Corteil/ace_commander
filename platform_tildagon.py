@@ -29,6 +29,7 @@ owner_name:
     owner_name()                the device owner's name, or None
 """
 import asyncio
+import gc
 
 import app as _app
 from events.input import BUTTON_TYPES, ButtonDownEvent, ButtonUpEvent
@@ -58,6 +59,17 @@ except Exception:
     tildagonos = None
 
 from . import config
+
+# Room for garbage (build 108). The badge's Python heap grows only when a
+# collection can't free enough, and hands back any area left empty, so with
+# the game's ~450 KB in use there was room for only ~60 KB of garbage: a 100 ms
+# collection every 10-15 flight frames, seen as the stardust stuttering (Brian;
+# every slow frame in the PERF lines was one). So at the start the heap is
+# grown by about HEAP_ROOM, one small piece kept at the far end of the new area
+# so it isn't handed back. Measured: 5 times fewer collections, each 30 -> 44 ms.
+HEAP_ROOM = 512 * 1024     # grow if it has less free than this
+HEAP_CHUNK = 16 * 1024
+SYSTEM_KEEP = 300 * 1024   # and only if the system keeps this much (Wi-Fi and the rest)
 
 App = _app.App      # the game's base class: the scheduler's app (on a PC, its own host)
 
@@ -201,6 +213,49 @@ class Platform:
         self.tilt_ok = imu is not None
         self.tx = self.ty = 0.0     # the last tilt reading, in g
         self.fast = scheduler is not None
+        self.anchor = self._grow_heap()
+
+    @staticmethod
+    def _grow_heap():
+        """Grow the heap once (by about its own size: the firmware doubles it)
+        if it has less than HEAP_ROOM free and the system would keep at least
+        SYSTEM_KEEP; keep the chunk that lands in the new area so the area isn't
+        handed back (see HEAP_ROOM). Returns the kept chunk, or None."""
+        try:
+            import esp32
+        except ImportError:
+            return None     # not the badge
+
+        def split():        # the largest block the heap could grow into
+            return max([r[2] for r in esp32.idf_heap_info(esp32.HEAP_DATA)] or [0])
+        try:
+            s0 = split()
+            free = gc.mem_free() - s0       # mem_free counts that block too
+            total = gc.mem_alloc() + free
+            if free >= HEAP_ROOM or s0 - total < SYSTEM_KEEP:
+                if config.perf_log:
+                    print("HEAP %d KB, %d free, system %d: left as it is" % (
+                        total // 1024, free // 1024, s0 // 1024))
+                return None
+            chunks = []
+            anchor = None
+            for _ in range(HEAP_ROOM // HEAP_CHUNK + 8):
+                c = bytearray(HEAP_CHUNK)
+                if split() < s0 - HEAP_CHUNK:   # this one made a new area: keep it
+                    anchor = c
+                    break
+                chunks.append(c)
+            chunks = None
+            gc.collect()
+            if config.perf_log:
+                s1 = split()
+                print("HEAP %d KB, %d free, system %d: grown, now %d free, system %d" % (
+                    total // 1024, free // 1024, s0 // 1024,
+                    (gc.mem_free() - s1) // 1024, s1 // 1024))
+            return anchor
+        except MemoryError:
+            gc.collect()
+            return None
 
     # ---- LEDs -------------------------------------------------------------
 

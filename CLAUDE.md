@@ -202,10 +202,16 @@ Source: `github.com/emfcamp/badge-2024-software`, folder `modules/`. Brian's own
 - IMU: `imu.acc_read()` gives m/s^2. `imu.mag_read()` works on the 2026 board.
 - Keyboard: `events.keyboard.KEYBOARD_BUTTONS` (letters, `SPACE`, `ENTER`, arrows...).
 - `ctx` draws straight into the framebuffer; `display.end_frame` then sends it to the screen.
-- **Garbage costs more than drawing (measured 2026-11-21, build 106).** Every float is a new
-  object on the badge. `gc.threshold()` is -1; a collection takes about 103 ms with 440 KB in
-  use and comes every 10-15 flight frames (the PERF line's 140-160 ms "slow" frames), so each
-  KB of garbage a frame costs roughly 1.5 ms a frame on average. Filling even a full-screen
+- **Garbage costs more than drawing (measured 2026-11-21, builds 106 and 108).** Every float
+  is a new object on the badge. `gc.threshold()` is -1. The Python heap starts at 64 KB and
+  grows (doubling) only when a collection can't free enough, and hands back any area left
+  empty (MicroPython `MICROPY_GC_SPLIT_HEAP_AUTO`), so it hugs what is in use: with the
+  game's ~450 KB there was room for ~60 KB of garbage, a collection (100-180 ms) every 10-15
+  flight frames, seen as the stardust stuttering. `gc.mem_free()` also counts the system
+  block the heap could grow into (`esp32.idf_heap_info(esp32.HEAP_DATA)`, largest free), so
+  it looks far bigger than the heap's real free space. Since build 108
+  `platform_tildagon.Platform._grow_heap` grows it once at start and keeps an anchor in the
+  new area: collections every ~100 frames. Filling even a full-screen
   polygon or big circle adds only 1-1.5 ms to a frame, a stroked 48-point ring about 3 ms; a
   frame with nothing drawn is about 17.6 ms (`display.end_frame`). So in the frame path prefer
   whole numbers and lists made once over floats and new tuples. Measure on the badge from the
