@@ -138,21 +138,29 @@ assert g.stick_roll != 0.0, "A rolls"
 badge.down.discard(buttons["A"])
 g.heat = 0.0
 badge.down.add(buttons["B"])
-frames(3)                   # (in flight B alone waits PAIR_WAIT ms for a partner)
-assert g.beam > 0, "B fires"
+fired = False
+for _ in range(3):
+    frames(1)
+    fired = fired or g.beam > 0
+assert fired, "B fires"
 badge.down.discard(buttons["B"])
 frames(2)
-assert h.ctx.labels == {"C": "B", "F": "B+C", "E": "A+B"}, "in flight the hints name the pairs"
+assert h.ctx.labels == {"C": "B", "F": "A+C+UP", "E": "A+C+DOWN"}, "in flight: the shift"
 s0 = g.speed
-badge.down.add(buttons["B"]); badge.down.add(buttons["C"])
+r0 = g.stick_roll
+badge.down.add(buttons["A"]); badge.down.add(buttons["C"])     # A + C held: a shift
+frames(2)
+assert g.speed == s0 and g.stick_roll == 0.0, "A + C alone: no roll, no speed change"
+badge.down.add(buttons["UP"])
 frames(10)
-badge.down.discard(buttons["B"]); badge.down.discard(buttons["C"])
-assert g.speed > s0 + 1, ("B + C together: faster", s0, g.speed)
+badge.down.discard(buttons["UP"])
+assert g.speed > s0 + 1 and g.stick_pitch == 0.0, ("A + C + UP: faster, no pitch", s0, g.speed)
 s1 = g.speed
-badge.down.add(buttons["A"]); badge.down.add(buttons["B"])
+badge.down.add(buttons["DOWN"])
 frames(10)
-badge.down.discard(buttons["A"]); badge.down.discard(buttons["B"])
-assert g.speed < s1 - 1, ("A + B together: slower", s1, g.speed)
+badge.down.discard(buttons["DOWN"])
+badge.down.discard(buttons["A"]); badge.down.discard(buttons["C"])
+assert g.speed < s1 - 1, ("A + C + DOWN: slower", s1, g.speed)
 frames(2)
 shot("tufty_practice")
 print("Tufty buttons alone: combat practice only, cursor keys, joystick, B fires: ok")

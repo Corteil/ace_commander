@@ -100,21 +100,25 @@ class Host:
         a = self.app
         flying = a is not None and a.mode == "flight" and not a.paused
         self.ctx.labels = controls_tufty.LABELS if flying else controls_tufty.LABELS_OFF
-        pairs = controls_tufty.PAIRS if flying else controls_tufty.PAIRS_OFF
-        for one, two, key in pairs:         # two together: speed in flight, back off it
-            if one in held and two in held:
-                keys.add(key)
-                held.discard(one)
-                held.discard(two)
-        # a button of a pair held alone waits PAIR_WAIT ms for its partner (on the frame clock)
-        waits = self.waits
-        for one, two, key in pairs:
-            for name in (one, two):
-                if name in held:
-                    if name not in waits:
-                        waits[name] = self.clock
-                    if self.clock - waits[name] < controls_tufty.PAIR_WAIT:
+        one, two = controls_tufty.SHIFT
+        if one in held and two in held:     # A + C: a shift in flight, back off it
+            held.discard(one)
+            held.discard(two)
+            if flying:
+                for name, key in controls_tufty.SHIFTED.items():
+                    if name in held:
+                        keys.add(key)
                         held.discard(name)
+            else:
+                keys.add(controls_tufty.BACK)
+        # A or C held alone waits PAIR_WAIT ms for the other (on the frame clock)
+        waits = self.waits
+        for name in (one, two):
+            if name in held:
+                if name not in waits:
+                    waits[name] = self.clock
+                if self.clock - waits[name] < controls_tufty.PAIR_WAIT:
+                    held.discard(name)
         for name in list(waits):
             if not b.held(self.buttons[name]):
                 del waits[name]     # let go: the next press waits afresh

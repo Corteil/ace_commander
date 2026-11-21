@@ -1372,3 +1372,8 @@ what is now `ace.py` (renamed in build 50).
    as F does). Any button in the current pairs, held alone, waits `PAIR_WAIT` for its partner
    (`host_tufty.waits`), so an uneven A + C doesn't move the cursor first. Hints off the
    flight: C is B, F is A+C.
+   **Build 118** (Brian: "hold A + C to toggle up/down buttons to change speed"): in flight A + C
+   held is a shift (`controls_tufty.SHIFT`, `SHIFTED`): UP then the badge's F (faster), DOWN its
+   E (slower), no roll or pitch meanwhile; A + B / B + C are gone, so B alone fires at once.
+   Off the flight A + C is still back. A or C alone waits `PAIR_WAIT`. Hints in flight: F is
+   A+C+UP, E is A+C+DOWN.
