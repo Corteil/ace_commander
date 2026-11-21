@@ -1175,3 +1175,37 @@ what is now `ace.py` (renamed in build 50).
    badge is unchanged: all 59 frames pixel-identical; the release gains no file. Run on
    the badge (as .mpy) and played by Brian, 2026-11-21: LEDs, tilt, text entry, the
    keyboard pages, frame rate and leaving all OK.
+   **Build 104** (2026-11-21, Brian: "is the planet horizon the same as the sun? the horizon
+   just pops out of view"; after a first try with bands near the planet: "looks rough
+   compared to the full planet, and it should not lose the bright ring", "should not see the
+   transfer", "make the same for the sun as well"). The planet was always a circle round its
+   centre's image (`_sphere`), dropped once the centre was under half a radius ahead, so
+   skimming past it vanished. And a sphere in perspective isn't that circle: measured, 12
+   pixels out at 40 pixels across near the side of the view, worse close by, so no switch
+   between the circle and the true edge could go unseen. Now the sun and the planet are both
+   drawn to their true edge unless tiny (`GLOBE_MIN` 6 pixels across in radius, where the
+   circle is within a pixel): `cockpit._globe` works out each row's ends every `GLOBE_STEP`
+   (4) rows (closer for a small one) and at the exact top and bottom, then fills one shape
+   down the left ends and up the right (`_globe_draw`), and for the planet strokes its bright
+   ring along the true edge, not along the screen's. The sun's build 99 bands went
+   (`_sun_bands` is kept as a name), and `_covers` / `MAX_ARC`. Tests: `tests/test_game.py`
+   checks the shapes against a ray through each pixel; `test_commander.py` checks the draw
+   order by colour. Frames with the planet in view changed by its truer edge, nothing else.
+   Speed, measured on the badge (the maths and calls, drawing not included): row by row
+   everywhere took 20-35 ms, so wholly in front of you (the usual case) the edge is the exact
+   ellipse it is, from tan(angle off ahead +- angular radius) and f sin(r) / sqrt(cos^2 -
+   sin^2), its points from a table (`GLOBE_N` 48; 24 or 12 for a smaller one) worked out
+   once for the fill and the ring; rows only close by (`GLOBE_ROWS` at most 28, over the rows
+   it covers, constants once per frame). Then: a dot 0.7 ms, approaching 1.2 ms, big or
+   huge 3 ms, skimming the planet 9 ms, close to the sun 17 ms (build 99's sun used about
+   60 rows).
+   Brian's play test: good, but the colours of the planet (and the sun) and space swapped
+   now and then: the shapes reached up to 2700 pixels off the screen, where the badge's
+   drawing overflows (no such fault on a PC; the old circles stopped at `MAX_ARC` 2000). Past
+   `GLOBE_SAFE` (600) the ellipse is now cut to the screen plus `CLIP_M` (4) first
+   (`_poly_clipped`: Sutherland-Hodgman for the fill, Liang-Barsky for each line of the ring,
+   so the ring is never drawn along the cut); the largest coordinate in a 1500-position sweep
+   is now 590. And (Brian) the altitude gauge near the planet: within `PLANET_GAUGE_ALT` (1)
+   radius of its surface, AL alone, centred under the frame time (Brian), full at 1 radius, red in its last
+   tenth (`_planet_gauge`). Played by Brian on the badge (as .mpy): all working, no colour
+   swap, frame time about 50-56 ms near the planet.

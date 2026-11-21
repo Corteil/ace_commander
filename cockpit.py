@@ -1130,114 +1130,381 @@ def _sphere(x, y, z, r):
     return x, y, r
 
 
-def _covers(c):
-    """True if the circle (x, y, r) covers the whole screen."""
-    x = abs(c[0]) + VIEW_HW
-    y = abs(c[1]) + VIEW_HH
-    return x * x + y * y < c[2] * c[2]
+# The sun and the planet are drawn to their true edge (build 104, Brian: the
+# planet's horizon "just pops out of view", then "should not see the transfer"
+# and "make the same for the sun"). A sphere seen in perspective is not the
+# circle _sphere gives round its centre's image: 12 pixels out at 40 pixels
+# across near the side of the view, worse close by, where _sphere drops it
+# (centre under half a radius ahead) and the planet vanished. So unless it is
+# tiny (GLOBE_MIN pixels, where the circle is within a pixel), each is one
+# filled shape through its true edge, worked out row by row every GLOBE_STEP
+# rows (and at its exact top and bottom), as Elite draws its sun in lines: a
+# horizon across the view that stays as you fly past. The planet's bright ring
+# is stroked along the same edge (but not along the screen's edge).
+GLOBE_MIN = 6.0         # pixels: a smaller sphere is drawn as a circle
+GLOBE_STEP = 6          # pixels between rows worked out close by (more rows: smoother, slower)
+GLOBE_ROWS = 28         # at most this many rows
+GLOBE_FAR = 1500.0      # pixels: an ellipse longer than this (half) is drawn by rows instead
+# the badge swapped the sphere's colour and space's when the shape reached a few
+# thousand pixels off the screen (its drawing's numbers overflow; the old
+# circles stopped at 2000): past this the shape is cut to just round the screen
+GLOBE_SAFE = 600.0
+CLIP_M = 4.0            # pixels round the screen the cut shape reaches
+SUN_BAND = GLOBE_STEP   # the old name (build 99)
+# wholly in front of you a sphere's edge is an exact ellipse (the badge took
+# 20-35 ms to work out the rows, against about 2 ms for this): its points from
+# a table of cosines and sines round it
+GLOBE_N = 48
+_GCS = tuple((math.cos(i * TAU / GLOBE_N), math.sin(i * TAU / GLOBE_N)) for i in range(GLOBE_N))
+_EX = [0.0] * GLOBE_N   # the ellipse's points, worked out once for the fill and the ring
+_EY = [0.0] * GLOBE_N
+_GY = []                # the rows of the shape being drawn: y, x0, left is the edge, x1, right is
+_GX0 = []
+_GE0 = []
+_GX1 = []
+_GE1 = []
 
 
-MAX_ARC = 2000      # pixels: circles bigger than this that don't cover the screen are left out
+_GR = [0.0, False, 0.0, False]     # _globe_row's answer: x0, left is the edge, x1, right is
+_GK = [0.0] * 7                     # its constants for this sphere: see _globe
 
 
-# Close to the sun (fuel skimming) it is drawn as bands across the screen, as
-# Elite draws its sun in lines: each band from the sphere's true edge, so it
-# lies across the view like a horizon and stays there as you fly past (the
-# circle _sphere gives is only right far off, and is dropped once the sun's
-# centre is beside you).
-SUN_BANDS_K = 3.0       # in sun radii from its centre: nearer than this, bands
-SUN_BAND = 4            # pixels: each band's height (fewer bands, less float garbage)
+def _globe_row(y, top):
+    """Where the row y meets the sphere's image (_GK): True, with _GR the
+    ends and whether each is the sphere's edge (not the screen's); or False.
+    top: y is the shape's top or bottom, where the two ends meet."""
+    hw = VIEW_HW
+    fcz, cy, cx2, a, k, ff, cx = _GK
+    # the ray through (x, y) on screen is (x, -y, f): on the edge (x cx + b)^2 = k (x^2 + e)
+    b = fcz - y * cy
+    bb = cx2 * b
+    c = b * b - k * (y * y + ff)
+    x0 = -hw
+    x1 = hw
+    e0 = e1 = False
+    if a > 1e-9 or a < -1e-9:
+        disc = bb * bb - 4.0 * a * c
+        if disc < 0.0 and top:
+            disc = 0.0
+        if disc >= 0.0:
+            q = math.sqrt(disc)
+            r1 = (-bb - q) / (2.0 * a)
+            r2 = (-bb + q) / (2.0 * a)
+            if r1 > r2:
+                r1, r2 = r2, r1
+            if a < 0.0:
+                x0, x1, e0, e1 = r1, r2, True, True     # between the roots
+            elif cx * (r1 - 1.0) + b > 0.0:           # outside them: the sphere's side
+                x1, e1 = r1, True
+            else:
+                x0, e0 = r2, True
+        elif a < 0.0:
+            return False
+    elif bb != 0.0:         # a straight edge
+        xe = -c / bb
+        if bb > 0.0:
+            x0, e0 = xe, True
+        else:
+            x1, e1 = xe, True
+    if x0 < -hw:
+        x0, e0 = -hw, False
+    if x1 > hw:
+        x1, e1 = hw, False
+    if x1 < x0 or cx * (x0 + x1) * 0.5 + b <= 0.0:     # off the screen, or the cone behind you
+        return False
+    r = _GR
+    r[0] = x0
+    r[1] = e0
+    r[2] = x1
+    r[3] = e1
+    return True
 
 
-def _sun_bands(ctx, sp):
-    """The sun from close by: a band of each SUN_BAND rows, filled where a ray
-    through the band's middle row meets the sphere. Inside it, all sun."""
-    cx, cy, cz = sp.sx, sp.sy, sp.sz
-    d2 = cx * cx + cy * cy + cz * cz
-    r2 = sp.sr * sp.sr
+def _globe(ctx, cx, cy, cz, rad, fill, edge=None):
+    """A sphere (centre cx, cy, cz, radius rad) to its true edge: filled in
+    fill, its outline in edge (None: none). Inside it, all of it."""
     hw, hh = VIEW_HW, VIEW_HH
-    if d2 <= r2:        # inside the sun's edge (the heat kills a little deeper in)
-        ctx.rectangle(-hw, -hh, 2 * hw, 2 * hh).fill()
+    d2 = cx * cx + cy * cy + cz * cz
+    r2 = rad * rad
+    if d2 <= r2:        # inside the edge (the sun's heat kills a little deeper in)
+        ctx.rgb(*fill).rectangle(-hw, -hh, 2 * hw, 2 * hh).fill()
+        return
+    if cz > 0.0 and rad * FOCAL < GLOBE_MIN * cz:     # tiny: the circle is right
+        c = _sphere(cx, cy, cz, rad)
+        if c is not None:
+            ctx.rgb(*fill).arc(c[0], c[1], c[2], 0, TAU, 0).fill()
+            if edge is not None:
+                ctx.rgb(*edge).arc(c[0], c[1], c[2], 0, TAU, 0).stroke()
         return
     d = math.sqrt(d2)
     cx /= d
     cy /= d
     cz /= d
-    k = 1.0 - r2 / d2   # cos^2 of the sun's angular radius: on the edge (p.c)^2 = k |p|^2
+    k = 1.0 - r2 / d2   # cos^2 of the sphere's angular radius: on the edge (p.c)^2 = k |p|^2
     # all of it behind the view: its edge more than 50 degrees off straight ahead
-    if cz < 0.64 and math.acos(cz) - math.asin(sp.sr / d) > 0.87:
+    if cz < 0.64 and math.acos(cz) - math.asin(rad / d) > 0.87:
         return
-    a = cx * cx - k
     f = FOCAL
-    y = -hh
-    while y < hh:
-        ym = y + SUN_BAND * 0.5
-        # the ray through (x, ym) on screen is (x, -ym, f): (x cx + b)^2 >= k (x^2 + e)
-        b = f * cz - ym * cy
-        e = ym * ym + f * f
-        bb = 2.0 * cx * b
-        c = b * b - k * e
-        x0 = x1 = None
-        if a > 1e-9 or a < -1e-9:
-            disc = bb * bb - 4.0 * a * c
-            if disc >= 0.0:
-                q = math.sqrt(disc)
-                r1 = (-bb - q) / (2.0 * a)
-                r2_ = (-bb + q) / (2.0 * a)
-                if r1 > r2_:
-                    r1, r2_ = r2_, r1
-                if a < 0.0:
-                    x0, x1 = r1, r2_                      # between the roots
-                elif cx * (r1 - 1.0) + b > 0.0:           # outside them: the sun's side
-                    x0, x1 = -hw, r1
-                else:
-                    x0, x1 = r2_, hw
-            elif a > 0.0:
-                x0, x1 = -hw, hw
-        elif bb != 0.0:         # a straight edge
-            xe = -c / bb
-            if bb > 0.0:
-                x0, x1 = xe, hw
+    sa = rad / d                        # sin of its angular radius
+    q = cz * cz - sa * sa               # cos^2 of the centre's angle off ahead - sin^2 of that
+    if q > 0.02 and cz > 0.0:           # wholly in front: an ellipse
+        ca = math.sqrt(1.0 - sa * sa)
+        st = math.sqrt(1.0 - cz * cz)   # sin of the centre's angle off straight ahead
+        # its far and near ends along the line out from the middle of the view,
+        # tan(angle +- radius); the half width across it
+        t2 = (st * ca + cz * sa) / (cz * ca - st * sa)
+        t1 = (st * ca - cz * sa) / (cz * ca + st * sa)
+        ea = f * (t2 - t1) * 0.5
+        if ea < GLOBE_FAR:
+            eb = f * sa / math.sqrt(q)
+            m = f * (t1 + t2) * 0.5
+            if st > 1e-6:
+                ux = cx / st
+                uy = -cy / st           # screen y is down
             else:
-                x0, x1 = -hw, xe
-        if x0 is not None:
-            if x0 < -hw:
-                x0 = -hw
-            if x1 > hw:
-                x1 = hw
-            if x1 > x0 and cx * (x0 + x1) * 0.5 + b > 0.0:    # not the cone behind you
-                ctx.rectangle(int(x0), y, int(x1 - x0) + 1, SUN_BAND).fill()
-        y += SUN_BAND
+                ux, uy = 1.0, 0.0
+            ox = ux * m
+            oy = uy * m
+            ax = ux * ea                # the long axis and the short one, on screen
+            ay = uy * ea
+            bx = -uy * eb
+            by = ux * eb
+            n = 1 if ea > 80.0 else 2 if ea > 20.0 else 4   # fewer points for a smaller one
+            xs, ys = _EX, _EY
+            j = 0
+            for i in range(0, GLOBE_N, n):
+                co, si = _GCS[i]
+                xs[j] = ox + ax * co + bx * si
+                ys[j] = oy + ay * co + by * si
+                j += 1
+            if (ox < 0.0 and -ox or ox) + ea < GLOBE_SAFE and (oy < 0.0 and -oy or oy) + ea < GLOBE_SAFE:
+                _poly(ctx, xs, ys, j, fill, edge)
+            else:   # reaching far off the screen: cut to just round it first
+                _poly_clipped(ctx, xs, ys, j, fill, edge)
+            return
+    a = cx * cx - k
+    # close by: row by row, over the rows it covers only
+    gk = _GK
+    gk[0] = f * cz
+    gk[1] = cy
+    gk[2] = 2.0 * cx
+    gk[3] = a
+    gk[4] = k
+    gk[5] = f * f
+    gk[6] = cx
+    # the shape's top and bottom, where a row just touches it:
+    # (cy^2 + a) y^2 - 2 f cz cy y + f^2 (cz^2 + a) = 0
+    ends = []
+    qa = cy * cy + a
+    qb = -2.0 * f * cz * cy
+    qc = f * f * (cz * cz + a)
+    if qa > 1e-12 or qa < -1e-12:
+        disc = qb * qb - 4.0 * qa * qc
+        if disc >= 0.0:
+            q = math.sqrt(disc)
+            for y in ((-qb - q) / (2.0 * qa), (-qb + q) / (2.0 * qa)):
+                if -hh < y < hh:
+                    ends.append(y)
+    ends.sort()
+    gy, gx0, ge0, gx1, ge1 = _GY, _GX0, _GE0, _GX1, _GE1
+    del gy[:], gx0[:], ge0[:], gx1[:], ge1[:]
+    y0 = -hh
+    y1 = hh
+    if not _globe_row(-hh, False) and ends:
+        y0 = ends[0]            # it starts below the top of the screen
+    if not _globe_row(hh, False) and ends:
+        y1 = ends[-1]           # and ends above the bottom
+    step = (y1 - y0) / GLOBE_ROWS
+    if step < GLOBE_STEP:
+        step = GLOBE_STEP
+    y = y0
+    ei = 0
+    while ei < len(ends) and ends[ei] < y0:
+        ei += 1
+    last = False
+    while True:
+        top = False
+        if ei < len(ends) and ends[ei] <= y:
+            yy = ends[ei]
+            ei += 1
+            top = True
+            if y < yy + 1.0:
+                y = yy + 1.0    # the next row a little past it (on it, rounding may miss)
+        else:
+            if y > y1:
+                if last:
+                    break
+                y = y1          # the last row exactly at its bottom (or the screen's)
+            last = y >= y1
+            yy = y
+            y += step
+        if yy > hh:
+            break
+        if not _globe_row(yy, top):
+            if gy:              # past it (its image is all one piece)
+                break
+            continue
+        r = _GR
+        gy.append(yy)
+        gx0.append(r[0])
+        ge0.append(r[1])
+        gx1.append(r[2])
+        ge1.append(r[3])
+        if yy >= hh:
+            break
+    if gy:
+        _globe_draw(ctx, fill, edge)
 
 
-def _sun(ctx, sp, sun):
-    if sp.sx * sp.sx + sp.sy * sp.sy + sp.sz * sp.sz < SUN_BANDS_K * SUN_BANDS_K * sp.sr * sp.sr:
-        ctx.rgb(*SUN_COLOURS[sp.sun % len(SUN_COLOURS)])
-        _sun_bands(ctx, sp)
-        return
-    if sun is None:
-        return
-    ctx.rgb(*SUN_COLOURS[sp.sun % len(SUN_COLOURS)])
-    if _covers(sun):
-        ctx.rectangle(-VIEW_HW, -VIEW_HH, 2 * VIEW_HW, 2 * VIEW_HH).fill()
-    elif sun[2] < MAX_ARC:
-        ctx.arc(sun[0], sun[1], sun[2], 0, TAU, 0).fill()
-
-
-def _planet(ctx, sp, planet):
-    """The planet: a disc in its colour with a brighter outline."""
-    if planet is None:
-        return
-    fill, edge = PLANET_COLOURS[sp.planet % len(PLANET_COLOURS)]
+def _poly(ctx, xs, ys, n, fill, edge):
+    """Fill the closed shape through the first n points of xs, ys, and
+    stroke it in edge (None: not)."""
     ctx.rgb(*fill)
-    if _covers(planet):
-        ctx.rectangle(-VIEW_HW, -VIEW_HH, 2 * VIEW_HW, 2 * VIEW_HH).fill()
+    ctx.begin_path()
+    ctx.move_to(xs[0], ys[0])
+    for i in range(1, n):
+        ctx.line_to(xs[i], ys[i])
+    ctx.fill()
+    if edge is not None:
+        ctx.rgb(*edge)
+        ctx.begin_path()
+        ctx.move_to(xs[0], ys[0])
+        for i in range(1, n):
+            ctx.line_to(xs[i], ys[i])
+        ctx.line_to(xs[0], ys[0])
+        ctx.stroke()
+
+
+def _clip_side(xs, ys, axis, lim, sign):
+    """The shape cut by one side of the box: keep sign * coordinate <= lim
+    (Sutherland-Hodgman). Returns the new xs, ys."""
+    ox = []
+    oy = []
+    n = len(xs)
+    if not n:
+        return ox, oy
+    px, py = xs[-1], ys[-1]
+    pin = sign * (px if axis == 0 else py) <= lim
+    for i in range(n):
+        x, y = xs[i], ys[i]
+        cin = sign * (x if axis == 0 else y) <= lim
+        if cin != pin:      # crossing the side: where
+            if axis == 0:
+                t = (sign * lim - px) / (x - px)
+                ox.append(sign * lim)
+                oy.append(py + (y - py) * t)
+            else:
+                t = (sign * lim - py) / (y - py)
+                ox.append(px + (x - px) * t)
+                oy.append(sign * lim)
+        if cin:
+            ox.append(x)
+            oy.append(y)
+        px, py, pin = x, y, cin
+    return ox, oy
+
+
+def _clip_seg(x0, y0, x1, y1, lx, ly):
+    """The part of the line from (x0, y0) to (x1, y1) inside the box |x| <= lx,
+    |y| <= ly (Liang-Barsky), as (x0, y0, x1, y1), or None."""
+    t0, t1 = 0.0, 1.0
+    dx = x1 - x0
+    dy = y1 - y0
+    for p, q in ((-dx, x0 + lx), (dx, lx - x0), (-dy, y0 + ly), (dy, ly - y0)):
+        if p == 0.0:
+            if q < 0.0:
+                return None
+        else:
+            t = q / p
+            if p < 0.0:
+                if t > t1:
+                    return None
+                if t > t0:
+                    t0 = t
+            else:
+                if t < t0:
+                    return None
+                if t < t1:
+                    t1 = t
+    return x0 + dx * t0, y0 + dy * t0, x0 + dx * t1, y0 + dy * t1
+
+
+def _poly_clipped(ctx, xs, ys, n, fill, edge):
+    """As _poly, for a shape reaching far off the screen: the fill cut to the
+    screen plus CLIP_M, the outline's lines cut to it too (so never drawn
+    along the cut)."""
+    lx = VIEW_HW + CLIP_M
+    ly = VIEW_HH + CLIP_M
+    cx, cy = xs[:n], ys[:n]
+    cx, cy = _clip_side(cx, cy, 0, lx, 1.0)
+    cx, cy = _clip_side(cx, cy, 0, lx, -1.0)
+    cx, cy = _clip_side(cx, cy, 1, ly, 1.0)
+    cx, cy = _clip_side(cx, cy, 1, ly, -1.0)
+    if len(cx) >= 3:
+        ctx.rgb(*fill)
+        ctx.begin_path()
+        ctx.move_to(cx[0], cy[0])
+        for i in range(1, len(cx)):
+            ctx.line_to(cx[i], cy[i])
+        ctx.fill()
+    if edge is None:
         return
-    if planet[2] >= MAX_ARC:
+    ctx.rgb(*edge)
+    ctx.begin_path()
+    for i in range(n):
+        j = i + 1 if i + 1 < n else 0
+        seg = _clip_seg(xs[i], ys[i], xs[j], ys[j], lx, ly)
+        if seg is not None:
+            ctx.move_to(seg[0], seg[1])
+            ctx.line_to(seg[2], seg[3])
+    ctx.stroke()
+
+
+def _globe_draw(ctx, fill, edge):
+    """Fill the rows in _GY.. as one shape (down the left ends, up the right),
+    then stroke its edge in edge (None: not)."""
+    gy, gx0, ge0, gx1, ge1 = _GY, _GX0, _GE0, _GX1, _GE1
+    n = len(gy)
+    ctx.rgb(*fill)
+    ctx.begin_path()
+    ctx.move_to(gx0[0], gy[0])
+    for i in range(1, n):
+        ctx.line_to(gx0[i], gy[i])
+    for i in range(n - 1, -1, -1):
+        ctx.line_to(gx1[i], gy[i])
+    ctx.fill()
+    if edge is None:
         return
-    x, y, r = planet
-    ctx.arc(x, y, r, 0, TAU, 0).fill()
-    ctx.rgb(*edge).arc(x, y, r, 0, TAU, 0).stroke()
+    ctx.rgb(*edge)
+    ctx.begin_path()
+    hh = VIEW_HH
+    if gy[0] > -hh and ge0[0] and ge1[0]:           # its top, where that is on screen
+        ctx.move_to(gx0[0], gy[0])
+        ctx.line_to(gx1[0], gy[0])
+    for xs, es in ((gx0, ge0), (gx1, ge1)):
+        for i in range(1, n):
+            if es[i - 1] and es[i]:
+                ctx.move_to(xs[i - 1], gy[i - 1])
+                ctx.line_to(xs[i], gy[i])
+    if gy[-1] < hh and ge0[-1] and ge1[-1]:         # and its bottom
+        ctx.move_to(gx0[-1], gy[-1])
+        ctx.line_to(gx1[-1], gy[-1])
+    ctx.stroke()
+
+
+def _sun(ctx, sp, sun=None):
+    _globe(ctx, sp.sx, sp.sy, sp.sz, sp.sr, SUN_COLOURS[sp.sun % len(SUN_COLOURS)])
+
+
+def _sun_bands(ctx, sp):
+    """The sun (the old name, build 99)."""
+    _sun(ctx, sp)
+
+
+def _planet(ctx, sp, planet=None):
+    """The planet: filled in its colour with a brighter outline, to its true edge."""
+    fill, edge = PLANET_COLOURS[sp.planet % len(PLANET_COLOURS)]
+    _globe(ctx, sp.px, sp.py, sp.pz, sp.pr, fill, edge)
 
 
 def _draw_space(ctx, sp, wire=WIRE_MIN):
@@ -1337,6 +1604,25 @@ def _sun_gauges(ctx, g, sp):
         ctx.rgb(*DIM).rectangle(-58, -85, 116, 4).fill()
         f = min(g.fuel, full) * 116 // full
         ctx.rgb(*(RED if g.fuel < full // 4 else GREEN)).rectangle(-58, -85, f, 4).fill()
+
+
+PLANET_GAUGE_ALT = 1.0  # planet radii above its surface: nearer, the altitude gauge shows
+
+
+def _planet_gauge(ctx, sp):
+    """Near the planet (Brian, build 104): the altitude above it (AL), centred
+    at the top, full PLANET_GAUGE_ALT radii up and empty at the surface, red in
+    its last tenth. Nothing further out."""
+    d = math.sqrt(sp.px * sp.px + sp.py * sp.py + sp.pz * sp.pz) - sp.pr
+    if d >= PLANET_GAUGE_ALT * sp.pr:
+        return
+    # centred under the frame time (Brian), the label on its left
+    ctx.rgba(0, 0, 0, 0.6).rectangle(-40, -99, 72, 10).fill()      # readable against the planet
+    text(ctx, "AL", -33, -92, 9, GREY)
+    ctx.rgb(*DIM).rectangle(-25, -94, 50, 4).fill()
+    a = int(50 * d / (PLANET_GAUGE_ALT * sp.pr))
+    a = 0 if a < 0 else 50 if a > 50 else a
+    ctx.rgb(*(RED if a < 5 else CYAN)).rectangle(-25, -94, a, 4).fill()
 
 
 def _compass(ctx, sp):
@@ -1444,6 +1730,8 @@ def draw_hud(ctx, g, ms=None, ring=True):
             _compass(ctx, sp)
         if g.cabin > COOL_CABIN:
             _sun_gauges(ctx, g, sp)
+        elif not sp.witch:
+            _planet_gauge(ctx, sp)
 
     # combat practice: wave (yellow) and score (white), as one centred row of
     # digits; a commander's flight has neither

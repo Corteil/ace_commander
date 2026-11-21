@@ -614,28 +614,62 @@ assert not g.over and g.cabin == game.FATAL_CABIN, "invincible: the heat can't k
 g.god = False; g.to_sun(0.9); g.step(DT, 0, 0, 0, False, False)
 assert g.over, "too hot: the end"
 
-# close to the sun it is drawn as bands from its true edge, a horizon across
-# the view that stays there while you skim past it (it used to vanish once the
-# sun's centre was half a radius ahead)
+# the sun and the planet are drawn to their true edge (build 99 the sun close
+# by, build 104 both always): a horizon across the view that stays there while
+# you skim past (it used to vanish once the centre was half a radius ahead);
+# checked against a ray through each pixel
 import cockpit as ck
+from PIL import Image, ImageDraw
 
 
-class _Bands:
+class _Img:
+    """Just what the sun and planet drawing use, onto a 240 x 240 image."""
+
     def __init__(self):
-        self.r = []
+        self.img = Image.new("RGB", (240, 240))
+        self.d = ImageDraw.Draw(self.img)
+        self.col = (0, 0, 0)
+        self.pts = []
+        self.segs = []
 
-    def rgb(self, *a):
+    def rgb(self, r, g, b):
+        self.col = (int(r * 255), int(g * 255), int(b * 255))
         return self
 
     def rectangle(self, x, y, w, h):
-        self.r.append((x, y, w, h))
+        self.d.rectangle((x + 120, y + 120, x + w + 119, y + h + 119), fill=self.col)
         return self
 
-    def arc(self, *a):
-        self.r.append(None)
+    def arc(self, x, y, r, a0, a1, d):
+        self.pts = [("arc", x, y, r)]
+        return self
+
+    def begin_path(self):
+        self.pts = []
+        return self
+
+    def move_to(self, x, y):
+        self.pts.append(("m", x + 120, y + 120))
+        return self
+
+    def line_to(self, x, y):
+        self.pts.append(("l", x + 120, y + 120))
         return self
 
     def fill(self):
+        if self.pts and self.pts[0][0] == "arc":
+            _, x, y, r = self.pts[0]
+            self.d.ellipse((x + 120 - r, y + 120 - r, x + 120 + r, y + 120 + r), fill=self.col)
+        elif self.pts:
+            self.d.polygon([(p[1], p[2]) for p in self.pts], fill=self.col)
+        return self
+
+    def stroke(self):
+        last = None
+        for p in self.pts:
+            if p[0] == "l" and last is not None:
+                self.segs.append((last, (p[1], p[2])))
+            last = (p[1], p[2])
         return self
 
 
@@ -644,31 +678,53 @@ class _Sp:
 
 
 def _sun_seen(sx, sy, sz, r=24000.0):
-    """The share of the view's pixels the bands fill, and the share wrong
+    """The share of the view's pixels the sun fills, and the share wrong
     against a ray through each pixel."""
     sp = _Sp()
     sp.sx, sp.sy, sp.sz, sp.sr = sx * r, sy * r, sz * r, r
-    c = _Bands()
+    c = _Img()
     ck._sun_bands(c, sp)
+    px = c.img.load()
     on = bad = n = 0
-    for y in range(-120, 120, ck.SUN_BAND):
-        ym = y + ck.SUN_BAND / 2.0
-        for x in range(-120, 120, 2):
-            px, py, pz = x + 0.5, -ym, ck.FOCAL
-            pc = px * sp.sx + py * sp.sy + pz * sp.sz
-            t = pc > 0 and pc * pc >= (px * px + py * py + pz * pz) * (sp.sx ** 2 + sp.sy ** 2 + sp.sz ** 2 - r * r)
-            got = any(rx <= x < rx + w and ry <= y < ry + h for rx, ry, w, h in c.r)
+    for iy in range(0, 240, 2):
+        for ix in range(0, 240, 2):
+            x, y = ix - 120 + 0.5, iy - 120 + 0.5
+            vx, vy, vz = x, -y, ck.FOCAL
+            pc = vx * sp.sx + vy * sp.sy + vz * sp.sz
+            t = pc > 0 and pc * pc >= (vx * vx + vy * vy + vz * vz) * (sp.sx ** 2 + sp.sy ** 2 + sp.sz ** 2 - r * r)
+            got = px[ix, iy] != (0, 0, 0)
             n += 1
             on += got
             bad += t != got
     return on / n, bad / n
 
 
-for at in ((1.15, 0, 0.5), (1.15, 0, 0.1), (0, -1.3, 0.4), (-0.8, 0.7, 0.6), (0.5, 0.2, 2.0), (0, 0, 2.5)):
+for at in ((1.15, 0, 0.5), (1.15, 0, 0.1), (0, -1.3, 0.4), (-0.8, 0.7, 0.6), (0.5, 0.2, 2.0), (0, 0, 2.5),
+           (0.3, -0.2, 8.0), (2.0, 1.0, 6.0)):
     seen, wrong = _sun_seen(*at)
     assert seen > 0.0 and wrong < 0.01, (at, seen, wrong)
 assert _sun_seen(0, 0, -1.5)[0] == 0.0 and _sun_seen(2.0, 0, -1.0)[0] == 0.0, "behind you: none"
 assert _sun_seen(0.6, 0.6, 0.3)[0] == 1.0, "inside the sun's edge: all sun"
+# the planet below you as you skim past it stays in view, with its bright
+# outline along its edge, never along the screen's edge
+class _PlanetSp:
+    planet = 0
+    station = None
+psp = _PlanetSp()
+pr = 6000.0
+fill_c, edge_c = ck.PLANET_COLOURS[0]
+for zk in (8.0, 2.5, 1.5, 0.4, 0.1):
+    psp.px, psp.py, psp.pz, psp.pr = 0.3 * pr, -1.1 * pr, zk * pr, pr
+    c = _Img()
+    ck._planet(c, psp)
+    filled = sum(1 for p in c.img.getdata() if p != (0, 0, 0))
+    assert filled > 0, ("the planet below you stays in view", zk)
+    if zk < 8.0:
+        assert c.segs, ("its outline", zk)
+        for (x0, y0), (x1, y1) in c.segs:
+            assert not (x0 == x1 and x0 in (0, 240)) and not (y0 == y1 and y0 in (0, 240)), \
+                ("no outline along the screen's edge", zk)
+print("the sun and the planet to their true edge, the planet's outline on it: ok")
 # DEBUG's TO THE SUN, flying on: while the cabin is hot enough to scoop and the
 # sun's edge is in front of you, some of the view is sun
 g = fresh(9)
@@ -681,14 +737,14 @@ hot = 0
 for _ in range(1200):
     g.step(DT, 0, 0, 0, False, False)
     if g.cabin >= game.SCOOP_TEMP and sp.sz > 0.15 * sp.sr:
-        c = _Bands()
-        ck._sun(c, sp, ck._sphere(sp.sx, sp.sy, sp.sz, sp.sr))
-        assert c.r and None not in c.r, ("no sun while skimming", sp.sz / sp.sr)
+        c = _Img()
+        ck._sun(c, sp)
+        assert c.img.getbbox() is not None, ("no sun while skimming", sp.sz / sp.sr)
         hot += 1
     if sp.sz < 0:
         break
 assert hot > 10, hot
-print("the sun close up: bands from its true edge, there while skimming: ok")
+print("the sun close up: to its true edge, there while skimming: ok")
 
 # waves are for combat practice only
 g = fresh(10)
