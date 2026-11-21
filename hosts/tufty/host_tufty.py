@@ -147,8 +147,9 @@ class Host:
         if self.pad is not None and not (self.pad_off and practising):  # (GAMEPAD OFF: practice)
             try:
                 for k, v in self.pad.read_buttons().items():
-                    if v and k in controls_tufty.PAD_MAP:
-                        keys.add(controls_tufty.PAD_MAP[k])
+                    pm = controls_tufty.PAD_MAP if in_flight else controls_tufty.PAD_MAP_OFF
+                    if v and k in pm:
+                        keys.add(pm[k])
             except Exception:
                 self.pad = None             # unplugged: carry on with the Tufty's buttons
         return keys

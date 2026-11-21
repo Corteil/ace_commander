@@ -236,6 +236,10 @@ pad_press("A")              # BC
 pad_press("+")              # done
 assert got == ["BC"], got
 frames(2)
+# the Pad's Y off the flight is the badge's B (search on the Galactic chart: build 125)
+import controls_tufty           # noqa: E402
+assert controls_tufty.PAD_MAP_OFF["Y"] is controls_tufty.BADGE["B"]
+assert controls_tufty.PAD_MAP["Y"] is controls_tufty.BADGE["E"], "in flight Y still slows down"
 # NEW COMMANDER: the Tufty's B selects (the badge's C), as without the Pad
 a.menu = a.choices().index("NEW COMMANDER")
 press("B")
@@ -243,6 +247,15 @@ press("B")
 assert a.mode == "docked", a.mode
 assert h.ace.SAVE_PATH.startswith(data) and os.path.exists(h.ace.SAVE_PATH), "saved in the data folder"
 shot("tufty_docked")
+d = a.dock
+d.open("GALACTIC CHART")
+pad_press("A")              # the chart's cursor (the badge's C)
+assert d.name() == "GALACTIC CHART" and d.cursor, (d.name(), d.cursor)
+pad_press("Y")              # the Pad's Y: search (the badge's B on the Galactic chart)
+assert a.tdialog is not None, "Y opens the search"
+pad_press("+")              # done (nothing typed: no match)
+assert a.tdialog is None
+d.open("STATUS")
 pad_press("+")          # the Pad's + is the badge's A: launch
 for _ in range(200):
     frames(1)

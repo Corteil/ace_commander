@@ -58,6 +58,10 @@ LABELS_OFF = {"C": "B", "F": "A+C"}
 PAD_MAP = {"U": STICK["UP"], "D": STICK["DOWN"], "L": STICK["LEFT"], "R": STICK["RIGHT"],
            "A": BADGE["C"], "B": BADGE["D"], "X": BADGE["F"], "Y": BADGE["E"],
            "+": BADGE["A"], "-": BADGE["B"]}
+# off the flight Y is the badge's B too (Brian, build 125): search on the Galactic
+# chart, as the Pi pad's Y; in flight it stays E (slower)
+PAD_MAP_OFF = dict(PAD_MAP)
+PAD_MAP_OFF["Y"] = BADGE["B"]
 
 
 class Feed:

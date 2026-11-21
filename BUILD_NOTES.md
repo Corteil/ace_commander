@@ -1416,3 +1416,7 @@ what is now `ace.py` (renamed in build 50).
    with the game pad used last (`platform_pi.pad_in_use`, from `run.Host.pad_last`) text entry
    is the picker (pad: D-pad up / down, south or right keep, left back, Start done, east
    cancel), with the keyboard its typing pages as before. Not yet on the badge.
+   **Build 125** (Brian: "button on pad to enter search, maybe Y?"): the Tufty's Qw/ST Pad, off
+   the flight, has Y as the badge's B too (`controls_tufty.PAD_MAP_OFF`): the search on the
+   Galactic chart (cursor on, C, first), the next tab elsewhere; in flight Y stays E (slower).
+   The Pi pad's Y already was the badge's B.
