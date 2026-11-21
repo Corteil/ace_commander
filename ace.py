@@ -396,6 +396,8 @@ class AceCommander(PLATFORM.App):
         self.p_update = 0.0
         self.p_rules = 0.0
         self.p_draw = 0.0
+        self.p_world = 0.0      # of which the 3D view, and the HUD
+        self.p_hud = 0.0
         self.p_avg = 60.0   # last window's average frame, ms
         self.p_nslow = 0
         self.p_slow = []
@@ -1366,16 +1368,22 @@ class AceCommander(PLATFORM.App):
             used = getattr(gc, "mem_alloc", lambda: 0)()
             free = getattr(gc, "mem_free", lambda: 0)()
             mem_ms = _diff(_us(), t0) / 1000.0
-            print("PERF frame %.0f max %.0f update %.1f rules %.1f draw %.1f objs %d fast %d"
-                  " slow %d %s used %d free %d memcall %.1f" % (
+            ts = cockpit.T_SPACE
+            space = ts[0] / 1000.0 / n if ts is not None else 0.0
+            if ts is not None:
+                ts[0] = 0
+            print("PERF frame %.0f max %.0f update %.1f rules %.1f draw %.1f (world %.1f space %.1f"
+                  " hud %.1f) objs %d fast %d slow %d %s used %d free %d memcall %.1f" % (
                       self.p_avg, self.p_max, self.p_update / n, self.p_rules / n,
-                      self.p_draw / n, len(self.game.objs), 1 if self.fast else 0,
+                      self.p_draw / n, self.p_world / n, space, self.p_hud / n,
+                      len(self.game.objs), 1 if self.fast else 0,
                       self.p_nslow, self.p_slow, used, free, mem_ms))
             self.p_n = 0
             self.p_nslow = 0
             self.p_slow = []
             self.p_skip = True
             self.p_frame = self.p_max = self.p_update = self.p_rules = self.p_draw = 0.0
+            self.p_world = self.p_hud = 0.0
 
     def _update_viewer(self, dt, cancel, confirm):
         v = self.viewer
@@ -2838,6 +2846,8 @@ class AceCommander(PLATFORM.App):
                 self.t_world += (world - self.t_world) * 0.1
                 self.t_hud += (hud - self.t_hud) * 0.1
                 self.p_draw += world + hud
+                self.p_world += world
+                self.p_hud += hud
         elif self.mode == "level":
             self._draw_level(ctx)
         elif self.mode == "practice":
