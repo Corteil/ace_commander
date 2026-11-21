@@ -269,6 +269,8 @@ PICKUP_MISSILE = 0.5   # combat practice: how often a canister holds a missile a
 # the last, a used energy bomb comes back, else the shields are filled
 UPGRADES = ("beam", "energy unit", "military", "bomb")
 WAVE_WAIT = 5.0         # seconds of countdown before the next wave (with the upgrades)
+UPGRADE_WAIT = 20.0     # the countdown waits for the upgrade canister to be collected (Brian),
+                        # this long at most: a canister missed goes, and the countdown starts
 UPGRADE_AHEAD = 400.0   # the upgrade canister appears this far straight ahead, drifting
                         # towards you, for an easy pick-up (Brian; it was 1200)
 UPGRADE_NAMES = {"beam": "BEAM LASER", "energy unit": "ENERGY UNIT", "military": "MILITARY LASER",
@@ -747,6 +749,7 @@ class Game:
         if not hasattr(self, "practice_upgrades"):
             self.practice_upgrades = False  # waves drop upgrade canisters (ace sets it)
         self.upgrade_n = 0     # the upgrades fitted so far (UPGRADES)
+        self.wave_hold = 0.0   # waiting for the upgrade canister to be collected (UPGRADE_WAIT)
         self.wave_wait = 0.0   # the countdown to the next wave (WAVE_WAIT), while > 0
         self.wave_shown = 0    # the second it last showed
         self.jump_t = 0.0      # > 0 while the hyperspace countdown runs
@@ -2156,10 +2159,13 @@ class Game:
                     self.missiles += 1
                 if self.practice_upgrades:
                     c = self.release_canister(UPGRADE_AHEAD)    # just ahead: easy to pick up
+                    self.wave_shown = 0
                     if c is not None:
                         c.upgrade = True    # (it can't be shot: see _weapons_view)
-                    self.wave_wait = WAVE_WAIT      # a breather, counted down (_director)
-                    self.wave_shown = 0
+                        self.wave_hold = UPGRADE_WAIT   # the countdown once it's collected
+                        self.say("UPGRADE AHEAD", 2.5)
+                    else:
+                        self.wave_wait = WAVE_WAIT      # a breather, counted down (_director)
                 else:
                     self.say("WAVE %d" % self.wave, 2.5)
             elif self.kills % 8 == 0:
@@ -2488,6 +2494,21 @@ class Game:
         if self.space is not None:
             self._encounters(dt, hostile, count)
             return
+        if self.wave_hold > 0:      # the upgrade canister not yet collected: nobody new comes
+            self.wave_hold -= dt
+            waiting = False
+            for o in self.objs:
+                if o.upgrade and not o.dead:
+                    waiting = True
+                    break
+            if waiting and self.wave_hold > 0:
+                return
+            for o in self.objs:     # collected, or too long: any left goes, the countdown starts
+                if o.upgrade:
+                    o.dead = True
+            self.wave_hold = 0.0
+            self.wave_wait = WAVE_WAIT
+            self.wave_shown = 0
         if self.wave_wait > 0:      # the countdown to the next wave: nobody new comes
             self.wave_wait -= dt
             if self.wave_wait <= 0:

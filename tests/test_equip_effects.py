@@ -610,6 +610,17 @@ for _ in range(3):
     g4._kill(put(g4, "SIDEWINDER", "ship", 0, 0, 3000))
 g4.objs[:] = [o for o in g4.objs if o.upgrade] + [o for o in g4.new if o.upgrade]
 g4.new[:] = []
+assert g4.wave_hold > 0 and g4.wave_wait == 0, "the countdown waits for the canister"
+for _ in range(int(3.0 / DT)):        # not collected: nobody new, no countdown
+    for o in g4.objs:
+        if o.upgrade:
+            o.x, o.y, o.z = 0.0, 300.0, 900.0   # kept out of reach
+    g4.step(DT, 0.0, 0.0, 0.0, False, False)
+    assert not [o for o in g4.objs if o.kind == "ship"] and g4.wave_wait == 0
+for o in g4.objs:
+    if o.upgrade:
+        o.dead = True               # collected (as scooping does)
+g4._upgrade()
 seen = set()
 for _ in range(int((game.WAVE_WAIT - 0.3) / DT)):
     g4.step(DT, 0.0, 0.0, 0.0, False, False)
@@ -619,6 +630,20 @@ assert "WAVE 2 IN 5" in seen and "WAVE 2 IN 1" in seen, sorted(seen)
 for _ in range(int(1.0 / DT)):
     g4.step(DT, 0.0, 0.0, 0.0, False, False)
 assert g4.wave_wait == 0.0 and [o for o in g4.objs + g4.new if o.kind == "ship"], "then the wave"
+# a canister missed: after UPGRADE_WAIT it goes and the countdown starts anyway
+g6 = fresh(29)
+g6.practice_upgrades = True
+for _ in range(3):
+    g6._kill(put(g6, "SIDEWINDER", "ship", 0, 0, 3000))
+g6.objs[:] = [o for o in g6.objs + g6.new if o.upgrade]
+g6.new[:] = []
+for _ in range(int((game.UPGRADE_WAIT + 0.5) / DT)):
+    for o in g6.objs:
+        if o.upgrade and not o.dead:
+            o.x, o.y, o.z = 0.0, 300.0, 900.0
+    g6.step(DT, 0.0, 0.0, 0.0, False, False)
+assert g6.wave_hold == 0 and (g6.wave_wait > 0 or g6.msg.startswith("WAVE")), (g6.wave_hold, g6.wave_wait)
+assert not [o for o in g6.objs if o.upgrade and not o.dead], "the missed canister goes"
 # the upgrade canister can't be shot
 g5 = fresh(27)
 c = g5.release_canister(600.0)

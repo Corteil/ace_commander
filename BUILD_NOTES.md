@@ -1343,4 +1343,6 @@ what is now `ace.py` (renamed in build 50).
    rack. `config.laser_leds` (off on the Tufty and the Pi): your laser no longer colours the
    LEDs (the Tufty's border, the Pi's drawn ring); the badge keeps it. The badge's practice
    changes too (upgrades, countdown). Then (Brian) the canister appears just ahead,
-   `UPGRADE_AHEAD` 400 (was 1200), so flying on picks it up.
+   `UPGRADE_AHEAD` 400 (was 1200), so flying on picks it up; and the countdown starts only
+   once it is collected (`Game.wave_hold`, "UPGRADE AHEAD"; missed, it goes after
+   `UPGRADE_WAIT` 20 s and the countdown starts anyway).
