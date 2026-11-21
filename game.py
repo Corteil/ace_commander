@@ -71,7 +71,8 @@ MISSILE_DAMAGE = 150.0
 JUMP_COUNT = 5.0           # seconds of countdown before a hyperspace jump
 WARP_TIME = 1.2            # seconds the streaks last on arriving
 LOCK_TIME = 2.0            # seconds a ship must stay in the sights before a missile locks
-AUTO_LOCK_TIME = 4.0   # the lock with auto_missile (no missile button: Brian, build 112)
+AUTO_LOCK_TIMES = (2.0, 3.0, 4.0)  # the lock with auto_missile, by level: EASY, NORMAL, HARD
+                       # (no missile button; Brian, builds 112 and 114)
 MISSILE_SPEED = 1100.0     # world units per second
 PMISSILE_SPEED = 1700.0
 TURN_RATE = 1.1            # how fast enemy ships can turn, radians per second
@@ -2012,7 +2013,7 @@ class Game:
                 self.locked = False
             elif not self.locked:
                 self.lock_t += dt
-                if self.lock_t >= (AUTO_LOCK_TIME if self.auto_missile else LOCK_TIME):
+                if self.lock_t >= (AUTO_LOCK_TIMES[self.level] if self.auto_missile else LOCK_TIME):
                     self.locked = True
 
         if fire and self.laser is None:

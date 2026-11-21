@@ -34,9 +34,11 @@ STICK["SELECT"] = Key("JOYSELECT", ("confirm",))
 # by themselves (config.auto_missiles) and the hints name these buttons (LABELS)
 TUFTY = {"A": STICK["LEFT"], "C": STICK["RIGHT"], "UP": STICK["UP"], "DOWN": STICK["DOWN"],
          "B": BADGE["C"]}
-# the hints' badge letters, named as the Tufty's buttons alone have them (ctx_tufty):
-# C is B; F (back, leave) is the HOME button, which leaves for the launcher
-LABELS = {"C": "B", "F": "HOME"}
+# two buttons together (Brian, build 114): the badge's F (speed up; back off the
+# flight) and E (slow down), which the five buttons haven't got on their own
+PAIRS = (("A", "C", BADGE["F"]), ("UP", "DOWN", BADGE["E"]))
+# the hints' badge letters named as the Tufty's buttons (ctx_tufty), Pad or not
+LABELS = {"C": "B", "F": "A+C", "E": "UP+DOWN"}
 # and each Qw/ST Pad button (qwstpad's names): the D-pad is the joystick
 PAD_MAP = {"U": STICK["UP"], "D": STICK["DOWN"], "L": STICK["LEFT"], "R": STICK["RIGHT"],
            "A": BADGE["C"], "B": BADGE["D"], "X": BADGE["F"], "Y": BADGE["E"],

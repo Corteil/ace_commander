@@ -525,6 +525,7 @@ print("builds 46, 48: the station a wireframe at any distance, to scale, in the 
 
 # ---- auto missiles (build 112: a device with no missile button) ---------------------
 g = fresh(21)
+g.set_level(2)                        # HARD: the longest auto lock (AUTO_LOCK_TIMES)
 g.auto_missile = True
 g.missiles = 4
 t = put(g, "SIDEWINDER", "ship", 0, 0, 3000)
@@ -532,7 +533,7 @@ t.speed = 0.0
 for _ in range(int(3.5 / DT)):        # in the sights 3.5 s: not yet locked (AUTO_LOCK_TIME 4)
     t.x, t.y, t.z = 0.0, 0.0, 3000.0
     g.step(DT, 0.0, 0.0, 0.0, False, False)
-assert not g.locked and g.missiles == 4, "the longer lock with auto missiles"
+assert not g.locked and g.missiles == 4, "the longer lock with auto missiles at HARD"
 for _ in range(int(1.0 / DT)):        # locked now, but the laser is firing: it waits
     t.x, t.y, t.z = 0.0, 0.0, 3000.0
     t.energy = 1e9
@@ -555,7 +556,16 @@ for _ in range(int(5.0 / DT)):
     t2.x, t2.y, t2.z = 0.0, 0.0, 3000.0
     g2.step(DT, 0.0, 0.0, 0.0, False, False)
 assert g2.locked and g2.missiles == game.MAX_MISSILES, "without it nothing fires by itself"
-print("auto missiles: a longer lock, wait for the laser, one a ship: ok")
+ge = fresh(30)
+ge.set_level(0)
+ge.auto_missile = True
+te = put(ge, "SIDEWINDER", "ship", 0, 0, 3000)
+te.speed = 0.0
+for _ in range(int(2.2 / DT)):
+    te.x, te.y, te.z = 0.0, 0.0, 3000.0
+    ge.step(DT, 0.0, 0.0, 0.0, False, False)
+assert ge.locked, "EASY: locked in 2 s"
+print("auto missiles: lock 2 / 3 / 4 s by level, wait for the laser, one a ship: ok")
 
 
 # ---- practice upgrades (build 113): each wave cleared drops an upgrade canister ----

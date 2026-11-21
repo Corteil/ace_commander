@@ -1346,3 +1346,11 @@ what is now `ace.py` (renamed in build 50).
    `UPGRADE_AHEAD` 400 (was 1200), so flying on picks it up; and the countdown starts only
    once it is collected (`Game.wave_hold`, "UPGRADE AHEAD"; missed, it goes after
    `UPGRADE_WAIT` 20 s and the countdown starts anyway).
+   **Build 114** (2026-11-21, Brian: "labels should reflect local button names, auto target
+   time 2 s, increases with level, need a way to change speed in the game, press two buttons
+   at the same time?", and HOME leaves for the app select screen). The auto-missile lock is
+   `AUTO_LOCK_TIMES` by level (EASY 2 s, NORMAL 3, HARD 4). On the Tufty two buttons together
+   are the badge's F and E (`controls_tufty.PAIRS`): A + C speeds up (and is "back" off the
+   flight), UP + DOWN slows down; and the hints name the Tufty's buttons with or without the
+   Pad (`LABELS`: C is B, F is A+C, E is UP+DOWN; HOME no longer, as it leaves the app). A
+   button pressed a moment before its pair counts alone for that moment.

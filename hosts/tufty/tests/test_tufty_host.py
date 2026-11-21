@@ -111,7 +111,7 @@ frames(5)
 assert a.choices() == ["COMBAT PRACTICE"], a.choices()
 cfg = sys.modules["ace_commander.config"]
 assert cfg.auto_missiles and cfg.practice_missile == 1.0, "missiles by themselves, in every canister"
-assert h.ctx.labels == {"C": "B", "F": "HOME"}, "the hints name the Tufty's buttons"
+assert h.ctx.labels == {"C": "B", "F": "A+C", "E": "UP+DOWN"}, "the hints name the Tufty's buttons"
 press("B")
 assert a.mode == "practice", a.mode
 press("B")
@@ -135,6 +135,17 @@ frames(2)
 assert g.beam > 0, "B fires"
 badge.down.discard(buttons["B"])
 frames(2)
+s0 = g.speed
+badge.down.add(buttons["A"]); badge.down.add(buttons["C"])
+frames(10)
+badge.down.discard(buttons["A"]); badge.down.discard(buttons["C"])
+assert g.speed > s0 + 1, ("A + C together: faster", s0, g.speed)
+s1 = g.speed
+badge.down.add(buttons["UP"]); badge.down.add(buttons["DOWN"])
+frames(10)
+badge.down.discard(buttons["UP"]); badge.down.discard(buttons["DOWN"])
+assert g.speed < s1 - 1, ("UP + DOWN together: slower", s1, g.speed)
+frames(2)
 shot("tufty_practice")
 print("Tufty buttons alone: combat practice only, cursor keys, joystick, B fires: ok")
 
@@ -145,7 +156,7 @@ frames(5)
 assert a.mode == "menu" and lit(0, 0, 320, 240) > 200, "the title draws"
 shot("tufty_title")
 assert "NEW COMMANDER" in a.choices() and not a.ctx_labels if hasattr(a, "ctx_labels") else True
-assert h.ctx.labels is None, "with the Pad the hints keep the badge's letters"
+assert h.ctx.labels is not None, "with the Pad too the hints name the Tufty's buttons"
 # NEW COMMANDER: the Tufty's B selects (the badge's C), as without the Pad
 a.menu = a.choices().index("NEW COMMANDER")
 press("B")

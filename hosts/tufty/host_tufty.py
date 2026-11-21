@@ -90,9 +90,17 @@ class Host:
         keys = set()
         b = self.badge
         m = controls_tufty.TUFTY
+        held = set()
         for name, const in self.buttons.items():
             if b.held(const):
-                keys.add(m[name])
+                held.add(name)
+        for one, two, key in controls_tufty.PAIRS:     # two together: speed (and back)
+            if one in held and two in held:
+                keys.add(key)
+                held.discard(one)
+                held.discard(two)
+        for name in held:
+            keys.add(m[name])
         if self.pad is not None:
             try:
                 for k, v in self.pad.read_buttons().items():
@@ -141,7 +149,7 @@ class Host:
             m.practice_missile = 1.0 if alone else None     # and one in every canister
             m.practice_upgrades = True  # practice waves drop upgrade canisters (build 113)
             m.laser_leds = False        # no laser colour on the LED border (Brian, build 113)
-            self.ctx.labels = controls_tufty.LABELS if alone else None  # hints: Tufty's buttons
+            self.ctx.labels = controls_tufty.LABELS     # hints name the Tufty's buttons
             m.platform = platform_tufty
             m.input = self.feed.attach
         elif name == "cockpit":
