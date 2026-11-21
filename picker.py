@@ -38,6 +38,8 @@ class LetterPicker:
         # driven: the game reads its buttons (ace._drive_picker: the badge, the Pi's pad);
         # otherwise the host gives it them (press / hold / let_go: the Tufty)
         self.driven = driven
+        self.hints = None       # (line, line) to show instead of the usual (a host's: the
+                                # Tufty's Pad or buttons, whichever was used last)
         self.i = 1              # LETTERS[1]: A
         self.held_ms = 0        # how long UP or DOWN has been held
         self.next_ms = 0        # when it next repeats
@@ -90,7 +92,10 @@ class LetterPicker:
                 text(ctx, "_" if letter == " " else letter, x + SLOT // 2, 0, 16, (0, 0, 0))
             else:
                 ctx.rgb(*ck.DIM).rectangle(x + 2, 8, SLOT - 4, 2).fill()
-        if self.driven:     # the badge's buttons (ace._drive_picker)
+        if self.hints:      # the host's (the Tufty: its Pad or its buttons)
+            text(ctx, self.hints[0], 0, 36, 11, ck.GREY)
+            text(ctx, self.hints[1], 0, 52, 11, ck.GREY)
+        elif self.driven:   # the badge's buttons (ace._drive_picker)
             text(ctx, "UP/DOWN letter   C next", 0, 36, 11, ck.GREY)
             text(ctx, "LEFT back   A done   F cancel", 0, 52, 11, ck.GREY)
         else:               # the Tufty's

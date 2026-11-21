@@ -51,6 +51,9 @@ PAIR_WAIT = 60
 # the job of (Brian, build 123): the D-pad's up / down the letter, A or right keeps it,
 # B or left goes back, + is done
 PAD_TYPING = {"U": "UP", "D": "DOWN", "A": "B", "R": "B", "B": "C", "L": "C", "+": "A"}
+# the picker's hint lines (build 127), by whichever was pressed last
+TYPING_HINTS = ("UP/DOWN letter   B next", "C back   A done")
+PAD_TYPING_HINTS = ("UP/DOWN letter   A next", "B back   + done")
 # the hints' badge letters named as the Tufty's buttons (ctx_tufty), Pad or not
 LABELS = {"C": "B"}         # (in flight A + C switches UP / DOWN: the game says which)
 LABELS_OFF = {"C": "B", "F": "A+C"}

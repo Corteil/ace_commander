@@ -1427,3 +1427,6 @@ what is now `ace.py` (renamed in build 50).
    C is ENTER, F is ESC, A is P (`run.KEY_LABELS_FLIGHT`); off the flight its A-F are the
    badge's buttons and the hints stay; the Pi pad's names as before (`pad_pi.labels`). The
    badge's hints were always its own.
+   **Build 127** (Brian: "the letter picker does not update its hints on the Tufty"): the
+   picker's own two hint lines can come from the host (`LetterPicker.hints`); the Tufty's sets
+   them each frame by what was pressed last (`controls_tufty.TYPING_HINTS` / `PAD_TYPING_HINTS`).

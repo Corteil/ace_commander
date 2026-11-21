@@ -212,6 +212,7 @@ a._open_name("", got.append)
 d = a.ndialog
 assert d is not None and d is a.platform.dialog, "the Tufty's letter picker, not the keyboard page"
 press("B")                  # A, the cursor on to the next place (A there too)
+assert d.hints == controls_tufty.TYPING_HINTS, "the Tufty's buttons: theirs"
 press("UP")                 # B
 press("UP")                 # C
 press("B")                  # AC
@@ -234,6 +235,7 @@ pad_press("R")              # BB
 pad_press("B")              # back onto the last B: B
 pad_press("U")              # C
 pad_press("A")              # BC
+assert d.hints == controls_tufty.PAD_TYPING_HINTS, "the Pad used: its names in the picker's hints"
 pad_press("+")              # done
 assert got == ["BC"], got
 frames(2)
