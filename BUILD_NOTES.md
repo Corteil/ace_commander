@@ -1191,5 +1191,11 @@ what is now `ace.py` (renamed in build 50).
    (`_sun_bands` is kept as a name), and `_covers` / `MAX_ARC`. Tests: `tests/test_game.py`
    checks the shapes against a ray through each pixel; `test_commander.py` checks the draw
    order by colour. Frames with the planet in view changed by its truer edge, nothing else.
-   Not yet run on the badge: the planet is now a shape of up to about 60 rows instead of one
-   circle whenever it is bigger than a dot, so watch the frame time with it in view.
+   Speed, measured on the badge (the maths and calls, drawing not included): row by row
+   everywhere took 20-35 ms, so wholly in front of you (the usual case) the edge is the exact
+   ellipse it is, from tan(angle off ahead +- angular radius) and f sin(r) / sqrt(cos^2 -
+   sin^2), its points from a table (`GLOBE_N` 48; 24 or 12 for a smaller one) worked out
+   once for the fill and the ring; rows only close by (`GLOBE_ROWS` at most 28, over the rows
+   it covers, constants once per frame). Then: a dot 0.7 ms, approaching 1.2 ms, big or
+   huge 3 ms, skimming the planet 9 ms, close to the sun 17 ms (build 99's sun used about
+   60 rows).

@@ -1142,8 +1142,17 @@ def _sphere(x, y, z, r):
 # horizon across the view that stays as you fly past. The planet's bright ring
 # is stroked along the same edge (but not along the screen's edge).
 GLOBE_MIN = 6.0         # pixels: a smaller sphere is drawn as a circle
-GLOBE_STEP = 4          # pixels between rows worked out (more rows: smoother, more float garbage)
+GLOBE_STEP = 6          # pixels between rows worked out close by (more rows: smoother, slower)
+GLOBE_ROWS = 28         # at most this many rows
+GLOBE_FAR = 1500.0      # pixels: an ellipse longer than this (half) is drawn by rows instead
 SUN_BAND = GLOBE_STEP   # the old name (build 99)
+# wholly in front of you a sphere's edge is an exact ellipse (the badge took
+# 20-35 ms to work out the rows, against about 2 ms for this): its points from
+# a table of cosines and sines round it
+GLOBE_N = 48
+_GCS = tuple((math.cos(i * TAU / GLOBE_N), math.sin(i * TAU / GLOBE_N)) for i in range(GLOBE_N))
+_EX = [0.0] * GLOBE_N   # the ellipse's points, worked out once for the fill and the ring
+_EY = [0.0] * GLOBE_N
 _GY = []                # the rows of the shape being drawn: y, x0, left is the edge, x1, right is
 _GX0 = []
 _GE0 = []
@@ -1151,17 +1160,20 @@ _GX1 = []
 _GE1 = []
 
 
-def _globe_row(y, cx, cy, cz, a, k, top):
-    """Where the row y meets the sphere's image: (x0, edge0, x1, edge1), edgeN
-    True if that end is the sphere's edge (not the screen's), or None. top:
-    y is the shape's top or bottom, where the two ends meet."""
+_GR = [0.0, False, 0.0, False]     # _globe_row's answer: x0, left is the edge, x1, right is
+_GK = [0.0] * 7                     # its constants for this sphere: see _globe
+
+
+def _globe_row(y, top):
+    """Where the row y meets the sphere's image (_GK): True, with _GR the
+    ends and whether each is the sphere's edge (not the screen's); or False.
+    top: y is the shape's top or bottom, where the two ends meet."""
     hw = VIEW_HW
-    f = FOCAL
+    fcz, cy, cx2, a, k, ff, cx = _GK
     # the ray through (x, y) on screen is (x, -y, f): on the edge (x cx + b)^2 = k (x^2 + e)
-    b = f * cz - y * cy
-    e = y * y + f * f
-    bb = 2.0 * cx * b
-    c = b * b - k * e
+    b = fcz - y * cy
+    bb = cx2 * b
+    c = b * b - k * (y * y + ff)
     x0 = -hw
     x1 = hw
     e0 = e1 = False
@@ -1182,7 +1194,7 @@ def _globe_row(y, cx, cy, cz, a, k, top):
             else:
                 x0, e0 = r2, True
         elif a < 0.0:
-            return None
+            return False
     elif bb != 0.0:         # a straight edge
         xe = -c / bb
         if bb > 0.0:
@@ -1194,8 +1206,13 @@ def _globe_row(y, cx, cy, cz, a, k, top):
     if x1 > hw:
         x1, e1 = hw, False
     if x1 < x0 or cx * (x0 + x1) * 0.5 + b <= 0.0:     # off the screen, or the cone behind you
-        return None
-    return x0, e0, x1, e1
+        return False
+    r = _GR
+    r[0] = x0
+    r[1] = e0
+    r[2] = x1
+    r[3] = e1
+    return True
 
 
 def _globe(ctx, cx, cy, cz, rad, fill, edge=None):
@@ -1222,14 +1239,64 @@ def _globe(ctx, cx, cy, cz, rad, fill, edge=None):
     # all of it behind the view: its edge more than 50 degrees off straight ahead
     if cz < 0.64 and math.acos(cz) - math.asin(rad / d) > 0.87:
         return
-    a = cx * cx - k
     f = FOCAL
-    # rows GLOBE_STEP apart; closer for a small one, so it stays round
-    step = rad * f / d / 6.0
-    if step > GLOBE_STEP:
-        step = GLOBE_STEP
-    elif step < 1.0:
-        step = 1.0
+    sa = rad / d                        # sin of its angular radius
+    q = cz * cz - sa * sa               # cos^2 of the centre's angle off ahead - sin^2 of that
+    if q > 0.02 and cz > 0.0:           # wholly in front: an ellipse
+        ca = math.sqrt(1.0 - sa * sa)
+        st = math.sqrt(1.0 - cz * cz)   # sin of the centre's angle off straight ahead
+        # its far and near ends along the line out from the middle of the view,
+        # tan(angle +- radius); the half width across it
+        t2 = (st * ca + cz * sa) / (cz * ca - st * sa)
+        t1 = (st * ca - cz * sa) / (cz * ca + st * sa)
+        ea = f * (t2 - t1) * 0.5
+        if ea < GLOBE_FAR:
+            eb = f * sa / math.sqrt(q)
+            m = f * (t1 + t2) * 0.5
+            if st > 1e-6:
+                ux = cx / st
+                uy = -cy / st           # screen y is down
+            else:
+                ux, uy = 1.0, 0.0
+            ox = ux * m
+            oy = uy * m
+            ax = ux * ea                # the long axis and the short one, on screen
+            ay = uy * ea
+            bx = -uy * eb
+            by = ux * eb
+            n = 1 if ea > 80.0 else 2 if ea > 20.0 else 4   # fewer points for a smaller one
+            xs, ys = _EX, _EY
+            j = 0
+            for i in range(0, GLOBE_N, n):
+                co, si = _GCS[i]
+                xs[j] = ox + ax * co + bx * si
+                ys[j] = oy + ay * co + by * si
+                j += 1
+            ctx.rgb(*fill)
+            ctx.begin_path()
+            ctx.move_to(xs[0], ys[0])
+            for i in range(1, j):
+                ctx.line_to(xs[i], ys[i])
+            ctx.fill()
+            if edge is not None:
+                ctx.rgb(*edge)
+                ctx.begin_path()
+                ctx.move_to(xs[0], ys[0])
+                for i in range(1, j):
+                    ctx.line_to(xs[i], ys[i])
+                ctx.line_to(xs[0], ys[0])
+                ctx.stroke()
+            return
+    a = cx * cx - k
+    # close by: row by row, over the rows it covers only
+    gk = _GK
+    gk[0] = f * cz
+    gk[1] = cy
+    gk[2] = 2.0 * cx
+    gk[3] = a
+    gk[4] = k
+    gk[5] = f * f
+    gk[6] = cx
     # the shape's top and bottom, where a row just touches it:
     # (cy^2 + a) y^2 - 2 f cz cy y + f^2 (cz^2 + a) = 0
     ends = []
@@ -1246,30 +1313,48 @@ def _globe(ctx, cx, cy, cz, rad, fill, edge=None):
     ends.sort()
     gy, gx0, ge0, gx1, ge1 = _GY, _GX0, _GE0, _GX1, _GE1
     del gy[:], gx0[:], ge0[:], gx1[:], ge1[:]
-    y = -hh
+    y0 = -hh
+    y1 = hh
+    if not _globe_row(-hh, False) and ends:
+        y0 = ends[0]            # it starts below the top of the screen
+    if not _globe_row(hh, False) and ends:
+        y1 = ends[-1]           # and ends above the bottom
+    step = (y1 - y0) / GLOBE_ROWS
+    if step < GLOBE_STEP:
+        step = GLOBE_STEP
+    y = y0
     ei = 0
+    while ei < len(ends) and ends[ei] < y0:
+        ei += 1
+    last = False
     while True:
         top = False
         if ei < len(ends) and ends[ei] <= y:
             yy = ends[ei]
             ei += 1
             top = True
+            if y < yy + 1.0:
+                y = yy + 1.0    # the next row a little past it (on it, rounding may miss)
         else:
+            if y > y1:
+                if last:
+                    break
+                y = y1          # the last row exactly at its bottom (or the screen's)
+            last = y >= y1
             yy = y
             y += step
         if yy > hh:
             break
-        row = _globe_row(yy, cx, cy, cz, a, k, top)
-        if row is None:
-            if gy:
-                _globe_draw(ctx, fill, edge)
-                del gy[:], gx0[:], ge0[:], gx1[:], ge1[:]
+        if not _globe_row(yy, top):
+            if gy:              # past it (its image is all one piece)
+                break
             continue
+        r = _GR
         gy.append(yy)
-        gx0.append(row[0])
-        ge0.append(row[1])
-        gx1.append(row[2])
-        ge1.append(row[3])
+        gx0.append(r[0])
+        ge0.append(r[1])
+        gx1.append(r[2])
+        ge1.append(r[3])
         if yy >= hh:
             break
     if gy:
