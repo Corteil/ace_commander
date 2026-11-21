@@ -1206,5 +1206,5 @@ what is now `ace.py` (renamed in build 50).
    (`_poly_clipped`: Sutherland-Hodgman for the fill, Liang-Barsky for each line of the ring,
    so the ring is never drawn along the cut); the largest coordinate in a 1500-position sweep
    is now 590. And (Brian) the altitude gauge near the planet: within `PLANET_GAUGE_ALT` (1)
-   radius of its surface, AL alone where the sun's AL goes, full at 1 radius, red in its last
+   radius of its surface, AL alone, centred under the frame time (Brian), full at 1 radius, red in its last
    tenth (`_planet_gauge`).

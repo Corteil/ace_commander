@@ -1610,18 +1610,19 @@ PLANET_GAUGE_ALT = 1.0  # planet radii above its surface: nearer, the altitude g
 
 
 def _planet_gauge(ctx, sp):
-    """Near the planet (Brian, build 104): the altitude above it (AL), where the
-    sun's AL goes, full PLANET_GAUGE_ALT radii up and empty at the surface,
-    red in its last tenth. Nothing further out."""
+    """Near the planet (Brian, build 104): the altitude above it (AL), centred
+    at the top, full PLANET_GAUGE_ALT radii up and empty at the surface, red in
+    its last tenth. Nothing further out."""
     d = math.sqrt(sp.px * sp.px + sp.py * sp.py + sp.pz * sp.pz) - sp.pr
     if d >= PLANET_GAUGE_ALT * sp.pr:
         return
-    ctx.rgba(0, 0, 0, 0.6).rectangle(0, -99, 74, 10).fill()      # readable against the planet
-    text(ctx, "AL", 66, -92, 9, GREY)
-    ctx.rgb(*DIM).rectangle(8, -94, 50, 4).fill()
+    # centred under the frame time (Brian), the label on its left
+    ctx.rgba(0, 0, 0, 0.6).rectangle(-40, -99, 72, 10).fill()      # readable against the planet
+    text(ctx, "AL", -33, -92, 9, GREY)
+    ctx.rgb(*DIM).rectangle(-25, -94, 50, 4).fill()
     a = int(50 * d / (PLANET_GAUGE_ALT * sp.pr))
     a = 0 if a < 0 else 50 if a > 50 else a
-    ctx.rgb(*(RED if a < 5 else CYAN)).rectangle(8, -94, a, 4).fill()
+    ctx.rgb(*(RED if a < 5 else CYAN)).rectangle(-25, -94, a, 4).fill()
 
 
 def _compass(ctx, sp):
