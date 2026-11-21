@@ -161,6 +161,13 @@ class Host:
         for name, const in self.buttons.items():
             if b.held(const):
                 down.add(name)
+        if self.pad is not None:    # the Pad as the same buttons (controls_tufty.PAD_TYPING)
+            try:
+                for k, v in self.pad.read_buttons().items():
+                    if v and k in controls_tufty.PAD_TYPING:
+                        down.add(controls_tufty.PAD_TYPING[k])
+            except Exception:
+                self.pad = None
         for name in ("UP", "DOWN", "A", "B", "C"):
             if name in down and name not in self.typed:
                 d.press(name)

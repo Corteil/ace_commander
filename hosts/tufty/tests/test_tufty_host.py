@@ -223,6 +223,19 @@ assert d.text == "AD", d.text
 press("A")                  # done
 assert got == ["AD"] and a.ndialog is None, (got, a.ndialog)
 frames(2)
+# and on the Pad (PAD_TYPING): up the letter, A keeps it, B back, + done
+got = []
+a._open_name("", got.append)
+d = a.ndialog
+pad_press("U")              # B
+pad_press("A")              # B
+pad_press("R")              # BB
+pad_press("B")              # back onto the last B: B
+pad_press("U")              # C
+pad_press("A")              # BC
+pad_press("+")              # done
+assert got == ["BC"], got
+frames(2)
 # NEW COMMANDER: the Tufty's B selects (the badge's C), as without the Pad
 a.menu = a.choices().index("NEW COMMANDER")
 press("B")

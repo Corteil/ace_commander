@@ -10,6 +10,8 @@ best match), ._result (None while open, the text when done) and draw(ctx).
                 letter there to start from)
     C           back: the cursor moves left onto the last letter, to change it
     A           done
+On a Qw/ST Pad (controls_tufty.PAD_TYPING): the D-pad's up / down the letter, A or
+right keeps it, B or left goes back, + is done.
 
 Drawn as a row of MAX_LEN places (Brian: "select letter, cursor moves right
 when selected"): the letters kept, the cursor's place highlighted with the

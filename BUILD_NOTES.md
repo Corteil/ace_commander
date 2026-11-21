@@ -1402,3 +1402,6 @@ what is now `ace.py` (renamed in build 50).
    `MAX_LEN` places (`SLOT` 12 px) with the cursor's place highlighted; B keeps the letter and
    the cursor moves right (the same letter there to start from); C moves it back onto the
    last letter to change it.
+   **Build 123** (Brian: "buttons for the gamepad so it can be used as well"): typing on the
+   Qw/ST Pad too (`controls_tufty.PAD_TYPING`): the D-pad's up / down the letter, A or right
+   keeps it, B or left goes back, + is done.

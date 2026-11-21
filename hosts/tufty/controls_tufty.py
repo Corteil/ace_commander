@@ -47,6 +47,10 @@ BACK = BADGE["F"]                                   # off the flight, A + C
 MENU_PAIR = ("UP", "DOWN")
 MENU = BADGE["A"]
 PAIR_WAIT = 60
+# typing (dialog_tufty's letter picker): each Pad button as the Tufty button it does
+# the job of (Brian, build 123): the D-pad's up / down the letter, A or right keeps it,
+# B or left goes back, + is done
+PAD_TYPING = {"U": "UP", "D": "DOWN", "A": "B", "R": "B", "B": "C", "L": "C", "+": "A"}
 # the hints' badge letters named as the Tufty's buttons (ctx_tufty), Pad or not
 LABELS = {"C": "B"}         # (in flight A + C switches UP / DOWN: the game says which)
 LABELS_OFF = {"C": "B", "F": "A+C"}
