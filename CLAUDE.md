@@ -53,6 +53,11 @@ Other devices are in `hosts/` (the Pi; the Tufty 2350 port is still its own repo
   (the badge's settings). The interface is at the top of the file; a host gives
   `config.platform` its own module with the same names (the Pi: `hosts/pi/platform_pi.py`).
   Imported only when `config.platform` is None.
+- `layout.py` - how flight is laid out (build 105, platform layer step 4; imports nothing):
+  `Layout` (the badge's: round 240 screen, all 3D view, the round HUD) with the view's and
+  tunnels' half sizes and `view` / `tunnel` / `hud` / `done`, which `cockpit.draw_world`,
+  `draw_hud` and `draw_tunnel` call; a host sets `config.layout` (the Pi: `layout_pi.PiLayout`).
+  Menus and docked screens stay on the 240 canvas.
 - `game.py` - game rules, including the star system (`Space`, `Game.enter`). No badge
   imports, so it runs on a PC.
 - `cockpit.py` - flight view, HUD, radar. Built from rectangles (see Speed).
@@ -120,8 +125,8 @@ Other devices are in `hosts/` (the Pi; the Tufty 2350 port is still its own repo
   `AceCommander.analog` and `Game` yaw, on in-flight screens `SCREEN_MAP`, elsewhere `BADGE_MAP`, the pad as the badge; hints
   name the pad's buttons after a pad press: `ctx_pygame.relabel`). P3: `dash_pi.py` (the Elite layout's dashboard, the Tufty's
   layout with Elite's gauges, any window width); `run.Host` layouts "badge" / "elite" (F10),
-  F11 full screen, F12 screenshot, resizable, `pi.json`; flight drawn through hooks on
-  `cockpit.draw_world` / `draw_hud` / `draw_tunnel` with `cockpit.VIEW_HW` / `VIEW_HH`. Tests:
+  F11 full screen, F12 screenshot, resizable, `pi.json`; flight laid out by `layout_pi.PiLayout`
+  (`config.layout`, build 105; hooks on `cockpit.draw_world` / `draw_hud` / `draw_tunnel` before). Tests:
   `hosts/pi/tests/test_pi_host.py`, `test_pi_trip.py` and `test_pi_pad.py`
   (P1: a whole trip by keys; SDL dummy driver), run by `tests/run_all.py` when pygame is there.
   `run.load_game` keeps save, options.json and debug.txt in `~/.local/share/ace_commander/`

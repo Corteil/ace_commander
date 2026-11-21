@@ -30,6 +30,10 @@ input = None
 # Platform and owner_name (see the top of platform_tildagon.py)
 platform = None
 
+# how flight is laid out on the screen (platform layer, step 4): None on the
+# badge (layout.BADGE); a host sets an object like layout.Layout
+layout = None
+
 
 def app_dir():
     """The folder this file is in: the app's."""

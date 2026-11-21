@@ -753,6 +753,8 @@ class Game:
         self.auto_far = False  # it is far from where it is heading: the jump drive's speed
         self.auto_level = False  # it is matching the slot's roll
         self.auto_stick = (0.0, 0.0)    # its last pitch and roll
+        self.stick_pitch = 0.0  # the pitch and roll last given to step (build 105)
+        self.stick_roll = 0.0
         self.auto_yaw = 0.0     # and yaw (on the run in, rolled to the slot: build 95)
 
     def say(self, msg, t=2.0):
@@ -1386,6 +1388,8 @@ class Game:
         none, so it is 0 there and costs nothing)."""
         if dt > 0.1:
             dt = 0.1
+        self.stick_pitch = pitch    # as given, for a dashboard's roll and dive meters
+        self.stick_roll = roll
         self.time += dt
         if self.msg_t > 0:
             self.msg_t -= dt
