@@ -1398,3 +1398,7 @@ what is now `ace.py` (renamed in build 50).
    letter, C deletes the last, A is done (nothing typed: no match / the suggested name). While
    it is open `host_tufty._typing` gives it the Tufty's buttons and the game none. The letter
    stays where it was after adding.
+   Then (Brian: "select letter, cursor moves right when selected"): drawn as a row of
+   `MAX_LEN` places (`SLOT` 12 px) with the cursor's place highlighted; B keeps the letter and
+   the cursor moves right (the same letter there to start from); C moves it back onto the
+   last letter to change it.

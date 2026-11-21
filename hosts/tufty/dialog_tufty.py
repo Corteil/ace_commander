@@ -4,15 +4,23 @@ firmware's TextDialog, for the Galactic chart's search and the commander's name.
 The same interface the game reads: .text, .message (the game sets it, e.g. the
 best match), ._result (None while open, the text when done) and draw(ctx).
 
-    UP / DOWN   the letter after the text: forward / back through LETTERS
+    UP / DOWN   the letter at the cursor: forward / back through LETTERS
                 (held, they repeat)
-    B           add it          C   delete the last letter      A   done
+    B           keep it: the cursor moves right to the next place (the same
+                letter there to start from)
+    C           back: the cursor moves left onto the last letter, to change it
+    A           done
+
+Drawn as a row of MAX_LEN places (Brian: "select letter, cursor moves right
+when selected"): the letters kept, the cursor's place highlighted with the
+letter being chosen, the empty places dim.
 
 host_tufty gives it the buttons while it is open (press), and the game draws it.
 """
 
 LETTERS = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-"
 MAX_LEN = 16
+SLOT = 12               # pixels a place is wide
 REPEAT_WAIT = 400       # ms UP / DOWN are held before they repeat
 REPEAT_EVERY = 110      # then a letter every this many ms
 
@@ -40,7 +48,10 @@ class LetterDialog:
             if len(self.text) < MAX_LEN:
                 self.text = self.text.upper() + LETTERS[self.i]
         elif name == "C":
-            self.text = self.text[:-1]
+            t = self.text.upper()
+            if t:           # back onto the last letter, to change it
+                self.i = LETTERS.find(t[-1]) if LETTERS.find(t[-1]) >= 0 else self.i
+                self.text = t[:-1]
         elif name == "A":
             self._result = self.text.upper()
 
@@ -62,11 +73,17 @@ class LetterDialog:
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()     # solid: easier to read
         text(ctx, self.message, 0, -40, 14, ck.GREEN)
         shown = self.text.upper()
-        letter = LETTERS[self.i]
-        ctx.rgb(*ck.DIM).rectangle(-100, -12, 200, 24).fill()
-        text(ctx, shown, -4, 0, 18, ck.WHITE, 1)          # the text, ending at the middle
-        ctx.rgb(*ck.CYAN).rectangle(0, -10, 14, 20).fill()
-        text(ctx, "_" if letter == " " else letter, 7, 0, 18, (0, 0, 0))   # the letter to add
-        text(ctx, "UP/DOWN letter   B add", 0, 36, 11, ck.GREY)
-        text(ctx, "C delete   A done", 0, 52, 11, ck.GREY)
+        x0 = -SLOT * MAX_LEN // 2
+        for k in range(MAX_LEN):       # the places: letters kept, the cursor, the rest
+            x = x0 + k * SLOT
+            if k < len(shown):
+                text(ctx, shown[k], x + SLOT // 2, 0, 16, ck.WHITE)
+            elif k == len(shown):
+                letter = LETTERS[self.i]
+                ctx.rgb(*ck.CYAN).rectangle(x, -10, SLOT - 1, 20).fill()
+                text(ctx, "_" if letter == " " else letter, x + SLOT // 2, 0, 16, (0, 0, 0))
+            else:
+                ctx.rgb(*ck.DIM).rectangle(x + 2, 8, SLOT - 4, 2).fill()
+        text(ctx, "UP/DOWN letter   B next", 0, 36, 11, ck.GREY)
+        text(ctx, "C back   A done", 0, 52, 11, ck.GREY)
         ctx.restore()

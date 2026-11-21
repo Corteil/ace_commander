@@ -23,6 +23,7 @@ sys.modules["ace_commander"] = importlib.util.module_from_spec(spec)
 
 import sim_badgeware as bw      # noqa: E402
 import host_tufty               # noqa: E402
+import dialog_tufty             # noqa: E402
 import platform_tufty           # noqa: E402
 
 class FakePad:
@@ -209,11 +210,12 @@ got = []
 a._open_name("", got.append)
 d = a.ndialog
 assert d is not None and d is a.platform.dialog, "the Tufty's letter picker, not the keyboard page"
-press("B")                  # A
+press("B")                  # A, the cursor on to the next place (A there too)
 press("UP")                 # B
 press("UP")                 # C
 press("B")                  # AC
-press("C")                  # A (the letter stays at C)
+press("C")                  # back onto the C: A, the cursor's letter C
+assert d.text == "A" and dialog_tufty.LETTERS[d.i] == "C"
 press("UP")                 # D
 press("B")                  # AD
 shot("tufty_name_entry")
