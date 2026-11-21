@@ -1342,4 +1342,5 @@ what is now `ace.py` (renamed in build 50).
    back, else full shields (`Game._upgrade`); with `auto_missile` it also fills the missile
    rack. `config.laser_leds` (off on the Tufty and the Pi): your laser no longer colours the
    LEDs (the Tufty's border, the Pi's drawn ring); the badge keeps it. The badge's practice
-   changes too (upgrades, countdown): not yet run on the badge.
+   changes too (upgrades, countdown). Then (Brian) the canister appears just ahead,
+   `UPGRADE_AHEAD` 400 (was 1200), so flying on picks it up.

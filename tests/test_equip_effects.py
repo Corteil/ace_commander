@@ -567,6 +567,20 @@ for _ in range(3):                    # wave 1: 2 + 1 kills clear it
     g._kill(put(g, "SIDEWINDER", "ship", 0, 0, 3000))
 ups = [o for o in g.objs + g.new if o.kind == "can" and o.upgrade]
 assert g.wave == 2 and len(ups) == 1, (g.wave, len(ups))
+u = ups[0]
+assert u.z <= game.UPGRADE_AHEAD and abs(u.x) < 1 and abs(u.y) < 60, "straight ahead, close"
+gp = fresh(28)
+gp.practice_upgrades = True
+for _ in range(3):
+    gp._kill(put(gp, "SIDEWINDER", "ship", 0, 0, 3000))
+gp.objs[:] = [o for o in gp.objs + gp.new if o.upgrade]
+gp.new[:] = []
+gp.speed = 10.0
+for _ in range(int(4.0 / DT)):        # fly on, not steering: it's picked up
+    gp.step(DT, 0.0, 0.0, 0.0, False, False)
+    if gp.upgrade_n:
+        break
+assert gp.upgrade_n == 1 and gp.laser == "beam", "flying straight on picks it up"
 fitted = []
 for want in ("beam", "energy unit", "military", "bomb"):
     g.missiles = 0

@@ -269,6 +269,8 @@ PICKUP_MISSILE = 0.5   # combat practice: how often a canister holds a missile a
 # the last, a used energy bomb comes back, else the shields are filled
 UPGRADES = ("beam", "energy unit", "military", "bomb")
 WAVE_WAIT = 5.0         # seconds of countdown before the next wave (with the upgrades)
+UPGRADE_AHEAD = 400.0   # the upgrade canister appears this far straight ahead, drifting
+                        # towards you, for an easy pick-up (Brian; it was 1200)
 UPGRADE_NAMES = {"beam": "BEAM LASER", "energy unit": "ENERGY UNIT", "military": "MILITARY LASER",
                  "bomb": "ENERGY BOMB"}
 
@@ -2153,7 +2155,7 @@ class Game:
                 if self.missile_bp and self.missiles < self.max_missiles:
                     self.missiles += 1
                 if self.practice_upgrades:
-                    c = self.release_canister(1200.0)
+                    c = self.release_canister(UPGRADE_AHEAD)    # just ahead: easy to pick up
                     if c is not None:
                         c.upgrade = True    # (it can't be shot: see _weapons_view)
                     self.wave_wait = WAVE_WAIT      # a breather, counted down (_director)
