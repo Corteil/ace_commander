@@ -1175,3 +1175,13 @@ what is now `ace.py` (renamed in build 50).
    badge is unchanged: all 59 frames pixel-identical; the release gains no file. Run on
    the badge (as .mpy) and played by Brian, 2026-11-21: LEDs, tilt, text entry, the
    keyboard pages, frame rate and leaving all OK.
+   **Build 104** (2026-11-21, Brian: "is the planet horizon the same as the sun? the horizon
+   just pops out of view"). It wasn't: the planet was always a circle from `_sphere`, which
+   drops it once its centre is under half a radius ahead (and circles over `MAX_ARC`), so
+   skimming low past it the planet vanished. Within `PLANET_BANDS_K` (2) planet radii it is
+   now drawn as the sun is close by: `cockpit._bands` (the sun's band code, made general for
+   any sphere; `_sun_bands` calls it), its true edge as a horizon that slides away as you
+   pass. Not round the station (3 radii out), so no extra cost there. The bands have no
+   bright outline, and at the switch (2 radii) the edge hops a few pixels: the circle is only
+   an approximation there. All 59 frames unchanged; a test in `tests/test_game.py`. Not yet
+   run on the badge: watch the frame time skimming the planet.

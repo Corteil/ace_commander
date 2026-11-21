@@ -638,6 +638,9 @@ class _Bands:
     def fill(self):
         return self
 
+    def stroke(self):
+        return self
+
 
 class _Sp:
     sun = 0
@@ -669,6 +672,21 @@ for at in ((1.15, 0, 0.5), (1.15, 0, 0.1), (0, -1.3, 0.4), (-0.8, 0.7, 0.6), (0.
     assert seen > 0.0 and wrong < 0.01, (at, seen, wrong)
 assert _sun_seen(0, 0, -1.5)[0] == 0.0 and _sun_seen(2.0, 0, -1.0)[0] == 0.0, "behind you: none"
 assert _sun_seen(0.6, 0.6, 0.3)[0] == 1.0, "inside the sun's edge: all sun"
+# the planet the same way within PLANET_BANDS_K radii (build 104: its horizon
+# popped out of view as its centre passed beside you); a circle further out
+class _PlanetSp:
+    planet = 0
+    station = None
+psp = _PlanetSp()
+pr = 6000.0
+for zk, banded in ((2.5, False), (1.5, True), (0.4, True), (0.1, True)):
+    psp.px, psp.py, psp.pz, psp.pr = 0.3 * pr, -1.1 * pr, zk * pr, pr
+    c = _Bands()
+    ck._planet(c, psp, ck._sphere(psp.px, psp.py, psp.pz, psp.pr))
+    rects = [r for r in c.r if r is not None]
+    assert (len(rects) > 1) == banded, (zk, len(rects), c.r[:2])
+    assert c.r, ("the planet below you stays in view", zk)
+print("the planet: its horizon in bands close by, a circle further out: ok")
 # DEBUG's TO THE SUN, flying on: while the cabin is hot enough to scoop and the
 # sun's edge is in front of you, some of the view is sun
 g = fresh(9)

@@ -1147,25 +1147,34 @@ MAX_ARC = 2000      # pixels: circles bigger than this that don't cover the scre
 # centre is beside you).
 SUN_BANDS_K = 3.0       # in sun radii from its centre: nearer than this, bands
 SUN_BAND = 4            # pixels: each band's height (fewer bands, less float garbage)
+# the planet the same way (build 104, Brian: its horizon "just pops out of view",
+# for the same reason the sun's did); within 2 radii only, so not round the
+# station (3 radii out), where the circle is right and costs less
+PLANET_BANDS_K = 2.0
 
 
 def _sun_bands(ctx, sp):
-    """The sun from close by: a band of each SUN_BAND rows, filled where a ray
-    through the band's middle row meets the sphere. Inside it, all sun."""
-    cx, cy, cz = sp.sx, sp.sy, sp.sz
+    """The sun from close by (see _bands)."""
+    _bands(ctx, sp.sx, sp.sy, sp.sz, sp.sr)
+
+
+def _bands(ctx, cx, cy, cz, rad):
+    """A sphere (centre cx, cy, cz, radius rad) from close by: a band of each
+    SUN_BAND rows, filled where a ray through the band's middle row meets the
+    sphere, in the colour already set. Inside it, all of it."""
     d2 = cx * cx + cy * cy + cz * cz
-    r2 = sp.sr * sp.sr
+    r2 = rad * rad
     hw, hh = VIEW_HW, VIEW_HH
-    if d2 <= r2:        # inside the sun's edge (the heat kills a little deeper in)
+    if d2 <= r2:        # inside the edge (the sun's heat kills a little deeper in)
         ctx.rectangle(-hw, -hh, 2 * hw, 2 * hh).fill()
         return
     d = math.sqrt(d2)
     cx /= d
     cy /= d
     cz /= d
-    k = 1.0 - r2 / d2   # cos^2 of the sun's angular radius: on the edge (p.c)^2 = k |p|^2
+    k = 1.0 - r2 / d2   # cos^2 of the sphere's angular radius: on the edge (p.c)^2 = k |p|^2
     # all of it behind the view: its edge more than 50 degrees off straight ahead
-    if cz < 0.64 and math.acos(cz) - math.asin(sp.sr / d) > 0.87:
+    if cz < 0.64 and math.acos(cz) - math.asin(rad / d) > 0.87:
         return
     a = cx * cx - k
     f = FOCAL
@@ -1225,10 +1234,16 @@ def _sun(ctx, sp, sun):
 
 
 def _planet(ctx, sp, planet):
-    """The planet: a disc in its colour with a brighter outline."""
+    """The planet: a disc in its colour with a brighter outline; close by,
+    bands to its true edge (_bands), a horizon that stays as you fly past."""
+    fill, edge = PLANET_COLOURS[sp.planet % len(PLANET_COLOURS)]
+    if (sp.px * sp.px + sp.py * sp.py + sp.pz * sp.pz
+            < PLANET_BANDS_K * PLANET_BANDS_K * sp.pr * sp.pr):
+        ctx.rgb(*fill)
+        _bands(ctx, sp.px, sp.py, sp.pz, sp.pr)
+        return
     if planet is None:
         return
-    fill, edge = PLANET_COLOURS[sp.planet % len(PLANET_COLOURS)]
     ctx.rgb(*fill)
     if _covers(planet):
         ctx.rectangle(-VIEW_HW, -VIEW_HH, 2 * VIEW_HW, 2 * VIEW_HH).fill()
