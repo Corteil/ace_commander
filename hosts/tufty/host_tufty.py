@@ -74,6 +74,10 @@ class Host:
         self.pad_off = False    # DEBUG > GAMEPAD OFF: the Pad ignored in combat practice
         self.waits = {}         # button -> when it went down alone (PAIR_WAIT), on self.clock
         self.typed = set()      # the buttons down last frame while typing (dialog_tufty)
+        self.typed_own = set()  # the Tufty's own buttons among them
+        self.typed_pad = set()  # and the Pad's
+        self.stale = set()      # buttons held when the picker closed: ignored until let go
+        self.stale_pad = set()
         self.pad_last = False   # the Pad was pressed last, not the Tufty's buttons (the hints)
         self.speed_mode = False     # in flight, UP / DOWN change speed (A + C toggles it)
         self.speed_game = None      # the flight it was set in
@@ -103,6 +107,9 @@ class Host:
         for name, const in self.buttons.items():
             if b.held(const):
                 held.add(name)
+        if self.stale:              # held when the picker closed: not until let go
+            self.stale &= held
+            held -= self.stale
         a = self.app
         flying = a is not None and a.mode == "flight" and not a.paused
         if held:                    # the Tufty's own buttons used: their names in the hints
@@ -152,8 +159,13 @@ class Host:
         practising = a is not None and a.mode == "flight" and not a.career
         if self.pad is not None and not (self.pad_off and practising):  # (GAMEPAD OFF: practice)
             try:
-                for k, v in self.pad.read_buttons().items():
+                pads = self.pad.read_buttons()
+                if self.stale_pad:      # held when the picker closed: not until let go
+                    self.stale_pad = set(k for k in self.stale_pad if pads.get(k))
+                for k, v in pads.items():
                     pm = controls_tufty.PAD_MAP if in_flight else controls_tufty.PAD_MAP_OFF
+                    if k in self.stale_pad:
+                        continue
                     if v and k in pm:
                         keys.add(pm[k])
                         self.pad_last = True    # the Pad used: its names in the hints
@@ -171,9 +183,12 @@ class Host:
                 down.add(name)
         if down:
             self.pad_last = False   # the Tufty's buttons used
+        pad_down = set()
         if self.pad is not None:    # the Pad as the same buttons (controls_tufty.PAD_TYPING)
             try:
                 for k, v in self.pad.read_buttons().items():
+                    if v:
+                        pad_down.add(k)
                     if v and k in controls_tufty.PAD_TYPING:
                         down.add(controls_tufty.PAD_TYPING[k])
                         self.pad_last = True
@@ -189,6 +204,8 @@ class Host:
         else:
             d.let_go()
         self.typed = down
+        self.typed_own = set(n for n in self.buttons if b.held(self.buttons[n]))
+        self.typed_pad = pad_down
 
     def _lights(self):
         """The case lights as bright as the brightest LED the game lit."""
@@ -318,6 +335,9 @@ class Host:
             self._typing(d, ms)
             self.feed.set_held(set())
         else:
+            if d is not None:       # it has just closed: what is still held (the + or A
+                self.stale = set(self.typed_own)    # that closed it) waits to be let go
+                self.stale_pad = set(self.typed_pad)
             self.app.platform.dialog = None
             self.feed.set_held(self._held())
         self.app.update(ms)

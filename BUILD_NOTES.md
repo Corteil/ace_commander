@@ -1430,3 +1430,7 @@ what is now `ace.py` (renamed in build 50).
    **Build 127** (Brian: "the letter picker does not update its hints on the Tufty"): the
    picker's own two hint lines can come from the host (`LetterPicker.hints`); the Tufty's sets
    them each frame by what was pressed last (`controls_tufty.TYPING_HINTS` / `PAD_TYPING_HINTS`).
+   **Build 128** (Brian: "the + launches the ship when exiting the letter picker"): the press
+   that closes the Tufty's picker was still held next frame and counted as the badge's A
+   (launch when docked). Now any Tufty button or Pad button held when it closes is ignored
+   until let go (`host_tufty.stale` / `stale_pad`).

@@ -261,8 +261,21 @@ pad_press("A")              # the chart's cursor (the badge's C)
 assert d.name() == "GALACTIC CHART" and d.cursor, (d.name(), d.cursor)
 pad_press("Y")              # the Pad's Y: search (the badge's B on the Galactic chart)
 assert a.tdialog is not None, "Y opens the search"
-pad_press("+")              # done (nothing typed: no match)
+h.pad.down.add("+")         # done (nothing typed: no match), held as a real press is
+frames(6)
 assert a.tdialog is None
+assert a.mode == "docked", "the + that closed the picker doesn't launch (build 128)"
+h.pad.down.discard("+")
+frames(2)
+assert a.mode == "docked", a.mode
+# the Tufty's A, held through closing the picker, doesn't go on either
+pad_press("Y")
+assert a.tdialog is not None
+badge.down.add(buttons["A"])
+frames(6)
+assert a.tdialog is None and a.mode == "docked", a.mode
+badge.down.discard(buttons["A"])
+frames(2)
 d.open("STATUS")
 pad_press("+")          # the Pad's + is the badge's A: launch
 for _ in range(200):
