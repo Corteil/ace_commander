@@ -1420,3 +1420,10 @@ what is now `ace.py` (renamed in build 50).
    the flight, has Y as the badge's B too (`controls_tufty.PAD_MAP_OFF`): the search on the
    Galactic chart (cursor on, C, first), the next tab elsewhere; in flight Y stays E (slower).
    The Pi pad's Y already was the badge's B.
+   **Build 126** (Brian: "hints must use local buttons / keys names"). The Tufty's hints name
+   whatever was pressed last (`host_tufty.pad_last`): the Pad's buttons (`PAD_LABELS` in
+   flight: A is +, B is -, C is A, D is B, E is Y, F is X; `PAD_LABELS_OFF`: B is Y) or the
+   Tufty's own (`LABELS`, `LABELS_OFF`). The Pi's keyboard in flight, where it is Elite's keys:
+   C is ENTER, F is ESC, A is P (`run.KEY_LABELS_FLIGHT`); off the flight its A-F are the
+   badge's buttons and the hints stay; the Pi pad's names as before (`pad_pi.labels`). The
+   badge's hints were always its own.

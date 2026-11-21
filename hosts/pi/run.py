@@ -48,6 +48,10 @@ LED_SIZE = 4                        # an LED's radius, in game pixels
 FPS = 60
 LINE_K = 0.5                        # the Elite layout's lines: half as thick as the scale
 LOAD_HOLD = 3000                    # ms the loading screen shows (as the Tufty's hold)
+# the hints' badge letters named as the keyboard's keys in flight, where it is Elite's
+# keys, not the badge's buttons (Brian, build 126: "hints must use local buttons / keys
+# names"): C is Enter, F is Esc, A (the pause menu) is P
+KEY_LABELS_FLIGHT = {"A": "P", "C": "ENTER", "F": "ESC"}
 WIRE_MIN = 3                        # ships are wireframes down to this size (badge units; the badge: 8)
 
 
@@ -295,7 +299,12 @@ class Host:
         if self.window.get_size() != getattr(self, "_size", None):
             self._size = self.window.get_size()
             self._fit()
-        self.ctx.labels = self.pads.labels() if self.pad_last else None
+        if self.pad_last:
+            self.ctx.labels = self.pads.labels()
+        elif self.app.mode == "flight":     # the keyboard in flight: Elite's keys (build 126)
+            self.ctx.labels = KEY_LABELS_FLIGHT
+        else:
+            self.ctx.labels = None          # off the flight its A-F are the badge's buttons
         self._paint(self.app.draw)
         self.frames += 1
 

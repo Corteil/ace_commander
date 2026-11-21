@@ -62,6 +62,10 @@ PAD_MAP = {"U": STICK["UP"], "D": STICK["DOWN"], "L": STICK["LEFT"], "R": STICK[
 # chart, as the Pi pad's Y; in flight it stays E (slower)
 PAD_MAP_OFF = dict(PAD_MAP)
 PAD_MAP_OFF["Y"] = BADGE["B"]
+# the hints' badge letters named as the Pad's buttons, when the Pad was used last
+# (Brian, build 126: "hints must use local buttons / keys names"), as PAD_MAP has them
+PAD_LABELS = {"A": "+", "B": "-", "C": "A", "D": "B", "E": "Y", "F": "X"}
+PAD_LABELS_OFF = {"A": "+", "B": "Y", "C": "A", "D": "B", "F": "X"}
 
 
 class Feed:

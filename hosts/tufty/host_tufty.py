@@ -74,6 +74,7 @@ class Host:
         self.pad_off = False    # DEBUG > GAMEPAD OFF: the Pad ignored in combat practice
         self.waits = {}         # button -> when it went down alone (PAIR_WAIT), on self.clock
         self.typed = set()      # the buttons down last frame while typing (dialog_tufty)
+        self.pad_last = False   # the Pad was pressed last, not the Tufty's buttons (the hints)
         self.speed_mode = False     # in flight, UP / DOWN change speed (A + C toggles it)
         self.speed_game = None      # the flight it was set in
         self.both_down = False      # A + C held last frame (the toggle goes on the press)
@@ -104,7 +105,8 @@ class Host:
                 held.add(name)
         a = self.app
         flying = a is not None and a.mode == "flight" and not a.paused
-        self.ctx.labels = controls_tufty.LABELS if flying else controls_tufty.LABELS_OFF
+        if held:                    # the Tufty's own buttons used: their names in the hints
+            self.pad_last = False
         in_flight = a is not None and a.mode == "flight"    # paused or not
         up, down = controls_tufty.MENU_PAIR
         if in_flight and up in held and down in held:     # UP + DOWN: the pause menu
@@ -143,6 +145,10 @@ class Host:
                 del waits[name]     # let go: the next press waits afresh
         for name in held:
             keys.add(m[name])
+        if self.pad_last:           # the hints name what was pressed last (Brian, build 126)
+            self.ctx.labels = controls_tufty.PAD_LABELS if flying else controls_tufty.PAD_LABELS_OFF
+        else:
+            self.ctx.labels = controls_tufty.LABELS if flying else controls_tufty.LABELS_OFF
         practising = a is not None and a.mode == "flight" and not a.career
         if self.pad is not None and not (self.pad_off and practising):  # (GAMEPAD OFF: practice)
             try:
@@ -150,6 +156,7 @@ class Host:
                     pm = controls_tufty.PAD_MAP if in_flight else controls_tufty.PAD_MAP_OFF
                     if v and k in pm:
                         keys.add(pm[k])
+                        self.pad_last = True    # the Pad used: its names in the hints
             except Exception:
                 self.pad = None             # unplugged: carry on with the Tufty's buttons
         return keys

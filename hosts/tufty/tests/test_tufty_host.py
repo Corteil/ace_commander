@@ -23,6 +23,7 @@ sys.modules["ace_commander"] = importlib.util.module_from_spec(spec)
 
 import sim_badgeware as bw      # noqa: E402
 import host_tufty               # noqa: E402
+import controls_tufty           # noqa: E402
 from ace_commander import picker as dialog_tufty  # noqa: E402  (the letter picker: picker.py)
 import platform_tufty           # noqa: E402
 
@@ -236,8 +237,13 @@ pad_press("A")              # BC
 pad_press("+")              # done
 assert got == ["BC"], got
 frames(2)
+# the hints name what was pressed last (build 126): the Pad's buttons, then the Tufty's
+pad_press("D"); frames(1)
+assert h.pad_last and h.ctx.labels == controls_tufty.PAD_LABELS_OFF, h.ctx.labels
+press("UP"); frames(1)
+assert not h.pad_last and h.ctx.labels == {"C": "B", "F": "A+C"}, h.ctx.labels
+a.menu = 0
 # the Pad's Y off the flight is the badge's B (search on the Galactic chart: build 125)
-import controls_tufty           # noqa: E402
 assert controls_tufty.PAD_MAP_OFF["Y"] is controls_tufty.BADGE["B"]
 assert controls_tufty.PAD_MAP["Y"] is controls_tufty.BADGE["E"], "in flight Y still slows down"
 # NEW COMMANDER: the Tufty's B selects (the badge's C), as without the Pad
