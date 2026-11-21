@@ -34,16 +34,17 @@ STICK["SELECT"] = Key("JOYSELECT", ("confirm",))
 # by themselves (config.auto_missiles) and the hints name these buttons (LABELS)
 TUFTY = {"A": STICK["LEFT"], "C": STICK["RIGHT"], "UP": STICK["UP"], "DOWN": STICK["DOWN"],
          "B": BADGE["C"]}
-# two buttons together, in flight only (Brian, builds 114-116): the badge's E (slow
-# down) on A + B and F (speed up) on B + C, which the five buttons haven't got alone.
-# B is in both, so in flight B alone waits PAIR_WAIT ms for its partner before it
-# counts; off the flight every button counts at once, alone
+# two buttons together (Brian, builds 114-117), for the badge's buttons the five
+# haven't got alone: in flight A + B its E (slow down) and B + C its F (speed up);
+# off the flight A + C its F (back). A button in one of the pairs, held alone, waits
+# PAIR_WAIT ms for its partner before it counts, so an uneven pair doesn't fire,
+# select or move the cursor first
 PAIRS = (("A", "B", BADGE["E"]), ("B", "C", BADGE["F"]))
+PAIRS_OFF = (("A", "C", BADGE["F"]),)
 PAIR_WAIT = 60
-# the hints' badge letters named as the Tufty's buttons (ctx_tufty), Pad or not:
-# in flight with the pairs, off the flight without
+# the hints' badge letters named as the Tufty's buttons (ctx_tufty), Pad or not
 LABELS = {"C": "B", "F": "B+C", "E": "A+B"}
-LABELS_OFF = {"C": "B"}
+LABELS_OFF = {"C": "B", "F": "A+C"}
 # and each Qw/ST Pad button (qwstpad's names): the D-pad is the joystick
 PAD_MAP = {"U": STICK["UP"], "D": STICK["DOWN"], "L": STICK["LEFT"], "R": STICK["RIGHT"],
            "A": BADGE["C"], "B": BADGE["D"], "X": BADGE["F"], "Y": BADGE["E"],

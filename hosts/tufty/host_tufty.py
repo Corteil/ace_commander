@@ -71,7 +71,7 @@ class Host:
         self.buttons = buttons
         self.pad = pad
         self.real_pad = pad     # the Pad found at start (DEBUG > GAMEPAD can switch it off)
-        self.b_since = None     # when B went down alone (PAIR_WAIT), on self.clock
+        self.waits = {}         # button -> when it went down alone (PAIR_WAIT), on self.clock
         self.clock = 0          # ms of frames so far (the frame times update() is given)
         self.data_dir = data_dir
         self.feed = controls_tufty.Feed()
@@ -100,22 +100,24 @@ class Host:
         a = self.app
         flying = a is not None and a.mode == "flight" and not a.paused
         self.ctx.labels = controls_tufty.LABELS if flying else controls_tufty.LABELS_OFF
-        paired = False
-        for one, two, key in (controls_tufty.PAIRS if flying else ()):  # in flight: speed
+        pairs = controls_tufty.PAIRS if flying else controls_tufty.PAIRS_OFF
+        for one, two, key in pairs:         # two together: speed in flight, back off it
             if one in held and two in held:
                 keys.add(key)
                 held.discard(one)
                 held.discard(two)
-                paired = True
-        # B is in both pairs: alone, it waits PAIR_WAIT ms for a partner before it
-        # counts (so a pair pressed a little unevenly doesn't fire or select first)
-        if flying and "B" in held and not paired:
-            if self.b_since is None:
-                self.b_since = self.clock
-            if self.clock - self.b_since < controls_tufty.PAIR_WAIT:
-                held.discard("B")
-        elif "B" not in held:
-            self.b_since = None
+        # a button of a pair held alone waits PAIR_WAIT ms for its partner (on the frame clock)
+        waits = self.waits
+        for one, two, key in pairs:
+            for name in (one, two):
+                if name in held:
+                    if name not in waits:
+                        waits[name] = self.clock
+                    if self.clock - waits[name] < controls_tufty.PAIR_WAIT:
+                        held.discard(name)
+        for name in list(waits):
+            if not b.held(self.buttons[name]):
+                del waits[name]     # let go: the next press waits afresh
         for name in held:
             keys.add(m[name])
         if self.pad is not None:

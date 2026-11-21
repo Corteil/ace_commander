@@ -112,9 +112,15 @@ assert a.choices() == ["COMBAT PRACTICE"], a.choices()
 assert not any(l.startswith("GAMEPAD") for l in a._cheats("DISPLAY", False)), "no Pad found: no line"
 cfg = sys.modules["ace_commander.config"]
 assert cfg.auto_missiles and cfg.practice_missile == 1.0, "missiles by themselves, in every canister"
-assert h.ctx.labels == {"C": "B"}, "off the flight the hints name the Tufty's B, no pairs"
+assert h.ctx.labels == {"C": "B", "F": "A+C"}, "off the flight: B, and A+C for back"
 press("B")
 assert a.mode == "practice", a.mode
+badge.down.add(buttons["A"]); badge.down.add(buttons["C"])     # A + C: back (the badge's F)
+frames(3)
+badge.down.discard(buttons["A"]); badge.down.discard(buttons["C"])
+frames(2)
+assert a.mode == "menu", ("A + C goes back", a.mode)
+press("B")
 press("B")
 assert a.mode == "flight", a.mode
 g = a.game

@@ -1367,3 +1367,8 @@ what is now `ace.py` (renamed in build 50).
    once, alone. In flight B alone waits `PAIR_WAIT` (60 ms, on the host's frame clock) for its
    partner, so an uneven pair doesn't fire first. The hints: `LABELS` in flight (C is B, F is
    B+C, E is A+B), `LABELS_OFF` off it (C is B).
+   **Build 117** (Brian: "A and C to go back has stopped working, and F = back"): off the
+   flight A + C is the badge's F, back (`PAIRS_OFF`; on the title screen that leaves the game,
+   as F does). Any button in the current pairs, held alone, waits `PAIR_WAIT` for its partner
+   (`host_tufty.waits`), so an uneven A + C doesn't move the cursor first. Hints off the
+   flight: C is B, F is A+C.
