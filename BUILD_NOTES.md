@@ -1441,3 +1441,6 @@ what is now `ace.py` (renamed in build 50).
    "C: cursor  < > screens  F: status", then "C: target  D: data  B: find  F: back", the
    local chart without B; its texts move up a little) and on the title screen ("< > choose
    C: select"). The Tufty's own buttons name "< >" as "A/C" (`LABELS["< >"]`, `relabel`).
+   **Build 130** (Brian: "the labels on the Pi picker don't match when the gamepad is being
+   used"): the picker's own hints had no colons ("C next"), so `relabel` left them; now
+   "C: next", "A: done", "F: cancel", which the Pi pad names A, START and B.

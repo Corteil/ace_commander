@@ -323,6 +323,14 @@ h.pad_last = True
 got = []
 a._open_name("", got.append)
 assert a.ndialog is not None and getattr(a.ndialog, "driven", False), "the pad: the picker"
+texts = []
+real_text = h.ctx.text
+h.ctx.text = lambda t: (texts.append(h.ctx.labels and __import__("ctx_pygame").relabel(str(t), h.ctx.labels) or str(t)), real_text(t))[1]
+h.step(40)
+h.ctx.text = real_text
+assert "UP/DOWN letter   A: next" in texts and "LEFT back   START: done   B: cancel" in texts, \
+    [t for t in texts if "letter" in t or "done" in t]
+pygame.image.save(h.window, os.path.join(os.path.dirname(os.path.abspath(__file__)), "shots", "pi_pad_picker.png"))
 a.ndialog._result = "PI"
 h.step(40)
 assert got == ["PI"]

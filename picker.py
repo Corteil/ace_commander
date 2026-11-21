@@ -96,8 +96,9 @@ class LetterPicker:
             text(ctx, self.hints[0], 0, 36, 11, ck.GREY)
             text(ctx, self.hints[1], 0, 52, 11, ck.GREY)
         elif self.driven:   # the badge's buttons (ace._drive_picker)
-            text(ctx, "UP/DOWN letter   C next", 0, 36, 11, ck.GREY)
-            text(ctx, "LEFT back   A done   F cancel", 0, 52, 11, ck.GREY)
+            # (with colons, so a host's labels name its own buttons: the Pi's pad)
+            text(ctx, "UP/DOWN letter   C: next", 0, 36, 11, ck.GREY)
+            text(ctx, "LEFT back   A: done   F: cancel", 0, 52, 11, ck.GREY)
         else:               # the Tufty's
             text(ctx, "UP/DOWN letter   B next", 0, 36, 11, ck.GREY)
             text(ctx, "C back   A done", 0, 52, 11, ck.GREY)
