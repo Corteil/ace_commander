@@ -264,6 +264,13 @@ THINK_EVERY = 3        # a ship re-plans on one frame in this many (see Game._th
 SCOOP_GOODS = 8        # a canister holds one of the first this many goods (food to computers)
 MAX_MISSILES = 4       # missiles the Cobra Mk III carries (others: Game.max_missiles)
 PICKUP_MISSILE = 0.5   # combat practice: how often a canister holds a missile as well
+# combat practice with upgrades (Game.practice_upgrades, build 113): each wave cleared
+# drops an upgrade canister (green); scooped, it fits the next of these, in order; after
+# the last, a used energy bomb comes back, else the shields are filled
+UPGRADES = ("beam", "energy unit", "military", "bomb")
+WAVE_WAIT = 5.0         # seconds of countdown before the next wave (with the upgrades)
+UPGRADE_NAMES = {"beam": "BEAM LASER", "energy unit": "ENERGY UNIT", "military": "MILITARY LASER",
+                 "bomb": "ENERGY BOMB"}
 
 # What the level changes: (most hostile ships at once, how often enemy lasers
 # hit compared with level 1, how much damage they and their missiles do
@@ -465,6 +472,7 @@ class Obj:
         self.aim = None     # [dx, dy, dz] heading used while breaking away
         self.target = None  # what a player missile is chasing
         self.good = None    # a splinter: the good it holds (a canister: None, any of several)
+        self.upgrade = False    # a practice upgrade canister (Game.practice_upgrades)
         self.role = "pirate"    # ships: "pirate", "trader", "police" or "hunter"
         self.dest = "station"   # a trader's: where it is making for, "station" or "planet"
         self.prey = None        # a pirate's: the trader it is after (None: you)
@@ -734,6 +742,11 @@ class Game:
             self.auto_missile = False   # fire one at each ship once it is locked (ace sets it)
             self.pickup_missile = PICKUP_MISSILE    # practice canisters' missile odds (ace sets it)
         self.auto_done = None  # the last ship auto_missile fired at
+        if not hasattr(self, "practice_upgrades"):
+            self.practice_upgrades = False  # waves drop upgrade canisters (ace sets it)
+        self.upgrade_n = 0     # the upgrades fitted so far (UPGRADES)
+        self.wave_wait = 0.0   # the countdown to the next wave (WAVE_WAIT), while > 0
+        self.wave_shown = 0    # the second it last showed
         self.jump_t = 0.0      # > 0 while the hyperspace countdown runs
         self.warp = 0.0        # > 0 while the streaks of a jump are drawn
         self.jumped = False    # set when a jump happens; whoever started it clears it
@@ -1884,7 +1897,10 @@ class Game:
                 if self.scoop is None:      # practice: a pick-up instead of cargo
                     self.cargo += 1
                     self.score += 25
-                    self._pickup()
+                    if o.upgrade:
+                        self._upgrade()
+                    else:
+                        self._pickup()
                     continue
                 # a canister holds one of the first SCOOP_GOODS goods, as in the
                 # original; with no room for it, it is lost
@@ -1920,6 +1936,30 @@ class Game:
                 and random.random() < self.pickup_missile):
             self.missiles += 1
             self.say("MISSILE + SHIELDS")
+        else:
+            self.say("SHIELDS RECHARGED")
+
+    def _upgrade(self):
+        """Combat practice: an upgrade canister fits the next of UPGRADES (and
+        fills the shields); after the last, a used energy bomb comes back,
+        else the shields are filled. With auto_missile (no missile button) it
+        also fills the missile rack (Brian, build 113)."""
+        self.shield = 100.0
+        if self.auto_missile and self.missile_bp:
+            self.missiles = self.max_missiles
+        if self.upgrade_n < len(UPGRADES):
+            u = UPGRADES[self.upgrade_n]
+            self.upgrade_n += 1
+            if u == "beam" or u == "military":
+                self.set_laser(u)
+            elif u == "energy unit":
+                self.energy_unit = True
+            elif u == "bomb":
+                self.bombs = 1
+            self.say(UPGRADE_NAMES[u] + " FITTED", 2.5)
+        elif self.bombs == 0:
+            self.bombs = 1
+            self.say("ENERGY BOMB FITTED", 2.5)
         else:
             self.say("SHIELDS RECHARGED")
 
@@ -1987,8 +2027,8 @@ class Game:
             best = None
             best_z = LASER_RANGE
             for o in (self.objs if self.looking else ()):   # off a space view: no hits
-                if o.dead or o.kind == "pmissile" or o.z <= 30 or o.z >= best_z:
-                    continue
+                if o.dead or o.kind == "pmissile" or o.z <= 30 or o.z >= best_z or o.upgrade:
+                    continue    # (a practice upgrade canister can't be shot)
                 lim = o.z * AIM_ASSIST
                 lim *= lim
                 if lim < o.bp.area:
@@ -2112,7 +2152,14 @@ class Game:
                 self.wave_kills = 0
                 if self.missile_bp and self.missiles < self.max_missiles:
                     self.missiles += 1
-                self.say("WAVE %d" % self.wave, 2.5)
+                if self.practice_upgrades:
+                    c = self.release_canister(1200.0)
+                    if c is not None:
+                        c.upgrade = True    # (it can't be shot: see _weapons_view)
+                    self.wave_wait = WAVE_WAIT      # a breather, counted down (_director)
+                    self.wave_shown = 0
+                else:
+                    self.say("WAVE %d" % self.wave, 2.5)
             elif self.kills % 8 == 0:
                 self.say("RIGHT ON COMMANDER!", 2.5)
         elif o.kind == "missile":
@@ -2439,6 +2486,18 @@ class Game:
         if self.space is not None:
             self._encounters(dt, hostile, count)
             return
+        if self.wave_wait > 0:      # the countdown to the next wave: nobody new comes
+            self.wave_wait -= dt
+            if self.wave_wait <= 0:
+                self.wave_wait = 0.0
+                self.spawn_t = 0.0
+                self.say("WAVE %d" % self.wave, 2.0)
+            else:
+                n = int(self.wave_wait) + 1
+                if n != self.wave_shown:
+                    self.wave_shown = n
+                    self.say("WAVE %d IN %d" % (self.wave, n), 1.2)
+                return
         self.spawn_t -= dt
         # more ships at once in later waves, and the longer the game goes on
         want = min(self.max_hostile, 1 + (self.wave + int(self.time / 60)) // 2)

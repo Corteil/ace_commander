@@ -84,6 +84,7 @@ def load_game(d, debug=False):
         config.platform = platform_pi   # LEDs, tilt, text entry, leaving (platform layer, step 3)
         config.title_quit = True    # a computer needs a way out on the title screen (Brian)
         config.title_cancel = False # Esc on the title doesn't quit: QUIT does (Brian, 2026-11-21)
+        config.laser_leds = False   # no laser colour on the drawn LED ring (Brian, build 113)
         config.debug_menu = want
         config.perf_log = 60 if want else 0     # the badge's timing lines, a line a second in flight
         config.wire_min = WIRE_MIN

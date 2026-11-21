@@ -140,6 +140,7 @@ DOCK_KEYS = (("k_1", "LAUNCH"), ("k_2", "MARKET"), ("k_3", "SELL"),
 # first galaxy (see AceCommander._egg)
 DEBUG_MENU = config.debug_menu
 TITLE_QUIT = config.title_quit  # a QUIT line on the title screen (a host sets it: the Pi; the badge has F)
+LASER_LEDS = config.laser_leds  # your laser lights the LEDs (off on the Tufty and the Pi: build 113)
 TITLE_CANCEL = config.title_cancel  # cancel on the title leaves (the Pi turns it off: QUIT does)
 EGG_WORD = "DRAKE"      # a male duck: no system name starts with C or U for DUCKS
 EGG_STOPS = 1           # dockings elsewhere forgiven between letters (to refuel)
@@ -493,7 +494,7 @@ class AceCommander(PLATFORM.App):
             self._leds(160)
         elif g.flash > 0:
             self._leds(80)
-        elif g.beam > 0:        # your laser firing: its own colour
+        elif g.beam > 0 and LASER_LEDS:     # your laser firing: its own colour (config.laser_leds)
             r, gr, b = cockpit.LASER_COLOURS.get(g.laser, cockpit.RED)
             self._leds_rgb(int(r * 255), int(gr * 255), int(b * 255))
         elif self._jump_flashes() or self.jump_lit:     # the jump: white where streaks leave
@@ -791,6 +792,7 @@ class AceCommander(PLATFORM.App):
             self.banked = 0
             self.banked_cash = 0
         g.auto_missile = config.auto_missiles       # a device with no missile button
+        g.practice_upgrades = config.practice_upgrades and not career
         if config.practice_missile is not None:
             g.pickup_missile = config.practice_missile
         elif g.over or career != self.career or g.level != level \

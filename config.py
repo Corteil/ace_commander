@@ -24,6 +24,12 @@ auto_missiles = False   # a missile goes as soon as a ship is locked, one a ship
                         # button: the Tufty without its Pad; build 112)
 practice_missile = None # how often a scooped canister in combat practice holds a missile
                         # too (None: game.PICKUP_MISSILE; build 112)
+practice_upgrades = True    # combat practice: each wave cleared drops an upgrade canister
+                        # (it can't be destroyed), the next of game.UPGRADES when scooped,
+                        # and the next wave comes after a countdown (game.WAVE_WAIT; every
+                        # device, Brian; build 113)
+laser_leds = True       # your laser lights the LEDs in its colour (off on the Tufty and the
+                        # Pi, whose "LEDs" are drawn on the screen; build 113)
 wire_min = 8.0          # ships that look smaller than this (pixels) are drawn as a marker
 
 # the game's input (platform layer, step 2): None on the badge, where

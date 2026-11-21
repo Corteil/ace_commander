@@ -557,4 +557,65 @@ for _ in range(int(5.0 / DT)):
 assert g2.locked and g2.missiles == game.MAX_MISSILES, "without it nothing fires by itself"
 print("auto missiles: a longer lock, wait for the laser, one a ship: ok")
 
+
+# ---- practice upgrades (build 113): each wave cleared drops an upgrade canister ----
+g = fresh(23)
+g.practice_upgrades = True
+g.auto_missile = True
+assert g.space is None and g.upgrade_n == 0
+for _ in range(3):                    # wave 1: 2 + 1 kills clear it
+    g._kill(put(g, "SIDEWINDER", "ship", 0, 0, 3000))
+ups = [o for o in g.objs + g.new if o.kind == "can" and o.upgrade]
+assert g.wave == 2 and len(ups) == 1, (g.wave, len(ups))
+fitted = []
+for want in ("beam", "energy unit", "military", "bomb"):
+    g.missiles = 0
+    g._upgrade()
+    fitted.append(want)
+    assert g.missiles == g.max_missiles, "auto missiles: the rack filled too"
+assert g.laser == "military" and g.energy_unit and g.bombs == 1, (g.laser, g.energy_unit, g.bombs)
+g.bombs = 0
+g._upgrade()
+assert g.bombs == 1, "after the list, a used bomb comes back"
+g2 = fresh(24)
+g2.practice_upgrades = True
+for _ in range(3):
+    g2._kill(put(g2, "SIDEWINDER", "ship", 0, 0, 3000))
+g2.missiles = 1
+g2._upgrade()
+assert g2.missiles == 1 and g2.laser == "beam", "without auto missiles the rack isn't filled"
+g3 = fresh(25)
+for _ in range(3):
+    g3._kill(put(g3, "SIDEWINDER", "ship", 0, 0, 3000))
+assert not [o for o in g3.objs + g3.new if o.upgrade], "a bare Game: off until ace sets it from config"
+# the countdown: nobody new for WAVE_WAIT seconds, the seconds shown, then the wave
+g4 = fresh(26)
+g4.practice_upgrades = True
+g4.spawn_t = 0.0
+for _ in range(3):
+    g4._kill(put(g4, "SIDEWINDER", "ship", 0, 0, 3000))
+g4.objs[:] = [o for o in g4.objs if o.upgrade] + [o for o in g4.new if o.upgrade]
+g4.new[:] = []
+seen = set()
+for _ in range(int((game.WAVE_WAIT - 0.3) / DT)):
+    g4.step(DT, 0.0, 0.0, 0.0, False, False)
+    seen.add(g4.msg)
+    assert not [o for o in g4.objs if o.kind == "ship"], "nobody new during the countdown"
+assert "WAVE 2 IN 5" in seen and "WAVE 2 IN 1" in seen, sorted(seen)
+for _ in range(int(1.0 / DT)):
+    g4.step(DT, 0.0, 0.0, 0.0, False, False)
+assert g4.wave_wait == 0.0 and [o for o in g4.objs + g4.new if o.kind == "ship"], "then the wave"
+# the upgrade canister can't be shot
+g5 = fresh(27)
+c = g5.release_canister(600.0)
+c.upgrade = True
+c.speed = 0.0
+for _ in range(int(2.0 / DT)):
+    c.x, c.y, c.z = 0.0, 0.0, 600.0
+    g5.heat = 0.0
+    g5.step(DT, 0.0, 0.0, 0.0, True, False)
+assert not c.dead, "the upgrade canister survives the laser"
+print("practice upgrades: a canister a wave (unshootable), beam, energy unit, military, bomb;"
+      " missiles with auto; a 5 s countdown: ok")
+
 print("ALL EQUIPMENT EFFECT TESTS PASSED")

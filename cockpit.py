@@ -73,6 +73,7 @@ LASER_COLOURS = {
     "mining": YELLOW,
 }
 # enemy missiles are orange like enemy lasers (all enemy fire), yours light purple
+UPGRADE_RGB = GREEN     # a practice upgrade canister (game.UPGRADES), on screen and radar
 COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": ORANGE, "pmissile": LIGHT_PURPLE,
           "station": WHITE}
 PLANET = (0.35, 0.6, 1)
@@ -1116,7 +1117,7 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
 
 
     for o in g.objs:
-        draw_ship(ctx, o)
+        draw_ship(ctx, o, UPGRADE_RGB if o.upgrade else None)
         if o.beam > 0:
             _enemy_beam(ctx, o)
 
@@ -1775,7 +1776,7 @@ def _hud(ctx, g, ms=None, ring=True):
             else:
                 ctx.rgb(*WHITE)
         else:
-            ctx.rgb(*COLOUR[o.kind])
+            ctx.rgb(*(UPGRADE_RGB if o.upgrade else COLOUR[o.kind]))
         if h >= 0:
             ctx.rectangle(bx, by - h, 1, h).fill()
         else:

@@ -139,6 +139,8 @@ class Host:
             m.practice_only = alone     # only combat practice,
             m.auto_missiles = alone     # missiles by themselves (no missile button)
             m.practice_missile = 1.0 if alone else None     # and one in every canister
+            m.practice_upgrades = True  # practice waves drop upgrade canisters (build 113)
+            m.laser_leds = False        # no laser colour on the LED border (Brian, build 113)
             self.ctx.labels = controls_tufty.LABELS if alone else None  # hints: Tufty's buttons
             m.platform = platform_tufty
             m.input = self.feed.attach

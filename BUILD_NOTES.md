@@ -1330,3 +1330,16 @@ what is now `ace.py` (renamed in build 50).
    badge and the Pi. `tests/test_install.py` now writes the release as ustar, as `git archive`
    does (Python's default PAX added ~40 KB and tipped it past its 600 KB bar: the release is
    573 KB). Equipment upgrades for practice: to think about (Brian).
+   **Build 113** (2026-11-21, Brian: option 1 of the upgrade ideas, "remove the screen LED
+   effects for lasers all modes on the Tufty and Pi", "should refill the missiles if auto
+   missiles are on", "the canister is indestructible and the next wave starts after a 5 second
+   count down; include this for all versions"). Combat practice (`config.practice_upgrades`,
+   on for every device): each wave cleared drops an upgrade canister (`Obj.upgrade`, drawn
+   green on screen and radar, `cockpit.UPGRADE_RGB`; the laser passes it by, the bomb already
+   spared canisters) and the next wave waits `WAVE_WAIT` (5 s), "WAVE n IN 5..1" then "WAVE n"
+   (`Game.wave_wait`, nobody new meanwhile; ships already there stay). Scooped, it fits the next
+   of `UPGRADES` (beam laser, energy unit, military laser, energy bomb), then a used bomb
+   back, else full shields (`Game._upgrade`); with `auto_missile` it also fills the missile
+   rack. `config.laser_leds` (off on the Tufty and the Pi): your laser no longer colours the
+   LEDs (the Tufty's border, the Pi's drawn ring); the badge keeps it. The badge's practice
+   changes too (upgrades, countdown): not yet run on the badge.
