@@ -13,6 +13,7 @@ button handlers, foreground checks and minimise through it.
 """
 import gc
 import sys
+import time
 
 import app
 
@@ -33,6 +34,8 @@ class AceCommander(app.App):
         self.real = None        # the real app, once everything is loaded
         self.done = 0           # modules loaded so far
         self.error = None       # why loading failed, if it did
+        self.ship = None        # the ship shown turning (letters.draw_ship), if there
+        self.t0 = time.ticks_ms() if hasattr(time, "ticks_ms") else 0
 
     async def run(self, render_update):
         global _letters
@@ -41,6 +44,11 @@ class AceCommander(app.App):
             _letters = __import__(pkg + ".letters", None, None, ["draw_name"])
         except Exception:
             pass
+        try:        # one of the game's own ships to show turning (build 110)
+            ships = __import__(pkg + ".original_ships", None, None, ["SHIPS"])
+            self.ship = _letters.load_ship(ships.SHIPS)
+        except Exception:
+            self.ship = None    # a build without them (build_mpy --elite-only)
         for name in STEPS:
             await render_update()           # show how far it has got
             try:
@@ -68,15 +76,21 @@ class AceCommander(app.App):
         else:
             _text(ctx, "ACE", 0, -96, 28, (1, 0.85, 0.2))
             _text(ctx, "COMMANDER", 0, -69, 16, (1, 1, 1))
+        bar = 4
+        if self.ship is not None and _letters is not None:
+            t = time.ticks_diff(time.ticks_ms(), self.t0) / 1000.0 if hasattr(time, "ticks_ms") else 0.0
+            title = _letters.draw_ship(ctx, self.ship, t)
+            _text(ctx, title, 0, _letters.SHIP_Y + _letters.SHIP_SIZE + 8, 10, GREY)
+            bar = _letters.BAR_Y
         n = len(STEPS)
-        ctx.rgb(*DIM).rectangle(-70, 4, 140, 8).fill()
-        ctx.rgb(*GREEN).rectangle(-70, 4, 140 * self.done // n, 8).fill()
+        ctx.rgb(*DIM).rectangle(-70, bar, 140, 8).fill()
+        ctx.rgb(*GREEN).rectangle(-70, bar, 140 * self.done // n, 8).fill()
         if self.error:
             _text(ctx, "LOAD FAILED", 0, 60, 14, (1, 0.3, 0.2))
             _text(ctx, self.error[:28], 0, 84, 10, GREY)
         else:
             if self.done < n:
-                _text(ctx, STEPS[self.done], 0, 28, 10, GREY)
+                _text(ctx, STEPS[self.done], 0, bar + 24, 10, GREY)
             _text(ctx, "LOADING", 0, 84, 13, GREEN)     # where the menu line will be
         ctx.restore()
 

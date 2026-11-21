@@ -1275,3 +1275,37 @@ what is now `ace.py` (renamed in build 50).
    free, system 1344: grown, now 558 free, system 848"; slow frames 0-1 per 60 (from 5-7),
    average frame 40-53 ms (from 46-58), each collection 165-180 ms, every ~4-5 s. Brian: the
    stutter is much better and the frame rate improved. The release is unchanged in files.
+   **Build 109** (2026-11-21, the platform layer's step 5: the Tufty 2350 into `hosts/tufty/`).
+   The Tufty port (`Corteil/tufty_ace_commarder`: a vendored game, 11 patches, firmware
+   stand-ins, Badgeware v2) is now host files on the shared game, as the Pi's: platform,
+   controls, layout + its dashboard (gauges following the ship: SP against `max_speed`, FU
+   against `fuel_max`, a lamp per pylon), the ctx adapter brought to Badgeware v3, the host
+   and app entry (`run(update)`), and `build_tufty.py`. Badgeware v3.1.1 on the Tufty is older
+   than the picovector source in places; four crashes on the way, each fixed and then every
+   call tried on the Tufty from the REPL: builtins found by plain name; `screen.text(s, x, y)`
+   (a point was ignored: all text top left); `shape.custom` takes one list of `vec2`, not a
+   list of outlines nor `array('f')`; `screen.circle(vec2, r)`. The PC stand-ins are as strict.
+   On the Tufty (Brian): it works, frames about 60 ms (PERF: 59-64; world 13-17, of which space
+   8-11, HUD 31-33: the dashboard; almost no slow frames: ~8 MB of RAM). Not yet tried: the Pad
+   in detail, saving and loading, search and name entry (no keyboard: the keyboard page can't
+   be typed into with the Pad).
+   Then (Brian): a loading screen as the badge's (a module a frame, `host_tufty.STEPS`: the
+   name, a bar, the module, LOADING where the menu line will be; LOAD FAILED and the reason
+   instead of a crash), with one of the game's own ships tumbling on it (the Kestrel, from
+   `original_ships`, loaded second), held at least `LOAD_HOLD` (3 s) to see it.
+   `build_tufty.py --mpy` compiles every module but the two `__init__.py` with MicroPython
+   1.29's mpy-cross (mpy v6.3, as the Tufty's `sys.implementation._mpy` 7942; installed in
+   `~/.local/share/venvs/mpycross129`): 557 KB -> 215 KB, about 340 KB less on the TUFTY drive,
+   and the game loads in 1.5 s (a LOADED line on serial).
+   **Build 110** (2026-11-21, Brian: the Tufty's loading screen "should have a ship on it from
+   one of our ships", then the icons, and "change the loader for each system"). `letters.py`
+   draws the loading screens' ship (`load_ship`, `draw_ship`: the Kestrel, the game's own
+   design in the Cobra Mk III role, turning, its name under it; `SHIP_Y`, `SHIP_SIZE`,
+   `BAR_Y`), shared by the badge's `app.py` (which loads `original_ships` straight after
+   `letters`; a build without them shows none), the Tufty's host (held 3 s) and the Pi's
+   new loading screen (`run.Host.loading`, 3 s, any key skips it; not in the tests or with
+   `--frames`). `tools/make_icons.py` draws the Kestrel as the icons: the Tufty's 24 x 24
+   pixel art (`hosts/tufty/app/icon.png`) and the Pi's 256 x 256 (`hosts/pi/icon.png`,
+   installed as `~/.local/share/icons/ace-commander.png`, the old one kept as
+   `ace-commander-title-old.png`). On the badge the ship turns in steps (the loader draws
+   only between imports). Not yet on the badge.
