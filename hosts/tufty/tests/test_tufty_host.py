@@ -204,6 +204,23 @@ assert a.menu == 1, ("the Pad still works on the title screen", a.menu)
 a.menu = 0
 a._odebug("GAMEPAD: OFF")
 assert not h.pad_off and not cfg.auto_missiles and "NEW COMMANDER" in a.choices()
+# text entry (build 122): the letter picker on the Tufty's buttons, for the name
+got = []
+a._open_name("", got.append)
+d = a.ndialog
+assert d is not None and d is a.platform.dialog, "the Tufty's letter picker, not the keyboard page"
+press("B")                  # A
+press("UP")                 # B
+press("UP")                 # C
+press("B")                  # AC
+press("C")                  # A (the letter stays at C)
+press("UP")                 # D
+press("B")                  # AD
+shot("tufty_name_entry")
+assert d.text == "AD", d.text
+press("A")                  # done
+assert got == ["AD"] and a.ndialog is None, (got, a.ndialog)
+frames(2)
 # NEW COMMANDER: the Tufty's B selects (the badge's C), as without the Pad
 a.menu = a.choices().index("NEW COMMANDER")
 press("B")

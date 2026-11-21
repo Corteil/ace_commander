@@ -1390,3 +1390,11 @@ what is now `ace.py` (renamed in build 50).
    ignored in a practice flight, auto missiles, a missile in every canister); the Pad works
    everywhere else and the title keeps the whole game (only a Tufty with no Pad at all is
    practice only). Auto missiles are practice only on every device (`ace._start_flight`).
+   **Build 122** (Brian: "sort out text entry for the Tufty: up/down change letter, B selects
+   it, C backspace, A enter"). `hosts/tufty/dialog_tufty.py`, `LetterDialog`: what
+   `platform_tufty.text_dialog` now gives the game (the badge's firmware TextDialog interface:
+   `.text`, `.message`, `._result`, `draw`), for the Galactic chart's search and the commander's
+   name. UP / DOWN go through `LETTERS` (space, A-Z, 0-9, "-"; held, they repeat), B adds the
+   letter, C deletes the last, A is done (nothing typed: no match / the suggested name). While
+   it is open `host_tufty._typing` gives it the Tufty's buttons and the game none. The letter
+   stays where it was after adding.

@@ -4,8 +4,8 @@ config.platform to this module before the game is imported.
 
 The game writes the badge's 12-LED ring into LEDS: layout_tufty paints it as
 a border round the 3D view and host_tufty lights the Tufty's case lights by
-how bright it is. No tilt sensor and no firmware text entry (the game's own
-keyboard page needs a keyboard, which the Tufty hasn't got yet). The frame
+how bright it is. No tilt sensor; text entry is dialog_tufty's letter picker
+on the five buttons (build 122). The frame
 loop is Badgeware's run(update) (host_tufty); leaving the game ends it.
 """
 
@@ -33,6 +33,8 @@ class Platform:
         self.tx = self.ty = 0.0
         self.fast = False       # Badgeware runs the frames (host_tufty)
         self.quit = False       # the game asked to leave: update() ends run()
+        self.dialog = None      # the text entry open (text_dialog), if any
+        self.ck = None          # the game's cockpit module, for drawing it (host_tufty sets it)
         self.gamepad = None     # True / False with a Pad found (DEBUG > DISPLAY > GAMEPAD),
         self.host = None        # which host_tufty switches (set_gamepad)
 
@@ -66,7 +68,11 @@ class Platform:
         return False
 
     def text_dialog(self, title):
-        return None
+        """The Tufty's letter picker (dialog_tufty), which host_tufty gives the
+        buttons while it is open."""
+        from dialog_tufty import LetterDialog
+        self.dialog = LetterDialog(title, self.ck)
+        return self.dialog
 
     async def run(self, render_update):
         raise RuntimeError("on the Tufty, Badgeware runs the frames (host_tufty)")

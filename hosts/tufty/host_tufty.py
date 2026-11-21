@@ -73,6 +73,7 @@ class Host:
         self.real_pad = pad     # the Pad found at start
         self.pad_off = False    # DEBUG > GAMEPAD OFF: the Pad ignored in combat practice
         self.waits = {}         # button -> when it went down alone (PAIR_WAIT), on self.clock
+        self.typed = set()      # the buttons down last frame while typing (dialog_tufty)
         self.speed_mode = False     # in flight, UP / DOWN change speed (A + C toggles it)
         self.speed_game = None      # the flight it was set in
         self.both_down = False      # A + C held last frame (the toggle goes on the press)
@@ -152,6 +153,24 @@ class Host:
                 self.pad = None             # unplugged: carry on with the Tufty's buttons
         return keys
 
+    def _typing(self, d, ms):
+        """The Tufty's buttons to the letter picker (dialog_tufty): a press as
+        it goes down, UP / DOWN repeating while held."""
+        b = self.badge
+        down = set()
+        for name, const in self.buttons.items():
+            if b.held(const):
+                down.add(name)
+        for name in ("UP", "DOWN", "A", "B", "C"):
+            if name in down and name not in self.typed:
+                d.press(name)
+        held = [n for n in ("UP", "DOWN") if n in down and n in self.typed]
+        if held:
+            d.hold(held[0], ms)
+        else:
+            d.let_go()
+        self.typed = down
+
     def _lights(self):
         """The case lights as bright as the brightest LED the game lit."""
         level = 0
@@ -197,6 +216,7 @@ class Host:
         if self.done == len(STEPS):
             self.ace = _module("ace")
             self.loaded = self.ace.AceCommander()     # started once LOAD_HOLD is up
+            self.loaded.platform.ck = _module("cockpit")    # to draw the text entry
             if self.real_pad is not None:   # DEBUG > DISPLAY > GAMEPAD can switch it
                 self.loaded.platform.gamepad = True
                 self.loaded.platform.host = self
@@ -274,7 +294,13 @@ class Host:
         elif ms > 100:
             ms = 100
         self.clock += ms
-        self.feed.set_held(self._held())
+        d = self.app.platform.dialog
+        if d is not None and d._result is None:     # typing: the buttons are the dialog's
+            self._typing(d, ms)
+            self.feed.set_held(set())
+        else:
+            self.app.platform.dialog = None
+            self.feed.set_held(self._held())
         self.app.update(ms)
         if self.app.platform.quit:
             return True
