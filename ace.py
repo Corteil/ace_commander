@@ -196,15 +196,15 @@ DEBUG_GROUPS = (
     ("TRAVEL", ("TO THE STATION", "TO THE SUN", "DOCK NOW", "MIS-JUMP NEXT",
                 "TO MISSION SYSTEM")),
     ("COMMANDER", ("+10 KILLS", "+1000 CR", "LEVEL", "HARDCORE", "LEGAL", "ANGER STATION", "MISSION")),
-    ("DISPLAY", ("FRAME TIME", "SPEED TEST")),
+    ("DISPLAY", ("FRAME TIME", "SPEED TEST", "GAMEPAD")),
 )
 CAREER_ONLY = ("+1000 CR", "HARDCORE", "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION",
                "MIS-JUMP NEXT", "LEGAL", "FUEL TO 1/4", "TO MISSION SYSTEM", "MISSION")
 # the cheats that work away from a flight (title screen Options, docked Options);
 # all but the last two need a commander, as does SHIP (the equipment) there
 OFF_FLIGHT = ("+10 KILLS", "+1000 CR", "LEVEL", "HARDCORE", "LEGAL", "MISSION",
-              "FRAME TIME", "SPEED TEST")
-NO_COMMANDER = ("FRAME TIME", "SPEED TEST")
+              "FRAME TIME", "SPEED TEST", "GAMEPAD")
+NO_COMMANDER = ("FRAME TIME", "SPEED TEST", "GAMEPAD")
 MSG_TIME = 1.5          # seconds a DEBUG message stays on the Options' DEBUG page
 
 
@@ -1835,6 +1835,8 @@ class AceCommander(PLATFORM.App):
             if self.career:
                 return key != "NEXT WAVE"       # waves are for combat practice
             return key not in CAREER_ONLY       # no commander: no cash, traffic or legal status
+        if key == "GAMEPAD":        # a device whose platform can switch its gamepad (the Tufty's)
+            return getattr(self.platform, "gamepad", None) is not None
         if key == "TO MISSION SYSTEM":      # docked: moved there and docked again
             return self.cmdr is not None and (self.mode == "docked" or self.od_from == "docked")
         if key not in OFF_FLIGHT:
@@ -1854,6 +1856,8 @@ class AceCommander(PLATFORM.App):
             return "HARDCORE: " + onoff(self._hardcore())
         if key == "FRAME TIME":
             return "FRAME TIME: " + onoff(self.show_ms)
+        if key == "GAMEPAD":
+            return "GAMEPAD: " + onoff(getattr(self.platform, "gamepad", None))
         if key == "MIS-JUMP NEXT":
             return "MIS-JUMP NEXT: " + onoff(self.misjump)
         if key == "LEGAL":
@@ -1982,6 +1986,9 @@ class AceCommander(PLATFORM.App):
         if item.startswith("FRAME TIME"):
             self.show_ms = not self.show_ms
             return "FRAME TIME " + ("ON" if self.show_ms else "OFF")
+        if item.startswith("GAMEPAD"):
+            self.platform.set_gamepad(not self.platform.gamepad)
+            return "GAMEPAD " + ("ON" if self.platform.gamepad else "OFF")
         if item == "SPEED TEST":
             from . import bench     # only when asked for: a DEBUG page (DISPLAY > SPEED TEST)
             self.bench = bench.Bench()      # F comes back to this page
@@ -2253,6 +2260,14 @@ class AceCommander(PLATFORM.App):
             return
         if item.startswith("FRAME TIME"):
             self.show_ms = not self.show_ms
+        elif item.startswith("GAMEPAD"):
+            self.platform.set_gamepad(not self.platform.gamepad)
+            g.auto_missile = config.auto_missiles       # at once, in this flight too
+            if config.practice_missile is not None:
+                g.pickup_missile = config.practice_missile
+            else:
+                g.pickup_missile = game.PICKUP_MISSILE
+            g.say("GAMEPAD " + ("ON" if self.platform.gamepad else "OFF"))
         elif item.startswith("INVINCIBLE"):
             g.god = not g.god
             if g.god:

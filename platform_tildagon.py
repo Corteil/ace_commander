@@ -26,6 +26,9 @@ owner_name:
       .fast                     True if run() can skip the wait between frames
       run(render_update)        the frame loop (async)
       .minimise()               leave the game
+      .gamepad                  optional: True / False if the device can switch a
+                                gamepad on and off (DEBUG > DISPLAY), with
+                                .set_gamepad(on); missing or None: no such line
     owner_name()                the device owner's name, or None
 """
 import asyncio

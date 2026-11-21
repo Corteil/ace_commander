@@ -70,6 +70,7 @@ class Host:
         self.rect = rect
         self.buttons = buttons
         self.pad = pad
+        self.real_pad = pad     # the Pad found at start (DEBUG > GAMEPAD can switch it off)
         self.data_dir = data_dir
         self.feed = controls_tufty.Feed()
         self.ctx = Ctx(screen, color, shape, font, SCREEN_W // 2, SCREEN_H // 2)
@@ -143,10 +144,7 @@ class Host:
         elif name == "config":
             _mkdirs(self.data_dir)
             m.data_dir = self.data_dir
-            alone = self.pad is None    # the five buttons alone (Brian, builds 111-112):
-            m.practice_only = alone     # only combat practice,
-            m.auto_missiles = alone     # missiles by themselves (no missile button)
-            m.practice_missile = 1.0 if alone else None     # and one in every canister
+            self._alone(m, self.pad is None)
             m.practice_upgrades = True  # practice waves drop upgrade canisters (build 113)
             m.laser_leds = False        # no laser colour on the LED border (Brian, build 113)
             self.ctx.labels = controls_tufty.LABELS     # hints name the Tufty's buttons
@@ -158,7 +156,25 @@ class Host:
         if self.done == len(STEPS):
             self.ace = _module("ace")
             self.loaded = self.ace.AceCommander()     # started once LOAD_HOLD is up
+            if self.real_pad is not None:   # DEBUG > DISPLAY > GAMEPAD can switch it
+                self.loaded.platform.gamepad = True
+                self.loaded.platform.host = self
             print("LOADED in %d ms" % _diff(_ms(), self.t_load))
+
+    @staticmethod
+    def _alone(config, alone):
+        """The game as the five buttons alone need it (Brian, builds 111-112), or not."""
+        config.practice_only = alone        # only combat practice,
+        config.auto_missiles = alone        # missiles by themselves (no missile button),
+        config.practice_missile = 1.0 if alone else None    # and one in every canister
+
+    def set_gamepad(self, on):
+        """DEBUG > DISPLAY > GAMEPAD: use the Pad, or play as without it."""
+        on = bool(on) and self.real_pad is not None
+        self.pad = self.real_pad if on else None
+        self._alone(_module("config"), not on)
+        if self.app is not None or self.loaded is not None:
+            (self.app or self.loaded).platform.gamepad = on
 
     def _draw_loading(self):
         """The name where the title screen has it, a bar, the module being

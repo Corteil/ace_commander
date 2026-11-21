@@ -1354,3 +1354,10 @@ what is now `ace.py` (renamed in build 50).
    flight), UP + DOWN slows down; and the hints name the Tufty's buttons with or without the
    Pad (`LABELS`: C is B, F is A+C, E is UP+DOWN; HOME no longer, as it leaves the app). A
    button pressed a moment before its pair counts alone for that moment.
+   **Build 115** (2026-11-21, Brian: "add gamepad off in debug menu and add debug.txt so the
+   debug menu works"). DEBUG > DISPLAY > GAMEPAD: ON / OFF, shown when the platform has a
+   `gamepad` setting (`platform_tildagon`'s interface: optional `gamepad` + `set_gamepad`):
+   the Tufty's, when a Pad was found at start. OFF plays as without the Pad (practice only,
+   auto missiles, a missile in every canister: `host_tufty.set_gamepad` / `_alone`; in a
+   flight at once), ON as with it. `/state/ace_commander/debug.txt` made on the Tufty, so its
+   DEBUG menu shows (`ace._debug_wanted`); that folder already held its save and options.

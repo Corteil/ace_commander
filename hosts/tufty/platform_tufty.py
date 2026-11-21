@@ -33,6 +33,12 @@ class Platform:
         self.tx = self.ty = 0.0
         self.fast = False       # Badgeware runs the frames (host_tufty)
         self.quit = False       # the game asked to leave: update() ends run()
+        self.gamepad = None     # True / False with a Pad found (DEBUG > DISPLAY > GAMEPAD),
+        self.host = None        # which host_tufty switches (set_gamepad)
+
+    def set_gamepad(self, on):
+        if self.host is not None:
+            self.host.set_gamepad(on)
 
     def leds_rgb(self, r, g, b):
         self.leds_on = True

@@ -109,6 +109,7 @@ def lit(x0, y0, x1, y1):
 h, a, data = make(None)
 frames(5)
 assert a.choices() == ["COMBAT PRACTICE"], a.choices()
+assert not any(l.startswith("GAMEPAD") for l in a._cheats("DISPLAY", False)), "no Pad found: no line"
 cfg = sys.modules["ace_commander.config"]
 assert cfg.auto_missiles and cfg.practice_missile == 1.0, "missiles by themselves, in every canister"
 assert h.ctx.labels == {"C": "B", "F": "A+C", "E": "UP+DOWN"}, "the hints name the Tufty's buttons"
@@ -157,6 +158,14 @@ assert a.mode == "menu" and lit(0, 0, 320, 240) > 200, "the title draws"
 shot("tufty_title")
 assert "NEW COMMANDER" in a.choices() and not a.ctx_labels if hasattr(a, "ctx_labels") else True
 assert h.ctx.labels is not None, "with the Pad too the hints name the Tufty's buttons"
+# DEBUG > DISPLAY > GAMEPAD: the Pad off plays as without it, on again as with it
+assert any(l.startswith("GAMEPAD: ON") for l in a._cheats("DISPLAY", False)), a._cheats("DISPLAY", False)
+a._odebug("GAMEPAD: ON")
+cfg = sys.modules["ace_commander.config"]
+assert h.pad is None and cfg.practice_only and cfg.auto_missiles and a.choices() == ["COMBAT PRACTICE"]
+assert any(l.startswith("GAMEPAD: OFF") for l in a._cheats("DISPLAY", False))
+a._odebug("GAMEPAD: OFF")
+assert h.pad is pad and not cfg.practice_only and not cfg.auto_missiles and "NEW COMMANDER" in a.choices()
 # NEW COMMANDER: the Tufty's B selects (the badge's C), as without the Pad
 a.menu = a.choices().index("NEW COMMANDER")
 press("B")
