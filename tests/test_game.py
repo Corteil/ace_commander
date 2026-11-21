@@ -724,7 +724,27 @@ for zk in (8.0, 2.5, 1.5, 0.4, 0.1):
         for (x0, y0), (x1, y1) in c.segs:
             assert not (x0 == x1 and x0 in (0, 240)) and not (y0 == y1 and y0 in (0, 240)), \
                 ("no outline along the screen's edge", zk)
-print("the sun and the planet to their true edge, the planet's outline on it: ok")
+# build 106: skimming low, beside you and with its edge behind you, the shape
+# is still right, and no point drawn lands more than 400 pixels out (the badge
+# swapped colours when shapes reached thousands of pixels out)
+far = [0]
+class _ImgFar(_Img):
+    def move_to(self, x, y):
+        far[0] = max(far[0], abs(x), abs(y))
+        return _Img.move_to(self, x, y)
+    def line_to(self, x, y):
+        far[0] = max(far[0], abs(x), abs(y))
+        return _Img.line_to(self, x, y)
+for at in ((0, -1.005, 0.05), (0, -1.02, 0.6), (1.01, 0.1, 0.0), (0.3, -1.05, -0.2), (0, 0, 1.3), (0.9, 0.9, 0.9)):
+    sp = _Sp()
+    rr = 24000.0
+    sp.sx, sp.sy, sp.sz, sp.sr = at[0] * rr, at[1] * rr, at[2] * rr, rr
+    c = _ImgFar()
+    ck._sun_bands(c, sp)
+    seen, wrong = _sun_seen(*at)
+    assert wrong < 0.01, (at, seen, wrong)
+assert far[0] <= 400, far[0]
+print("close by, beside you, behind you: right, and never far off the screen: ok")
 # DEBUG's TO THE SUN, flying on: while the cabin is hot enough to scoop and the
 # sun's edge is in front of you, some of the view is sun
 g = fresh(9)
