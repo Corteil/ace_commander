@@ -331,5 +331,24 @@ a._open_name("", got.append)
 assert a.ndialog is None and a.namer is not None, "the keyboard: its own typing page"
 a.namer = None
 print("text entry: the picker with the pad, the keyboard's page without: ok")
+# Start (done) held through closing the picker doesn't launch (as the Tufty's build 128)
+a.paused = False
+a._dock()
+h.step(40)
+assert a.mode == "docked", a.mode
+h.pad_last = True
+got = []
+a._open_name("", got.append)
+assert a.ndialog is not None
+button(h, "start", True)
+for _ in range(6):
+    h.step(40)
+assert a.ndialog is None, "Start: done"
+assert a.mode == "docked", "the Start that closed the picker doesn't launch: " + a.mode
+button(h, "start", False)
+for _ in range(3):
+    h.step(40)
+assert a.mode == "docked", a.mode
+print("the press that closes the picker doesn't launch: ok")
 pygame.quit()
 print("ALL PI PAD TESTS PASSED")
