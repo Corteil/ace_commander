@@ -25,6 +25,11 @@ wire_min = 8.0          # ships that look smaller than this (pixels) are drawn a
 # a function input(controls, owner) that feeds controls.Controls itself
 input = None
 
+# what only the device can do (platform layer, step 3): None on the badge, where
+# the game uses platform_tildagon; a host sets its own module with App,
+# Platform and owner_name (see the top of platform_tildagon.py)
+platform = None
+
 
 def app_dir():
     """The folder this file is in: the app's."""

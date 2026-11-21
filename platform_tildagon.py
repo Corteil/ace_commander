@@ -2,9 +2,35 @@
 firmware can do, so the rest of the game doesn't import it.
 
 Step 2 (build 101): input. Input listens for the firmware's button events and
-tells controls.Controls which control names each one counts as. The rest
-(LEDs, tilt, dialogs, the frame loop) moves here in step 3.
+tells controls.Controls which control names each one counts as.
+
+Step 3 (build 103): the rest, moved out of ace.py, not rewritten. Platform is
+what the game asks of the device it runs on; another device (hosts/) gives
+config.platform its own module with the same names, App, Platform and
+owner_name:
+
+    App                         the game's base class (the firmware's app.App)
+    Platform(app)               made once by the game (app: ace.AceCommander)
+      .leds                     True if there is a ring of 12 LEDs
+      .leds_rgb(r, g, b)        the whole ring one colour (0-255 each); written
+                                only when it changes
+      .leds_each(values, rgb)   each LED in colour rgb at its own level (values[1]
+                                to [12], 0-255)
+      .leds_release()           give the LEDs back to the device
+      .tilt_ok                  True if there is a tilt sensor
+      .tilt()                   read the sensor: True, with .tx and .ty the
+                                acceleration in g; False if it failed
+      .keyboard_fitted()        True if a keyboard is known to be fitted
+      .text_dialog(title)       the device's own text entry (the firmware's
+                                TextDialog: .text, .message, ._result), or None
+      .fast                     True if run() can skip the wait between frames
+      run(render_update)        the frame loop (async)
+      .minimise()               leave the game
+    owner_name()                the device owner's name, or None
 """
+import asyncio
+
+import app as _app
 from events.input import BUTTON_TYPES, ButtonDownEvent, ButtonUpEvent
 from events.joystick import JOYSTICK_BUTTON_TYPES as JOY
 from frontboards.common import FRONTBOARD_BUTTON_TYPES as FB
@@ -15,7 +41,25 @@ try:
 except ImportError:
     KEYBOARD_BUTTONS = {}
 
+try:
+    import imu
+except ImportError:
+    imu = None
+
+try:    # lets the flight screen skip the 50 ms pause the badge adds to every frame
+    from system.scheduler import scheduler
+except Exception:
+    scheduler = None
+
+try:    # the badge's LEDs, used to flash red when you're hit
+    from tildagonos import tildagonos
+    from system.patterndisplay.events import PatternDisable, PatternEnable
+except Exception:
+    tildagonos = None
+
 from . import config
+
+App = _app.App      # the game's base class: the scheduler's app (on a PC, its own host)
 
 # keyboard keys not in the firmware's KEYBOARD_BUTTONS, by the name a driver
 # would give them, and the control name they count as
@@ -119,3 +163,176 @@ class Input:
         if config.log_keys:
             print("KEY UP", repr(button))
         self.controls.release(button)
+
+
+def owner_name():
+    """The badge owner's name from the badge's settings, or None."""
+    try:
+        import settings
+        n = settings.get("name")
+        if isinstance(n, str) and n.strip():
+            return n.strip()
+    except Exception:
+        pass
+    return None
+
+
+try:
+    import time
+    _ms = time.ticks_ms
+    _diff = time.ticks_diff
+except AttributeError:   # off the badge (tests)
+    def _ms():
+        return int(time.perf_counter() * 1000)
+
+    def _diff(a, b):
+        return a - b
+
+
+class Platform:
+    """The badge's firmware, for the game (see the top of this file)."""
+
+    def __init__(self, app):
+        self.app = app
+        self.host = app.host        # the app the scheduler knows (app.py's loader)
+        self.leds = tildagonos is not None
+        self.leds_on = False        # we have taken over the LEDs
+        self.led_level = None       # (r, g, b) last written to the whole ring
+        self.tilt_ok = imu is not None
+        self.tx = self.ty = 0.0     # the last tilt reading, in g
+        self.fast = scheduler is not None
+
+    # ---- LEDs -------------------------------------------------------------
+
+    def _take_leds(self):
+        if not self.leds_on:
+            eventbus.emit(PatternDisable())
+            try:
+                tildagonos.set_led_power(True)
+            except Exception:
+                pass
+            self.leds_on = True
+            self.led_level = None
+
+    def leds_rgb(self, r, g, b):
+        """Set the ring of 12 LEDs to (r, g, b), 0-255 each, taking them over
+        from the badge's own pattern first. Only writes when the colour changes."""
+        if tildagonos is None:
+            return
+        try:
+            self._take_leds()
+            rgb = (r, g, b)
+            if rgb != self.led_level:
+                self.led_level = rgb
+                leds = tildagonos.leds
+                for i in range(1, 13):      # the front ring is LEDs 1 to 12
+                    leds[i] = rgb
+                leds.write()
+        except Exception:
+            self.leds_on = False
+
+    def leds_each(self, values, rgb):
+        """Each ring LED in colour rgb at its own level (values[1] to [12],
+        0-255)."""
+        if tildagonos is None:
+            return
+        try:
+            self._take_leds()
+            leds = tildagonos.leds
+            r, gr, b = rgb
+            for i in range(1, 13):
+                v = int(values[i])
+                leds[i] = (r * v // 255, gr * v // 255, b * v // 255)
+            leds.write()
+            self.led_level = None       # the next whole-ring colour is written afresh
+        except Exception:
+            self.leds_on = False
+
+    def leds_release(self):
+        """Hand the LEDs back to the badge's own pattern."""
+        if self.leds_on:
+            self.leds_on = False
+            try:
+                eventbus.emit(PatternEnable())
+            except Exception:
+                pass
+
+    # ---- tilt -------------------------------------------------------------
+
+    def tilt(self):
+        """Read the accelerometer into tx, ty (in g): True, or False if it
+        failed (then tilt_ok is False from then on). No new object per frame."""
+        if not self.tilt_ok:
+            return False
+        try:
+            ax, ay, _ = imu.acc_read()
+        except Exception:
+            self.tilt_ok = False
+            return False
+        self.tx = ax / 9.81
+        self.ty = ay / 9.81
+        return True
+
+    # ---- keyboard and text entry -----------------------------------------
+
+    def keyboard_fitted(self):
+        """True if a keyboard is fitted: its hexpansion's driver (KeyboardApp)
+        is running, or its header names a keyboard."""
+        try:
+            from system.hexpansion.app import _hexpansion_manager as m
+            if m is not None:
+                for a in m.hexpansion_apps.values():
+                    if a is not None and type(a).__name__ == "KeyboardApp":
+                        return True
+                for h in m.hexpansion_headers.values():
+                    if h is not None and "KEYB" in str(getattr(h, "friendly_name", "")).upper():
+                        return True
+        except Exception:
+            pass
+        return False
+
+    def text_dialog(self, title):
+        """The firmware's TextDialog with the game's smaller text (build 90), or
+        None if there is none. Registered to the host (app.py's loader): the
+        firmware's eventbus gives the buttons only to the focused app, and the
+        game itself never is (build 89 fix: it froze the badge)."""
+        try:
+            from app_components.dialog import TextDialog
+            from . import find
+            return find.small_dialog(TextDialog)(title, self.host)
+        except Exception:
+            return None
+
+    # ---- the frame loop ---------------------------------------------------
+
+    async def run(self, render_update):
+        """The badge's own loop waits 50 ms after every update before the next
+        one, which caps any app at about 14 frames a second. On the title
+        screen, in flight and in the viewer this asks for a redraw directly and
+        carries on as soon as it has been drawn. The other screens, and
+        anything unexpected, use the normal path. app.fast switches it off."""
+        a = self.app
+        last = _ms()
+        while True:
+            now = _ms()
+            a.update(_diff(now, last))
+            last = now
+            if a.fast and (a.mode == "flight" or a.mode == "viewer"
+                           or a.mode == "launch" or a.mode == "docking"
+                           or (a.mode == "menu" and a.title is not None)):
+                try:
+                    scheduler.render_needed.set()
+                    await asyncio.sleep(0)      # the renderer and other tasks run here
+                    if scheduler.app_is_foregrounded(self.host):
+                        continue
+                except Exception:
+                    a.fast = False              # firmware differs: stay on the normal path
+            await render_update()
+
+    def minimise(self):
+        """Leave the game: the host (the loading screen) is the app the
+        scheduler knows; the game is its own host only on a PC (the tests)."""
+        if self.host is not self.app:
+            self.host.minimise()
+        else:
+            _app.App.minimise(self.host)

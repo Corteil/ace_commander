@@ -1159,3 +1159,18 @@ what is now `ace.py` (renamed in build 50).
    (300) of the face and docks `AUTO_IN` 70 inside (40 before; 100 missed on a Dodo, too
    near its middle). The tunnel scene is unchanged (DOCK_TIME). Run on the badge (as
    .mpy) and played by Brian: all OK.
+   **Build 103** (2026-11-21, the platform layer's step 3, `hosts/NEXT_SESSION.md` B3).
+   `ace.py` imports no firmware any more (it lost `app`, `system.eventbus`, `imu`,
+   `system.scheduler`, `tildagonos`, `system.patterndisplay.events`, `settings`,
+   `system.hexpansion.app`, `app_components.dialog` and `asyncio`). What only the device can
+   do is `self.platform`, from `PLATFORM.Platform(self)`: `platform_tildagon` on the badge,
+   or `config.platform` (a host's module with `App`, `Platform`, `owner_name`). Moved, not
+   rewritten: the LED takeover and writes (`leds_rgb`, `leds_each`, `leds_release`, with
+   `leds_on` / `led_level`; ace keeps which effect to show and the LEDS option), tilt
+   (`tilt()` sets `tx` / `ty`, no new object per frame), `keyboard_fitted()`,
+   `text_dialog(title)` (the small TextDialog on the host), the frame loop `run` and
+   `minimise`; `App` is the game's base class (the firmware's `app.App`). The Pi's
+   `hosts/pi/platform_pi.py` replaces `pi_firmware.py` (no stand-in modules at all now;
+   its LED ring goes dark when the game lets go, as the badge's pattern takes over). The
+   badge is unchanged: all 59 frames pixel-identical; the release gains no file. Not yet
+   run on the badge.
