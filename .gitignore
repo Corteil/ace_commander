@@ -21,3 +21,4 @@ key_guide.pdf
 # made by tools/build_mpy.py
 build/
 hosts/tufty/tests/shots/
+elite_sfx.py

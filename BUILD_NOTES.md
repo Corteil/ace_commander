@@ -1522,3 +1522,18 @@ what is now `ace.py` (renamed in build 50).
    (options.json "sound") only where there is sound. Platform interface: optional `sound_ok`,
    `sound(name)`, `sound_step()`. Tests: `tests/test_sound.py` (a stand-in I2C bus), the Pi and
    Tufty host tests. **Not tried on a real buzzer** (Brian hasn't got one yet).
+   **Build 141** (Brian: "how close are the sounds to Elite's?", then "match Elite"). They were
+   invented; now, with Elite's data, Elite's own. `tools/import_sfx.py CLONE` reads the SFX table
+   (main source) and the four envelopes E% (loader), plays each SOUND on a model of the BBC
+   Micro's sound system (envelopes stepped each centisecond; pitch 53 = middle C, 4 a semitone;
+   the noise channel's rates, and rate 3 following channel 1, which Elite's death sound sweeps
+   unheard to colour the noise) and writes `elite_sfx.py` (gitignored, Elite-derived; with
+   `build_mpy --elite` / `build_tufty --elite` if made, never in a release: `DERIVED`). Events
+   as the original calls them: laser 0, hit and explode 24 (EXNO), hurt 8, crash and die 16+24
+   (EXNO3: a collision, hit with no shields), lock 32 (BEEP), unarm 40, missile / incoming /
+   launch 48, jump 56 (LL164), ecm 64; the rest silent, as in Elite. `sfx.py` uses it when
+   `content.OWN` is False, else the game's own (now with hit, crash, unarm too). Format: a sound
+   is (priority, part, ...), parts played together; steps (Hz, ms[, level 0-126]), negative Hz
+   noise at that rate; `CHANNELS` (the Pi restarts a sound on its channel, Elite's flush). The
+   buzzer plays the first part, levels as its volume 1-4, and skips steps shorter than a frame
+   to keep time; the badge checks for the buzzer before importing it (heap).

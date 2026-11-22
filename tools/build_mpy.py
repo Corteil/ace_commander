@@ -44,6 +44,8 @@ PI_MPY_CROSS = os.path.expanduser(
 BADGE_VERSION = "v1.28"
 KEEP_SOURCE = ("app.py", "__init__.py")
 ELITE = ("ship_data.py", "game_data.py")
+ELITE_EXTRA = ("elite_sfx.py",)     # Elite's sounds (tools/import_sfx.py): with --elite if made
+DERIVED = ELITE + ELITE_EXTRA       # never in a release
 OWN_CONTENT = ("original_ships.py", "original_data.py")
 BADGE_DIR = ":/apps/ace_commander/"
 
@@ -56,7 +58,7 @@ def release_files():
     attrs = subprocess.run(["git", "-C", REPO, "check-attr", "export-ignore", "--"] + files,
                            capture_output=True, text=True, check=True).stdout.splitlines()
     ignored = set(line.split(":")[0] for line in attrs if line.endswith(": set"))
-    return [f for f in files if f not in ignored and f not in ELITE and "/" not in f
+    return [f for f in files if f not in ignored and f not in DERIVED and "/" not in f
             and f not in ("README.md", "LICENSE")]     # not needed on the badge
 
 
@@ -100,6 +102,7 @@ def build(args):
             sys.exit("--elite: %s not made yet (tools/import_ships.py, tools/import_galaxy.py)"
                      % ", ".join(missing))
         files += list(ELITE)
+        files += [f for f in ELITE_EXTRA if os.path.exists(os.path.join(REPO, f))]
     made = []
     src = dst = 0
     for f in files:

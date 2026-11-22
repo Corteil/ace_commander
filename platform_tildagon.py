@@ -230,17 +230,18 @@ class Platform:
         (a hexpansion with a Qwiic connector), or None."""
         try:
             from machine import I2C
-            from . import buzzer
         except ImportError:
             return None
         for port in range(1, 7):
             try:
                 i2c = I2C(port)
-            except Exception:
+                if 0x34 not in i2c.scan() or i2c.readfrom_mem(0x34, 0, 1)[0] != 0x5E:
+                    continue    # (buzzer.ADDRESS, its ID: checked before importing the
+            except Exception:   # player and its sounds, which cost heap)
                 continue
-            if buzzer.find(i2c):
-                print("Qwiic buzzer on hexpansion port %d" % port)
-                return buzzer.Buzzer(i2c)
+            from . import buzzer
+            print("Qwiic buzzer on hexpansion port %d" % port)
+            return buzzer.Buzzer(i2c)
         return None
 
     def sound(self, name):

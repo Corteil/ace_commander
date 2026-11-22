@@ -17,14 +17,38 @@ import ace_commander
 from ace_commander import buzzer, game, sfx
 mod = ace_commander.ace
 
-# ---- the table
-for name, (prio, steps) in sfx.SOUNDS.items():
-    assert isinstance(prio, int) and steps, name
-    for f, ms in steps:
-        assert isinstance(f, int) and isinstance(ms, int) and 0 < ms <= 1000, (name, f, ms)
-        assert f == sfx.NOISE or f == 0 or 50 <= f <= 5000, (name, f)
-    assert sfx.length(name) <= 1500, (name, "short")
-print("sound table: %d sounds: ok" % len(sfx.SOUNDS))
+# ---- the tables: the game's own, and Elite's when it's in use (build 141)
+def check(table):
+    for name, s in table.items():
+        prio, parts = s[0], s[1:]
+        assert isinstance(prio, int) and parts and all(parts), name
+        for part in parts:
+            for st in part:
+                f, ms = st[0], st[1]
+                assert isinstance(f, int) and isinstance(ms, int) and 0 < ms <= 1500, (name, st)
+                assert f < 0 or f == 0 or 50 <= f <= 8000, (name, f)
+                assert len(st) == 2 or 0 <= st[2] <= 126, (name, st)
+            assert sum(st[1] for st in part) <= 2000, (name, "short")
+
+
+check(sfx.OWN)
+check(sfx.SOUNDS)
+from ace_commander import content
+if sfx.ELITE:
+    E = sfx.SOUNDS
+    assert not content.OWN
+    assert E["lock"][1] == [(1838, 50, 126)], "Elite's short high beep"
+    assert E["unarm"][1] == [(145, 400, 100)], "and its long low beep"
+    assert E["laser"][1][0][0] == 122 and max(st[0] for st in E["laser"][1]) > 500, "the zap"
+    assert all(st[0] < 0 for st in E["missile"][1]), "missile launch: noise"
+    assert "scoop" not in E and "tick" not in E and "dock" not in E, "silent, as in Elite"
+    assert sfx.CHANNELS["laser"] == sfx.CHANNELS["hurt"] == 2 and sfx.CHANNELS["lock"] == 3
+    print("Elite's sounds (elite_sfx.py) in use: ok")
+else:
+    print("the game's own sounds in use (no elite_sfx.py, or DATA: OWN)")
+print("sound tables: ok")
+SOUNDS_IN_USE = sfx.SOUNDS
+sfx.SOUNDS = sfx.OWN            # the buzzer tests below use the game's own
 
 
 # ---- the buzzer, on a stand-in bus and clock
@@ -55,6 +79,7 @@ assert bus.writes[0] == (buzzer.REG_FREQ, bytes([1200 >> 8, 1200 & 255, buzzer.V
 assert bus.writes[1] == (buzzer.REG_ACTIVE, b"\x01")
 b.step(); assert len(bus.writes) == 2, "not until the tone's time is up"
 now[0] += 40; b.step()
+assert bus.writes[2][1][4] == 70, "the second tone, its full 70 ms"
 assert bus.writes[2][1][:2] == bytes([1700 >> 8, 1700 & 255]), bus.writes[2]
 now[0] += 70; b.step()
 assert bus.writes[-1] == (buzzer.REG_ACTIVE, b"\x00") and b.steps is None, "done: off"
@@ -67,7 +92,26 @@ for _ in range(200):        # the noise burst plays as pitches, then the tones
     now[0] += 20
     b.step()
 assert b.steps is None
-print("Qwiic buzzer: tones, rests, noise, priority: ok")
+# steps shorter than a frame are skipped, keeping time (Elite's change every 10 ms)
+sfx.SOUNDS = {"fast": (1, [(f, 10, 126) for f in range(500, 1500, 10)])}   # 1 s of 10 ms steps
+b.play("fast")
+n = 0
+while b.steps is not None and n < 100:
+    now[0] += 40                # a 40 ms frame
+    b.step()
+    n += 1
+assert 24 <= n <= 26, ("1 s in 40 ms frames", n)
+sfx.SOUNDS = {"soft": (1, [(1000, 50, 30), (1000, 50, 126), (1000, 50, 0)])}
+bus.writes[:] = []
+b.play("soft")
+assert bus.writes[0][1][2] == 1, "a quiet step: volume 1"
+now[0] += 50; b.step()
+assert bus.writes[-2][1][2] == buzzer.VOLUME, "a loud one: the buzzer's volume"
+now[0] += 50; b.step()
+assert bus.writes[-1] == (buzzer.REG_ACTIVE, b"\x00"), "level 0: a rest"
+sfx.SOUNDS = sfx.OWN
+print("Qwiic buzzer: tones, rests, noise, priority, levels, keeping time: ok")
+sfx.SOUNDS = SOUNDS_IN_USE
 
 # ---- the game asks for sounds
 g = game.Game(mod.SHIPS)
@@ -79,7 +123,14 @@ for _ in range(3):
 assert "laser" in g.sounds, g.sounds
 del g.sounds[:]
 g._hurt(5)
-assert g.sounds == ["hurt"]
+assert g.sounds == ["hurt"], "lasers on the shields"
+del g.sounds[:]
+g.flash = 0.0
+g.shield = 0.0
+g._hurt(5)
+assert g.sounds == ["crash"], "no shields left: Elite's crash sound"
+g.shield = 100.0
+g.hull = 100.0
 g.start_jump()
 assert "tick" in g.sounds
 print("Game.sfx: laser, hurt, countdown: ok")

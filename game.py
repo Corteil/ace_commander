@@ -1399,6 +1399,7 @@ class Game:
             self.lock_t = 0.0
             self.locked = False
             self.say("MISSILE SAFE", 1.0)
+            self.sfx("unarm")       # Elite's long low beep
 
     def energy_bomb(self):
         """Set off the energy bomb, if there is one: every ship, missile and
@@ -1936,6 +1937,7 @@ class Game:
                     self._boom(o.x, o.y, o.z, 6)
                     self.say("HOLD FULL")
                 continue
+            self.sfx("crash")
             self._hurt(10.0 + self.speed * 0.5)
             self.speed *= 0.4
             o.energy -= 60.0
@@ -2077,6 +2079,8 @@ class Game:
                 best.hit = 0.12
                 if best.energy <= 0:
                     self._kill(best, self.laser == "mining")
+                else:
+                    self.sfx("hit")     # a strike that didn't kill (Elite's EXNO)
 
         if (self.auto_missile and self.locked and self.missiles > 0 and self.lock is not None
                 and self.lock is not self.auto_done and not self.lock.dead
@@ -2237,8 +2241,9 @@ class Game:
     def _hurt(self, damage):
         if self.over:
             return
-        if self.flash <= 0.1:
-            self.sfx("hurt")    # (not again on every frame of a long hit)
+        if self.flash <= 0.1:   # (not again on every frame of a long hit)
+            # lasers on the shields, or Elite's crash sound with none left (EXNO3)
+            self.sfx("hurt" if self.shield > 0 else "crash")
         self.flash = 0.3
         if self.god:
             return

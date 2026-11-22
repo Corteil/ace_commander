@@ -51,55 +51,65 @@ class Buzzer:
         self.steps = None       # the sound playing: its steps,
         self.i = 0              # the one now,
         self.prio = -1          # its priority
-        self.due = 0            # and when the next step starts (ticks_ms)
-        self.left = 0           # ms of noise left in this step
+        self.end = 0            # when the step now ends (ticks_ms)
+        self.shown = -1         # the step last written
+        self.next_noise = 0     # when a noise step next changes pitch
         self.buf = bytearray(5)
+        self.vol = volume       # this step's volume (its level, up to volume)
         self.ok = True          # False once a write has failed: it is left alone
 
     def play(self, name):
         s = sfx.SOUNDS.get(name)
         if s is None or not self.ok:
             return
-        prio, steps = s
+        prio, steps = s[0], s[1]    # (only the first part: one tone at a time)
         if self.steps is not None and prio < self.prio:
             return              # something more important is playing
         self.steps = steps
         self.prio = prio
-        self.i = -1
-        self.left = 0
-        self.due = ticks_ms()
+        self.i = 0
+        self.end = ticks_ms() + steps[0][1]     # when this step ends
+        self.shown = -1         # the step last written to the buzzer
+        self.next_noise = 0
         self.step()
 
     def step(self):
-        """Move on to the next tone if this one's time is up."""
+        """Write the tone due now. Called once a frame, so steps shorter than a
+        frame (Elite's change every 10 ms) are skipped over, keeping time."""
         if self.steps is None or not self.ok:
             return
         now = ticks_ms()
-        if ticks_diff(now, self.due) < 0:
+        steps = self.steps
+        while ticks_diff(now, self.end) >= 0:
+            self.i += 1
+            if self.i >= len(steps):
+                self.steps = None
+                self.prio = -1
+                self._write(REG_ACTIVE, 0)
+                return
+            self.end += steps[self.i][1]
+        st = steps[self.i]
+        f = st[0]
+        level = st[2] if len(st) > 2 else 126
+        vol = 0 if level <= 0 else min(self.volume, 1 + level * self.volume // 127)
+        left = ticks_diff(self.end, now)
+        if f < 0 and vol:       # noise: a new pitch round its rate every NOISE_STEP
+            if self.i != self.shown or ticks_diff(now, self.next_noise) >= 0:
+                r = -f
+                self.vol = vol
+                self._tone(random.randint(max(80, r // 16), max(160, min(4000, r // 3))),
+                           min(NOISE_STEP, left))
+                self.next_noise = now + NOISE_STEP
+                self.shown = self.i
             return
-        if self.left > 0:                       # more of a noise burst
-            ms = min(NOISE_STEP, self.left)
-            self.left -= ms
-            self._tone(random.randint(120, 700), ms)
-            self.due = now + ms
+        if self.i == self.shown:
             return
-        self.i += 1
-        if self.i >= len(self.steps):
-            self.steps = None
-            self.prio = -1
-            self._write(REG_ACTIVE, 0)
-            return
-        f, ms = self.steps[self.i]
-        if f == sfx.NOISE:
-            self.left = ms
-            self.due = now
-            self.step()
-            return
-        if f <= 0:
+        self.shown = self.i
+        if f <= 0 or not vol:
             self._write(REG_ACTIVE, 0)          # a rest
         else:
-            self._tone(f, ms)
-        self.due = now + ms
+            self.vol = vol
+            self._tone(f, left)
 
     def stop(self):
         self.steps = None
@@ -110,7 +120,7 @@ class Buzzer:
         b = self.buf
         b[0] = (f >> 8) & 0xFF
         b[1] = f & 0xFF
-        b[2] = self.volume
+        b[2] = self.vol
         b[3] = (ms >> 8) & 0xFF
         b[4] = ms & 0xFF
         try:
