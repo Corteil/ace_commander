@@ -2,7 +2,7 @@
 matched, the keyboard's own page with its suggestions, and the badge's own
 text entry when no keyboard is fitted (a stand-in for the firmware's
 TextDialog), in flight and docked."""
-import os, sys, types
+import json, os, sys, types
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 PARENT = os.path.dirname(REPO)
@@ -206,6 +206,33 @@ e._open("status")
 assert "COMMANDER ZAPHOD" in texts(e)
 assert not any(t.startswith("NAME") for t in e._settings(True)), "not in flight"
 del sys.modules["settings"]
+# TEXT ENTRY: PICKER (build 124): the letter picker on the badge's own controls
+e.pad.keyboard = False
+assert any(t.startswith("TEXT ENTRY: BADGE") for t in e._settings(False)), e._settings(False)
+e._change("TEXT ENTRY: BADGE", False)
+assert e.use_picker and json.load(open(mod.options_path())).get("picker") is True
+got = []
+e._open_name("", got.append)
+from ace_commander import picker as pk
+dl = e.ndialog
+assert isinstance(dl, pk.LetterPicker) and dl.driven, type(dl)
+tick(e, fresh=["C"])                # keep A
+tick(e, fresh=["JOYUP"]); tick(e, fresh=["JOYUP"])  # C
+tick(e, fresh=["JOYRIGHT"])         # keep: AC
+tick(e, fresh=["JOYLEFT"])          # back onto the C
+assert dl.text == "A" and pk.LETTERS[dl.i] == "C", (dl.text, dl.i)
+for _ in range(20):
+    tick(e, held=["JOYUP"])         # held: it repeats
+assert pk.LETTERS[dl.i] != "D", "held up runs on"
+tick(e, fresh=["C"])
+tick(e, fresh=["A"])                # done
+assert got and got[0].startswith("A") and len(got[0]) == 2 and e.ndialog is None, got
+got = []
+e._open_name("", got.append)
+tick(e, fresh=["F"])                # F cancels
+assert got == [] and e.ndialog is None
+e._change("TEXT ENTRY: PICKER", False)
+assert not e.use_picker
 os.remove(SAVE)
-print("commander's name: suggested from the badge, Tab, Options, saved, Status: ok")
+print("commander's name: suggested from the badge, Tab, Options, saved, Status; the picker: ok")
 print("ALL FIND TESTS PASSED")

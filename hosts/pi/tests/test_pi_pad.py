@@ -233,6 +233,10 @@ tap(h, "x"); assert a.fsub == "data" and g.jump_t == jt, ("X: system data, no ju
 tap(h, "x"); assert a.fsub == "chart", "X again: back to the chart"
 tap(h, "y"); assert type(a.chart).__name__ == "GalChart", "Y: the galactic chart"
 tap(h, "back"); assert a.finder is not None or a.tdialog is not None or a.fsub == "chart", "Back: search"
+if a.tdialog is not None:           # the pad in use: the letter picker (build 124); B cancels
+    assert getattr(a.tdialog, "driven", False)
+    tap(h, "b")
+    assert a.tdialog is None, "B cancels the search"
 if a.finder is not None:
     key = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, unicode="", mod=0)
     h.handle(key); h.step(40)
@@ -314,5 +318,45 @@ h.handle(pygame.event.Event(pygame.CONTROLLERDEVICEREMOVED, instance_id=PAD)); h
 assert not a.pad.held("k_J") and PAD not in h.pads.pads, "unplugged: let go"
 assert a.analog is None, "no pad: no analogue controls"
 print("unplugging lets go: ok")
+# text entry with the pad in use (build 124): the letter picker; with the keyboard, its page
+h.pad_last = True
+got = []
+a._open_name("", got.append)
+assert a.ndialog is not None and getattr(a.ndialog, "driven", False), "the pad: the picker"
+texts = []
+real_text = h.ctx.text
+h.ctx.text = lambda t: (texts.append(h.ctx.labels and __import__("ctx_pygame").relabel(str(t), h.ctx.labels) or str(t)), real_text(t))[1]
+h.step(40)
+h.ctx.text = real_text
+assert "UP/DOWN letter   A: next" in texts and "LEFT back   START: done   B: cancel" in texts, \
+    [t for t in texts if "letter" in t or "done" in t]
+pygame.image.save(h.window, os.path.join(os.path.dirname(os.path.abspath(__file__)), "shots", "pi_pad_picker.png"))
+a.ndialog._result = "PI"
+h.step(40)
+assert got == ["PI"]
+h.pad_last = False
+a._open_name("", got.append)
+assert a.ndialog is None and a.namer is not None, "the keyboard: its own typing page"
+a.namer = None
+print("text entry: the picker with the pad, the keyboard's page without: ok")
+# Start (done) held through closing the picker doesn't launch (as the Tufty's build 128)
+a.paused = False
+a._dock()
+h.step(40)
+assert a.mode == "docked", a.mode
+h.pad_last = True
+got = []
+a._open_name("", got.append)
+assert a.ndialog is not None
+button(h, "start", True)
+for _ in range(6):
+    h.step(40)
+assert a.ndialog is None, "Start: done"
+assert a.mode == "docked", "the Start that closed the picker doesn't launch: " + a.mode
+button(h, "start", False)
+for _ in range(3):
+    h.step(40)
+assert a.mode == "docked", a.mode
+print("the press that closes the picker doesn't launch: ok")
 pygame.quit()
 print("ALL PI PAD TESTS PASSED")

@@ -26,6 +26,9 @@ owner_name:
       .fast                     True if run() can skip the wait between frames
       run(render_update)        the frame loop (async)
       .minimise()               leave the game
+      .gamepad                  optional: True / False if the device can switch a
+                                gamepad on and off (DEBUG > DISPLAY), with
+                                .set_gamepad(on); missing or None: no such line
     owner_name()                the device owner's name, or None
 """
 import asyncio
@@ -212,6 +215,7 @@ class Platform:
         self.led_level = None       # (r, g, b) last written to the whole ring
         self.tilt_ok = imu is not None
         self.tx = self.ty = 0.0     # the last tilt reading, in g
+        self.picker_choice = True   # Options > TEXT ENTRY: its own dialog or the letter picker
         self.fast = scheduler is not None
         self.anchor = self._grow_heap()
 
@@ -347,10 +351,14 @@ class Platform:
         return False
 
     def text_dialog(self, title):
-        """The firmware's TextDialog with the game's smaller text (build 90), or
-        None if there is none. Registered to the host (app.py's loader): the
+        """The letter picker (picker.py) if Options > TEXT ENTRY says so (build
+        124), else the firmware's TextDialog with the game's smaller text
+        (build 90), or None if there is none. Registered to the host (app.py's loader): the
         firmware's eventbus gives the buttons only to the focused app, and the
         game itself never is (build 89 fix: it froze the badge)."""
+        if getattr(self.app, "use_picker", False):
+            from .picker import LetterPicker
+            return LetterPicker(title, driven=True)
         try:
             from app_components.dialog import TextDialog
             from . import find

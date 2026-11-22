@@ -33,6 +33,7 @@ class Platform:
         self.tilt_ok = False
         self.fast = False       # run.py runs the frames itself
         self.quit = False       # the game asked to leave: run.py ends
+        self.host = None        # run.Host (its pad_last: the pad was used last), set by run.py
 
     def leds_rgb(self, r, g, b):
         self.leds_on = True
@@ -60,7 +61,19 @@ class Platform:
     def keyboard_fitted(self):
         return False
 
+    @property
+    def pad_in_use(self):
+        """The game pad was used last (run.Host.pad_last): text entry is the
+        letter picker, not the keyboard's typing pages (build 124)."""
+        return self.host is not None and getattr(self.host, "pad_last", False)
+
     def text_dialog(self, title):
+        """With the game pad in use, the letter picker (picker.py, build 124);
+        with the keyboard, None: the game's own typing pages."""
+        if self.pad_in_use:
+            import importlib
+            pkg = self.app.__class__.__module__.rsplit(".", 1)[0]
+            return importlib.import_module(pkg + ".picker").LetterPicker(title, driven=True)
         return None
 
     async def run(self, render_update):

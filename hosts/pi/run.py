@@ -48,6 +48,10 @@ LED_SIZE = 4                        # an LED's radius, in game pixels
 FPS = 60
 LINE_K = 0.5                        # the Elite layout's lines: half as thick as the scale
 LOAD_HOLD = 3000                    # ms the loading screen shows (as the Tufty's hold)
+# the hints' badge letters named as the keyboard's keys in flight, where it is Elite's
+# keys, not the badge's buttons (Brian, build 126: "hints must use local buttons / keys
+# names"): C is Enter, F is Esc, A (the pause menu) is P
+KEY_LABELS_FLIGHT = {"A": "P", "C": "ENTER", "F": "ESC"}
 WIRE_MIN = 3                        # ships are wireframes down to this size (badge units; the badge: 8)
 
 
@@ -84,6 +88,7 @@ def load_game(d, debug=False):
         config.platform = platform_pi   # LEDs, tilt, text entry, leaving (platform layer, step 3)
         config.title_quit = True    # a computer needs a way out on the title screen (Brian)
         config.title_cancel = False # Esc on the title doesn't quit: QUIT does (Brian, 2026-11-21)
+        config.laser_leds = False   # no laser colour on the drawn LED ring (Brian, build 113)
         config.debug_menu = want
         config.perf_log = 60 if want else 0     # the badge's timing lines, a line a second in flight
         config.wire_min = WIRE_MIN
@@ -134,6 +139,7 @@ class Host:
         self.pad_last = False       # the pad was the last thing used
         self.log_keys = log_keys
         self.app = self.ace.AceCommander()
+        self.app.platform.host = self       # its text entry asks whether the pad is in use
         self.clock = pygame.time.Clock()
         self.running = True
         self.frames = 0
@@ -169,6 +175,11 @@ class Host:
     def _fit(self):
         """Work the layout out for the window's size (after opening or resizing)."""
         w, h = self.window.get_size()
+        # the Elite layout's screen is square, its corners show: hints on the charts and
+        # the title screen (build 129); the badge layout's round screen hasn't room
+        cfg = sys.modules.get(PKG + ".config")
+        if cfg is not None:
+            cfg.more_hints = self.layout == "elite"
         if self.layout == "elite":
             s = h / 240.0
             self.scale = s
@@ -293,7 +304,12 @@ class Host:
         if self.window.get_size() != getattr(self, "_size", None):
             self._size = self.window.get_size()
             self._fit()
-        self.ctx.labels = self.pads.labels() if self.pad_last else None
+        if self.pad_last:
+            self.ctx.labels = self.pads.labels()
+        elif self.app.mode == "flight":     # the keyboard in flight: Elite's keys (build 126)
+            self.ctx.labels = KEY_LABELS_FLIGHT
+        else:
+            self.ctx.labels = None          # off the flight its A-F are the badge's buttons
         self._paint(self.app.draw)
         self.frames += 1
 

@@ -73,6 +73,7 @@ LASER_COLOURS = {
     "mining": YELLOW,
 }
 # enemy missiles are orange like enemy lasers (all enemy fire), yours light purple
+UPGRADE_RGB = GREEN     # a practice upgrade canister (game.UPGRADES), on screen and radar
 COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": ORANGE, "pmissile": LIGHT_PURPLE,
           "station": WHITE}
 PLANET = (0.35, 0.6, 1)
@@ -138,6 +139,30 @@ def number(ctx, value, x, y, font=_BIG, align=0):
                 ctx.rectangle(x + rx, y + ry, rw, rh).fill()
         x += step
     return width
+
+
+def menu_lines(ctx, items, sel, y, step, rows, half_w):
+    """A list of setting lines from y down, sel highlighted, at most rows of
+    them: a longer list scrolls with sel, a small bar above or below saying
+    there is more (Options with TEXT ENTRY has nine lines, the hints sit
+    below eight: build 131)."""
+    n = len(items)
+    top = 0
+    if n > rows:
+        top = sel - rows + 1 if sel >= rows else 0
+        if top > n - rows:
+            top = n - rows
+    for i in range(top, min(n, top + rows)):
+        if i == sel:
+            ctx.rgb(*DIM).rectangle(-half_w, y - 7, 2 * half_w, 15).fill()
+        text(ctx, items[i], 0, y, 13, GREEN if i == sel else GREY)
+        y += step
+    ctx.rgb(*GREY)
+    if top > 0:
+        ctx.rectangle(-8, y - (rows + 1) * step + 2, 16, 2).fill()
+    if top + rows < n:
+        ctx.rectangle(-8, y - step + 10, 16, 2).fill()
+    return y
 
 
 def text(ctx, s, x, y, size, rgb, align=0):
@@ -1116,7 +1141,7 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
 
 
     for o in g.objs:
-        draw_ship(ctx, o)
+        draw_ship(ctx, o, UPGRADE_RGB if o.upgrade else None)
         if o.beam > 0:
             _enemy_beam(ctx, o)
 
@@ -1775,7 +1800,7 @@ def _hud(ctx, g, ms=None, ring=True):
             else:
                 ctx.rgb(*WHITE)
         else:
-            ctx.rgb(*COLOUR[o.kind])
+            ctx.rgb(*(UPGRADE_RGB if o.upgrade else COLOUR[o.kind]))
         if h >= 0:
             ctx.rectangle(bx, by - h, 1, h).fill()
         else:

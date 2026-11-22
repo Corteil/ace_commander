@@ -18,6 +18,21 @@ perf_log = 60           # a PERF line on the console every this many flight fram
 log_keys = False        # print every button / key event (to see what a keyboard sends)
 title_quit = False      # a QUIT line on the title screen (the badge has F to leave)
 title_cancel = True     # cancel (F, Esc) on the title screen leaves the game
+practice_only = False   # the title screen offers only COMBAT PRACTICE (a device with too
+                        # few buttons for the rest: the Tufty without its Pad; build 111)
+auto_missiles = False   # a missile goes as soon as a ship is locked, one a ship (no missile
+                        # button: the Tufty without its Pad; build 112)
+practice_missile = None # how often a scooped canister in combat practice holds a missile
+                        # too (None: game.PICKUP_MISSILE; build 112)
+practice_upgrades = True    # combat practice: each wave cleared drops an upgrade canister
+                        # (it can't be destroyed), the next of game.UPGRADES when scooped,
+                        # and the next wave comes after a countdown (game.WAVE_WAIT; every
+                        # device, Brian; build 113)
+more_hints = False      # the screen is square, so its corners show (the Tufty, the Pi's
+                        # Elite layout): hint lines where the badge's round screen has no
+                        # room, the charts and the title screen (Brian, build 129)
+laser_leds = True       # your laser lights the LEDs in its colour (off on the Tufty and the
+                        # Pi, whose "LEDs" are drawn on the screen; build 113)
 wire_min = 8.0          # ships that look smaller than this (pixels) are drawn as a marker
 
 # the game's input (platform layer, step 2): None on the badge, where

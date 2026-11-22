@@ -23,31 +23,51 @@ sys.modules["ace_commander"] = importlib.util.module_from_spec(spec)
 
 import sim_badgeware as bw      # noqa: E402
 import host_tufty               # noqa: E402
+import controls_tufty           # noqa: E402
+from ace_commander import picker as dialog_tufty  # noqa: E402  (the letter picker: picker.py)
 import platform_tufty           # noqa: E402
 
-data = tempfile.mkdtemp(prefix="ace_tufty_")
+class FakePad:
+    """A Qw/ST Pad: read_buttons() as qwstpad's, from the names held."""
+
+    def __init__(self):
+        self.down = set()
+
+    def read_buttons(self):
+        return {k: (k in self.down) for k in ("U", "D", "L", "R", "A", "B", "X", "Y", "+", "-")}
+
+
 screen = bw.Screen()
 badge = bw.Badge()
 buttons = dict(bw.BUTTONS)
-h = host_tufty.Host(screen, badge, bw.color, bw.shape, bw.font, bw.rect, buttons, None, data)
-# the loading screen: a module a frame, the name and a bar drawn meanwhile
-assert h.app is None
-h.update()
-assert h.app is None and h.done == 1 and h.letters is not None
-h.update()
-screen.img.save(os.path.join(SHOTS, "tufty_loading.png"))
-px = screen.img.load()
-assert any(px[x, y] != (0, 0, 0) for x in range(80, 240, 2) for y in range(10, 60, 2)), "the name"
-for _ in range(len(host_tufty.STEPS)):
+
+
+DATA = tempfile.mkdtemp(prefix="ace_tufty_")    # one for both hosts: the game fixes its save
+                                                # path when its module first loads
+
+
+def make(pad):
+    """A Tufty host, loaded (through its loading screen) and its game started."""
+    global h
+    data = DATA
+    h = host_tufty.Host(screen, badge, bw.color, bw.shape, bw.font, bw.rect, buttons, pad, data)
+    assert h.app is None
     h.update()
-assert h.loaded is not None and h.app is None and h.error is None, h.error
-h.update()
-assert h.app is None, "held for LOAD_HOLD, to see the ship"
-h.t_load -= host_tufty.LOAD_HOLD
-h.update()
-assert h.app is not None, "then the game takes over"
-a = h.app
-assert a.platform.__class__ is platform_tufty.Platform, "the Tufty's platform"
+    assert h.app is None and h.done == 1 and h.letters is not None
+    h.update()
+    screen.img.save(os.path.join(SHOTS, "tufty_loading.png"))
+    px = screen.img.load()
+    assert any(px[x, y] != (0, 0, 0) for x in range(80, 240, 2) for y in range(10, 60, 2)), "the name"
+    for _ in range(len(host_tufty.STEPS)):
+        h.update()
+    assert h.loaded is not None and h.app is None and h.error is None, h.error
+    h.update()
+    assert h.app is None, "held for LOAD_HOLD, to see the ship"
+    h.t_load -= host_tufty.LOAD_HOLD
+    h.update()
+    assert h.app is not None, "then the game takes over"
+    assert h.app.platform.__class__ is platform_tufty.Platform, "the Tufty's platform"
+    return h, h.app, data
 
 
 def frames(n=1):
@@ -59,8 +79,15 @@ def frames(n=1):
 
 def press(name, n=2):
     badge.down.add(buttons[name])
-    frames(1)
+    frames(3)               # (in flight B alone waits PAIR_WAIT ms for a partner)
     badge.down.discard(buttons[name])
+    frames(n)
+
+
+def pad_press(name, n=2):
+    h.pad.down.add(name)
+    frames(1)
+    h.pad.down.discard(name)
     frames(n)
 
 
@@ -78,20 +105,184 @@ def lit(x0, y0, x1, y1):
     return n
 
 
+# ---- the Tufty's buttons alone (no Pad, build 111): combat practice only; A / C /
+# UP / DOWN are cursor keys off the flight and the joystick in flight, B selects
+# and fires
+h, a, data = make(None)
+frames(5)
+assert a.choices() == ["COMBAT PRACTICE"], a.choices()
+assert not any(l.startswith("GAMEPAD") for l in a._cheats("DISPLAY", False)), "no Pad found: no line"
+cfg = sys.modules["ace_commander.config"]
+assert cfg.auto_missiles and cfg.practice_missile == 1.0, "missiles by themselves, in every canister"
+assert h.ctx.labels == controls_tufty.LABELS_OFF, "off the flight: B, and A+C for back"
+press("B")
+assert a.mode == "practice", a.mode
+badge.down.add(buttons["A"]); badge.down.add(buttons["C"])     # A + C: back (the badge's F)
+frames(3)
+badge.down.discard(buttons["A"]); badge.down.discard(buttons["C"])
+frames(2)
+assert a.mode == "menu", ("A + C goes back", a.mode)
+press("B")
+press("B")
+assert a.mode == "flight", a.mode
+g = a.game
+assert g.auto_missile and g.pickup_missile == 1.0
+g.spawn_t = g.rock_t = 1e9
+frames(3)
+m0 = list(g.space.station.m) if g.space and g.space.station else None
+badge.down.add(buttons["UP"])
+frames(5)                   # (alone, UP waits PAIR_WAIT ms for DOWN)
+assert g.stick_pitch != 0.0, "UP steers (the joystick)"
+badge.down.discard(buttons["UP"])
+badge.down.add(buttons["A"])
+frames(3)
+assert g.stick_roll != 0.0, "A rolls"
+badge.down.discard(buttons["A"])
+g.heat = 0.0
+badge.down.add(buttons["B"])
+fired = False
+for _ in range(3):
+    frames(1)
+    fired = fired or g.beam > 0
+assert fired, "B fires"
+badge.down.discard(buttons["B"])
+frames(2)
+assert h.ctx.labels == controls_tufty.LABELS, "in flight: B named; the game says what A + C does"
+s0 = g.speed
+badge.down.add(buttons["A"]); badge.down.add(buttons["C"])     # A + C: UP / DOWN to speed
+frames(3)
+badge.down.discard(buttons["A"]); badge.down.discard(buttons["C"])
+frames(1)
+assert h.speed_mode and g.msg == "UP/DOWN: SPEED" and g.speed == s0, (h.speed_mode, g.msg)
+badge.down.add(buttons["UP"])
+frames(10)
+badge.down.discard(buttons["UP"])
+assert g.speed > s0 + 1 and g.stick_pitch == 0.0, ("UP: faster, no pitch", s0, g.speed)
+s1 = g.speed
+badge.down.add(buttons["DOWN"])
+frames(10)
+badge.down.discard(buttons["DOWN"])
+assert g.speed < s1 - 1, ("DOWN: slower", s1, g.speed)
+badge.down.add(buttons["A"]); badge.down.add(buttons["C"])     # A + C again: pitch
+frames(3)
+badge.down.discard(buttons["A"]); badge.down.discard(buttons["C"])
+frames(1)
+assert not h.speed_mode and g.msg == "UP/DOWN: PITCH"
+badge.down.add(buttons["UP"])
+frames(3)
+badge.down.discard(buttons["UP"])
+assert g.stick_pitch != 0.0, "UP pitches again"
+badge.down.add(buttons["UP"]); badge.down.add(buttons["DOWN"])     # UP + DOWN: the pause menu
+frames(3)
+badge.down.discard(buttons["UP"]); badge.down.discard(buttons["DOWN"])
+frames(2)
+assert a.paused, "UP + DOWN opens the pause menu"
+badge.down.add(buttons["UP"]); badge.down.add(buttons["DOWN"])
+frames(3)
+badge.down.discard(buttons["UP"]); badge.down.discard(buttons["DOWN"])
+frames(2)
+assert not a.paused, "and closes it"
+frames(2)
+shot("tufty_practice")
+print("Tufty buttons alone: combat practice only, cursor keys, joystick, B fires: ok")
+
+# ---- with a Pad: the whole game
+pad = FakePad()
+h, a, data = make(pad)
 frames(5)
 assert a.mode == "menu" and lit(0, 0, 320, 240) > 200, "the title draws"
 shot("tufty_title")
-# NEW COMMANDER: C chooses (the Tufty's C is the badge's C), C again on its page
-choose = a.choices().index("NEW COMMANDER")
-for _ in range(choose):
-    press("DOWN")       # the Tufty's DOWN is the badge's E: left, the line before...
-a.menu = choose         # (moving lines with E / F wraps; set it to be sure)
-press("C")
-press("C")
+assert "NEW COMMANDER" in a.choices() and not a.ctx_labels if hasattr(a, "ctx_labels") else True
+assert h.ctx.labels is not None, "with the Pad too the hints name the Tufty's buttons"
+# DEBUG > DISPLAY > GAMEPAD: the Pad off plays as without it, on again as with it
+assert any(l.startswith("GAMEPAD: ON") for l in a._cheats("DISPLAY", False)), a._cheats("DISPLAY", False)
+a._odebug("GAMEPAD: ON")
+cfg = sys.modules["ace_commander.config"]
+assert h.pad_off and cfg.auto_missiles and not cfg.practice_only and "NEW COMMANDER" in a.choices(), \
+    "GAMEPAD OFF: practice as without the Pad; the Pad and the whole game still off the flight"
+assert any(l.startswith("GAMEPAD: OFF") for l in a._cheats("DISPLAY", False))
+pad.down.add("D"); frames(3); pad.down.discard("D"); frames(2)
+assert a.menu == 1, ("the Pad still works on the title screen", a.menu)
+a.menu = 0
+a._odebug("GAMEPAD: OFF")
+assert not h.pad_off and not cfg.auto_missiles and "NEW COMMANDER" in a.choices()
+# text entry (build 122): the letter picker on the Tufty's buttons, for the name
+got = []
+a._open_name("", got.append)
+d = a.ndialog
+assert d is not None and d is a.platform.dialog, "the Tufty's letter picker, not the keyboard page"
+press("B")                  # A, the cursor on to the next place (A there too)
+assert d.hints == controls_tufty.TYPING_HINTS, "the Tufty's buttons: theirs"
+press("UP")                 # B
+press("UP")                 # C
+press("B")                  # AC
+press("C")                  # back onto the C: A, the cursor's letter C
+assert d.text == "A" and dialog_tufty.LETTERS[d.i] == "C"
+press("UP")                 # D
+press("B")                  # AD
+shot("tufty_name_entry")
+assert d.text == "AD", d.text
+press("A")                  # done
+assert got == ["AD"] and a.ndialog is None, (got, a.ndialog)
+frames(2)
+# and on the Pad (PAD_TYPING): up the letter, A keeps it, B back, + done
+got = []
+a._open_name("", got.append)
+d = a.ndialog
+pad_press("U")              # B
+pad_press("A")              # B
+pad_press("R")              # BB
+pad_press("B")              # back onto the last B: B
+pad_press("U")              # C
+pad_press("A")              # BC
+assert d.hints == controls_tufty.PAD_TYPING_HINTS, "the Pad used: its names in the picker's hints"
+pad_press("+")              # done
+assert got == ["BC"], got
+frames(2)
+# the hints name what was pressed last (build 126): the Pad's buttons, then the Tufty's
+pad_press("D"); frames(1)
+assert h.pad_last and h.ctx.labels == controls_tufty.PAD_LABELS_OFF, h.ctx.labels
+press("UP"); frames(1)
+assert not h.pad_last and h.ctx.labels == controls_tufty.LABELS_OFF, h.ctx.labels
+a.menu = 0
+# "< >" is the Tufty's A / C with its own buttons (build 129)
+from ctx_tufty import relabel   # noqa: E402
+assert relabel("< > screens   F: status", controls_tufty.LABELS_OFF) == "A/C screens   A+C: status"
+assert relabel("C: cursor   < > screens", controls_tufty.PAD_LABELS_OFF) == "A: cursor   < > screens"
+# the Pad's Y off the flight is the badge's B (search on the Galactic chart: build 125)
+assert controls_tufty.PAD_MAP_OFF["Y"] is controls_tufty.BADGE["B"]
+assert controls_tufty.PAD_MAP["Y"] is controls_tufty.BADGE["E"], "in flight Y still slows down"
+# NEW COMMANDER: the Tufty's B selects (the badge's C), as without the Pad
+a.menu = a.choices().index("NEW COMMANDER")
+press("B")
+press("B")
 assert a.mode == "docked", a.mode
 assert h.ace.SAVE_PATH.startswith(data) and os.path.exists(h.ace.SAVE_PATH), "saved in the data folder"
 shot("tufty_docked")
-press("A")              # A launches
+d = a.dock
+d.open("GALACTIC CHART")
+pad_press("A")              # the chart's cursor (the badge's C)
+assert d.name() == "GALACTIC CHART" and d.cursor, (d.name(), d.cursor)
+shot("tufty_galactic")      # build 129: a hint line (the Pad's names: "A: target ... Y: find")
+pad_press("Y")              # the Pad's Y: search (the badge's B on the Galactic chart)
+assert a.tdialog is not None, "Y opens the search"
+h.pad.down.add("+")         # done (nothing typed: no match), held as a real press is
+frames(6)
+assert a.tdialog is None
+assert a.mode == "docked", "the + that closed the picker doesn't launch (build 128)"
+h.pad.down.discard("+")
+frames(2)
+assert a.mode == "docked", a.mode
+# the Tufty's A, held through closing the picker, doesn't go on either
+pad_press("Y")
+assert a.tdialog is not None
+badge.down.add(buttons["A"])
+frames(6)
+assert a.tdialog is None and a.mode == "docked", a.mode
+badge.down.discard(buttons["A"])
+frames(2)
+d.open("STATUS")
+pad_press("+")          # the Pad's + is the badge's A: launch
 for _ in range(200):
     frames(1)
     if a.mode == "flight":

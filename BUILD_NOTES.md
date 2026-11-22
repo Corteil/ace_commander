@@ -1309,3 +1309,142 @@ what is now `ace.py` (renamed in build 50).
    installed as `~/.local/share/icons/ace-commander.png`, the old one kept as
    `ace-commander-title-old.png`). On the badge the ship turns in steps (the loader draws
    only between imports). Not yet on the badge.
+   **Build 111** (2026-11-21, Brian: the Tufty's own buttons "need to act as cursor keys, A
+   left, B select, up up, down down; act as the joystick in flight, B = fire; should only work
+   for combat practice"). Without a Pad (`host_tufty` finds none at start) the Tufty's five
+   buttons use `controls_tufty.ALONE`: A / C / UP / DOWN are the joystick (cursor keys off the
+   flight, steering in flight), B is the badge's C (select, fire), and `config.practice_only`
+   (new, off on the badge and the Pi) leaves only COMBAT PRACTICE on the title screen
+   (`ace.choices`). With a Pad, everything as before. Test: both, in
+   `hosts/tufty/tests/test_tufty_host.py`. On the Tufty, not yet tried by Brian.
+   **Build 112** (2026-11-21, Brian: "the buttons should be the same for both modes, the labels
+   need renaming in badge only mode, auto missiles and more drops of missiles", then "the lock
+   time should be increased and if the laser is firing the launch is delayed"). The Tufty's
+   buttons are always `controls_tufty.TUFTY` (A / C / UP / DOWN the joystick, B the badge's C),
+   Pad or not. Without the Pad the host also sets `config.auto_missiles` (new: `Game.auto_missile`
+   fires one missile at each ship once locked, after `AUTO_LOCK_TIME` 4 s rather than
+   `LOCK_TIME` 2 s, and not while the laser fires: it goes when you let go) and
+   `config.practice_missile` 1.0 (new: `Game.pickup_missile`, every scooped canister in combat
+   practice holds a missile; `PICKUP_MISSILE` 0.5 otherwise), and the hints name the Tufty's
+   buttons (`ctx_tufty.relabel`, `controls_tufty.LABELS`: C is B, F is HOME). All off on the
+   badge and the Pi. `tests/test_install.py` now writes the release as ustar, as `git archive`
+   does (Python's default PAX added ~40 KB and tipped it past its 600 KB bar: the release is
+   573 KB). Equipment upgrades for practice: to think about (Brian).
+   **Build 113** (2026-11-21, Brian: option 1 of the upgrade ideas, "remove the screen LED
+   effects for lasers all modes on the Tufty and Pi", "should refill the missiles if auto
+   missiles are on", "the canister is indestructible and the next wave starts after a 5 second
+   count down; include this for all versions"). Combat practice (`config.practice_upgrades`,
+   on for every device): each wave cleared drops an upgrade canister (`Obj.upgrade`, drawn
+   green on screen and radar, `cockpit.UPGRADE_RGB`; the laser passes it by, the bomb already
+   spared canisters) and the next wave waits `WAVE_WAIT` (5 s), "WAVE n IN 5..1" then "WAVE n"
+   (`Game.wave_wait`, nobody new meanwhile; ships already there stay). Scooped, it fits the next
+   of `UPGRADES` (beam laser, energy unit, military laser, energy bomb), then a used bomb
+   back, else full shields (`Game._upgrade`); with `auto_missile` it also fills the missile
+   rack. `config.laser_leds` (off on the Tufty and the Pi): your laser no longer colours the
+   LEDs (the Tufty's border, the Pi's drawn ring); the badge keeps it. The badge's practice
+   changes too (upgrades, countdown). Then (Brian) the canister appears just ahead,
+   `UPGRADE_AHEAD` 400 (was 1200), so flying on picks it up; and the countdown starts only
+   once it is collected (`Game.wave_hold`, "UPGRADE AHEAD"; missed, it goes after
+   `UPGRADE_WAIT` 20 s and the countdown starts anyway).
+   **Build 114** (2026-11-21, Brian: "labels should reflect local button names, auto target
+   time 2 s, increases with level, need a way to change speed in the game, press two buttons
+   at the same time?", and HOME leaves for the app select screen). The auto-missile lock is
+   `AUTO_LOCK_TIMES` by level (EASY 2 s, NORMAL 3, HARD 4). On the Tufty two buttons together
+   are the badge's F and E (`controls_tufty.PAIRS`): A + C speeds up (and is "back" off the
+   flight), UP + DOWN slows down; and the hints name the Tufty's buttons with or without the
+   Pad (`LABELS`: C is B, F is A+C, E is UP+DOWN; HOME no longer, as it leaves the app). A
+   button pressed a moment before its pair counts alone for that moment.
+   **Build 115** (2026-11-21, Brian: "add gamepad off in debug menu and add debug.txt so the
+   debug menu works"). DEBUG > DISPLAY > GAMEPAD: ON / OFF, shown when the platform has a
+   `gamepad` setting (`platform_tildagon`'s interface: optional `gamepad` + `set_gamepad`):
+   the Tufty's, when a Pad was found at start. OFF plays as without the Pad (practice only,
+   auto missiles, a missile in every canister: `host_tufty.set_gamepad` / `_alone`; in a
+   flight at once), ON as with it. `/state/ace_commander/debug.txt` made on the Tufty, so its
+   DEBUG menu shows (`ace._debug_wanted`); that folder already held its save and options.
+   **Build 116** (2026-11-21, Brian: "change the speed on the Tufty: A+B to slow down and B+C
+   to speed up", "only in flight mode"). `controls_tufty.PAIRS`: A + B the badge's E (slower),
+   B + C its F (faster), in flight only (not paused); off the flight every button counts at
+   once, alone. In flight B alone waits `PAIR_WAIT` (60 ms, on the host's frame clock) for its
+   partner, so an uneven pair doesn't fire first. The hints: `LABELS` in flight (C is B, F is
+   B+C, E is A+B), `LABELS_OFF` off it (C is B).
+   **Build 117** (Brian: "A and C to go back has stopped working, and F = back"): off the
+   flight A + C is the badge's F, back (`PAIRS_OFF`; on the title screen that leaves the game,
+   as F does). Any button in the current pairs, held alone, waits `PAIR_WAIT` for its partner
+   (`host_tufty.waits`), so an uneven A + C doesn't move the cursor first. Hints off the
+   flight: C is B, F is A+C.
+   **Build 118** (Brian: "hold A + C to toggle up/down buttons to change speed"): in flight A + C
+   held is a shift (`controls_tufty.SHIFT`, `SHIFTED`): UP then the badge's F (faster), DOWN its
+   E (slower), no roll or pitch meanwhile; A + B / B + C are gone, so B alone fires at once.
+   Off the flight A + C is still back. A or C alone waits `PAIR_WAIT`. Hints in flight: F is
+   A+C+UP, E is A+C+DOWN.
+   **Build 119** (Brian: "hold A + C will turn the up and down buttons into speed control
+   buttons"): a toggle, not a shift. In flight each press of A + C switches UP / DOWN between
+   pitch and speed (`host_tufty.speed_mode`; "UP/DOWN: SPEED" / "UP/DOWN: PITCH" said), staying
+   so once let go; a new flight starts in pitch. Off the flight A + C is back.
+   **Build 120** (Brian: "both up/down need to be held for the pause menu"): in flight, paused
+   or not, UP + DOWN held is the badge's A (`controls_tufty.MENU_PAIR`, `MENU`): the pause menu,
+   and closing it; UP or DOWN alone waits `PAIR_WAIT` there. In the menu UP / DOWN move, B
+   chooses, A + C goes back.
+   **Build 121** (Brian: "the gamepad should still operate outside of combat practice"): DEBUG >
+   GAMEPAD OFF now plays only combat practice as without the Pad (`host_tufty.pad_off`: the Pad
+   ignored in a practice flight, auto missiles, a missile in every canister); the Pad works
+   everywhere else and the title keeps the whole game (only a Tufty with no Pad at all is
+   practice only). Auto missiles are practice only on every device (`ace._start_flight`).
+   **Build 122** (Brian: "sort out text entry for the Tufty: up/down change letter, B selects
+   it, C backspace, A enter"). `hosts/tufty/dialog_tufty.py`, `LetterDialog`: what
+   `platform_tufty.text_dialog` now gives the game (the badge's firmware TextDialog interface:
+   `.text`, `.message`, `._result`, `draw`), for the Galactic chart's search and the commander's
+   name. UP / DOWN go through `LETTERS` (space, A-Z, 0-9, "-"; held, they repeat), B adds the
+   letter, C deletes the last, A is done (nothing typed: no match / the suggested name). While
+   it is open `host_tufty._typing` gives it the Tufty's buttons and the game none. The letter
+   stays where it was after adding.
+   Then (Brian: "select letter, cursor moves right when selected"): drawn as a row of
+   `MAX_LEN` places (`SLOT` 12 px) with the cursor's place highlighted; B keeps the letter and
+   the cursor moves right (the same letter there to start from); C moves it back onto the
+   last letter to change it.
+   **Build 123** (Brian: "buttons for the gamepad so it can be used as well"): typing on the
+   Qw/ST Pad too (`controls_tufty.PAD_TYPING`): the D-pad's up / down the letter, A or right
+   keeps it, B or left goes back, + is done.
+   **Build 124** (Brian: "also build for the Pi version when using the game pad, plus for the
+   badge as an option"). The letter picker is the game's own now, `picker.py` (`LetterPicker`;
+   the Tufty's `dialog_tufty` just makes one). Where the game drives it (`driven`:
+   `ace._drive_picker`, from its controls): the joystick's up / down the letter (held, it
+   repeats), C or right keeps it, left goes back, A done, F cancels; while it is open the game
+   doesn't clear its controls (so holding works), only when it closes. The badge: Options >
+   TEXT ENTRY: BADGE / PICKER (`use_picker`, options.json "picker"; `platform_tildagon`'s
+   `picker_choice` and `text_dialog`); BADGE (its firmware dialog) stays the default. The Pi:
+   with the game pad used last (`platform_pi.pad_in_use`, from `run.Host.pad_last`) text entry
+   is the picker (pad: D-pad up / down, south or right keep, left back, Start done, east
+   cancel), with the keyboard its typing pages as before. Not yet on the badge.
+   **Build 125** (Brian: "button on pad to enter search, maybe Y?"): the Tufty's Qw/ST Pad, off
+   the flight, has Y as the badge's B too (`controls_tufty.PAD_MAP_OFF`): the search on the
+   Galactic chart (cursor on, C, first), the next tab elsewhere; in flight Y stays E (slower).
+   The Pi pad's Y already was the badge's B.
+   **Build 126** (Brian: "hints must use local buttons / keys names"). The Tufty's hints name
+   whatever was pressed last (`host_tufty.pad_last`): the Pad's buttons (`PAD_LABELS` in
+   flight: A is +, B is -, C is A, D is B, E is Y, F is X; `PAD_LABELS_OFF`: B is Y) or the
+   Tufty's own (`LABELS`, `LABELS_OFF`). The Pi's keyboard in flight, where it is Elite's keys:
+   C is ENTER, F is ESC, A is P (`run.KEY_LABELS_FLIGHT`); off the flight its A-F are the
+   badge's buttons and the hints stay; the Pi pad's names as before (`pad_pi.labels`). The
+   badge's hints were always its own.
+   **Build 127** (Brian: "the letter picker does not update its hints on the Tufty"): the
+   picker's own two hint lines can come from the host (`LetterPicker.hints`); the Tufty's sets
+   them each frame by what was pressed last (`controls_tufty.TYPING_HINTS` / `PAD_TYPING_HINTS`).
+   **Build 128** (Brian: "the + launches the ship when exiting the letter picker"): the press
+   that closes the Tufty's picker was still held next frame and counted as the badge's A
+   (launch when docked). Now any Tufty button or Pad button held when it closes is ignored
+   until let go (`host_tufty.stale` / `stale_pad`).
+   **Build 129** (Brian: "hints should reflect the selected controls, there's enough room in the
+   Pi / Tufty versions to show hints on most screens"). `config.more_hints` (the Tufty; the
+   Pi's Elite layout, set in `run.Host._fit`; off on the badge and the Pi's round badge
+   layout, which have no room): a hint line on both charts (`chart._hint`: docked before C
+   "C: cursor  < > screens  F: status", then "C: target  D: data  B: find  F: back", the
+   local chart without B; its texts move up a little) and on the title screen ("< > choose
+   C: select"). The Tufty's own buttons name "< >" as "A/C" (`LABELS["< >"]`, `relabel`).
+   **Build 130** (Brian: "the labels on the Pi picker don't match when the gamepad is being
+   used"): the picker's own hints had no colons ("C next"), so `relabel` left them; now
+   "C: next", "A: done", "F: cancel", which the Pi pad names A, START and B.
+   **Build 131** (Brian: "the hints clash with the menu on Options on the badge"): with TEXT
+   ENTRY, Options has nine lines (docked and the title's), one more than fits above the hints.
+   `cockpit.menu_lines` shows eight and scrolls with the selection, a small bar above / below
+   when there is more.

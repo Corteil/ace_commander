@@ -67,6 +67,17 @@ for _ in range(12):
     tick(a)
 print("no LEDs to be seen in the layout: the ring on the screen: ok")
 
+# config.laser_leds off (build 113: the Tufty and the Pi): firing leaves the LEDs alone
+mod.LASER_LEDS = False
+for _ in range(15):
+    tick(a)
+g.flash = 0.0; g.heat = 0.0; g.hot = False; g.cool = 0.0
+before = leds.values[1]
+tick(a, held=["C"])
+assert g.beam > 0 and leds.values[1] == before, ("no laser colour", leds.values[1], before)
+mod.LASER_LEDS = True
+print("laser_leds off: firing doesn't colour the LEDs: ok")
+
 # your laser: each type its own colour, on screen and on the LEDs, at each shot
 from ace_commander import cockpit
 seen = {}

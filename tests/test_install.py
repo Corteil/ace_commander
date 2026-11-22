@@ -23,7 +23,9 @@ attrs = subprocess.run(["git", "-C", REPO, "check-attr", "export-ignore", "--"] 
 ignored = set(l.split(":")[0] for l in attrs if l.endswith(": set"))
 names = [f for f in files if f not in ignored]
 buf = io.BytesIO()
-with tarfile.open(fileobj=buf, mode="w") as t:
+# ustar, as git archive (what a release is) writes it: Python's default PAX adds a
+# header of about 1 KB a file for sub-second times (about 40 KB more, build 112)
+with tarfile.open(fileobj=buf, mode="w", format=tarfile.USTAR_FORMAT) as t:
     for f in names:
         t.add(os.path.join(REPO, f), arcname=f)
 tar = buf.getvalue()

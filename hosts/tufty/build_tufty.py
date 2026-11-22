@@ -28,7 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 OUT = os.path.join(REPO, "build", "tufty", "ace_commander")
 HOST_FILES = ("host_tufty.py", "platform_tufty.py", "controls_tufty.py", "layout_tufty.py",
-              "dash_tufty.py", "ctx_tufty.py")
+              "dash_tufty.py", "ctx_tufty.py", "dialog_tufty.py")
 APP_FILES = ("__init__.py", "icon.png")
 ELITE = ("ship_data.py", "game_data.py")
 TUFTY_MPY = "v6.3"              # what the Tufty's MicroPython 1.29 loads

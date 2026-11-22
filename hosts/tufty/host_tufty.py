@@ -70,6 +70,19 @@ class Host:
         self.rect = rect
         self.buttons = buttons
         self.pad = pad
+        self.real_pad = pad     # the Pad found at start
+        self.pad_off = False    # DEBUG > GAMEPAD OFF: the Pad ignored in combat practice
+        self.waits = {}         # button -> when it went down alone (PAIR_WAIT), on self.clock
+        self.typed = set()      # the buttons down last frame while typing (dialog_tufty)
+        self.typed_own = set()  # the Tufty's own buttons among them
+        self.typed_pad = set()  # and the Pad's
+        self.stale = set()      # buttons held when the picker closed: ignored until let go
+        self.stale_pad = set()
+        self.pad_last = False   # the Pad was pressed last, not the Tufty's buttons (the hints)
+        self.speed_mode = False     # in flight, UP / DOWN change speed (A + C toggles it)
+        self.speed_game = None      # the flight it was set in
+        self.both_down = False      # A + C held last frame (the toggle goes on the press)
+        self.clock = 0          # ms of frames so far (the frame times update() is given)
         self.data_dir = data_dir
         self.feed = controls_tufty.Feed()
         self.ctx = Ctx(screen, color, shape, font, SCREEN_W // 2, SCREEN_H // 2)
@@ -89,17 +102,110 @@ class Host:
     def _held(self):
         keys = set()
         b = self.badge
+        m = controls_tufty.TUFTY
+        held = set()
         for name, const in self.buttons.items():
             if b.held(const):
-                keys.add(controls_tufty.TUFTY_MAP[name])
-        if self.pad is not None:
+                held.add(name)
+        if self.stale:              # held when the picker closed: not until let go
+            self.stale &= held
+            held -= self.stale
+        a = self.app
+        flying = a is not None and a.mode == "flight" and not a.paused
+        if held:                    # the Tufty's own buttons used: their names in the hints
+            self.pad_last = False
+        in_flight = a is not None and a.mode == "flight"    # paused or not
+        up, down = controls_tufty.MENU_PAIR
+        if in_flight and up in held and down in held:     # UP + DOWN: the pause menu
+            keys.add(controls_tufty.MENU)
+            held.discard(up)
+            held.discard(down)
+        one, two = controls_tufty.SHIFT
+        both = one in held and two in held
+        if a is None or a.game is not self.speed_game:  # a new flight: UP / DOWN pitch again
+            self.speed_mode = False
+            self.speed_game = a.game if a is not None else None
+        if both:                            # A + C: the speed toggle in flight, back off it
+            held.discard(one)
+            held.discard(two)
+            if flying and not self.both_down:
+                self.speed_mode = not self.speed_mode
+                a.game.say("UP/DOWN: SPEED" if self.speed_mode else "UP/DOWN: PITCH", 1.5)
+            elif not flying:
+                keys.add(controls_tufty.BACK)
+        self.both_down = both
+        if flying and self.speed_mode:      # UP / DOWN are the speed buttons
+            for name, key in controls_tufty.SHIFTED.items():
+                if name in held:
+                    keys.add(key)
+                    held.discard(name)
+        # A or C (and in flight UP or DOWN) held alone waits PAIR_WAIT ms for its partner
+        waits = self.waits
+        for name in ((one, two, up, down) if in_flight else (one, two)):
+            if name in held:
+                if name not in waits:
+                    waits[name] = self.clock
+                if self.clock - waits[name] < controls_tufty.PAIR_WAIT:
+                    held.discard(name)
+        for name in list(waits):
+            if not b.held(self.buttons[name]):
+                del waits[name]     # let go: the next press waits afresh
+        for name in held:
+            keys.add(m[name])
+        if self.pad_last:           # the hints name what was pressed last (Brian, build 126)
+            self.ctx.labels = controls_tufty.PAD_LABELS if flying else controls_tufty.PAD_LABELS_OFF
+        else:
+            self.ctx.labels = controls_tufty.LABELS if flying else controls_tufty.LABELS_OFF
+        practising = a is not None and a.mode == "flight" and not a.career
+        if self.pad is not None and not (self.pad_off and practising):  # (GAMEPAD OFF: practice)
             try:
-                for k, v in self.pad.read_buttons().items():
-                    if v and k in controls_tufty.PAD_MAP:
-                        keys.add(controls_tufty.PAD_MAP[k])
+                pads = self.pad.read_buttons()
+                if self.stale_pad:      # held when the picker closed: not until let go
+                    self.stale_pad = set(k for k in self.stale_pad if pads.get(k))
+                for k, v in pads.items():
+                    pm = controls_tufty.PAD_MAP if in_flight else controls_tufty.PAD_MAP_OFF
+                    if k in self.stale_pad:
+                        continue
+                    if v and k in pm:
+                        keys.add(pm[k])
+                        self.pad_last = True    # the Pad used: its names in the hints
             except Exception:
                 self.pad = None             # unplugged: carry on with the Tufty's buttons
         return keys
+
+    def _typing(self, d, ms):
+        """The Tufty's buttons to the letter picker (dialog_tufty): a press as
+        it goes down, UP / DOWN repeating while held."""
+        b = self.badge
+        down = set()
+        for name, const in self.buttons.items():
+            if b.held(const):
+                down.add(name)
+        if down:
+            self.pad_last = False   # the Tufty's buttons used
+        pad_down = set()
+        if self.pad is not None:    # the Pad as the same buttons (controls_tufty.PAD_TYPING)
+            try:
+                for k, v in self.pad.read_buttons().items():
+                    if v:
+                        pad_down.add(k)
+                    if v and k in controls_tufty.PAD_TYPING:
+                        down.add(controls_tufty.PAD_TYPING[k])
+                        self.pad_last = True
+            except Exception:
+                self.pad = None
+        d.hints = controls_tufty.PAD_TYPING_HINTS if self.pad_last else controls_tufty.TYPING_HINTS
+        for name in ("UP", "DOWN", "A", "B", "C"):
+            if name in down and name not in self.typed:
+                d.press(name)
+        held = [n for n in ("UP", "DOWN") if n in down and n in self.typed]
+        if held:
+            d.hold(held[0], ms)
+        else:
+            d.let_go()
+        self.typed = down
+        self.typed_own = set(n for n in self.buttons if b.held(self.buttons[n]))
+        self.typed_pad = pad_down
 
     def _lights(self):
         """The case lights as bright as the brightest LED the game lit."""
@@ -134,6 +240,11 @@ class Host:
         elif name == "config":
             _mkdirs(self.data_dir)
             m.data_dir = self.data_dir
+            self._alone(m, self.pad is None)
+            m.practice_upgrades = True  # practice waves drop upgrade canisters (build 113)
+            m.laser_leds = False        # no laser colour on the LED border (Brian, build 113)
+            m.more_hints = True         # a square screen: hints on the charts and title (build 129)
+            self.ctx.labels = controls_tufty.LABELS     # hints name the Tufty's buttons
             m.platform = platform_tufty
             m.input = self.feed.attach
         elif name == "cockpit":
@@ -142,7 +253,31 @@ class Host:
         if self.done == len(STEPS):
             self.ace = _module("ace")
             self.loaded = self.ace.AceCommander()     # started once LOAD_HOLD is up
+            self.loaded.platform.ck = _module("cockpit")    # to draw the text entry
+            if self.real_pad is not None:   # DEBUG > DISPLAY > GAMEPAD can switch it
+                self.loaded.platform.gamepad = True
+                self.loaded.platform.host = self
             print("LOADED in %d ms" % _diff(_ms(), self.t_load))
+
+    @staticmethod
+    def _alone(config, alone):
+        """The game as the five buttons alone need it (Brian, builds 111-112), or not."""
+        config.practice_only = alone        # only combat practice,
+        config.auto_missiles = alone        # missiles by themselves (no missile button),
+        config.practice_missile = 1.0 if alone else None    # and one in every canister
+
+    def set_gamepad(self, on):
+        """DEBUG > DISPLAY > GAMEPAD (Brian, builds 115, 121): OFF plays combat
+        practice as without the Pad (its buttons ignored there, missiles by
+        themselves, one in every canister); the Pad still works everywhere
+        else, and the whole game stays on the title screen."""
+        on = bool(on) and self.real_pad is not None
+        self.pad_off = not on
+        config = _module("config")
+        config.auto_missiles = not on               # (practice only: ace)
+        config.practice_missile = None if on else 1.0
+        if self.app is not None or self.loaded is not None:
+            (self.app or self.loaded).platform.gamepad = on
 
     def _draw_loading(self):
         """The name where the title screen has it, a bar, the module being
@@ -195,7 +330,17 @@ class Host:
             ms = 1
         elif ms > 100:
             ms = 100
-        self.feed.set_held(self._held())
+        self.clock += ms
+        d = self.app.platform.dialog
+        if d is not None and d._result is None:     # typing: the buttons are the dialog's
+            self._typing(d, ms)
+            self.feed.set_held(set())
+        else:
+            if d is not None:       # it has just closed: what is still held (the + or A
+                self.stale = set(self.typed_own)    # that closed it) waits to be let go
+                self.stale_pad = set(self.typed_pad)
+            self.app.platform.dialog = None
+            self.feed.set_held(self._held())
         self.app.update(ms)
         if self.app.platform.quit:
             return True

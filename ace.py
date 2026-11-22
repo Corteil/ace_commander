@@ -140,6 +140,7 @@ DOCK_KEYS = (("k_1", "LAUNCH"), ("k_2", "MARKET"), ("k_3", "SELL"),
 # first galaxy (see AceCommander._egg)
 DEBUG_MENU = config.debug_menu
 TITLE_QUIT = config.title_quit  # a QUIT line on the title screen (a host sets it: the Pi; the badge has F)
+LASER_LEDS = config.laser_leds  # your laser lights the LEDs (off on the Tufty and the Pi: build 113)
 TITLE_CANCEL = config.title_cancel  # cancel on the title leaves (the Pi turns it off: QUIT does)
 EGG_WORD = "DRAKE"      # a male duck: no system name starts with C or U for DUCKS
 EGG_STOPS = 1           # dockings elsewhere forgiven between letters (to refuel)
@@ -195,15 +196,15 @@ DEBUG_GROUPS = (
     ("TRAVEL", ("TO THE STATION", "TO THE SUN", "DOCK NOW", "MIS-JUMP NEXT",
                 "TO MISSION SYSTEM")),
     ("COMMANDER", ("+10 KILLS", "+1000 CR", "LEVEL", "HARDCORE", "LEGAL", "ANGER STATION", "MISSION")),
-    ("DISPLAY", ("FRAME TIME", "SPEED TEST")),
+    ("DISPLAY", ("FRAME TIME", "SPEED TEST", "GAMEPAD")),
 )
 CAREER_ONLY = ("+1000 CR", "HARDCORE", "ADD A TRADER", "ADD POLICE", "ADD A HUNTER", "ANGER STATION",
                "MIS-JUMP NEXT", "LEGAL", "FUEL TO 1/4", "TO MISSION SYSTEM", "MISSION")
 # the cheats that work away from a flight (title screen Options, docked Options);
 # all but the last two need a commander, as does SHIP (the equipment) there
 OFF_FLIGHT = ("+10 KILLS", "+1000 CR", "LEVEL", "HARDCORE", "LEGAL", "MISSION",
-              "FRAME TIME", "SPEED TEST")
-NO_COMMANDER = ("FRAME TIME", "SPEED TEST")
+              "FRAME TIME", "SPEED TEST", "GAMEPAD")
+NO_COMMANDER = ("FRAME TIME", "SPEED TEST", "GAMEPAD")
 MSG_TIME = 1.5          # seconds a DEBUG message stays on the Options' DEBUG page
 
 
@@ -366,6 +367,8 @@ class AceCommander(PLATFORM.App):
         self.jump_lit = False            # the last write was a jump flash
         self.jump_rgb = DUST_RGB         # their colour at full brightness
         self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
+        self.use_picker = False          # TEXT ENTRY: the letter picker (picker.py) rather than
+                                         # the badge's own dialog (build 124, an option)
         self.old_hardcore = False        # options.json's HARDCORE from before build 74
         self.own_ships = ORIGINAL_SHIPS  # DATA: OWN / ELITE, from the next start
         self.omenu = 0                   # the chosen line on the Options page
@@ -493,7 +496,7 @@ class AceCommander(PLATFORM.App):
             self._leds(160)
         elif g.flash > 0:
             self._leds(80)
-        elif g.beam > 0:        # your laser firing: its own colour
+        elif g.beam > 0 and LASER_LEDS:     # your laser firing: its own colour (config.laser_leds)
             r, gr, b = cockpit.LASER_COLOURS.get(g.laser, cockpit.RED)
             self._leds_rgb(int(r * 255), int(gr * 255), int(b * 255))
         elif self._jump_flashes() or self.jump_lit:     # the jump: white where streaks leave
@@ -697,6 +700,11 @@ class AceCommander(PLATFORM.App):
 
     def choices(self):
         """The title screen's choices, in order."""
+        if config.practice_only:        # too few buttons for the rest (config.py)
+            items = ["COMBAT PRACTICE"]
+            if TITLE_QUIT:
+                items.append("QUIT")
+            return items
         items = ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS"]
         if self.cmdr is not None:
             items.insert(0, "CONTINUE")
@@ -785,6 +793,10 @@ class AceCommander(PLATFORM.App):
             self.game = g = game.Game(SHIPS, level)
             self.banked = 0
             self.banked_cash = 0
+        g.auto_missile = config.auto_missiles and not career    # no missile button: practice
+        g.practice_upgrades = config.practice_upgrades and not career
+        if config.practice_missile is not None:
+            g.pickup_missile = config.practice_missile
         elif g.over or career != self.career or g.level != level \
                 or (not career and g.rules.hardcore != self.p_hardcore):   # practice: HARDCORE changed
             g.set_level(level)
@@ -1674,6 +1686,8 @@ class AceCommander(PLATFORM.App):
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
         if self.platform.leds:
             items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))
+        if getattr(self.platform, "picker_choice", False):    # the badge: its own or the picker
+            items.append("TEXT ENTRY: " + ("PICKER" if self.use_picker else "BADGE"))
         if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose data, from the next start
             items.append("DATA: " + ("OWN" if self.own_ships else "ELITE")
                          + ("" if self.own_ships == ORIGINAL_SHIPS else " (RESTART)"))
@@ -1732,6 +1746,9 @@ class AceCommander(PLATFORM.App):
             if not self.use_leds:
                 self._leds_release()
             self._save_options()
+        elif item.startswith("TEXT ENTRY"):
+            self.use_picker = not self.use_picker
+            self._save_options()
 
     def _load_options(self):
         try:
@@ -1744,6 +1761,8 @@ class AceCommander(PLATFORM.App):
                 self.use_tilt = d["tilt"] and self.tilt_ok
             if isinstance(d.get("leds"), bool):
                 self.use_leds = d["leds"]
+            if isinstance(d.get("picker"), bool):
+                self.use_picker = d["picker"]
             k = d.get("tilt_flip")
             if isinstance(k, int) and not isinstance(k, bool) and 0 <= k < len(TILT_FLIPS):
                 self.tilt_flip = k
@@ -1764,7 +1783,7 @@ class AceCommander(PLATFORM.App):
         try:
             with open(options_path(), "w") as f:
                 f.write(json.dumps({"tilt": self.use_tilt, "tilt_flip": self.tilt_flip,
-                                    "leds": self.use_leds,
+                                    "leds": self.use_leds, "picker": self.use_picker,
                                     "practice_level": self.p_level,
                                     "practice_hardcore": self.p_hardcore,
                                     "own": self.own_ships, "egg": self.egg,
@@ -1794,13 +1813,8 @@ class AceCommander(PLATFORM.App):
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
         text(ctx, "OPTIONS", 0, -80, 20, cockpit.WHITE)
         items = self._settings(True)
-        y = -50                 # eight lines fit (CONTROLS, NAME)
-        for i, label in enumerate(items):
-            if i == self.omenu % len(items):
-                ctx.rgb(*cockpit.DIM).rectangle(-100, y - 7, 200, 15).fill()
-            text(ctx, label, 0, y, 13, cockpit.GREEN if i == self.omenu % len(items)
-                 else cockpit.GREY)
-            y += 16
+        # eight lines fit above the hints; more scroll (build 131)
+        y = cockpit.menu_lines(ctx, items, self.omenu % len(items), -50, 16, 8, 100)
         if self.cmdr is None:
             text(ctx, "more with a commander", 0, y + 4, 11, cockpit.GREY)
         text(ctx, "< > or C: change", 0, 82, 11, cockpit.GREY)     # below six lines
@@ -1825,6 +1839,8 @@ class AceCommander(PLATFORM.App):
             if self.career:
                 return key != "NEXT WAVE"       # waves are for combat practice
             return key not in CAREER_ONLY       # no commander: no cash, traffic or legal status
+        if key == "GAMEPAD":        # a device whose platform can switch its gamepad (the Tufty's)
+            return getattr(self.platform, "gamepad", None) is not None
         if key == "TO MISSION SYSTEM":      # docked: moved there and docked again
             return self.cmdr is not None and (self.mode == "docked" or self.od_from == "docked")
         if key not in OFF_FLIGHT:
@@ -1844,6 +1860,8 @@ class AceCommander(PLATFORM.App):
             return "HARDCORE: " + onoff(self._hardcore())
         if key == "FRAME TIME":
             return "FRAME TIME: " + onoff(self.show_ms)
+        if key == "GAMEPAD":
+            return "GAMEPAD: " + onoff(getattr(self.platform, "gamepad", None))
         if key == "MIS-JUMP NEXT":
             return "MIS-JUMP NEXT: " + onoff(self.misjump)
         if key == "LEGAL":
@@ -1972,6 +1990,9 @@ class AceCommander(PLATFORM.App):
         if item.startswith("FRAME TIME"):
             self.show_ms = not self.show_ms
             return "FRAME TIME " + ("ON" if self.show_ms else "OFF")
+        if item.startswith("GAMEPAD"):
+            self.platform.set_gamepad(not self.platform.gamepad)
+            return "GAMEPAD " + ("ON" if self.platform.gamepad else "OFF")
         if item == "SPEED TEST":
             from . import bench     # only when asked for: a DEBUG page (DISPLAY > SPEED TEST)
             self.bench = bench.Bench()      # F comes back to this page
@@ -2243,6 +2264,14 @@ class AceCommander(PLATFORM.App):
             return
         if item.startswith("FRAME TIME"):
             self.show_ms = not self.show_ms
+        elif item.startswith("GAMEPAD"):
+            self.platform.set_gamepad(not self.platform.gamepad)
+            g.auto_missile = config.auto_missiles and not self.career  # at once, this flight too
+            if config.practice_missile is not None:
+                g.pickup_missile = config.practice_missile
+            else:
+                g.pickup_missile = game.PICKUP_MISSILE
+            g.say("GAMEPAD " + ("ON" if self.platform.gamepad else "OFF"))
         elif item.startswith("INVINCIBLE"):
             g.god = not g.god
             if g.god:
@@ -2588,6 +2617,8 @@ class AceCommander(PLATFORM.App):
         """True if a keyboard is fitted: its hexpansion's driver (KeyboardApp)
         is running, or its header names a keyboard; else if a keyboard key
         has been pressed."""
+        if getattr(self.platform, "pad_in_use", False):    # the Pi: its game pad used last
+            return False
         return self.platform.keyboard_fitted() or self.pad.keyboard
 
     def _names(self):
@@ -2624,6 +2655,7 @@ class AceCommander(PLATFORM.App):
         """While a search is open: True (it takes all the input)."""
         if self.tdialog is not None:
             dl = self.tdialog
+            driven = self._drive_picker(dl)
             found = self._names().matches(dl.text)
             dl.message = self._names().names[found[0]] if found else (
                 "NO MATCH" if dl.text else "FIND SYSTEM")
@@ -2632,7 +2664,8 @@ class AceCommander(PLATFORM.App):
                 self._found(None)
             elif r is not None:
                 self._found(found[0] if found else None)
-            self.pad.clear()        # the dialog has the buttons
+            if r is not None or not driven:
+                self.pad.clear()    # the dialog has the buttons (or the one that closed it)
             return True
         if self.finder is None:
             return False
@@ -2650,6 +2683,36 @@ class AceCommander(PLATFORM.App):
             self._found(f.chosen())
         elif cancel:
             self._found(None)
+        return True
+
+    def _drive_picker(self, dl):
+        """The letter picker (picker.py) on the game's own controls, where the
+        game drives it (the badge's TEXT ENTRY: PICKER, the Pi's pad): the
+        joystick's up / down the letter (held, it repeats), C or right keeps
+        it, left goes back, A is done, F cancels. False for any other dialog."""
+        if not getattr(dl, "driven", False):
+            return False
+        hit = self.pad.hit
+        held = self.pad.held
+        if hit("j_up"):
+            dl.press("UP")
+        elif hit("j_down"):
+            dl.press("DOWN")
+        elif hit("confirm") or hit("j_right"):
+            dl.press("B")
+        elif hit("j_left") or hit("k_BACKSPACE"):
+            dl.press("C")
+        elif hit("A"):
+            dl.press("A")
+        elif hit("cancel"):
+            dl.cancel()
+        ms = int(self.dt * 1000)
+        if held("j_up"):
+            dl.hold("UP", ms)
+        elif held("j_down"):
+            dl.hold("DOWN", ms)
+        else:
+            dl.let_go()
         return True
 
     def _open_name(self, current, done):
@@ -2677,13 +2740,15 @@ class AceCommander(PLATFORM.App):
         """While the name is being entered: True (it takes all the input)."""
         from . import find
         if self.ndialog is not None:
+            driven = self._drive_picker(self.ndialog)
             r = getattr(self.ndialog, "_result", None)
             if r is False:
                 self._name_entered(None)
             elif r is not None:
                 n = r.strip().upper()[:find.NAME_MAX]
                 self._name_entered(n or badge_name().upper()[:find.NAME_MAX])
-            self.pad.clear()        # the dialog has the buttons
+            if r is not None or not driven:
+                self.pad.clear()    # the dialog has the buttons (or the one that closed it)
             return True
         if self.namer is None:
             return False

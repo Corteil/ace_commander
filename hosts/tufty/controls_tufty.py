@@ -27,12 +27,49 @@ class Key:
 BADGE = {c: Key(c, (_DIRECTION[c], c)) for c in "ABCDEF"}
 STICK = {n: Key("JOY" + n, (n.lower(), "j_" + n.lower())) for n in ("UP", "DOWN", "LEFT", "RIGHT")}
 STICK["SELECT"] = Key("JOYSELECT", ("confirm",))
-# the badge button each Tufty button stands for (its five: A, B, C, UP, DOWN)
-TUFTY_MAP = {"A": BADGE["A"], "B": BADGE["B"], "C": BADGE["C"], "UP": BADGE["F"], "DOWN": BADGE["E"]}
+# the Tufty's five buttons, with or without the Pad (Brian, builds 111-112): A / C /
+# UP / DOWN are the joystick, cursor keys off the flight (A left, C right) and the
+# steering in flight; B is the badge's C, select off the flight and fire in flight.
+# Without the Pad only combat practice is offered (config.practice_only), missiles go
+# by themselves (config.auto_missiles) and the hints name these buttons (LABELS)
+TUFTY = {"A": STICK["LEFT"], "C": STICK["RIGHT"], "UP": STICK["UP"], "DOWN": STICK["DOWN"],
+         "B": BADGE["C"]}
+# A + C held together (Brian, builds 114-119), for the badge's buttons the five haven't
+# got alone: in flight it toggles UP and DOWN between pitch and speed (SPEED: UP its F,
+# faster, and DOWN its E, slower), staying so once let go; off the flight its F (back).
+# A or C held alone waits PAIR_WAIT ms for the other before it counts, so starting
+# A + C doesn't roll or move the cursor first
+SHIFT = ("A", "C")
+SHIFTED = {"UP": BADGE["F"], "DOWN": BADGE["E"]}    # in flight, in speed mode
+BACK = BADGE["F"]                                   # off the flight, A + C
+# UP + DOWN held together in flight (Brian, build 120): the badge's A, the pause menu
+# (open, and close again from inside it); UP or DOWN alone waits PAIR_WAIT ms there too
+MENU_PAIR = ("UP", "DOWN")
+MENU = BADGE["A"]
+PAIR_WAIT = 60
+# typing (dialog_tufty's letter picker): each Pad button as the Tufty button it does
+# the job of (Brian, build 123): the D-pad's up / down the letter, A or right keeps it,
+# B or left goes back, + is done
+PAD_TYPING = {"U": "UP", "D": "DOWN", "A": "B", "R": "B", "B": "C", "L": "C", "+": "A"}
+# the picker's hint lines (build 127), by whichever was pressed last
+TYPING_HINTS = ("UP/DOWN letter   B next", "C back   A done")
+PAD_TYPING_HINTS = ("UP/DOWN letter   A next", "B back   + done")
+# the hints' badge letters named as the Tufty's buttons (ctx_tufty), Pad or not
+# "< >" (the joystick's left / right) is the A and C buttons (build 129)
+LABELS = {"C": "B", "< >": "A/C"}   # (in flight A + C switches UP / DOWN: the game says which)
+LABELS_OFF = {"C": "B", "F": "A+C", "< >": "A/C"}
 # and each Qw/ST Pad button (qwstpad's names): the D-pad is the joystick
 PAD_MAP = {"U": STICK["UP"], "D": STICK["DOWN"], "L": STICK["LEFT"], "R": STICK["RIGHT"],
            "A": BADGE["C"], "B": BADGE["D"], "X": BADGE["F"], "Y": BADGE["E"],
            "+": BADGE["A"], "-": BADGE["B"]}
+# off the flight Y is the badge's B too (Brian, build 125): search on the Galactic
+# chart, as the Pi pad's Y; in flight it stays E (slower)
+PAD_MAP_OFF = dict(PAD_MAP)
+PAD_MAP_OFF["Y"] = BADGE["B"]
+# the hints' badge letters named as the Pad's buttons, when the Pad was used last
+# (Brian, build 126: "hints must use local buttons / keys names"), as PAD_MAP has them
+PAD_LABELS = {"A": "+", "B": "-", "C": "A", "D": "B", "E": "Y", "F": "X"}
+PAD_LABELS_OFF = {"A": "+", "B": "Y", "C": "A", "D": "B", "F": "X"}
 
 
 class Feed:

@@ -135,8 +135,9 @@ Other devices are in `hosts/`: the Pi, and the Tufty 2350 since build 109 (`host
   `hosts/tufty/` (build 109, from `Corteil/tufty_ace_commarder`, which it replaces): the Tufty
   2350 on Badgeware v3 (bw-1.29.0, MicroPython 1.29, ~8 MB RAM), on the same platform layer:
   `platform_tufty.py` (the LED ring in `LEDS`, painted as a border round the view and the case
-  lights), `controls_tufty.py` (Tufty A/B/C = badge A/B/C, UP/DOWN = F/E; Qw/ST Pad on I2C0
-  GP4/GP5 at 0x21: D-pad = joystick, A=C, B=D, X=F, Y=E, + = A, - = B), `layout_tufty.py` with
+  lights), `controls_tufty.py` (with the Qw/ST Pad, on I2C0 GP4/GP5 at 0x21: Tufty A/B/C = badge
+  A/B/C, UP/DOWN = F/E, Pad D-pad = joystick, A=C, B=D, X=F, Y=E, + = A, - = B; without it,
+  build 111: A/C/UP/DOWN = the joystick, B = the badge's C, and `config.practice_only`), `layout_tufty.py` with
   `dash_tufty.py` (a 320 x 180 view over a 320 x 60 dashboard), `ctx_tufty.py` (the ctx calls
   on Badgeware v3's `screen`: plain x, y everywhere except `screen.circle(vec2, r)` and
   `shape.custom([vec2, ...])`, one outline a call; pixel fonts picked by size), `host_tufty.py`

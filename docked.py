@@ -164,6 +164,7 @@ class Docked:
             self.data = self.gal.system(self.target if self.target is not None else c.system)
         if self.view is not None:
             self.view.active = False
+            self.view.docked = True
 
     def use_cursor(self, on):
         """On a chart: C gives the joystick to the cursor, F gives it back to the tabs."""
@@ -616,12 +617,8 @@ class Docked:
         text(ctx, "OPTIONS", 0, -94, 14, cockpit.GREY)
         items = self.options[0]()
         sel = self.osel % len(items)
-        y = -62                 # eight lines fit inside the round edge (CONTROLS, NAME)
-        for i, label in enumerate(items):
-            if i == sel:
-                ctx.rgb(*cockpit.DIM).rectangle(-96, y - 7, 192, 15).fill()
-            text(ctx, label, 0, y, 13, cockpit.GREEN if i == sel else cockpit.GREY)
-            y += 15
+        # eight lines fit inside the round edge above the hints; more scroll (build 131)
+        cockpit.menu_lines(ctx, items, sel, -62, 15, 8, 96)
         text(ctx, "up / down: pick   C: change", 0, 66, 11, cockpit.GREY)
         text(ctx, "F: back to status", 0, 82, 11, cockpit.GREY)
 
