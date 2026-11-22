@@ -301,6 +301,7 @@ class AceCommander(PLATFORM.App):
         self.cmdr = commander.load(SAVE_PATH, DATA_TAG)   # the saved commander, or None
         # the commander as last saved, as JSON: being destroyed goes back to it
         self.saved = json.dumps(self.cmdr.to_dict()) if self.cmdr is not None else None
+        self.just_saved = False     # Hardcore: SAVE COMMANDER pressed since Options opened
         self.level = 1          # the level showing on the new-commander screen
         self.p_level = 1        # combat practice's level (options.json)
         self.p_hardcore = False # combat practice's own HARDCORE, apart from the commander's
@@ -898,7 +899,8 @@ class AceCommander(PLATFORM.App):
             from . import market
             c.market = market.new(GOODS, c.system, self.galaxy.system(c.system).economy,
                                   random.randint(0, 255))
-        self._write()
+        self._auto_write()
+        self.just_saved = False
         if self.game is not None:
             self.game.docked = False
             self.game.autodock = False      # the docking computer starts afresh next time
@@ -958,7 +960,7 @@ class AceCommander(PLATFORM.App):
         n = missions.on_docking(c, gal.xs[c.system], gal.ys[c.system])
         if n is None:
             return
-        self._write()
+        self._auto_write()
         ship = None
         if n in missions.SHOWS_SHIP:
             for e in SHIPS:
@@ -976,6 +978,8 @@ class AceCommander(PLATFORM.App):
         d = self.dock
         hit = self.pad.hit
         d.tick(dt)
+        if not d.in_options:
+            self.just_saved = False     # "SAVED" shows until Options is left
         if self._update_find(cancel, confirm):
             return
         if (d.view is not None and d.cursor and hasattr(d.view, "number")
@@ -1186,8 +1190,19 @@ class AceCommander(PLATFORM.App):
         return market.scoop(self.cmdr, GOODS, i)
 
     def _save_docked(self):
-        """Save what was bought and sold while docked."""
+        """Save what was bought and sold while docked (not in Hardcore: only
+        SAVE COMMANDER saves there, build 133)."""
+        self._auto_write()
+
+    def _auto_write(self):
+        """A save the game makes by itself: none in Hardcore (rules.manual_save)."""
+        if not self._hardcore():
+            self._write()
+
+    def _save_now(self):
+        """Options > SAVE COMMANDER (Hardcore, docked)."""
         self._write()
+        self.just_saved = True
 
     def _write(self):
         """Save the commander, and keep a copy of what was saved: being
@@ -1679,6 +1694,8 @@ class AceCommander(PLATFORM.App):
             steer = "STEER: %s (no tilt sensor)" % stick
         items = [steer]
         items.append("CONTROLS: " + TILT_FLIPS[self.tilt_flip])
+        if cmdr and self.mode == "docked" and self._hardcore():   # no saving by itself (build 133)
+            items.insert(0, "SAVE COMMANDER" + (": SAVED" if self.just_saved else ""))
         if cmdr and self.cmdr is not None and self.mode != "flight":
             items.append("NAME: " + cmdr_name(self.cmdr).upper())     # build 89
         if cmdr and self.cmdr is not None:
@@ -1712,6 +1729,9 @@ class AceCommander(PLATFORM.App):
                 self.od_sel = 0
                 self.od_msg = None
                 self.mode = "odebug"
+        elif item.startswith("SAVE COMMANDER"):
+            if not left:
+                self._save_now()
         elif item.startswith("NAME"):
             if not left:
                 self._open_name(self.cmdr.name, self._set_name)

@@ -348,4 +348,51 @@ p.mode = "menu"
 p.menu = p.choices().index("COMBAT PRACTICE")
 tick(p, fresh=["CONFIRM"]); tick(p, fresh=["CANCEL"]); assert p.mode == "menu", "F: back"
 print("combat practice page: ok")
+# ---- Hardcore saves only when asked (build 133): Options > SAVE COMMANDER, docked
+import json
+from ace_commander import commander
+
+
+def on_file():
+    return json.load(open(SAVE))["credits"]
+
+
+for hard in (False, True):
+    bs.press(())
+    a = ace_commander.AceCommander()
+    a.cmdr = commander.Commander(1)
+    a.cmdr.hardcore = hard
+    a._write()                      # a new commander is saved as it's made, in both modes
+    a._dock()
+    start = on_file()
+    a.cmdr.cash += 5000             # 500 Cr: bought, sold, flown...
+    a._dock()                       # docking again
+    a.dock.open("OPTIONS")
+    items = a._settings(True)
+    if not hard:
+        assert on_file() == start + 500, "standard: docking saves"
+        assert not any(i.startswith("SAVE") for i in items), "standard: no SAVE line"
+        continue
+    assert on_file() == start, "Hardcore: docking doesn't save"
+    a._launch()
+    assert on_file() == start, "Hardcore: launching doesn't save"
+    a._dock()
+    a.dock.open("OPTIONS")
+    items = a._settings(True)
+    assert items[0] == "SAVE COMMANDER", items
+    a.dock.osel = 0
+    a.dock.change_option()
+    assert on_file() == start + 500, "SAVE COMMANDER saves"
+    assert a._settings(True)[0] == "SAVE COMMANDER: SAVED"
+    bs_texts(a)                     # it fits on the round screen
+    a.cmdr.cash += 1000
+    if a.game is None:
+        a.game = game.Game(SHIPS)
+    a._restore()                    # destroyed: back to the last save
+    assert a.cmdr.credits == start + 500, a.cmdr.credits
+    a._dock()
+    tick(a, fresh=["CANCEL"])       # Options back to Status
+    tick(a, fresh=["CANCEL"])       # Status to the title: not saved either
+    assert a.mode == "menu" and on_file() == start + 500
+print("Hardcore saves only by SAVE COMMANDER: ok")
 print("ALL HARDCORE TESTS PASSED")
