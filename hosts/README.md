@@ -6,8 +6,9 @@ runs the same game files on another device:
 
 - `pi/`: a Raspberry Pi (or any computer with Python 3 and pygame), in a window or full screen.
   See `pi/PLAN.md`.
-- `tufty/` (later): the Pimoroni Tufty 2350, now in `Corteil/tufty_ace_commarder`; it moves here
-  after its first run on hardware.
+- `tufty/`: the Pimoroni Tufty 2350 on Badgeware v3 (since build 109).
+- `presto/`: the Pimoroni Presto (RP2350, 4" square touchscreen, buzzer): a plan only so far,
+  `presto/PLAN.md` (2026-11-22).
 
 How a host works (for now): the game imports a few Tildagon firmware modules (`app`,
 `events.input`, `events.joystick`, `events.keyboard`, `frontboards.common`, `system.eventbus`,
