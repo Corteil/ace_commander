@@ -618,7 +618,7 @@ class Docked:
         items = self.options[0]()
         sel = self.osel % len(items)
         # eight lines fit inside the round edge above the hints; more scroll (build 131)
-        cockpit.menu_lines(ctx, items, sel, -62, 15, 8, 96)
+        cockpit.menu_lines(ctx, items, sel, -62, 15, 8)
         text(ctx, "up / down: pick   C: change", 0, 66, 11, cockpit.GREY)
         text(ctx, "F: back to status", 0, 82, 11, cockpit.GREY)
 

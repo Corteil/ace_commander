@@ -141,7 +141,7 @@ def number(ctx, value, x, y, font=_BIG, align=0):
     return width
 
 
-def menu_lines(ctx, items, sel, y, step, rows, half_w):
+def menu_lines(ctx, items, sel, y, step, rows):
     """A list of setting lines from y down, sel highlighted, at most rows of
     them: a longer list scrolls with sel, a small bar above or below saying
     there is more (Options with TEXT ENTRY has nine lines, the hints sit
@@ -152,9 +152,7 @@ def menu_lines(ctx, items, sel, y, step, rows, half_w):
         top = sel - rows + 1 if sel >= rows else 0
         if top > n - rows:
             top = n - rows
-    for i in range(top, min(n, top + rows)):
-        if i == sel:
-            ctx.rgb(*DIM).rectangle(-half_w, y - 7, 2 * half_w, 15).fill()
+    for i in range(top, min(n, top + rows)):     # the chosen line green, no box (build 136)
         text(ctx, items[i], 0, y, 13, GREEN if i == sel else GREY)
         y += step
     ctx.rgb(*GREY)

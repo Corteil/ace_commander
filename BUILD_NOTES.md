@@ -1480,3 +1480,10 @@ what is now `ace.py` (renamed in build 50).
    the line reads COMMANDER SAVED after C, until Options is left (C there saves again).
    **Release 0.4.1** (2026-11-22): builds 133-135 (Hardcore saving by hand), by
    `tools/make_release.py 0.4.1 --push`.
+   **Build 136** (Brian: "on the systems where tilt steer is impossible just show the pitch swapped
+   status", "also remove the background box around the selected option"). Without a tilt sensor
+   (the Pi, the Tufty, a badge whose sensor failed) Settings / Options have no STEER line and
+   CONTROLS becomes PITCH: NORMAL / SWAPPED (bit 1 of `tilt_flip`; a roll flip left from tilt
+   isn't used then). The chosen line on menu pages (Options, the pause menu and Settings, the
+   DEBUG pages, NEW COMMANDER, practice) is green text without the box behind it; the market,
+   Equip and shipyard lists keep their row highlight.
