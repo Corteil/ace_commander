@@ -6,6 +6,8 @@ tools export-ignore
 tools/** export-ignore
 hosts export-ignore
 hosts/** export-ignore
+plans export-ignore
+plans/** export-ignore
 CLAUDE.md export-ignore
 DESIGN.md export-ignore
 deploy.bat export-ignore
