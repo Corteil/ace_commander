@@ -301,6 +301,7 @@ class AceCommander(PLATFORM.App):
         self.cmdr = commander.load(SAVE_PATH, DATA_TAG)   # the saved commander, or None
         # the commander as last saved, as JSON: being destroyed goes back to it
         self.saved = json.dumps(self.cmdr.to_dict()) if self.cmdr is not None else None
+        self.just_saved = False     # Hardcore: SAVE COMMANDER pressed since Options opened
         self.level = 1          # the level showing on the new-commander screen
         self.p_level = 1        # combat practice's level (options.json)
         self.p_hardcore = False # combat practice's own HARDCORE, apart from the commander's
@@ -765,12 +766,14 @@ class AceCommander(PLATFORM.App):
         self._draw_rows(ctx, self.p_level, self.p_hardcore, self.p_sel, -42, 56)
         cockpit.text(ctx, "C: fly   F: back", 0, 80, 12, cockpit.GREY)
 
-    def _draw_rows(self, ctx, level, hardcore, sel, top, step):
-        """The LEVEL and HARDCORE lines of the practice and new-commander pages."""
+    def _draw_rows(self, ctx, level, hardcore, sel, top, step, saves=False):
+        """The LEVEL and HARDCORE lines of the practice and new-commander pages
+        (saves: a commander's, where Hardcore also means saving by hand)."""
         text = cockpit.text
         rows = ("LEVEL", "< %s >" % commander.LEVELS[level], LEVEL_NOTE[level]), \
                ("HARDCORE", "< %s >" % ("ON" if hardcore else "OFF"),
-                "ECM by hand, armed missiles" if hardcore else "the game's usual help")
+                ("ECM, missiles, saving by hand" if saves else "ECM by hand, armed missiles")
+                if hardcore else "the game's usual help")
         for i, (name, value, note) in enumerate(rows):
             y = top + i * step
             on = i == sel
@@ -898,7 +901,8 @@ class AceCommander(PLATFORM.App):
             from . import market
             c.market = market.new(GOODS, c.system, self.galaxy.system(c.system).economy,
                                   random.randint(0, 255))
-        self._write()
+        self._auto_write()
+        self.just_saved = False
         if self.game is not None:
             self.game.docked = False
             self.game.autodock = False      # the docking computer starts afresh next time
@@ -958,7 +962,7 @@ class AceCommander(PLATFORM.App):
         n = missions.on_docking(c, gal.xs[c.system], gal.ys[c.system])
         if n is None:
             return
-        self._write()
+        self._auto_write()
         ship = None
         if n in missions.SHOWS_SHIP:
             for e in SHIPS:
@@ -976,6 +980,8 @@ class AceCommander(PLATFORM.App):
         d = self.dock
         hit = self.pad.hit
         d.tick(dt)
+        if not d.in_options:
+            self.just_saved = False     # "SAVED" shows until Options is left
         if self._update_find(cancel, confirm):
             return
         if (d.view is not None and d.cursor and hasattr(d.view, "number")
@@ -1186,8 +1192,19 @@ class AceCommander(PLATFORM.App):
         return market.scoop(self.cmdr, GOODS, i)
 
     def _save_docked(self):
-        """Save what was bought and sold while docked."""
+        """Save what was bought and sold while docked (not in Hardcore: only
+        SAVE COMMANDER saves there, build 133)."""
+        self._auto_write()
+
+    def _auto_write(self):
+        """A save the game makes by itself: none in Hardcore (rules.manual_save)."""
+        if not self._hardcore():
+            self._write()
+
+    def _save_now(self):
+        """Options > SAVE COMMANDER (Hardcore, docked): it then reads COMMANDER SAVED."""
         self._write()
+        self.just_saved = True
 
     def _write(self):
         """Save the commander, and keep a copy of what was saved: being
@@ -1679,6 +1696,9 @@ class AceCommander(PLATFORM.App):
             steer = "STEER: %s (no tilt sensor)" % stick
         items = [steer]
         items.append("CONTROLS: " + TILT_FLIPS[self.tilt_flip])
+        if cmdr and self.mode == "docked" and self._hardcore():   # no saving by itself (build 133)
+            # once saved it says so (Brian, build 135), until Options is left
+            items.insert(0, "COMMANDER SAVED" if self.just_saved else "SAVE COMMANDER")
         if cmdr and self.cmdr is not None and self.mode != "flight":
             items.append("NAME: " + cmdr_name(self.cmdr).upper())     # build 89
         if cmdr and self.cmdr is not None:
@@ -1712,6 +1732,9 @@ class AceCommander(PLATFORM.App):
                 self.od_sel = 0
                 self.od_msg = None
                 self.mode = "odebug"
+        elif item in ("SAVE COMMANDER", "COMMANDER SAVED"):
+            if not left:
+                self._save_now()
         elif item.startswith("NAME"):
             if not left:
                 self._open_name(self.cmdr.name, self._set_name)
@@ -2963,13 +2986,15 @@ class AceCommander(PLATFORM.App):
         name = self.n_name or badge_name().upper()[:12]
         text(ctx, name, 0, -58, 16, (cockpit.GREEN if on else cockpit.WHITE) if self.n_name
              else cockpit.GREY)
-        self._draw_rows(ctx, self.level, self.n_hardcore, self.n_sel - 1, -36, 54)
+        self._draw_rows(ctx, self.level, self.n_hardcore, self.n_sel - 1, -36, 54, True)
         if self.n_sel == 1:
             top = commander.thresholds(self.level)[-1]
             text(ctx, "top rank at %d kills" % top, 0, 58, 11, cockpit.GREY)
         if self.cmdr is not None:
             text(ctx, "replaces your saved commander", 0, 72, 11, cockpit.RED)
-        text(ctx, "C: name   F: back" if on else "C: start   F: back", 0, 86, 12, cockpit.GREY)
+        # on LEVEL / HARDCORE left / right changes it, C starts from any line (build 134:
+        # C on HARDCORE: OFF started a standard commander)
+        text(ctx, "C: name   F: back" if on else "< > change   C: start", 0, 86, 12, cockpit.GREY)
 
     def _draw_fmenu(self, ctx):
         text = cockpit.text

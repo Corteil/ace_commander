@@ -1463,3 +1463,18 @@ what is now `ace.py` (renamed in build 50).
    TUFTY drive's apps/) and `ace_commander-pi-V.zip` (source with hosts/pi, README_PI.txt),
    attached to the GitHub release. Compiled code needs the badge's MicroPython (1.28's mpy
    format): a firmware with another would need a new release.
+   **Build 133** (Brian: "Hardcore mode, auto save switched off. Add a save option to the docking
+   menu"). A Hardcore commander isn't saved by itself any more: not on docking, launching,
+   leaving for the title, or a mission's news (`ace._auto_write`; `rules.manual_save` names it).
+   Docked, Options has SAVE COMMANDER at the top (C saves; it reads "SAVE COMMANDER: SAVED"
+   until Options is left). Being destroyed goes back to the last save, as before. Still saved
+   in Hardcore: a new commander as it's made, and the settings and DEBUG changes that write
+   one field into the last save (`_write_setting`). Standard mode unchanged. Test in
+   `tests/test_hardcore.py`.
+   **Build 134** (Brian couldn't find SAVE COMMANDER: his "Hardcore" commander was saved with
+   HARDCORE off; on NEW COMMANDER C starts from any line, so C on HARDCORE: OFF started a
+   standard one). The hint there reads "< > change   C: start" on LEVEL and HARDCORE, and the
+   HARDCORE note "ECM, missiles, saving by hand" (practice's page keeps "ECM by hand, armed
+   missiles": practice saves nothing).
+   **Build 135** (Brian: "when the game is saved the menu option should say COMMANDER SAVED"):
+   the line reads COMMANDER SAVED after C, until Options is left (C there saves again).

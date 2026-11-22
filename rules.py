@@ -13,6 +13,9 @@ and Hardcore Mode turns them all on. Each flag can be set by hand for testing or
     manual_docking        docking is always by hand (the MANUAL style): no assisted tractor beam, no
                           automatic docking; only a docking computer you have bought flies you in
     galactic_hyperspace   the galactic hyperdrive from a key rather than a menu            [not built]
+    manual_save           no saving by itself (on docking, launching, leaving for the title or
+                          a mission's news): only Options > SAVE COMMANDER while docked saves, and
+                          being destroyed goes back to that save (Brian, build 133)
 
 Already in the game, so not Hardcore flags: the four views (front, rear, left, right: in every mode,
 changed from the in-flight menu or by keyboard, with a laser fitted to each), the DOCKING setting itself
@@ -20,7 +23,8 @@ changed from the in-flight menu or by keyboard, with a laser fitted to each), th
 mass lock, no ship or missile in radar range, no cabin heat), and saving only when docked (build 35).
 """
 
-FLAGS = ("manual_ecm", "missile_lock_required", "manual_docking", "galactic_hyperspace")
+FLAGS = ("manual_ecm", "missile_lock_required", "manual_docking", "galactic_hyperspace",
+         "manual_save")
 
 
 class GameRules:
