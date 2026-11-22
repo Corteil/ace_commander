@@ -1476,3 +1476,5 @@ what is now `ace.py` (renamed in build 50).
    standard one). The hint there reads "< > change   C: start" on LEVEL and HARDCORE, and the
    HARDCORE note "ECM, missiles, saving by hand" (practice's page keeps "ECM by hand, armed
    missiles": practice saves nothing).
+   **Build 135** (Brian: "when the game is saved the menu option should say COMMANDER SAVED"):
+   the line reads COMMANDER SAVED after C, until Options is left (C there saves again).

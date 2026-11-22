@@ -383,7 +383,7 @@ for hard in (False, True):
     a.dock.osel = 0
     a.dock.change_option()
     assert on_file() == start + 500, "SAVE COMMANDER saves"
-    assert a._settings(True)[0] == "SAVE COMMANDER: SAVED"
+    assert a._settings(True)[0] == "COMMANDER SAVED"
     bs_texts(a)                     # it fits on the round screen
     a.cmdr.cash += 1000
     if a.game is None:

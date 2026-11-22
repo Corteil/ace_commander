@@ -1202,7 +1202,7 @@ class AceCommander(PLATFORM.App):
             self._write()
 
     def _save_now(self):
-        """Options > SAVE COMMANDER (Hardcore, docked)."""
+        """Options > SAVE COMMANDER (Hardcore, docked): it then reads COMMANDER SAVED."""
         self._write()
         self.just_saved = True
 
@@ -1697,7 +1697,8 @@ class AceCommander(PLATFORM.App):
         items = [steer]
         items.append("CONTROLS: " + TILT_FLIPS[self.tilt_flip])
         if cmdr and self.mode == "docked" and self._hardcore():   # no saving by itself (build 133)
-            items.insert(0, "SAVE COMMANDER" + (": SAVED" if self.just_saved else ""))
+            # once saved it says so (Brian, build 135), until Options is left
+            items.insert(0, "COMMANDER SAVED" if self.just_saved else "SAVE COMMANDER")
         if cmdr and self.cmdr is not None and self.mode != "flight":
             items.append("NAME: " + cmdr_name(self.cmdr).upper())     # build 89
         if cmdr and self.cmdr is not None:
@@ -1731,7 +1732,7 @@ class AceCommander(PLATFORM.App):
                 self.od_sel = 0
                 self.od_msg = None
                 self.mode = "odebug"
-        elif item.startswith("SAVE COMMANDER"):
+        elif item in ("SAVE COMMANDER", "COMMANDER SAVED"):
             if not left:
                 self._save_now()
         elif item.startswith("NAME"):
