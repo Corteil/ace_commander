@@ -1506,3 +1506,4 @@ what is now `ace.py` (renamed in build 50).
    0.48. Then ("they should be the same colour as the Tufty and Pi versions"): near white, the
    Pi dashboard's `SCAN_RGB` (0.85, 0.85, 0.9), and the Tufty's scanner and compass, which were
    still the dim grey, use `RADAR_GRID` too.
+   **Release 0.4.2** (2026-11-22): builds 136-139, by `tools/make_release.py 0.4.2 --push`.
