@@ -422,4 +422,24 @@ a.cmdr.hardcore = False             # (DEBUG can switch it off again)
 a._start_flight(True)
 assert not a.game.rules.hardcore and a.game.docking == "B", a.game.docking
 print("HARDCORE changed since the last flight: its rules and docking: ok")
+
+# ---- NEW COMMANDER starts with nothing left from before (build 138)
+a._dock()
+a._start_flight(True)
+a.target = 5
+a.banked = 3
+a.fsub = "status"
+old_game = a.game
+a.mode = "menu"
+choose(a, "NEW COMMANDER")
+a.n_sel = 2
+tick(a, fresh=["RIGHT"])            # HARDCORE: ON
+assert a.n_hardcore
+tick(a, fresh=["CONFIRM"])          # C: start
+assert a.mode == "docked" and a.cmdr.hardcore, a.mode
+assert a.game is None and a.target is None and a.banked == 0 and a.fsub is None, \
+    (a.game is old_game, a.target, a.banked, a.fsub)
+a._start_flight(True)
+assert a.game is not old_game and a.game.rules.manual_docking and a.game.docking == "A"
+print("NEW COMMANDER: nothing carried over: ok")
 print("ALL HARDCORE TESTS PASSED")

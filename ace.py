@@ -634,6 +634,7 @@ class AceCommander(PLATFORM.App):
                 elif self.n_sel == 2:
                     self.n_hardcore = not self.n_hardcore
             elif confirm:
+                self._forget_flight()   # nothing carries over from before (build 138)
                 self.cmdr = commander.Commander(self.level)
                 self.cmdr.name = self.n_name or badge_name().upper()[:12]
                 self.cmdr.hardcore = self.n_hardcore    # fixed from now on (DEBUG can change it)
@@ -1130,6 +1131,46 @@ class AceCommander(PLATFORM.App):
             return True
         self.held_t[name] = t
         return False
+
+    def _forget_flight(self):
+        """A new commander starts with nothing left from before (Brian, build 138):
+        no flight carried on (its rules, docking style, ship, kills), no target,
+        jump, witchspace, open screen or chart, and nothing banked. Kept: the
+        settings (options.json), the galaxy (remade if it differs) and the
+        tilt sensor's level."""
+        self.game = None
+        self.career = False     # an old commander's flight banks nothing into it
+        self.docked = True
+        self.banked = 0
+        self.banked_cash = 0
+        self.saved = None
+        self.saved_over = False
+        self.just_saved = False
+        self.paused = False
+        self.fmenu = 0
+        self.fsub = None
+        self.top = 0
+        self.fmarket = None
+        self.chart = None
+        self.data_of = None
+        self.finder = None
+        self.tdialog = None
+        self.find_chart = None
+        self.target = None
+        self.jump_to = None
+        self.witch = None
+        self.misjump = False
+        self.brief = None
+        self.eject_t = 0.0
+        self.fire_lock = False
+        self.dgroup = None
+        self.debug_from = None
+        self.dock = None
+        self.tunnel = None
+        self.glow = 0.0
+        self.jump_leds = [0.0] * 13
+        self.jump_lit = False
+        self._bps = {}
 
     def _hardcore(self):
         """The commander's HARDCORE (picked with them, fixed but for DEBUG)."""

@@ -1493,3 +1493,9 @@ what is now `ace.py` (renamed in build 50).
    flew with a standard one's rules: ASSISTED docking, the tractor beam. `_start_flight` now
    starts afresh when HARDCORE differs from the last flight's, for a commander as for practice.
    Test in `tests/test_hardcore.py`.
+   **Build 138** (Brian: "when a new commander is created all flags should be reset").
+   `ace._forget_flight()` on NEW COMMANDER: the game left from before is dropped (its rules,
+   docking style, ship, kills; a part-way practice fight too), and the target, countdown,
+   witchspace, open screen / chart / search, banked kills and cash, last save, DEBUG page
+   and LED effects are cleared. Kept: the settings (options.json), the galaxy (remade if it
+   differs), the tilt sensor's level. Test in `tests/test_hardcore.py`.
