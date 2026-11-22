@@ -85,7 +85,7 @@ def _stalk(ctx, bx, by, h, size):
 
 
 def _scanner(ctx, g):
-    ctx.rgb(*RULE)
+    ctx.rgb(*ck.RADAR_GRID)     # as the badge's and the Pi's (build 139)
     for px, py in _RING_OUT:
         ctx.rectangle(px, py, 1.5, 1.5).fill()
     for px, py in _RING_IN:
@@ -119,7 +119,7 @@ def _scanner(ctx, g):
 
 
 def _compass(ctx, sp):
-    ctx.rgb(*RULE)
+    ctx.rgb(*ck.RADAR_GRID)     # as the scanner (build 139)
     for px, py in _COMPASS:
         ctx.rectangle(px, py, 1.5, 1.5).fill()
     st = sp.station

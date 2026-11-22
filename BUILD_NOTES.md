@@ -1502,5 +1502,7 @@ what is now `ace.py` (renamed in build 50).
    map should be reset to the first galaxy as well"): the galaxy is dropped too and made afresh
    for the new commander, galaxy 1.
    **Build 139** (Brian: "the radar grid should be brighter on the badge"): the round HUD's radar
-   ellipse and cross, and the compass ring beside it, are `cockpit.RADAR_GRID` (0.6, 0.6, 0.72),
-   was 0.38, 0.38, 0.48. The Pi's Elite and the Tufty's dashboards have their own radars.
+   ellipse and cross, and the compass ring beside it, are `cockpit.RADAR_GRID`, was 0.38, 0.38,
+   0.48. Then ("they should be the same colour as the Tufty and Pi versions"): near white, the
+   Pi dashboard's `SCAN_RGB` (0.85, 0.85, 0.9), and the Tufty's scanner and compass, which were
+   still the dim grey, use `RADAR_GRID` too.

@@ -45,8 +45,9 @@ RADAR_Y = 88
 RADAR_RX = 58
 RADAR_RY = 24
 RADAR_RANGE = 10000.0
-RADAR_GRID = (0.6, 0.6, 0.72)   # the radar's ellipse and cross (Brian, build 139: brighter
-                                # on the badge; was 0.38, 0.38, 0.48)
+RADAR_GRID = (0.85, 0.85, 0.9)  # the radar's ellipse and cross and the compass ring: near
+                                # white, the same on every device (Brian, build 139; the Pi's
+                                # SCAN_RGB; was 0.38, 0.38, 0.48 on the badge and the Tufty)
 _RADAR = tuple(
     (RADAR_RX * math.cos(i * TAU / 24) - 0.75, RADAR_Y + RADAR_RY * math.sin(i * TAU / 24) - 0.75)
     for i in range(24)
