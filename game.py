@@ -148,6 +148,8 @@ SUN_HEAT = 36.0
 FATAL_CABIN = 255           # as Elite (main flight loop part 15): past this the heat kills you,
                             # about 0.91 sun radii from its centre; the sun has no surface to hit
 SCOOP_TEMP = 224
+SCOOP_ALT = 2000.0          # and no higher than this above the sun's surface (world units),
+                            # whatever the cabin's heat: a fixed skimming height (Brian, build 143)
 SUN_CHECK = 1.0
 
 # Phase 5: traders, police and legal status, as the original (BBC Micro disc
@@ -773,6 +775,7 @@ class Game:
         self.docked = False    # set on reaching the station; whoever is watching takes over
         self.cabin = COOL_CABIN  # the cabin temperature, 30 in deep space to 255
         self.scooping = False  # skimming fuel from the sun just now
+        self.full_said = False # FUEL FULL said on this pass through the scooping band
         self.sun_t = SUN_CHECK  # time to the next fuel scoop
         self.tractor = False   # docking B: the station is drawing you in
         self.bump_t = 0.0      # > 0 just after hitting the station (no second hit meanwhile)
@@ -1130,20 +1133,25 @@ class Game:
             if not self.god and not self.over:
                 self._hurt(1e6)         # too hot: as Elite, the end
                 return
-        if self.cabin < SCOOP_TEMP:
+        alt = math.sqrt(k) * sp.sr - sp.sr      # height above the surface
+        low = self.cabin >= SCOOP_TEMP and alt <= SCOOP_ALT
+        if not low:
             self.scooping = False       # out of the band: stops at once
+            self.full_said = False
         self.sun_t -= dt
         if self.sun_t > 0:
             return
         self.sun_t = SUN_CHECK
         self.scooping = False
-        if (self.cabin >= SCOOP_TEMP and self.fuel_scoops and self.refuel is not None
-                and not self.over):
+        if low and self.fuel_scoops and self.refuel is not None and not self.over:
             n = int(self.speed) // 8
             if n > 0 and self.refuel(n) > 0:
                 self.scooping = True
                 self.say("FUEL SCOOPS ON", 1.2)
                 self.sfx("beep")    # Elite's message has a beep in it
+            elif n > 0 and not self.full_said:
+                self.full_said = True       # the tank is full: said once a pass (Brian, build 143)
+                self.say("FUEL FULL", 2.0)
 
     def _refused(self, sp, st):
         """Docking at a hostile station: it fails, as in the original. At

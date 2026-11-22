@@ -1552,3 +1552,11 @@ what is now `ace.py` (renamed in build 50).
    silent where Elite is (countdowns, scooping, docking, the bomb, practice's waves and
    upgrades). `test_install` now measures the compiled release tarball (with the badge's
    mpy-cross), not the source.
+   **Build 143** (Brian: "the fuel scoops should stop filling above a fixed point above the sun,
+   even if the cabin temperature is high"; "also add a fuel full message"). Suns are 11,000 to
+   28,000 units in radius, so the heat band (cabin 224, 1.3 radii) reached 3,400 to 8,300 units
+   above the surface. Now the scoops also need to be within `SCOOP_ALT` (2000 units) of the
+   surface (`Game._sun`), marked in yellow on the AL gauge (`cockpit.SCOOP_ALT`, the same). With
+   a full tank in the band: FUEL FULL, once a pass (`Game.full_said`). DEBUG > TO THE SUN now
+   passes half SCOOP_ALT above the surface. Tests in test_game, test_commander, test_leds; a
+   market check in test_commander made safe for a stock of exactly 20 (NONE LEFT).

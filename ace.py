@@ -2454,7 +2454,11 @@ class AceCommander(PLATFORM.App):
             else:
                 g.say("ESCAPE POD AWAY")
         elif item == "TO THE SUN":
-            g.to_sun(1.15, 1.6)     # flying on takes you down through the scooping band
+            # flying on takes you down through the scooping band: half SCOOP_ALT up at the
+            # closest (build 143: the band is a fixed height, whatever the sun's size)
+            sp = g.space
+            k = 1.0 + 0.5 * game.SCOOP_ALT / sp.sr if sp is not None else 1.15
+            g.to_sun(k, 1.6)
         elif item == "TO THE STATION":
             g.to_station()
         elif item == "DOCK NOW":

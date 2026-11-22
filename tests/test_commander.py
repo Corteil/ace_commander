@@ -471,9 +471,30 @@ tx = texts(d)
 assert "CT" in tx and "AL" in tx and "FU" in tx and g.fuel == d.cmdr.fuel
 fuel = d.cmdr.fuel
 d.cmdr.fuel = 69
+said = set()
 for _ in range(int(2.5 / 0.04)):
     tick(d, held=["F"])
+    said.add(g.msg)
 assert d.cmdr.fuel == 70, "up to a full tank"
+assert "FUEL FULL" in said, ("then FUEL FULL (build 143)", said)
+# a fixed skimming height (build 143): hot enough, but above SCOOP_ALT, nothing goes in
+sp = g.space
+d.cmdr.fuel = 40
+sp.sx, sp.sy, sp.sz = 0.0, 0.0, sp.sr + game.SCOOP_ALT + 100.0
+g.sun_t = 0.0
+g.speed = 40.0
+tick(d, held=["F"])
+assert g.cabin >= game.SCOOP_TEMP, ("still in the heat", g.cabin, sp.sr)
+for _ in range(int(2.5 / 0.04)):
+    sp.sx, sp.sy, sp.sz = 0.0, 0.0, sp.sr + game.SCOOP_ALT + 100.0
+    tick(d)
+assert d.cmdr.fuel == 40 and not g.scooping, ("above SCOOP_ALT: no fuel", d.cmdr.fuel)
+sp.sx, sp.sy, sp.sz = 0.0, 0.0, sp.sr + game.SCOOP_ALT - 300.0
+for _ in range(int(2.5 / 0.04)):
+    sp.sx, sp.sy, sp.sz = 0.0, 0.0, sp.sr + game.SCOOP_ALT - 300.0
+    tick(d)
+assert d.cmdr.fuel > 40, ("below it: fuel", d.cmdr.fuel)
+print("fuel scoops: a fixed height, FUEL FULL: ok")
 g.fuel_scoops = False; d.cmdr.extras.remove("scoops")
 debug(d, "TO THE STATION"); tick(d, fresh=["A"]); tick(d)
 tx = texts(d)
@@ -768,8 +789,8 @@ for _ in range(60):
     tick(e, held=["C"])
 tick(e)
 assert c.cargo[0] == min(20, food0) and (d.msg in ("HOLD FULL", "NONE LEFT") or c.cargo[0] < 20), (c.cargo[0], d.msg)
-if c.cargo[0] == 20:
-    tick(e, fresh=["C"]); assert d.msg == "HOLD FULL"
+if c.cargo[0] == 20 and food0 > 20:     # (with exactly 20 in stock it says NONE LEFT)
+    tick(e, fresh=["C"]); assert d.msg == "HOLD FULL", d.msg
 # gold is by the kilo and doesn't use the hold
 for _ in range(5):
     tick(e, fresh=["JOYDOWN"])
