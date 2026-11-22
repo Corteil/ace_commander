@@ -1478,3 +1478,5 @@ what is now `ace.py` (renamed in build 50).
    missiles": practice saves nothing).
    **Build 135** (Brian: "when the game is saved the menu option should say COMMANDER SAVED"):
    the line reads COMMANDER SAVED after C, until Options is left (C there saves again).
+   **Release 0.4.1** (2026-11-22): builds 133-135 (Hardcore saving by hand), by
+   `tools/make_release.py 0.4.1 --push`.
