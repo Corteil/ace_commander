@@ -1,4 +1,4 @@
-"""The game's sounds (builds 140-141): each a short run of tones, so a Qwiic
+"""The game's sounds (builds 140-142): each a short run of tones, so a Qwiic
 buzzer (the badge, the Tufty: buzzer.py) and the Pi (hosts/pi/sound_pi.py)
 play the same tunes.
 
@@ -17,39 +17,48 @@ The game asks for them by name: game.Game.sfx() in flight, ace.py for
 launching and docking; the device plays them (Platform.sound) or not.
 """
 
-NOISE = -3000           # the game's own noise: changing 3000 times a second
+NOISE = -3000           # noise changing 3000 times a second
 
 
-def _sweep(f0, f1, n, ms):
-    """n steps from f0 to f1 Hz, each ms long."""
-    return [(f0 + (f1 - f0) * i // (n - 1), ms) for i in range(n)]
+def _zap(n):
+    """A laser zap, n times over: a low note, then a jump up falling away."""
+    one = [(150, 40, 60)] + [(f, 10, 110) for f in (700, 600, 500, 420, 350, 290, 240, 200)]
+    return one * n
 
 
+def _fade(f, ms, n, top=126):
+    """n steps of f Hz, each ms long, fading from top."""
+    return [(f, ms, top - top * i // n) for i in range(n)]
+
+
+# The game's own sounds (builds 140-142): for the same events as Elite's and in
+# its style, written by ear, not taken from it; silent where Elite is silent.
 OWN = {
-    "laser": (1, [(1800, 20), (1300, 20), (900, 25)]),
-    "hit": (2, [(NOISE, 60)]),
-    "overheat": (2, [(300, 120), (0, 40), (300, 120)]),
-    "hurt": (2, [(220, 50), (170, 70)]),
-    "crash": (4, [(NOISE, 300), (150, 100)]),
-    "explode": (3, [(NOISE, 220)]),
-    "die": (5, [(NOISE, 500), (120, 150), (90, 250)]),
-    "lock": (2, [(2000, 40), (0, 30), (2000, 40)]),
-    "unarm": (2, [(300, 200)]),
-    "missile": (2, _sweep(500, 1600, 6, 25)),
-    "incoming": (4, [(1500, 90), (0, 60), (1500, 90), (0, 60), (1500, 90)]),
-    "ecm": (3, [(3000, 25), (1500, 25)] * 5),
-    "bomb": (5, [(NOISE, 400), (200, 200)]),
-    "tick": (1, [(1000, 50)]),
-    "jump": (5, _sweep(200, 2400, 12, 40)),
-    "scoop": (2, [(1200, 40), (1700, 70)]),
-    "upgrade": (3, [(800, 60), (1000, 60), (1300, 60), (1600, 120)]),
-    "wave": (2, [(600, 80), (900, 140)]),
-    "tractor": (2, [(400, 70), (500, 70), (600, 90)]),
-    "launch": (3, _sweep(250, 1200, 10, 50)),
-    "dock": (3, _sweep(1200, 250, 10, 50)),
+    "laser": (1, _zap(4)),
+    "hit": (2, _fade(-4000, 250, 5)),
+    "explode": (3, _fade(-4000, 250, 5)),
+    "hurt": (2, [(300, 30, 50), (380, 30, 80), (300, 30, 110), (380, 30, 80)] * 3),
+    "crash": (4, [(-8000, 200, 126), (-6000, 200, 126), (-4000, 300, 110),
+                  (-2500, 300, 80), (-1500, 300, 40)]),
+    "die": (5, [(-8000, 200, 126), (-6000, 200, 126), (-4000, 300, 110),
+                (-2500, 300, 80), (-1500, 300, 40)]),
+    "lock": (2, [(1900, 50)]),
+    "unarm": (2, [(150, 400, 100)]),
+    "beep": (2, [(1900, 50)]),
+    "boop": (2, [(150, 400, 100)]),
+    "missile": (3, [(-2000, 600, 120)]),
+    "incoming": (4, [(-2000, 600, 120)]),
+    "launch": (3, [(-2000, 600, 120)]),
+    "jump": (5, [(-2000, 200, 40), (-6000, 200, 80), (-3000, 300, 110),
+                 (-1500, 400, 80), (-1000, 300, 40)]),
+    "ecm": (3, [(2100, 10, 60), (2400, 10, 90)] * 25),
 }
+# the BBC Micro's layout: tones on 2 and 3, noise on 0 (a sound restarts its channel)
+OWN_CHANNELS = {"laser": 2, "hurt": 2, "lock": 3, "unarm": 3, "beep": 3, "boop": 3, "ecm": 3,
+                "hit": 0, "explode": 0, "crash": 0, "die": 0, "missile": 0, "incoming": 0,
+                "launch": 0, "jump": 0}
 SOUNDS = OWN
-CHANNELS = {}
+CHANNELS = OWN_CHANNELS
 ELITE = False           # Elite's sounds in use
 
 try:

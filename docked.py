@@ -40,6 +40,18 @@ def _ly(d):
 
 
 class Docked:
+
+    @property
+    def msg(self):
+        """The last trade's message (or why it didn't happen), or None."""
+        return self._msg
+
+    @msg.setter
+    def msg(self, v):
+        self._msg = v
+        if v is not None:
+            self.msg_n += 1     # each message counted: ace.py beeps, as Elite's dn2
+
     def __init__(self, cmdr, gal, target=None, goods=None, equip=None, ship=None,
                  options=None, bps=None):
         """ship is your ship's blueprint, for the Repair Shop, which is shown
@@ -84,7 +96,8 @@ class Docked:
             self.yard = ships.for_sale(cmdr.galaxy, cmdr.system, h.tech, h.government)
         self.ysel = 0           # the ship picked at the Shipyard
         self.hsel = 0           # and in the Hangar (0: the one you fly)
-        self.msg = None         # why the last trade didn't happen
+        self._msg = None        # why the last trade didn't happen (msg)
+        self.msg_n = 0          # messages so far
         self.msg_t = 0.0
         self.sold = False       # the message says what Inventory's sell all made
         self.tab = 0

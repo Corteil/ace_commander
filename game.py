@@ -71,6 +71,9 @@ MISSILE_DAMAGE = 150.0
 JUMP_COUNT = 5.0           # seconds of countdown before a hyperspace jump
 WARP_TIME = 1.2            # seconds the streaks last on arriving
 LOCK_TIME = 2.0            # seconds a ship must stay in the sights before a missile locks
+ENERGY_LOW = 20.0          # energy banks (hull) below this: ENERGY LOW, as Elite's under 50 of 255
+LOW_EVERY = 2.0            # seconds between ENERGY LOW warnings (Elite: every 32 main loops)
+REFUSE_EVERY = 1.0         # seconds between the jump drive's refusal beeps, while held
 AUTO_LOCK_TIMES = (2.0, 3.0, 4.0)  # the lock with auto_missile, by level: EASY, NORMAL, HARD
                        # (no missile button; Brian, builds 112 and 114)
 MISSILE_SPEED = 1100.0     # world units per second
@@ -737,6 +740,8 @@ class Game:
         self.time = 0.0
         self.since_hit = 9.0
         self.flash = 0.0       # > 0 just after the player is hit
+        self.refuse_t = 0.0    # until the jump drive's refusal beeps again
+        self.low_t = 0.0       # until ENERGY LOW is said again
         self.over = False
         self.msg = "WAVE 1"
         self.msg_t = 2.5
@@ -1138,6 +1143,7 @@ class Game:
             if n > 0 and self.refuel(n) > 0:
                 self.scooping = True
                 self.say("FUEL SCOOPS ON", 1.2)
+                self.sfx("beep")    # Elite's message has a beep in it
 
     def _refused(self, sp, st):
         """Docking at a hostile station: it fails, as in the original. At
@@ -1478,6 +1484,18 @@ class Game:
                 and throttle > 0 and self.speed >= self.max_speed and self.msg_t <= 0
                 and not self.jumping and self._massed(sp)):
             self.say("MASS LOCKED", 1.0)
+        self.refuse_t -= dt
+        if (sp is not None and not sp.witch and not self.over and throttle > 0
+                and self.speed >= self.max_speed and not self.jumping and self.jump_t <= 0
+                and self.refuse_t <= 0):
+            self.sfx("boop")    # the jump drive refused: Elite's long low beep (WA1)
+            self.refuse_t = REFUSE_EVERY
+        if not self.over:       # Elite: ENERGY LOW, with a beep, while the banks are low
+            self.low_t -= dt
+            if self.hull < ENERGY_LOW and self.low_t <= 0:
+                self.say("ENERGY LOW", 1.5)
+                self.sfx("beep")
+                self.low_t = LOW_EVERY
         if self.jumping or (self.autodock and self.speed >= self.max_speed and self.auto_far):
             fwd *= JUMP_K
         self.fwd = int(fwd)
@@ -1830,6 +1848,7 @@ class Game:
                 if o.t > 0:
                     self._hurt(30.0 * self.damage_k)
                 self._boom(o.x, o.y, o.z, 8)
+                self.sfx("crash")       # a missile exploding: Elite's EXNO3 (TA34)
                 o.dead = True
                 return
             _turn(m, -o.x / d, -o.y / d, -o.z / d, 2.2 * dt)
@@ -1838,6 +1857,7 @@ class Game:
             o.t -= dt
             if o.t <= 0:
                 self._boom(o.x, o.y, o.z, 8)
+                self.sfx("crash")       # a missile exploding: Elite's EXNO3 (TA34)
                 o.dead = True
                 return
             t = o.target
@@ -1852,6 +1872,7 @@ class Game:
                     return
                 if dd < t.bp.radius + 90:
                     self._boom(o.x, o.y, o.z, 8)
+                    self.sfx("crash")   # a missile exploding: Elite's EXNO3 (TA34)
                     o.dead = True
                     self._provoke(t)
                     t.energy -= MISSILE_DAMAGE
@@ -1936,6 +1957,7 @@ class Game:
                 else:
                     self._boom(o.x, o.y, o.z, 6)
                     self.say("HOLD FULL")
+                    self.sfx("crash")   # a canister lost: Elite's EXNO3
                 continue
             self.sfx("crash")
             self._hurt(10.0 + self.speed * 0.5)

@@ -18,10 +18,15 @@ them (NOISE, BEEP, EXNO, EXNO3 in the flight source):
     hit      24 our laser strikes a ship (EXNO)
     explode  24 a ship we killed (EXNO2 -> EXNO)
     hurt     8  lasers hitting our shields
-    crash    16 + 24 together: a collision, hit with no shields left (EXNO3)
+    crash    16 + 24 together: a collision, hit with no shields left, a missile
+                exploding, a canister lost scooping (EXNO3)
     die      16 + 24 together (DEATH -> EXNO3)
     lock     32 short high beep: missile locked on (BEEP)
     unarm    40 long low beep: missile unarmed
+    beep     32 short high beep: FUEL SCOOPS ON, ENERGY LOW (their {beep}), and
+                docked after a trade or a refusal (dn, dn2)
+    boop     40 long low beep: the in-system jump refused (WA1), a search that
+                finds nothing (HME6)
     missile  48 our missile launched (FRMIS)
     incoming 48 an enemy's missile launched (SFRMIS)
     launch   48 launching from the station (LAUN)
@@ -51,6 +56,8 @@ EVENTS = {      # event: (priority, the Elite sound numbers played together)
     "die": (5, (24, 16)),
     "lock": (2, (32,)),
     "unarm": (2, (40,)),
+    "beep": (2, (32,)),
+    "boop": (2, (40,)),
     "missile": (3, (48,)),
     "incoming": (4, (48,)),
     "launch": (3, (48,)),

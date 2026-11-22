@@ -1537,3 +1537,18 @@ what is now `ace.py` (renamed in build 50).
    noise at that rate; `CHANNELS` (the Pi restarts a sound on its channel, Elite's flush). The
    buzzer plays the first part, levels as its volume 1-4, and skips steps shorter than a frame
    to keep time; the badge checks for the buzzer before importing it (heap).
+   **Build 142** (Brian: "the sounds should be as close to Elite as possible in both games; add
+   the missing sounds and warnings"). Every NOISE / BEEP / EXNO call in both halves of the
+   source, flight and docked, now has its event: `beep` (32, short high: FUEL SCOOPS ON and
+   ENERGY LOW, whose messages hold a {beep}, and docked after each trade message or refusal,
+   Elite's dn / dn2: `Docked.msg_n` counts them), `boop` (40, long low: the jump drive refused,
+   WA1, once a second while speed is held up at full; a search that finds nothing, HME6),
+   `crash` (EXNO3) also for a missile exploding (TA34) and a canister lost scooping (MA59).
+   New warning ENERGY LOW (Elite: energy under 50 of 255, checked every 32 main loops): the
+   hull under `ENERGY_LOW` (20), every `LOW_EVERY` (2 s). The game's own sounds (no
+   elite_sfx.py, or DATA: OWN, so the store release) were rewritten for the same events in
+   Elite's style, by ear, not taken from it (a repeating low-then-falling zap, a shield warble,
+   noise bursts, 1.9 kHz and 150 Hz beeps), on the same channel layout (`OWN_CHANNELS`), and
+   silent where Elite is (countdowns, scooping, docking, the bomb, practice's waves and
+   upgrades). `test_install` now measures the compiled release tarball (with the badge's
+   mpy-cross), not the source.

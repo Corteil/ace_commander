@@ -74,7 +74,8 @@ buzzer.ticks_ms = lambda: now[0]
 assert buzzer.find(FakeI2C()) and not buzzer.find(FakeI2C(False))
 bus = FakeI2C()
 b = buzzer.Buzzer(bus)
-b.play("scoop")             # (1200, 40), (1700, 70)
+sfx.SOUNDS = dict(sfx.OWN, two=(2, [(1200, 40), (1700, 70)]))
+b.play("two")               # (1200, 40), (1700, 70)
 assert bus.writes[0] == (buzzer.REG_FREQ, bytes([1200 >> 8, 1200 & 255, buzzer.VOLUME, 0, 40]))
 assert bus.writes[1] == (buzzer.REG_ACTIVE, b"\x01")
 b.step(); assert len(bus.writes) == 2, "not until the tone's time is up"
@@ -133,7 +134,24 @@ g.shield = 100.0
 g.hull = 100.0
 g.start_jump()
 assert "tick" in g.sounds
-print("Game.sfx: laser, hurt, countdown: ok")
+g.jump_t = 0.0
+# ENERGY LOW, as Elite: the message and a short high beep while the banks are low (build 142)
+del g.sounds[:]
+g.hull = game.ENERGY_LOW - 1
+g.step(0.04, 0, 0, 0, False, False)
+assert g.msg == "ENERGY LOW" and "beep" in g.sounds, (g.msg, g.sounds)
+del g.sounds[:]
+g.step(0.04, 0, 0, 0, False, False)
+assert "beep" not in g.sounds, "not every frame"
+g.hull = 100.0
+# a missile exploding: Elite's crash sound
+del g.sounds[:]
+m = game.Obj(g.types["MISSILE"], "missile", 0.0, 0.0, 100.0)
+m.t = 5.0
+g.objs.append(m)
+g.step(0.04, 0, 0, 0, False, False)
+assert "crash" in g.sounds, g.sounds
+print("Game.sfx: laser, hurt, countdown, ENERGY LOW, missile exploding: ok")
 
 
 # ---- ace hands them to the device, Options > SOUND
@@ -170,6 +188,22 @@ dev.played[:] = []
 a.game.sfx("explode")
 bs.tick(a)
 assert dev.played == [] and not a.game.sounds, "SOUND: OFF plays nothing"
+# docked: a beep with each trade message or refusal, as Elite's dn2 (build 142)
+from ace_commander import commander
+a._change("SOUND: OFF", False)
+a.cmdr = commander.Commander(1)
+a._write()
+a._dock()
+bs.tick(a)
+dev.played[:] = []
+a.dock.msg = "NOT ENOUGH CASH"
+bs.tick(a)
+a.dock.msg = "NOT ENOUGH CASH"      # the same refusal again: another beep
+bs.tick(a)
+assert dev.played.count("beep") == 2, dev.played
+bs.tick(a)
+assert dev.played.count("beep") == 2, "not again without a new message"
+a._change("SOUND: ON", False)
 b2 = ace_commander.AceCommander()
 assert not b2.use_sound, "kept in options.json"
 a._change("SOUND: OFF", False)

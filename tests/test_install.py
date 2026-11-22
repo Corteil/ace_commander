@@ -39,10 +39,29 @@ for d in ("tests/test_app.py", "tools/shipmaker.py", "CLAUDE.md"):
 
 # only the app: no tests, tools, notes, or anything made from Elite
 assert "app.py" in names and "tildagon.toml" in names and "LICENSE" in names
-for bad in ("ship_data.py", "game_data.py", "CLAUDE.md", "DESIGN.md", "deploy.bat"):
+for bad in ("ship_data.py", "game_data.py", "elite_sfx.py", "CLAUDE.md", "DESIGN.md", "deploy.bat"):
     assert bad not in names, bad
 assert not any(n.startswith(("tests", "tools")) for n in names), names
-assert len(tar) < 600 * 1024, "the badge unpacks the whole tarball in memory: %d" % len(tar)
+# The badge unpacks the whole tarball in memory (under 600 KB). Since 0.4.0 a release is
+# the compiled build (tools/make_release.py), not this source, so that is what's measured,
+# with the badge's own mpy-cross when it's here (build 142)
+sys.path.insert(0, os.path.join(REPO, "tools"))
+import argparse, tempfile                       # noqa: E401,E402
+import build_mpy                                # noqa: E402
+if os.path.exists(build_mpy.PI_MPY_CROSS):
+    out = os.path.join(tempfile.mkdtemp(prefix="ace_rel_"), "ace_commander")
+    import contextlib
+    with contextlib.redirect_stdout(io.StringIO()):
+        build_mpy.build(argparse.Namespace(out=out, elite=False, elite_only=False,
+                                           mpy_cross=None, any_compiler=False))
+    rb = io.BytesIO()
+    with tarfile.open(fileobj=rb, mode="w", format=tarfile.USTAR_FORMAT) as t:
+        t.add(out, arcname="Corteil-ace_commander")
+    rel = len(rb.getvalue())
+    assert rel < 600 * 1024, "the badge unpacks the whole tarball in memory: %d" % rel
+    print("compiled release tarball: %d KB (under 600): ok" % (rel // 1024))
+else:
+    print("no badge mpy-cross here: the compiled release's size not checked")
 toml = open(os.path.join(TMP, NAME, "tildagon.toml")).read()
 for key in ('license = "MIT"', 'url = "https://github.com/Corteil/ace_commander"',
             'category = "Games"'):

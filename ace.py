@@ -302,6 +302,7 @@ class AceCommander(PLATFORM.App):
         # the commander as last saved, as JSON: being destroyed goes back to it
         self.saved = json.dumps(self.cmdr.to_dict()) if self.cmdr is not None else None
         self.just_saved = False     # Hardcore: SAVE COMMANDER pressed since Options opened
+        self.dock_msg = 0           # the docked screens' message count (a beep for each new one)
         self.level = 1          # the level showing on the new-commander screen
         self.p_level = 1        # combat practice's level (options.json)
         self.p_hardcore = False # combat practice's own HARDCORE, apart from the commander's
@@ -872,6 +873,7 @@ class AceCommander(PLATFORM.App):
                         (c.system * 53 + 29) % 7)                   # and the planet's
 
     def _make_dock(self):
+        self.dock_msg = 0       # its messages are counted afresh (a beep for each)
         self.dock = docked.Docked(self.cmdr, self.galaxy, self.target, GOODS, EQUIP,
                                   self._ship_bp(),
                                   (lambda: self._settings(True), self._change),
@@ -983,6 +985,9 @@ class AceCommander(PLATFORM.App):
         d = self.dock
         hit = self.pad.hit
         d.tick(dt)
+        if d.msg_n != self.dock_msg:
+            self._play("beep")          # a trade done or refused: Elite's short high beep
+        self.dock_msg = d.msg_n
         if not d.in_options:
             self.just_saved = False     # "SAVED" shows until Options is left
         if self._update_find(cancel, confirm):
@@ -2762,6 +2767,8 @@ class AceCommander(PLATFORM.App):
             if r is False:
                 self._found(None)
             elif r is not None:
+                if not found:
+                    self._play("boop")      # a search that finds nothing: Elite's long low beep
                 self._found(found[0] if found else None)
             if r is not None or not driven:
                 self.pad.clear()    # the dialog has the buttons (or the one that closed it)
@@ -2779,6 +2786,8 @@ class AceCommander(PLATFORM.App):
         elif hit("j_down"):
             f.pick(1)
         elif confirm:
+            if f.chosen() is None:
+                self._play("boop")      # nothing found (Elite's HME6)
             self._found(f.chosen())
         elif cancel:
             self._found(None)
