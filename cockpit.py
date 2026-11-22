@@ -45,6 +45,8 @@ RADAR_Y = 88
 RADAR_RX = 58
 RADAR_RY = 24
 RADAR_RANGE = 10000.0
+RADAR_GRID = (0.6, 0.6, 0.72)   # the radar's ellipse and cross (Brian, build 139: brighter
+                                # on the badge; was 0.38, 0.38, 0.48)
 _RADAR = tuple(
     (RADAR_RX * math.cos(i * TAU / 24) - 0.75, RADAR_Y + RADAR_RY * math.sin(i * TAU / 24) - 0.75)
     for i in range(24)
@@ -1705,7 +1707,7 @@ def _planet_gauge(ctx, sp):
 
 
 def _compass(ctx, sp):
-    ctx.rgb(0.38, 0.38, 0.48)
+    ctx.rgb(*RADAR_GRID)        # its ring as bright as the radar's (build 139)
     for px, py in _COMPASS:
         ctx.rectangle(px, py, 1.5, 1.5).fill()
     st = sp.station
@@ -1773,7 +1775,7 @@ def _hud(ctx, g, ms=None, ring=True):
         ctx.rgb(*(GREEN if i < g.missiles else DIM)).rectangle(-70 + i * 9, 56, 6, 4).fill()
 
     # radar: across is left-right, up the ellipse is ahead, sticks show height
-    ctx.rgb(0.38, 0.38, 0.48)
+    ctx.rgb(*RADAR_GRID)
     for px, py in _RADAR:
         ctx.rectangle(px, py, 1.5, 1.5).fill()
     ctx.rectangle(-RADAR_RX, RADAR_Y - 0.5, 2 * RADAR_RX, 1).fill()

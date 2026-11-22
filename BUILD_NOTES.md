@@ -1501,3 +1501,6 @@ what is now `ace.py` (renamed in build 50).
    differs), the tilt sensor's level. Test in `tests/test_hardcore.py`. Then (Brian: "the galaxy
    map should be reset to the first galaxy as well"): the galaxy is dropped too and made afresh
    for the new commander, galaxy 1.
+   **Build 139** (Brian: "the radar grid should be brighter on the badge"): the round HUD's radar
+   ellipse and cross, and the compass ring beside it, are `cockpit.RADAR_GRID` (0.6, 0.6, 0.72),
+   was 0.38, 0.38, 0.48. The Pi's Elite and the Tufty's dashboards have their own radars.
