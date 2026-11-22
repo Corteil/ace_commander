@@ -1813,13 +1813,8 @@ class AceCommander(PLATFORM.App):
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
         text(ctx, "OPTIONS", 0, -80, 20, cockpit.WHITE)
         items = self._settings(True)
-        y = -50                 # eight lines fit (CONTROLS, NAME)
-        for i, label in enumerate(items):
-            if i == self.omenu % len(items):
-                ctx.rgb(*cockpit.DIM).rectangle(-100, y - 7, 200, 15).fill()
-            text(ctx, label, 0, y, 13, cockpit.GREEN if i == self.omenu % len(items)
-                 else cockpit.GREY)
-            y += 16
+        # eight lines fit above the hints; more scroll (build 131)
+        y = cockpit.menu_lines(ctx, items, self.omenu % len(items), -50, 16, 8, 100)
         if self.cmdr is None:
             text(ctx, "more with a commander", 0, y + 4, 11, cockpit.GREY)
         text(ctx, "< > or C: change", 0, 82, 11, cockpit.GREY)     # below six lines

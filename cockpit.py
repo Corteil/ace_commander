@@ -141,6 +141,30 @@ def number(ctx, value, x, y, font=_BIG, align=0):
     return width
 
 
+def menu_lines(ctx, items, sel, y, step, rows, half_w):
+    """A list of setting lines from y down, sel highlighted, at most rows of
+    them: a longer list scrolls with sel, a small bar above or below saying
+    there is more (Options with TEXT ENTRY has nine lines, the hints sit
+    below eight: build 131)."""
+    n = len(items)
+    top = 0
+    if n > rows:
+        top = sel - rows + 1 if sel >= rows else 0
+        if top > n - rows:
+            top = n - rows
+    for i in range(top, min(n, top + rows)):
+        if i == sel:
+            ctx.rgb(*DIM).rectangle(-half_w, y - 7, 2 * half_w, 15).fill()
+        text(ctx, items[i], 0, y, 13, GREEN if i == sel else GREY)
+        y += step
+    ctx.rgb(*GREY)
+    if top > 0:
+        ctx.rectangle(-8, y - (rows + 1) * step + 2, 16, 2).fill()
+    if top + rows < n:
+        ctx.rectangle(-8, y - step + 10, 16, 2).fill()
+    return y
+
+
 def text(ctx, s, x, y, size, rgb, align=0):
     """Text centred on (x, y), or with align -1 starting at x, 1 ending at x."""
     ctx.font_size = size

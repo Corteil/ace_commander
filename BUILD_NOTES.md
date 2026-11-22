@@ -1444,3 +1444,7 @@ what is now `ace.py` (renamed in build 50).
    **Build 130** (Brian: "the labels on the Pi picker don't match when the gamepad is being
    used"): the picker's own hints had no colons ("C next"), so `relabel` left them; now
    "C: next", "A: done", "F: cancel", which the Pi pad names A, START and B.
+   **Build 131** (Brian: "the hints clash with the menu on Options on the badge"): with TEXT
+   ENTRY, Options has nine lines (docked and the title's), one more than fits above the hints.
+   `cockpit.menu_lines` shows eight and scrolls with the selection, a small bar above / below
+   when there is more.
