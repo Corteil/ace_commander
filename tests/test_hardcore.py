@@ -395,4 +395,31 @@ for hard in (False, True):
     tick(a, fresh=["CANCEL"])       # Status to the title: not saved either
     assert a.mode == "menu" and on_file() == start + 500
 print("Hardcore saves only by SAVE COMMANDER: ok")
+
+# ---- a new Hardcore commander after a standard one's flight docks by hand (build 137:
+# the flight left from the standard one kept its rules, so the tractor beam was on)
+bs.press(())
+a = ace_commander.AceCommander()
+a.cmdr = commander.Commander(1)
+a.cmdr.hardcore = False
+a.cmdr.docking = "B"                # ASSISTED: the tractor beam
+a._write()
+a._dock()
+a._start_flight(True)
+assert not a.game.rules.manual_docking and a.game.docking == "B"
+a._dock()                           # back at the station
+a.cmdr = commander.Commander(1)     # NEW COMMANDER, HARDCORE ON (as ace.py makes one)
+a.cmdr.hardcore = True
+a.cmdr.docking = "B"
+a.career = False
+a._write()
+a._dock()
+a._start_flight(True)
+assert a.game.rules.hardcore and a.game.rules.manual_docking, "Hardcore's rules"
+assert a.game.docking == "A", ("by hand: no tractor beam", a.game.docking)
+a._dock()
+a.cmdr.hardcore = False             # (DEBUG can switch it off again)
+a._start_flight(True)
+assert not a.game.rules.hardcore and a.game.docking == "B", a.game.docking
+print("HARDCORE changed since the last flight: its rules and docking: ok")
 print("ALL HARDCORE TESTS PASSED")

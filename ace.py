@@ -799,7 +799,9 @@ class AceCommander(PLATFORM.App):
         if config.practice_missile is not None:
             g.pickup_missile = config.practice_missile
         elif g.over or career != self.career or g.level != level \
-                or (not career and g.rules.hardcore != self.p_hardcore):   # practice: HARDCORE changed
+                or g.rules.hardcore != (self._hardcore() if career else self.p_hardcore):
+            # HARDCORE changed since the last flight: practice's, or the commander's (build 137:
+            # a new Hardcore commander kept a standard one's rules, tractor beam and all)
             g.set_level(level)
             g.reset()
             self.banked = 0

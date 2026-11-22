@@ -1487,3 +1487,9 @@ what is now `ace.py` (renamed in build 50).
    isn't used then). The chosen line on menu pages (Options, the pause menu and Settings, the
    DEBUG pages, NEW COMMANDER, practice) is green text without the box behind it; the market,
    Equip and shipyard lists keep their row highlight.
+   **Build 137** (Brian: "the tractor beam was on at the space station with Hardcore on"). A
+   launch carries on the `Game` from the last flight and rebuilt its rules only when the level
+   or career changed; a new commander docks at once (career again), so a new Hardcore commander
+   flew with a standard one's rules: ASSISTED docking, the tractor beam. `_start_flight` now
+   starts afresh when HARDCORE differs from the last flight's, for a commander as for practice.
+   Test in `tests/test_hardcore.py`.
