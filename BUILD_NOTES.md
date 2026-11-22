@@ -1507,3 +1507,18 @@ what is now `ace.py` (renamed in build 50).
    Pi dashboard's `SCAN_RGB` (0.85, 0.85, 0.9), and the Tufty's scanner and compass, which were
    still the dim grey, use `RADAR_GRID` too.
    **Release 0.4.2** (2026-11-22): builds 136-139, by `tools/make_release.py 0.4.2 --push`.
+   **Build 140, sound** (Brian: "add sound"; the badge has no speaker and the Tufty 2350 no
+   buzzer, so a SparkFun Qwiic Buzzer on I2C for both, or I2S amp hexpansions later). One table,
+   `sfx.py`: each sound a short run of (Hz, ms) steps (0 a rest, `NOISE` a noise burst) with a
+   priority. The game asks by name (`Game.sfx`, a list `Game.sounds` that `ace._sounds` hands to
+   the device each frame, flying and not paused): laser, overheat, hurt, explode, die, lock,
+   missile, incoming, ecm, bomb, tick (hyperspace and wave countdowns), jump, scoop, upgrade,
+   wave, tractor; ace.py plays launch and dock. `buzzer.py`: the Qwiic Buzzer (0x34, ID 0x5E;
+   register 0x03 frequency / volume / duration, 0x08 on) stepped each frame, never blocking, a
+   lower-priority sound not cutting in. The badge looks on the six hexpansion ports' I2C buses
+   at start (`platform_tildagon._find_buzzer`), the Tufty on its Qw/ST port (`host_tufty._buzzer`).
+   The Pi: `hosts/pi/sound_pi.py` makes each sound once as square waves and noise for pygame's
+   mixer, with `--sound` (added to both desktop shortcuts). Options > SOUND: ON / OFF
+   (options.json "sound") only where there is sound. Platform interface: optional `sound_ok`,
+   `sound(name)`, `sound_step()`. Tests: `tests/test_sound.py` (a stand-in I2C bus), the Pi and
+   Tufty host tests. **Not tried on a real buzzer** (Brian hasn't got one yet).

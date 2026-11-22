@@ -547,6 +547,7 @@ class Game:
     def __init__(self, ships, level=1):
         self.set_level(level)
         self.god = False    # a cheat: hits flash but do no damage
+        self.sounds = []    # sounds asked for this frame (sfx.py's names), which ace.py plays
         self.docking = "C"  # how docking works: see set_docking
         self.view = 0               # 0 front, 1 rear, 2 left, 3 right (Elite's VIEW)
         self.ship_name = "COBRA MK III"     # the ship you fly (ace.py's _ship_name), for the chase view
@@ -789,6 +790,11 @@ class Game:
         self.msg = msg
         self.msg_t = t
 
+    def sfx(self, name):
+        """Ask for a sound (sfx.py): ace.py hands it to the device each frame."""
+        if len(self.sounds) < 4:
+            self.sounds.append(name)
+
     # ---- hyperspace -------------------------------------------------------
 
     def start_jump(self):
@@ -797,6 +803,7 @@ class Game:
         if not self.over:
             self.jump_t = JUMP_COUNT
             self.say("HYPERSPACE %d" % int(JUMP_COUNT), 1.5)
+            self.sfx("tick")
 
     def _hyper(self, dt):
         if self.jump_t <= 0:
@@ -807,9 +814,11 @@ class Game:
             left = int(self.jump_t + 0.999)
             if left != before:
                 self.say("HYPERSPACE %d" % left, 1.5)
+                self.sfx("tick")
             return
         # the jump: everything here is left behind
         self.jump_t = 0.0
+        self.sfx("jump")
         self.autodock = False   # a new system: the docking computer is off
         self.objs = []
         self.new = []
@@ -914,6 +923,7 @@ class Game:
             self.add_thargoid()
         self._measure()
         self.say("WITCHSPACE", 3.0)
+        self.sfx("incoming")
 
     def add_thargoid(self):
         """A Thargoid round you (GTHG), with a Thargon beside it."""
@@ -1182,6 +1192,7 @@ class Game:
             elif slow and cone >= SLOT_CONE_B and head >= HEAD_B and not sp.hostile:
                 self.tractor = True
                 self.say("TRACTOR BEAM")
+                self.sfx("tractor")
             if self.tractor and d > 1.0:
                 # the slot swings round to face you and the station closes in
                 ux, uy, uz = -st.x / d, -st.y / d, -st.z / d
@@ -1341,6 +1352,7 @@ class Game:
             self.ecm_t = 0.5
             self.shield = max(0.0, self.shield - ECM_COST)
             self.say("ECM")
+            self.sfx("ecm")
 
     def fire_ecm(self):
         """The ECM key (Hardcore: the only way the ECM fires). A pulse destroys every enemy
@@ -1360,6 +1372,7 @@ class Game:
         self.ecm_t = 0.5
         self.shield = max(0.0, self.shield - ECM_COST)
         self.say("ECM")
+        self.sfx("ecm")
         return True
 
     def arm_missile(self):
@@ -1405,6 +1418,7 @@ class Game:
                 else:
                     self._kill(o)
         self.say("ENERGY BOMB")
+        self.sfx("bomb")
         return True
 
     # ---- one step of the simulation ---------------------------------------
@@ -1833,6 +1847,7 @@ class Game:
                     self._boom(o.x, o.y, o.z, 8)
                     o.dead = True
                     self.say("ECM")
+                    self.sfx("ecm")
                     return
                 if dd < t.bp.radius + 90:
                     self._boom(o.x, o.y, o.z, 8)
@@ -1859,6 +1874,7 @@ class Game:
         o.t = 12.0
         self.new.append(o)
         self.say("INCOMING MISSILE")
+        self.sfx("incoming")
 
     def _booms(self, dt):
         keep = False
@@ -1915,6 +1931,7 @@ class Game:
                     self.cargo += 1
                     self.score += 25
                     self.say(name)
+                    self.sfx("scoop")
                 else:
                     self._boom(o.x, o.y, o.z, 6)
                     self.say("HOLD FULL")
@@ -1944,6 +1961,7 @@ class Game:
             self.say("MISSILE + SHIELDS")
         else:
             self.say("SHIELDS RECHARGED")
+        self.sfx("scoop")
 
     def _upgrade(self):
         """Combat practice: an upgrade canister fits the next of UPGRADES (and
@@ -1951,6 +1969,7 @@ class Game:
         else the shields are filled. With auto_missile (no missile button) it
         also fills the missile rack (Brian, build 113)."""
         self.shield = 100.0
+        self.sfx("upgrade")
         if self.auto_missile and self.missile_bp:
             self.missiles = self.max_missiles
         if self.upgrade_n < len(UPGRADES):
@@ -1997,6 +2016,7 @@ class Game:
             o.t = 8.0
             self.new.append(o)
             self.say("MISSILE AWAY", 1.0)
+            self.sfx("missile")
 
     def _weapons_view(self, dt, fire, missile):
         self.heat -= LASER_COOL * dt
@@ -2015,6 +2035,7 @@ class Game:
                 self.lock_t += dt
                 if self.lock_t >= (AUTO_LOCK_TIMES[self.level] if self.auto_missile else LOCK_TIME):
                     self.locked = True
+                    self.sfx("lock")
 
         if fire and self.laser is None:
             if self.msg_t <= 0:
@@ -2026,10 +2047,12 @@ class Game:
             self.cool = self.laser_period
             self.beam = 0.07
             self.heat += self.laser_heat
+            self.sfx("laser")
             if self.heat >= 1.0:
                 self.heat = 1.0
                 self.hot = True
                 self.say("LASER OVERHEAT")
+                self.sfx("overheat")
             best = None
             best_z = LASER_RANGE
             for o in (self.objs if self.looking else ()):   # off a space view: no hits
@@ -2140,6 +2163,7 @@ class Game:
         o.dead = True
         bp = o.bp
         self._boom(o.x, o.y, o.z, 8 + 2 * min(bp.explosions, 6))
+        self.sfx("explode")
         if o.role == "constrictor":
             self.got_constrictor = True
         if credit:
@@ -2213,6 +2237,8 @@ class Game:
     def _hurt(self, damage):
         if self.over:
             return
+        if self.flash <= 0.1:
+            self.sfx("hurt")    # (not again on every frame of a long hit)
         self.flash = 0.3
         if self.god:
             return
@@ -2228,6 +2254,7 @@ class Game:
             self.lock = None
             self.locked = False
             self._boom(0.0, 0.0, 150.0, 20)
+            self.sfx("die")
             if self.pod and self.space is not None and self.space.witch:
                 self.pod = False        # no station to reach from witchspace
                 self.say("GAME OVER", 1e9)
@@ -2516,11 +2543,13 @@ class Game:
                 self.wave_wait = 0.0
                 self.spawn_t = 0.0
                 self.say("WAVE %d" % self.wave, 2.0)
+                self.sfx("wave")
             else:
                 n = int(self.wave_wait) + 1
                 if n != self.wave_shown:
                     self.wave_shown = n
                     self.say("WAVE %d IN %d" % (self.wave, n), 1.2)
+                    self.sfx("tick")
                 return
         self.spawn_t -= dt
         # more ships at once in later waves, and the longer the game goes on

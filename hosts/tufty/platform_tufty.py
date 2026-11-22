@@ -37,6 +37,14 @@ class Platform:
         self.ck = None          # the game's cockpit module, for drawing it (host_tufty sets it)
         self.gamepad = None     # True / False with a Pad found (DEBUG > DISPLAY > GAMEPAD),
         self.host = None        # which host_tufty switches (set_gamepad)
+        self.buzzer = None      # a Qwiic buzzer on the Qw/ST port (host_tufty, build 140)
+        self.sound_ok = False
+
+    def sound(self, name):
+        self.buzzer.play(name)
+
+    def sound_step(self):
+        self.buzzer.step()
 
     def set_gamepad(self, on):
         if self.host is not None:
