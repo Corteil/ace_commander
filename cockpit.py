@@ -1635,6 +1635,7 @@ _COMPASS = tuple(
 
 COOL_CABIN = 30         # the same as game.COOL_CABIN
 SCOOP_TEMP = 224        # the same as game.SCOOP_TEMP
+SCOOP_ALT = 2000.0      # and game.SCOOP_ALT: the scoops' height, marked on the AL gauge
 SUN_HEAT = 36.0         # the same as game.SUN_HEAT
 # the altitude gauge is full where the cabin starts to warm, empty at the
 # sun's surface: in sun radii above it, so it fits every sun's size
@@ -1680,6 +1681,10 @@ def _sun_gauges(ctx, g, sp):
     a = int(50 * d / (SUN_GAUGE_ALT * sp.sr))
     a = 0 if a < 0 else 50 if a > 50 else a
     ctx.rgb(*CYAN).rectangle(8, -94, a, 4).fill()
+    if getattr(g, "fuel_scoops", False):    # where the scoops start to fill (game.SCOOP_ALT)
+        m = int(50 * SCOOP_ALT / (SUN_GAUGE_ALT * sp.sr))
+        if 0 < m < 50:
+            ctx.rgb(*YELLOW).rectangle(8 + m, -96, 1, 8).fill()
     full = getattr(g, "fuel_max", MAX_FUEL)     # the ship's own tank (ships.tank)
     if g.fuel is not None and full:     # the fuel, under them: watch it fill as you skim
         text(ctx, "FU", -66, -83, 9, GREY)

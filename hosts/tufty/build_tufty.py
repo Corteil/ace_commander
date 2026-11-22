@@ -30,7 +30,7 @@ OUT = os.path.join(REPO, "build", "tufty", "ace_commander")
 HOST_FILES = ("host_tufty.py", "platform_tufty.py", "controls_tufty.py", "layout_tufty.py",
               "dash_tufty.py", "ctx_tufty.py", "dialog_tufty.py")
 APP_FILES = ("__init__.py", "icon.png")
-ELITE = ("ship_data.py", "game_data.py")
+ELITE = ("ship_data.py", "game_data.py", "elite_sfx.py")    # with --elite, if made
 TUFTY_MPY = "v6.3"              # what the Tufty's MicroPython 1.29 loads
 MPY_CROSS = (os.path.expanduser("~/.local/share/venvs/mpycross129/bin/mpy-cross"), "mpy-cross")
 # the badge's own: its loading screen and its firmware side (never imported on the Tufty)

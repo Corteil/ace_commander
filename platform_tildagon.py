@@ -29,6 +29,9 @@ owner_name:
       .gamepad                  optional: True / False if the device can switch a
                                 gamepad on and off (DEBUG > DISPLAY), with
                                 .set_gamepad(on); missing or None: no such line
+      .sound_ok                 optional: True if it can play sfx.py's sounds, with
+                                .sound(name) to start one and .sound_step() each
+                                frame (build 140); missing or False: no SOUND line
     owner_name()                the device owner's name, or None
 """
 import asyncio
@@ -218,6 +221,34 @@ class Platform:
         self.picker_choice = True   # Options > TEXT ENTRY: its own dialog or the letter picker
         self.fast = scheduler is not None
         self.anchor = self._grow_heap()
+        self.buzzer = self._find_buzzer()   # a Qwiic buzzer on a hexpansion port (build 140)
+        self.sound_ok = self.buzzer is not None
+
+    @staticmethod
+    def _find_buzzer():
+        """A SparkFun Qwiic Buzzer on any of the six hexpansion ports' I2C buses
+        (a hexpansion with a Qwiic connector), or None."""
+        try:
+            from machine import I2C
+        except ImportError:
+            return None
+        for port in range(1, 7):
+            try:
+                i2c = I2C(port)
+                if 0x34 not in i2c.scan() or i2c.readfrom_mem(0x34, 0, 1)[0] != 0x5E:
+                    continue    # (buzzer.ADDRESS, its ID: checked before importing the
+            except Exception:   # player and its sounds, which cost heap)
+                continue
+            from . import buzzer
+            print("Qwiic buzzer on hexpansion port %d" % port)
+            return buzzer.Buzzer(i2c)
+        return None
+
+    def sound(self, name):
+        self.buzzer.play(name)
+
+    def sound_step(self):
+        self.buzzer.step()
 
     @staticmethod
     def _grow_heap():

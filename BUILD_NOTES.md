@@ -1507,3 +1507,61 @@ what is now `ace.py` (renamed in build 50).
    Pi dashboard's `SCAN_RGB` (0.85, 0.85, 0.9), and the Tufty's scanner and compass, which were
    still the dim grey, use `RADAR_GRID` too.
    **Release 0.4.2** (2026-11-22): builds 136-139, by `tools/make_release.py 0.4.2 --push`.
+   **Build 140, sound** (Brian: "add sound"; the badge has no speaker and the Tufty 2350 no
+   buzzer, so a SparkFun Qwiic Buzzer on I2C for both, or I2S amp hexpansions later). One table,
+   `sfx.py`: each sound a short run of (Hz, ms) steps (0 a rest, `NOISE` a noise burst) with a
+   priority. The game asks by name (`Game.sfx`, a list `Game.sounds` that `ace._sounds` hands to
+   the device each frame, flying and not paused): laser, overheat, hurt, explode, die, lock,
+   missile, incoming, ecm, bomb, tick (hyperspace and wave countdowns), jump, scoop, upgrade,
+   wave, tractor; ace.py plays launch and dock. `buzzer.py`: the Qwiic Buzzer (0x34, ID 0x5E;
+   register 0x03 frequency / volume / duration, 0x08 on) stepped each frame, never blocking, a
+   lower-priority sound not cutting in. The badge looks on the six hexpansion ports' I2C buses
+   at start (`platform_tildagon._find_buzzer`), the Tufty on its Qw/ST port (`host_tufty._buzzer`).
+   The Pi: `hosts/pi/sound_pi.py` makes each sound once as square waves and noise for pygame's
+   mixer, with `--sound` (added to both desktop shortcuts). Options > SOUND: ON / OFF
+   (options.json "sound") only where there is sound. Platform interface: optional `sound_ok`,
+   `sound(name)`, `sound_step()`. Tests: `tests/test_sound.py` (a stand-in I2C bus), the Pi and
+   Tufty host tests. **Not tried on a real buzzer** (Brian hasn't got one yet).
+   **Build 141** (Brian: "how close are the sounds to Elite's?", then "match Elite"). They were
+   invented; now, with Elite's data, Elite's own. `tools/import_sfx.py CLONE` reads the SFX table
+   (main source) and the four envelopes E% (loader), plays each SOUND on a model of the BBC
+   Micro's sound system (envelopes stepped each centisecond; pitch 53 = middle C, 4 a semitone;
+   the noise channel's rates, and rate 3 following channel 1, which Elite's death sound sweeps
+   unheard to colour the noise) and writes `elite_sfx.py` (gitignored, Elite-derived; with
+   `build_mpy --elite` / `build_tufty --elite` if made, never in a release: `DERIVED`). Events
+   as the original calls them: laser 0, hit and explode 24 (EXNO), hurt 8, crash and die 16+24
+   (EXNO3: a collision, hit with no shields), lock 32 (BEEP), unarm 40, missile / incoming /
+   launch 48, jump 56 (LL164), ecm 64; the rest silent, as in Elite. `sfx.py` uses it when
+   `content.OWN` is False, else the game's own (now with hit, crash, unarm too). Format: a sound
+   is (priority, part, ...), parts played together; steps (Hz, ms[, level 0-126]), negative Hz
+   noise at that rate; `CHANNELS` (the Pi restarts a sound on its channel, Elite's flush). The
+   buzzer plays the first part, levels as its volume 1-4, and skips steps shorter than a frame
+   to keep time; the badge checks for the buzzer before importing it (heap).
+   **Build 142** (Brian: "the sounds should be as close to Elite as possible in both games; add
+   the missing sounds and warnings"). Every NOISE / BEEP / EXNO call in both halves of the
+   source, flight and docked, now has its event: `beep` (32, short high: FUEL SCOOPS ON and
+   ENERGY LOW, whose messages hold a {beep}, and docked after each trade message or refusal,
+   Elite's dn / dn2: `Docked.msg_n` counts them), `boop` (40, long low: the jump drive refused,
+   WA1, once a second while speed is held up at full; a search that finds nothing, HME6),
+   `crash` (EXNO3) also for a missile exploding (TA34) and a canister lost scooping (MA59).
+   New warning ENERGY LOW (Elite: energy under 50 of 255, checked every 32 main loops): the
+   hull under `ENERGY_LOW` (20), every `LOW_EVERY` (2 s). The game's own sounds (no
+   elite_sfx.py, or DATA: OWN, so the store release) were rewritten for the same events in
+   Elite's style, by ear, not taken from it (a repeating low-then-falling zap, a shield warble,
+   noise bursts, 1.9 kHz and 150 Hz beeps), on the same channel layout (`OWN_CHANNELS`), and
+   silent where Elite is (countdowns, scooping, docking, the bomb, practice's waves and
+   upgrades). `test_install` now measures the compiled release tarball (with the badge's
+   mpy-cross), not the source.
+   **Build 143** (Brian: "the fuel scoops should stop filling above a fixed point above the sun,
+   even if the cabin temperature is high"; "also add a fuel full message"). Suns are 11,000 to
+   28,000 units in radius, so the heat band (cabin 224, 1.3 radii) reached 3,400 to 8,300 units
+   above the surface. Now the scoops also need to be within `SCOOP_ALT` (2000 units) of the
+   surface (`Game._sun`), marked in yellow on the AL gauge (`cockpit.SCOOP_ALT`, the same). With
+   a full tank in the band: FUEL FULL, once a pass (`Game.full_said`). DEBUG > TO THE SUN now
+   passes half SCOOP_ALT above the surface. Tests in test_game, test_commander, test_leds; a
+   market check in test_commander made safe for a stock of exactly 20 (NONE LEFT).
+   **Build 144** (Brian: "the mass lock should only bleep once when held in the same mass field,
+   and can sound if a new mass field stops the jump"). `Game._blocker` names what keeps the jump
+   drive off: "station" (its safe zone), "planet" / "sun" (mass lock), "heat", "ships"; the boop
+   plays when that changes to something new while speed is held up at full (`Game.refused`),
+   and letting go resets it. (Was: once a second while held.)

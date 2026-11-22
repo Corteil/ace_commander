@@ -129,5 +129,17 @@ while a.choices()[a.menu] != "QUIT":
 key(h, pygame.K_RETURN)
 assert not h.running, "QUIT on the title screen quits"
 print("the title's QUIT line: ok")
+# --sound (build 140): sfx.py's sounds made for the mixer, and Options > SOUND
+hs = run.Host(scale=1, save_dir=tempfile.mkdtemp(prefix="ace_pi_sound_"), sound=True)
+if hs.player is None:
+    print("no sound device here: --sound carries on silent: ok")
+else:
+    assert hs.app.platform.sound_ok and "SOUND: ON" in hs.app._settings(False)
+    assert set(hs.player.sounds) == set(hs.ace.sfx.SOUNDS if hasattr(hs.ace, "sfx") else
+                                        __import__(run.PKG + ".sfx").sfx.SOUNDS)
+    hs.app.platform.sound("laser")
+    print("--sound: %d sounds, SOUND line: ok" % len(hs.player.sounds))
+assert h.player is None and not any(i.startswith("SOUND") for i in h.app._settings(False)), \
+    "without --sound: none"
 pygame.quit()
 print("ALL PI HOST TESTS PASSED")

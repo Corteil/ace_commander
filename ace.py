@@ -302,6 +302,7 @@ class AceCommander(PLATFORM.App):
         # the commander as last saved, as JSON: being destroyed goes back to it
         self.saved = json.dumps(self.cmdr.to_dict()) if self.cmdr is not None else None
         self.just_saved = False     # Hardcore: SAVE COMMANDER pressed since Options opened
+        self.dock_msg = 0           # the docked screens' message count (a beep for each new one)
         self.level = 1          # the level showing on the new-commander screen
         self.p_level = 1        # combat practice's level (options.json)
         self.p_hardcore = False # combat practice's own HARDCORE, apart from the commander's
@@ -368,6 +369,7 @@ class AceCommander(PLATFORM.App):
         self.jump_lit = False            # the last write was a jump flash
         self.jump_rgb = DUST_RGB         # their colour at full brightness
         self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
+        self.use_sound = True            # SOUND: ON / OFF (build 140), where there is sound
         self.use_picker = False          # TEXT ENTRY: the letter picker (picker.py) rather than
                                          # the badge's own dialog (build 124, an option)
         self.old_hardcore = False        # options.json's HARDCORE from before build 74
@@ -693,6 +695,7 @@ class AceCommander(PLATFORM.App):
                 self._leds_release()
             if flying and PERF_LOG:
                 self._perf(delta, _diff(_us(), t0) / 1000.0)
+        self._sounds()
         pad.end_frame()
         # the keyboard's A-F are the badge's buttons for the next frame's keys:
         # off the flight (docked, the title, its pages), not while typing; in
@@ -870,6 +873,7 @@ class AceCommander(PLATFORM.App):
                         (c.system * 53 + 29) % 7)                   # and the planet's
 
     def _make_dock(self):
+        self.dock_msg = 0       # its messages are counted afresh (a beep for each)
         self.dock = docked.Docked(self.cmdr, self.galaxy, self.target, GOODS, EQUIP,
                                   self._ship_bp(),
                                   (lambda: self._settings(True), self._change),
@@ -981,6 +985,9 @@ class AceCommander(PLATFORM.App):
         d = self.dock
         hit = self.pad.hit
         d.tick(dt)
+        if d.msg_n != self.dock_msg:
+            self._play("beep")          # a trade done or refused: Elite's short high beep
+        self.dock_msg = d.msg_n
         if not d.in_options:
             self.just_saved = False     # "SAVED" shows until Options is left
         if self._update_find(cancel, confirm):
@@ -1131,6 +1138,27 @@ class AceCommander(PLATFORM.App):
             return True
         self.held_t[name] = t
         return False
+
+    def _sound_ok(self):
+        """The device can play sounds (Platform.sound: the Pi, a Qwiic buzzer)."""
+        return getattr(self.platform, "sound_ok", False)
+
+    def _play(self, name):
+        """One of sfx.py's sounds, if the device has sound and SOUND is ON."""
+        if self.use_sound and self._sound_ok():
+            self.platform.sound(name)
+
+    def _sounds(self):
+        """Each frame: the flight's sounds (Game.sfx) to the device, and its
+        player moved on (a buzzer plays one tone at a time)."""
+        g = self.game
+        if g is not None and g.sounds:
+            if self.mode == "flight" and not self.paused:
+                for name in g.sounds:
+                    self._play(name)
+            del g.sounds[:]
+        if self._sound_ok():
+            self.platform.sound_step()
 
     def _forget_flight(self):
         """A new commander starts with nothing left from before (Brian, build 138):
@@ -1323,6 +1351,7 @@ class AceCommander(PLATFORM.App):
                              random)
 
     def _launch(self):
+        self._play("launch")
         self._save_docked()
         self._pick_tunnel()
         self.launch_t = 0.0
@@ -1726,6 +1755,7 @@ class AceCommander(PLATFORM.App):
         self.dock_hold = random.uniform(*DOCK_HOLD)
         self._pick_tunnel(pod)
         self.mode = "docking"
+        self._play("dock")
 
     # ---- in-flight menu ---------------------------------------------------
 
@@ -1748,6 +1778,8 @@ class AceCommander(PLATFORM.App):
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
         if self.platform.leds:
             items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))
+        if self._sound_ok():        # the Pi, or a Qwiic buzzer found (build 140)
+            items.append("SOUND: " + ("ON" if self.use_sound else "OFF"))
         if getattr(self.platform, "picker_choice", False):    # the badge: its own or the picker
             items.append("TEXT ENTRY: " + ("PICKER" if self.use_picker else "BADGE"))
         if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose data, from the next start
@@ -1814,6 +1846,11 @@ class AceCommander(PLATFORM.App):
             if not self.use_leds:
                 self._leds_release()
             self._save_options()
+        elif item.startswith("SOUND"):
+            self.use_sound = not self.use_sound
+            self._save_options()
+            if self.use_sound:
+                self._play("tick")
         elif item.startswith("TEXT ENTRY"):
             self.use_picker = not self.use_picker
             self._save_options()
@@ -1831,6 +1868,8 @@ class AceCommander(PLATFORM.App):
                 self.use_leds = d["leds"]
             if isinstance(d.get("picker"), bool):
                 self.use_picker = d["picker"]
+            if isinstance(d.get("sound"), bool):
+                self.use_sound = d["sound"]
             k = d.get("tilt_flip")
             if isinstance(k, int) and not isinstance(k, bool) and 0 <= k < len(TILT_FLIPS):
                 self.tilt_flip = k
@@ -1852,6 +1891,7 @@ class AceCommander(PLATFORM.App):
             with open(options_path(), "w") as f:
                 f.write(json.dumps({"tilt": self.use_tilt, "tilt_flip": self.tilt_flip,
                                     "leds": self.use_leds, "picker": self.use_picker,
+                                    "sound": self.use_sound,
                                     "practice_level": self.p_level,
                                     "practice_hardcore": self.p_hardcore,
                                     "own": self.own_ships, "egg": self.egg,
@@ -2414,7 +2454,11 @@ class AceCommander(PLATFORM.App):
             else:
                 g.say("ESCAPE POD AWAY")
         elif item == "TO THE SUN":
-            g.to_sun(1.15, 1.6)     # flying on takes you down through the scooping band
+            # flying on takes you down through the scooping band: half SCOOP_ALT up at the
+            # closest (build 143: the band is a fixed height, whatever the sun's size)
+            sp = g.space
+            k = 1.0 + 0.5 * game.SCOOP_ALT / sp.sr if sp is not None else 1.15
+            g.to_sun(k, 1.6)
         elif item == "TO THE STATION":
             g.to_station()
         elif item == "DOCK NOW":
@@ -2727,6 +2771,8 @@ class AceCommander(PLATFORM.App):
             if r is False:
                 self._found(None)
             elif r is not None:
+                if not found:
+                    self._play("boop")      # a search that finds nothing: Elite's long low beep
                 self._found(found[0] if found else None)
             if r is not None or not driven:
                 self.pad.clear()    # the dialog has the buttons (or the one that closed it)
@@ -2744,6 +2790,8 @@ class AceCommander(PLATFORM.App):
         elif hit("j_down"):
             f.pick(1)
         elif confirm:
+            if f.chosen() is None:
+                self._play("boop")      # nothing found (Elite's HME6)
             self._found(f.chosen())
         elif cancel:
             self._found(None)

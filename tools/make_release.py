@@ -40,7 +40,7 @@ OUT = os.path.join(REPO, "build", "release")
 WORKTREE = os.path.join(OUT, "worktree")
 BRANCH = "release"
 LIMIT = 600 * 1024          # the badge unpacks the whole tarball in memory (tests/test_install.py)
-ELITE = build_mpy.ELITE
+ELITE = build_mpy.DERIVED     # Elite-derived: ship_data, game_data, elite_sfx
 EXTRA = ("README.md", "LICENSE")    # on the release branch too, for anyone reading it on GitHub
 PI_README = """Ace Commander {v} for the Raspberry Pi (or any computer with Python 3 and pygame)
 

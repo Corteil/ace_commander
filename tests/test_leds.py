@@ -219,6 +219,7 @@ a.game.to_sun(); tick(a)
 v = leds.values[1]
 assert v[0] > 150 and v[2] == 0 and v[1] < v[0] // 3, ("near the sun: hot red", v)
 a.game.fuel_scoops = True; a.game.speed = 40.0; a.cmdr.fuel = 10
+a.game.to_sun(1.0 + 0.5 * ace_commander.game.SCOOP_ALT / a.game.space.sr)    # within the scoops' height
 seen = set()
 for _ in range(60):
     tick(a, held=["F"])

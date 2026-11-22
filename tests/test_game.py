@@ -591,7 +591,8 @@ def tank(n):
     got.append(n)
     return n
 g.refuel = tank
-g.speed = 40.0; g.to_sun(1.15); g.sun_t = 0.0
+band = 1.0 + 0.5 * game.SCOOP_ALT / g.space.sr     # half the scoops' height up (build 143)
+g.speed = 40.0; g.to_sun(band); g.sun_t = 0.0
 for _ in range(int(3.5 / DT)):
     g.step(DT, 0, 0, 0, False, False)
 assert g.cabin >= game.SCOOP_TEMP and len(got) == 4 and set(got) == {5}, got
@@ -602,7 +603,10 @@ g.speed = 40.0; g.fuel_scoops = False; g.sun_t = 0.0; g.step(DT, 0, 0, 0, False,
 assert not got and not g.scooping, "no scoops, no fuel"
 g.fuel_scoops = True; g.refuel = lambda n: 0; g.msg_t = 0.0; g.sun_t = 0.0
 g.step(DT, 0, 0, 0, False, False)
-assert not g.scooping and g.msg_t <= 0, "a full tank takes nothing"
+assert not g.scooping and g.msg == "FUEL FULL", "a full tank takes nothing, and says so (build 143)"
+g.msg_t = 0.0; g.sun_t = 0.0
+g.step(DT, 0, 0, 0, False, False)
+assert g.msg_t <= 0, "once a pass through the band"
 g.refuel = tank; g.to_sun(1.6); g.sun_t = 0.0; g.step(DT, 0, 0, 0, False, False)
 assert g.cabin < game.SCOOP_TEMP and not got, "not close enough"
 # as Elite: the sun has no surface to hit; past a cabin temperature of 255

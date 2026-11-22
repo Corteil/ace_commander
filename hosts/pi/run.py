@@ -113,7 +113,8 @@ class Host:
     (dash_pi.py), the badge's screens in the middle elsewhere, no LEDs. F11: full
     screen. The window can be any size: everything scales to fit."""
 
-    def __init__(self, scale=2, full=None, save_dir=None, debug=False, log_keys=False, layout=None):
+    def __init__(self, scale=2, full=None, save_dir=None, debug=False, log_keys=False, layout=None,
+                 sound=False):
         pygame.init()
         pygame.display.set_caption("Ace Commander")
         self.leds = platform_pi.LEDS    # the ring the game writes, drawn round the screen
@@ -140,6 +141,18 @@ class Host:
         self.log_keys = log_keys
         self.app = self.ace.AceCommander()
         self.app.platform.host = self       # its text entry asks whether the pad is in use
+        self.player = None
+        if sound:                           # --sound (build 140): sfx.py's sounds by pygame
+            try:
+                import sound_pi
+                self.player = sound_pi.Player(pygame, importlib.import_module(PKG + ".sfx"))
+            except Exception as e:
+                print("no sound:", e)
+        if self.player is not None:
+            p = self.app.platform
+            p.sound_ok = True
+            p.sound = self.player.play
+            p.sound_step = self.player.step
         self.clock = pygame.time.Clock()
         self.running = True
         self.frames = 0
@@ -418,11 +431,12 @@ def main(argv=None):
     ap.add_argument("--layout", choices=("badge", "elite"), default=None,
                     help="badge: the round screen; elite: a 3D view over a dashboard (F10 switches)")
     ap.add_argument("--debug", action="store_true", help="the DEBUG menu of cheats")
+    ap.add_argument("--sound", action="store_true", help="the game's sounds (Options > SOUND too)")
     ap.add_argument("--log-keys", action="store_true", help="print every key and the button it becomes")
     ap.add_argument("--frames", type=int, default=None, help="stop after this many frames")
     args = ap.parse_args(argv)
     Host(args.scale, args.full, debug=args.debug, log_keys=args.log_keys,
-         layout=args.layout).run(args.frames)
+         layout=args.layout, sound=args.sound).run(args.frames)
 
 
 if __name__ == "__main__":
