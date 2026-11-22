@@ -1471,3 +1471,8 @@ what is now `ace.py` (renamed in build 50).
    in Hardcore: a new commander as it's made, and the settings and DEBUG changes that write
    one field into the last save (`_write_setting`). Standard mode unchanged. Test in
    `tests/test_hardcore.py`.
+   **Build 134** (Brian couldn't find SAVE COMMANDER: his "Hardcore" commander was saved with
+   HARDCORE off; on NEW COMMANDER C starts from any line, so C on HARDCORE: OFF started a
+   standard one). The hint there reads "< > change   C: start" on LEVEL and HARDCORE, and the
+   HARDCORE note "ECM, missiles, saving by hand" (practice's page keeps "ECM by hand, armed
+   missiles": practice saves nothing).

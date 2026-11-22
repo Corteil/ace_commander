@@ -766,12 +766,14 @@ class AceCommander(PLATFORM.App):
         self._draw_rows(ctx, self.p_level, self.p_hardcore, self.p_sel, -42, 56)
         cockpit.text(ctx, "C: fly   F: back", 0, 80, 12, cockpit.GREY)
 
-    def _draw_rows(self, ctx, level, hardcore, sel, top, step):
-        """The LEVEL and HARDCORE lines of the practice and new-commander pages."""
+    def _draw_rows(self, ctx, level, hardcore, sel, top, step, saves=False):
+        """The LEVEL and HARDCORE lines of the practice and new-commander pages
+        (saves: a commander's, where Hardcore also means saving by hand)."""
         text = cockpit.text
         rows = ("LEVEL", "< %s >" % commander.LEVELS[level], LEVEL_NOTE[level]), \
                ("HARDCORE", "< %s >" % ("ON" if hardcore else "OFF"),
-                "ECM by hand, armed missiles" if hardcore else "the game's usual help")
+                ("ECM, missiles, saving by hand" if saves else "ECM by hand, armed missiles")
+                if hardcore else "the game's usual help")
         for i, (name, value, note) in enumerate(rows):
             y = top + i * step
             on = i == sel
@@ -2983,13 +2985,15 @@ class AceCommander(PLATFORM.App):
         name = self.n_name or badge_name().upper()[:12]
         text(ctx, name, 0, -58, 16, (cockpit.GREEN if on else cockpit.WHITE) if self.n_name
              else cockpit.GREY)
-        self._draw_rows(ctx, self.level, self.n_hardcore, self.n_sel - 1, -36, 54)
+        self._draw_rows(ctx, self.level, self.n_hardcore, self.n_sel - 1, -36, 54, True)
         if self.n_sel == 1:
             top = commander.thresholds(self.level)[-1]
             text(ctx, "top rank at %d kills" % top, 0, 58, 11, cockpit.GREY)
         if self.cmdr is not None:
             text(ctx, "replaces your saved commander", 0, 72, 11, cockpit.RED)
-        text(ctx, "C: name   F: back" if on else "C: start   F: back", 0, 86, 12, cockpit.GREY)
+        # on LEVEL / HARDCORE left / right changes it, C starts from any line (build 134:
+        # C on HARDCORE: OFF started a standard commander)
+        text(ctx, "C: name   F: back" if on else "< > change   C: start", 0, 86, 12, cockpit.GREY)
 
     def _draw_fmenu(self, ctx):
         text = cockpit.text
