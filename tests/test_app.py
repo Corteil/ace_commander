@@ -321,8 +321,14 @@ Imu.fail = True
 tick(a)
 assert not a.tilt_ok and not a.use_tilt
 tick(a, fresh=["A"]); a.fmenu = a._fitems_top().index("SETTINGS"); tick(a, fresh=["C"])
-tick(a, fresh=["JOYLEFT"]); tick(a, fresh=["C"]); assert not a.use_tilt
-assert any("no tilt sensor" in t[0] for t in frame(a).texts)
+# no tilt sensor now: no STEER line, only PITCH (build 136), which C swaps
+tx = [t[0] for t in frame(a).texts]
+assert "PITCH: NORMAL" in tx and not any(t.startswith("STEER") for t in tx), tx
+assert a._settings(False)[0] == "PITCH: NORMAL"
+a.tilt_flip = 2                     # a roll flip from when there was tilt: not used now
+a._change("PITCH: NORMAL", False)
+assert a.tilt_flip == 1 and a._settings(False)[0] == "PITCH: SWAPPED" and not a.use_tilt
+a._change("PITCH: SWAPPED", False); assert a.tilt_flip == 0
 print("tilt sensor failure: ok")
 
 # ---- TILT_DEFAULT -----------------------------------------------------------

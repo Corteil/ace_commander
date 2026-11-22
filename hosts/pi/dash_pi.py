@@ -34,7 +34,8 @@ SC_RY = 20              # scanner: half height; its half width fills the middle
 SC_Y = 4                # its centre, below the dashboard's centre
 STALK = 13              # tallest blip stalk
 COMPASS_R = 9
-SCAN_RGB = (0.85, 0.85, 0.9)    # the scanner's lines: near white (Brian)
+SCAN_RGB = (0.85, 0.85, 0.9)    # the scanner's lines: near white (Brian); cockpit.RADAR_GRID
+                                # is the same, for the badge's and the Tufty's (build 139)
 PANEL = (0.04, 0.04, 0.07)
 RULE = (0.45, 0.45, 0.55)
 ECM_RGB = (0.63, 0.0, 1.0)

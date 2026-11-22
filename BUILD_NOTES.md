@@ -1480,3 +1480,29 @@ what is now `ace.py` (renamed in build 50).
    the line reads COMMANDER SAVED after C, until Options is left (C there saves again).
    **Release 0.4.1** (2026-11-22): builds 133-135 (Hardcore saving by hand), by
    `tools/make_release.py 0.4.1 --push`.
+   **Build 136** (Brian: "on the systems where tilt steer is impossible just show the pitch swapped
+   status", "also remove the background box around the selected option"). Without a tilt sensor
+   (the Pi, the Tufty, a badge whose sensor failed) Settings / Options have no STEER line and
+   CONTROLS becomes PITCH: NORMAL / SWAPPED (bit 1 of `tilt_flip`; a roll flip left from tilt
+   isn't used then). The chosen line on menu pages (Options, the pause menu and Settings, the
+   DEBUG pages, NEW COMMANDER, practice) is green text without the box behind it; the market,
+   Equip and shipyard lists keep their row highlight.
+   **Build 137** (Brian: "the tractor beam was on at the space station with Hardcore on"). A
+   launch carries on the `Game` from the last flight and rebuilt its rules only when the level
+   or career changed; a new commander docks at once (career again), so a new Hardcore commander
+   flew with a standard one's rules: ASSISTED docking, the tractor beam. `_start_flight` now
+   starts afresh when HARDCORE differs from the last flight's, for a commander as for practice.
+   Test in `tests/test_hardcore.py`.
+   **Build 138** (Brian: "when a new commander is created all flags should be reset").
+   `ace._forget_flight()` on NEW COMMANDER: the game left from before is dropped (its rules,
+   docking style, ship, kills; a part-way practice fight too), and the target, countdown,
+   witchspace, open screen / chart / search, banked kills and cash, last save, DEBUG page
+   and LED effects are cleared. Kept: the settings (options.json), the galaxy (remade if it
+   differs), the tilt sensor's level. Test in `tests/test_hardcore.py`. Then (Brian: "the galaxy
+   map should be reset to the first galaxy as well"): the galaxy is dropped too and made afresh
+   for the new commander, galaxy 1.
+   **Build 139** (Brian: "the radar grid should be brighter on the badge"): the round HUD's radar
+   ellipse and cross, and the compass ring beside it, are `cockpit.RADAR_GRID`, was 0.38, 0.38,
+   0.48. Then ("they should be the same colour as the Tufty and Pi versions"): near white, the
+   Pi dashboard's `SCAN_RGB` (0.85, 0.85, 0.9), and the Tufty's scanner and compass, which were
+   still the dim grey, use `RADAR_GRID` too.

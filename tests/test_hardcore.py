@@ -395,4 +395,58 @@ for hard in (False, True):
     tick(a, fresh=["CANCEL"])       # Status to the title: not saved either
     assert a.mode == "menu" and on_file() == start + 500
 print("Hardcore saves only by SAVE COMMANDER: ok")
+
+# ---- a new Hardcore commander after a standard one's flight docks by hand (build 137:
+# the flight left from the standard one kept its rules, so the tractor beam was on)
+bs.press(())
+a = ace_commander.AceCommander()
+a.cmdr = commander.Commander(1)
+a.cmdr.hardcore = False
+a.cmdr.docking = "B"                # ASSISTED: the tractor beam
+a._write()
+a._dock()
+a._start_flight(True)
+assert not a.game.rules.manual_docking and a.game.docking == "B"
+a._dock()                           # back at the station
+a.cmdr = commander.Commander(1)     # NEW COMMANDER, HARDCORE ON (as ace.py makes one)
+a.cmdr.hardcore = True
+a.cmdr.docking = "B"
+a.career = False
+a._write()
+a._dock()
+a._start_flight(True)
+assert a.game.rules.hardcore and a.game.rules.manual_docking, "Hardcore's rules"
+assert a.game.docking == "A", ("by hand: no tractor beam", a.game.docking)
+a._dock()
+a.cmdr.hardcore = False             # (DEBUG can switch it off again)
+a._start_flight(True)
+assert not a.game.rules.hardcore and a.game.docking == "B", a.game.docking
+print("HARDCORE changed since the last flight: its rules and docking: ok")
+
+# ---- NEW COMMANDER starts with nothing left from before (build 138)
+a.cmdr.galaxy = 3                   # an old commander in the fourth galaxy
+a._dock()
+assert a.galaxy_n == 3
+gal3 = a.galaxy
+a._start_flight(True)
+a.target = 5
+a.banked = 3
+a.fsub = "status"
+old_game = a.game
+a.mode = "menu"
+choose(a, "NEW COMMANDER")
+a.n_sel = 2
+tick(a, fresh=["RIGHT"])            # HARDCORE: ON
+assert a.n_hardcore
+tick(a, fresh=["CONFIRM"])          # C: start
+assert a.mode == "docked" and a.cmdr.hardcore, a.mode
+assert a.game is None and a.target is None and a.banked == 0 and a.fsub is None, \
+    (a.game is old_game, a.target, a.banked, a.fsub)
+assert a.cmdr.galaxy == 0 and a.galaxy_n == 0 and a.galaxy is not gal3, "back to the first galaxy"
+from ace_commander import galaxy as galaxy_mod
+first = galaxy_mod.Galaxy(galaxy_mod.seeds_for(mod.game_data.SEEDS, 0), mod.game_data.PAIRS)
+assert a.galaxy.system(a.cmdr.system).name == first.system(a.cmdr.system).name
+a._start_flight(True)
+assert a.game is not old_game and a.game.rules.manual_docking and a.game.docking == "A"
+print("NEW COMMANDER: nothing carried over: ok")
 print("ALL HARDCORE TESTS PASSED")

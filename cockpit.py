@@ -45,6 +45,9 @@ RADAR_Y = 88
 RADAR_RX = 58
 RADAR_RY = 24
 RADAR_RANGE = 10000.0
+RADAR_GRID = (0.85, 0.85, 0.9)  # the radar's ellipse and cross and the compass ring: near
+                                # white, the same on every device (Brian, build 139; the Pi's
+                                # SCAN_RGB; was 0.38, 0.38, 0.48 on the badge and the Tufty)
 _RADAR = tuple(
     (RADAR_RX * math.cos(i * TAU / 24) - 0.75, RADAR_Y + RADAR_RY * math.sin(i * TAU / 24) - 0.75)
     for i in range(24)
@@ -141,7 +144,7 @@ def number(ctx, value, x, y, font=_BIG, align=0):
     return width
 
 
-def menu_lines(ctx, items, sel, y, step, rows, half_w):
+def menu_lines(ctx, items, sel, y, step, rows):
     """A list of setting lines from y down, sel highlighted, at most rows of
     them: a longer list scrolls with sel, a small bar above or below saying
     there is more (Options with TEXT ENTRY has nine lines, the hints sit
@@ -152,9 +155,7 @@ def menu_lines(ctx, items, sel, y, step, rows, half_w):
         top = sel - rows + 1 if sel >= rows else 0
         if top > n - rows:
             top = n - rows
-    for i in range(top, min(n, top + rows)):
-        if i == sel:
-            ctx.rgb(*DIM).rectangle(-half_w, y - 7, 2 * half_w, 15).fill()
+    for i in range(top, min(n, top + rows)):     # the chosen line green, no box (build 136)
         text(ctx, items[i], 0, y, 13, GREEN if i == sel else GREY)
         y += step
     ctx.rgb(*GREY)
@@ -1707,7 +1708,7 @@ def _planet_gauge(ctx, sp):
 
 
 def _compass(ctx, sp):
-    ctx.rgb(0.38, 0.38, 0.48)
+    ctx.rgb(*RADAR_GRID)        # its ring as bright as the radar's (build 139)
     for px, py in _COMPASS:
         ctx.rectangle(px, py, 1.5, 1.5).fill()
     st = sp.station
@@ -1775,7 +1776,7 @@ def _hud(ctx, g, ms=None, ring=True):
         ctx.rgb(*(GREEN if i < g.missiles else DIM)).rectangle(-70 + i * 9, 56, 6, 4).fill()
 
     # radar: across is left-right, up the ellipse is ahead, sticks show height
-    ctx.rgb(0.38, 0.38, 0.48)
+    ctx.rgb(*RADAR_GRID)
     for px, py in _RADAR:
         ctx.rectangle(px, py, 1.5, 1.5).fill()
     ctx.rectangle(-RADAR_RX, RADAR_Y - 0.5, 2 * RADAR_RX, 1).fill()

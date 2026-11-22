@@ -634,6 +634,7 @@ class AceCommander(PLATFORM.App):
                 elif self.n_sel == 2:
                     self.n_hardcore = not self.n_hardcore
             elif confirm:
+                self._forget_flight()   # nothing carries over from before (build 138)
                 self.cmdr = commander.Commander(self.level)
                 self.cmdr.name = self.n_name or badge_name().upper()[:12]
                 self.cmdr.hardcore = self.n_hardcore    # fixed from now on (DEBUG can change it)
@@ -778,8 +779,6 @@ class AceCommander(PLATFORM.App):
             y = top + i * step
             on = i == sel
             text(ctx, name, 0, y, 12, cockpit.GREY)
-            if on:
-                ctx.rgb(*cockpit.DIM).rectangle(-80, y + 6, 160, 24).fill()
             text(ctx, value, 0, y + 18, 17, cockpit.GREEN if on else cockpit.GREY)
             if on:
                 text(ctx, note, 0, y + 38, 11, cockpit.YELLOW)
@@ -801,7 +800,9 @@ class AceCommander(PLATFORM.App):
         if config.practice_missile is not None:
             g.pickup_missile = config.practice_missile
         elif g.over or career != self.career or g.level != level \
-                or (not career and g.rules.hardcore != self.p_hardcore):   # practice: HARDCORE changed
+                or g.rules.hardcore != (self._hardcore() if career else self.p_hardcore):
+            # HARDCORE changed since the last flight: practice's, or the commander's (build 137:
+            # a new Hardcore commander kept a standard one's rules, tractor beam and all)
             g.set_level(level)
             g.reset()
             self.banked = 0
@@ -1130,6 +1131,49 @@ class AceCommander(PLATFORM.App):
             return True
         self.held_t[name] = t
         return False
+
+    def _forget_flight(self):
+        """A new commander starts with nothing left from before (Brian, build 138):
+        no flight carried on (its rules, docking style, ship, kills), no target,
+        jump, witchspace, open screen or chart, and nothing banked. Kept: the
+        settings (options.json) and the tilt sensor's level. The galaxy goes
+        too (Brian): the new commander's, the first, is made afresh."""
+        self.game = None
+        self.galaxy = None
+        self.galaxy_n = 0
+        self.find_names = None
+        self.career = False     # an old commander's flight banks nothing into it
+        self.docked = True
+        self.banked = 0
+        self.banked_cash = 0
+        self.saved = None
+        self.saved_over = False
+        self.just_saved = False
+        self.paused = False
+        self.fmenu = 0
+        self.fsub = None
+        self.top = 0
+        self.fmarket = None
+        self.chart = None
+        self.data_of = None
+        self.finder = None
+        self.tdialog = None
+        self.find_chart = None
+        self.target = None
+        self.jump_to = None
+        self.witch = None
+        self.misjump = False
+        self.brief = None
+        self.eject_t = 0.0
+        self.fire_lock = False
+        self.dgroup = None
+        self.debug_from = None
+        self.dock = None
+        self.tunnel = None
+        self.glow = 0.0
+        self.jump_leds = [0.0] * 13
+        self.jump_lit = False
+        self._bps = {}
 
     def _hardcore(self):
         """The commander's HARDCORE (picked with them, fixed but for DEBUG)."""
@@ -1570,7 +1614,7 @@ class AceCommander(PLATFORM.App):
                 g.stop_autodock()   # taking the controls, as _took_controls
         if self.tilt_flip & 1:      # the CONTROLS setting (build 87: every way of steering)
             jy = -jy
-        if self.tilt_flip & 2:
+        if self.tilt_flip & 2 and self.tilt_ok:     # (without tilt only PITCH is offered)
             roll = -roll
             yaw = -yaw
         if g.rules.manual_ecm:      # Hardcore: E is the ECM (or both speed buttons together)
@@ -1689,13 +1733,11 @@ class AceCommander(PLATFORM.App):
         """The settings, shared by the in-flight Settings page and the title
         screen's Options page. cmdr: include the commander's own (docking
         style and the Constrictor)."""
-        stick = "JOYSTICK"
         if self.tilt_ok:
-            steer = "STEER: " + ("TILT" if self.use_tilt else stick)
-        else:
-            steer = "STEER: %s (no tilt sensor)" % stick
-        items = [steer]
-        items.append("CONTROLS: " + TILT_FLIPS[self.tilt_flip])
+            items = ["STEER: " + ("TILT" if self.use_tilt else "JOYSTICK"),
+                     "CONTROLS: " + TILT_FLIPS[self.tilt_flip]]
+        else:   # no tilt sensor (the Pi, the Tufty): nothing to choose but the pitch (build 136)
+            items = ["PITCH: " + ("SWAPPED" if self.tilt_flip & 1 else "NORMAL")]
         if cmdr and self.mode == "docked" and self._hardcore():   # no saving by itself (build 133)
             # once saved it says so (Brian, build 135), until Options is left
             items.insert(0, "COMMANDER SAVED" if self.just_saved else "SAVE COMMANDER")
@@ -1738,6 +1780,9 @@ class AceCommander(PLATFORM.App):
         elif item.startswith("NAME"):
             if not left:
                 self._open_name(self.cmdr.name, self._set_name)
+        elif item.startswith("PITCH"):     # no tilt sensor: up / down swapped or not
+            self.tilt_flip = (self.tilt_flip & 1) ^ 1
+            self._save_options()
         elif item.startswith("CONTROLS"):  # left goes back a choice
             self.tilt_flip = (self.tilt_flip + (-1 if left else 1)) % len(TILT_FLIPS)
             self._save_options()
@@ -1837,7 +1882,7 @@ class AceCommander(PLATFORM.App):
         text(ctx, "OPTIONS", 0, -80, 20, cockpit.WHITE)
         items = self._settings(True)
         # eight lines fit above the hints; more scroll (build 131)
-        y = cockpit.menu_lines(ctx, items, self.omenu % len(items), -50, 16, 8, 100)
+        y = cockpit.menu_lines(ctx, items, self.omenu % len(items), -50, 16, 8)
         if self.cmdr is None:
             text(ctx, "more with a commander", 0, y + 4, 11, cockpit.GREY)
         text(ctx, "< > or C: change", 0, 82, 11, cockpit.GREY)     # below six lines
@@ -1930,8 +1975,6 @@ class AceCommander(PLATFORM.App):
         if n <= DEBUG_ROWS:     # all of it fits: in order, top to bottom
             for i in range(n):
                 y = (i - (n - 1) / 2) * 16
-                if i == sel:
-                    ctx.rgb(*cockpit.DIM).rectangle(-100, y - 8, 200, 16).fill()
                 text(ctx, items[i], 0, y, 14, cockpit.GREEN if i == sel else cockpit.GREY)
             if help_line:
                 text(ctx, help_line + "   F: back", 0, 70, 11, cockpit.GREY)
@@ -1941,8 +1984,6 @@ class AceCommander(PLATFORM.App):
             off = k - rows // 2
             i = (sel + off) % n
             y = off * 16
-            if off == 0:
-                ctx.rgb(*cockpit.DIM).rectangle(-100, y - 8, 200, 16).fill()
             text(ctx, items[i], 0, y, 14, cockpit.GREEN if off == 0 else cockpit.GREY)
         if help_line:
             text(ctx, help_line + "   F: back", 0, 70, 11, cockpit.GREY)
@@ -2981,8 +3022,6 @@ class AceCommander(PLATFORM.App):
         # NAME (build 89): the one entered, or the badge's (JAMESON) greyed
         on = self.n_sel == 0
         text(ctx, "NAME", 0, -76, 12, cockpit.GREY)
-        if on:
-            ctx.rgb(*cockpit.DIM).rectangle(-80, -69, 160, 22).fill()
         name = self.n_name or badge_name().upper()[:12]
         text(ctx, name, 0, -58, 16, (cockpit.GREEN if on else cockpit.WHITE) if self.n_name
              else cockpit.GREY)
@@ -3011,8 +3050,6 @@ class AceCommander(PLATFORM.App):
         top = -44 if many else -40
         for i, label in enumerate(items):
             y = top + i * step
-            if i == self.fmenu:
-                ctx.rgb(*cockpit.DIM).rectangle(-96, y - step / 2, 192, step).fill()
             text(ctx, label, 0, y, 12 if many else 13,
                  cockpit.GREEN if i == self.fmenu else cockpit.GREY)
 
