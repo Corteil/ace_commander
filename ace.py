@@ -1136,9 +1136,12 @@ class AceCommander(PLATFORM.App):
         """A new commander starts with nothing left from before (Brian, build 138):
         no flight carried on (its rules, docking style, ship, kills), no target,
         jump, witchspace, open screen or chart, and nothing banked. Kept: the
-        settings (options.json), the galaxy (remade if it differs) and the
-        tilt sensor's level."""
+        settings (options.json) and the tilt sensor's level. The galaxy goes
+        too (Brian): the new commander's, the first, is made afresh."""
         self.game = None
+        self.galaxy = None
+        self.galaxy_n = 0
+        self.find_names = None
         self.career = False     # an old commander's flight banks nothing into it
         self.docked = True
         self.banked = 0

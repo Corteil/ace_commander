@@ -1498,4 +1498,6 @@ what is now `ace.py` (renamed in build 50).
    docking style, ship, kills; a part-way practice fight too), and the target, countdown,
    witchspace, open screen / chart / search, banked kills and cash, last save, DEBUG page
    and LED effects are cleared. Kept: the settings (options.json), the galaxy (remade if it
-   differs), the tilt sensor's level. Test in `tests/test_hardcore.py`.
+   differs), the tilt sensor's level. Test in `tests/test_hardcore.py`. Then (Brian: "the galaxy
+   map should be reset to the first galaxy as well"): the galaxy is dropped too and made afresh
+   for the new commander, galaxy 1.

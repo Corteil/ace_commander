@@ -424,7 +424,10 @@ assert not a.game.rules.hardcore and a.game.docking == "B", a.game.docking
 print("HARDCORE changed since the last flight: its rules and docking: ok")
 
 # ---- NEW COMMANDER starts with nothing left from before (build 138)
+a.cmdr.galaxy = 3                   # an old commander in the fourth galaxy
 a._dock()
+assert a.galaxy_n == 3
+gal3 = a.galaxy
 a._start_flight(True)
 a.target = 5
 a.banked = 3
@@ -439,6 +442,10 @@ tick(a, fresh=["CONFIRM"])          # C: start
 assert a.mode == "docked" and a.cmdr.hardcore, a.mode
 assert a.game is None and a.target is None and a.banked == 0 and a.fsub is None, \
     (a.game is old_game, a.target, a.banked, a.fsub)
+assert a.cmdr.galaxy == 0 and a.galaxy_n == 0 and a.galaxy is not gal3, "back to the first galaxy"
+from ace_commander import galaxy as galaxy_mod
+first = galaxy_mod.Galaxy(galaxy_mod.seeds_for(mod.game_data.SEEDS, 0), mod.game_data.PAIRS)
+assert a.galaxy.system(a.cmdr.system).name == first.system(a.cmdr.system).name
 a._start_flight(True)
 assert a.game is not old_game and a.game.rules.manual_docking and a.game.docking == "A"
 print("NEW COMMANDER: nothing carried over: ok")
