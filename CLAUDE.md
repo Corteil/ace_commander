@@ -111,6 +111,12 @@ Other devices are in `hosts/`: the Pi, and the Tufty 2350 since build 109 (`host
   first) and checks sizes. **Not yet tried on the badge**: check it starts, how much faster
   the loading screen is, and that tracebacks still give line numbers. Not yet known whether
   the app store takes `.mpy` in a release.
+- `tools/make_release.py V [--commit] [--push]` - **the release (0.4.0 on)**: the badge app
+  compiled (build_mpy, no Elite files) committed onto the `release` branch and tagged there
+  (the app store installs GitHub's tarball of the tagged commit), plus the Tufty and Pi zips
+  in `build/release/` to attach to the GitHub release. Change the version in `tildagon.toml`
+  and `metadata.json` on main first. `app.py` removes old .py files that a .mpy replaces (the
+  store's update deletes nothing).
 - `tools/badge_log.py`, `deploy.bat` - copy to the badge, restart it, save its serial output
   to `badge_log.txt`.
 - `tests/` - PC test suite with stand-ins for the badge firmware.

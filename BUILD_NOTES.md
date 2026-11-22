@@ -1448,3 +1448,18 @@ what is now `ace.py` (renamed in build 50).
    ENTRY, Options has nine lines (docked and the title's), one more than fits above the hints.
    `cockpit.menu_lines` shows eight and scrolls with the selection, a small bar above / below
    when there is more.
+   **Build 132, release 0.4.0** (Brian: "how do we sort out the releases for the Pi and Tufty
+   versions? EMF badge, next version number and compiled files to reduce the size"). The app
+   store installs GitHub's tarball of the tagged commit (`firmware_apps/app_store.py`:
+   `install_app`, from the listing's `tarballUrl`), so a compiled release must be committed:
+   `tools/make_release.py V [--commit] [--push]` builds the badge app compiled (no Elite
+   files) onto the `release` branch, one commit a release, tagged there; main stays source.
+   Tarball 230 KB against 584 KB of source (limit 600 KB). The store's update writes over the
+   old folder and deletes nothing, so 0.3.2's .py would stay and be imported before the new
+   .mpy: `app.py` (still source) now removes every x.py with an x.mpy beside it before
+   importing anything. Checked on the badge: v0.3.2 installed store-style into
+   /apps/Corteil_ace_commander, 0.4.0's tarball written over it, the loader removed the 23
+   old .py files. Also built: `ace_commander-tufty-V.zip` (build_tufty --mpy, unzip into the
+   TUFTY drive's apps/) and `ace_commander-pi-V.zip` (source with hosts/pi, README_PI.txt),
+   attached to the GitHub release. Compiled code needs the badge's MicroPython (1.28's mpy
+   format): a firmware with another would need a new release.

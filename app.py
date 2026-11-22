@@ -17,6 +17,31 @@ import time
 
 import app
 
+
+def _drop_stale_source():
+    """Remove every x.py that has an x.mpy beside it (build 132). A release
+    since 0.4.0 is compiled, and the app store's update writes the new files
+    over the old folder without deleting anything: 0.3.2's game.py etc. would
+    stay, and MicroPython imports x.py before x.mpy, so the old code would run.
+    This file and __init__.py stay source and are never compiled."""
+    import os
+    here = __file__.rsplit("/", 1)[0] if "/" in __file__ else "."
+    try:
+        names = os.listdir(here)
+    except OSError:
+        return
+    for n in names:
+        if n.endswith(".mpy") and n[:-4] + ".py" in names:
+            try:
+                os.remove(here + "/" + n[:-4] + ".py")
+                print("removed old " + n[:-4] + ".py (" + n + " replaces it)")
+            except OSError:
+                pass
+
+
+if sys.implementation.name == "micropython":
+    _drop_stale_source()
+
 # in the order they are imported: each after the ones it needs
 STEPS = ("ship_data", "game_data", "config", "layout", "content", "commander", "galaxy", "market", "ships", "equipment", "rules", "game",
          "cockpit", "chart", "find", "screens", "title", "viewer", "describe", "missions", "briefing",
