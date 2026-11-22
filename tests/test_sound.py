@@ -153,6 +153,38 @@ g.step(0.04, 0, 0, 0, False, False)
 assert "crash" in g.sounds, g.sounds
 print("Game.sfx: laser, hurt, countdown, ENERGY LOW, missile exploding: ok")
 
+# the jump drive refused: Elite's long low beep, once a hold, again for a new field (build 144)
+mod.SAVE_PATH = os.path.join(tempfile.mkdtemp(), "j.json")
+from ace_commander import commander as _cm
+ja = ace_commander.AceCommander()
+ja.cmdr = _cm.Commander(1); ja._write(); ja._dock(); ja._start_flight(True)
+jg = ja.game
+jg.speed = jg.max_speed
+
+
+def hold(frames, throttle=1.0):
+    n = 0
+    for _ in range(frames):
+        del jg.sounds[:]
+        jg.step(0.04, 0, 0, throttle, False, False)
+        n += jg.sounds.count("boop")
+    return n
+
+
+assert jg.space.safe and hold(60) == 1, "the station's zone: once while held"
+sp = jg.space
+jg.to_sun(0.0, 1.5)                                 # the sun ahead: its mass, the station far
+jg.objs[:] = []
+assert not sp.safe and jg._blocker(sp) == "sun", jg._blocker(sp)
+jg.speed = jg.max_speed
+assert hold(30) == 1, "a new field stops the jump: once more"
+jg.speed = jg.max_speed
+assert hold(30) == 0, "still the same field"
+hold(2, throttle=0.0)                               # let go
+jg.speed = jg.max_speed
+assert hold(30) == 1, "held again: once"
+print("jump refused: once a hold, again for a new field: ok")
+
 
 # ---- ace hands them to the device, Options > SOUND
 class Sound:

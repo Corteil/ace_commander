@@ -73,7 +73,6 @@ WARP_TIME = 1.2            # seconds the streaks last on arriving
 LOCK_TIME = 2.0            # seconds a ship must stay in the sights before a missile locks
 ENERGY_LOW = 20.0          # energy banks (hull) below this: ENERGY LOW, as Elite's under 50 of 255
 LOW_EVERY = 2.0            # seconds between ENERGY LOW warnings (Elite: every 32 main loops)
-REFUSE_EVERY = 1.0         # seconds between the jump drive's refusal beeps, while held
 AUTO_LOCK_TIMES = (2.0, 3.0, 4.0)  # the lock with auto_missile, by level: EASY, NORMAL, HARD
                        # (no missile button; Brian, builds 112 and 114)
 MISSILE_SPEED = 1100.0     # world units per second
@@ -742,7 +741,7 @@ class Game:
         self.time = 0.0
         self.since_hit = 9.0
         self.flash = 0.0       # > 0 just after the player is hit
-        self.refuse_t = 0.0    # until the jump drive's refusal beeps again
+        self.refused = None    # what stops the jump drive while speed is held up (_blocker)
         self.low_t = 0.0       # until ENERGY LOW is said again
         self.over = False
         self.msg = "WAVE 1"
@@ -1069,6 +1068,23 @@ class Game:
         if self.shield < 50:
             return "RED"
         return "YELLOW" if near else "GREEN"
+
+    def _blocker(self, sp):
+        """What keeps the jump drive off just now: "station" (its safe zone), "planet" or
+        "sun" (a mass lock), "heat" (near the sun), "ships" (something in radar range), or
+        None. Each is its own field: the refusal beeps again only when it changes."""
+        if sp.safe:
+            return "station"
+        for name, x, y, z, r in (("planet", sp.px, sp.py, sp.pz, sp.pr),
+                                 ("sun", sp.sx, sp.sy, sp.sz, sp.sr)):
+            k = r * MASS_LOCK_K
+            if x * x + y * y + z * z < k * k:
+                return name
+        if self.cabin > COOL_CABIN:
+            return "heat"
+        if self._near():
+            return "ships"
+        return None
 
     def _massed(self, sp):
         """True within MASS_LOCK_K radii of the planet's or the sun's centre (the mass lock: the
@@ -1492,12 +1508,14 @@ class Game:
                 and throttle > 0 and self.speed >= self.max_speed and self.msg_t <= 0
                 and not self.jumping and self._massed(sp)):
             self.say("MASS LOCKED", 1.0)
-        self.refuse_t -= dt
         if (sp is not None and not sp.witch and not self.over and throttle > 0
-                and self.speed >= self.max_speed and not self.jumping and self.jump_t <= 0
-                and self.refuse_t <= 0):
-            self.sfx("boop")    # the jump drive refused: Elite's long low beep (WA1)
-            self.refuse_t = REFUSE_EVERY
+                and self.speed >= self.max_speed and not self.jumping and self.jump_t <= 0):
+            why = self._blocker(sp)
+            if why is not None and why != self.refused:
+                self.sfx("boop")    # the jump drive refused: Elite's long low beep (WA1), once
+            self.refused = why      # a hold, and again only for a new mass field (Brian, build 144)
+        else:
+            self.refused = None
         if not self.over:       # Elite: ENERGY LOW, with a beep, while the banks are low
             self.low_t -= dt
             if self.hull < ENERGY_LOW and self.low_t <= 0:

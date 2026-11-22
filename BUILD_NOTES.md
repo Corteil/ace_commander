@@ -1560,3 +1560,8 @@ what is now `ace.py` (renamed in build 50).
    a full tank in the band: FUEL FULL, once a pass (`Game.full_said`). DEBUG > TO THE SUN now
    passes half SCOOP_ALT above the surface. Tests in test_game, test_commander, test_leds; a
    market check in test_commander made safe for a stock of exactly 20 (NONE LEFT).
+   **Build 144** (Brian: "the mass lock should only bleep once when held in the same mass field,
+   and can sound if a new mass field stops the jump"). `Game._blocker` names what keeps the jump
+   drive off: "station" (its safe zone), "planet" / "sun" (mass lock), "heat", "ships"; the boop
+   plays when that changes to something new while speed is held up at full (`Game.refused`),
+   and letting go resets it. (Was: once a second while held.)
