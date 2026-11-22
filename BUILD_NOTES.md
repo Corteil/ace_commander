@@ -1565,3 +1565,5 @@ what is now `ace.py` (renamed in build 50).
    drive off: "station" (its safe zone), "planet" / "sun" (mass lock), "heat", "ships"; the boop
    plays when that changes to something new while speed is held up at full (`Game.refused`),
    and letting go resets it. (Was: once a second while held.)
+   **Release 0.4.3** (2026-11-22): builds 140-144 (sound, ENERGY LOW, the fixed scooping height,
+   FUEL FULL); the Pi zip's README names --sound.
