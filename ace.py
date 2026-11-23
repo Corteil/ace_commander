@@ -388,6 +388,8 @@ class AceCommander(PLATFORM.App):
         self.od_msg = None               # and what the last cheat did
         self.od_msg_t = 0.0
         self._load_options()
+        if self.use_sound and hasattr(self.platform, "sound_warm"):
+            self.platform.sound_warm()      # the badge's I2S open now, settled by the first sound
         c = self.cmdr
         if c is not None and c.hardcore is None:    # a save from before build 74:
             c.hardcore = self.old_hardcore          # HARDCORE was an option then

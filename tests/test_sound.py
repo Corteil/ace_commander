@@ -162,6 +162,16 @@ for table in (sfx.OWN, SOUNDS_IN_USE):
         want = max(sum(RATE * st[1] // 1000 for st in part) for part in table[name][1:])
         assert len(out.samples) == want, (name, len(out.samples), want)
         assert max(abs(v) for v in out.samples) <= 32767, name
+# just opened: nothing written while it settles, then the sound from its start
+out, s = synth()
+s.settle()
+sfx.SOUNDS = dict(sfx.OWN, tone=(1, [(1000, 100)]))
+s.play("tone")
+for _ in range(i2s_sound.SETTLE_MS // 40):
+    now[0] += 40; s.step()
+assert out.calls == 0, "settling: nothing written"
+run(s, 400)
+assert len(out.samples) == RATE * 100 // 1000 and s.hold is None, "then all of it"
 # VOLUME: the height, from the next sound (or step)
 for v, want in ((1, sfx.VOLUMES[1]), (11, sfx.VOLUMES[11]), (0, sfx.VOLUMES[1]), (99, sfx.VOLUMES[11])):
     out, s = synth()

@@ -38,6 +38,7 @@ owner_name:
       .set_volume(v)            optional: Options > VOLUME, 1-11 (build 145);
                                 missing: no VOLUME line
       .sound_stop()             optional: cut off what is playing (SOUND: MUTED)
+      .sound_warm()             optional: get ready to play (at start, SOUND ON)
     owner_name()                the device owner's name, or None
 """
 import asyncio
@@ -247,6 +248,7 @@ class Platform:
             self.i2s = i2s_sound.open_i2s(self.sound_port)
             self.synth = i2s_sound.Synth(self.i2s)
             self.synth.set_volume(self.volume)
+            self.synth.settle()
             print("I2S sound on hexpansion port %d" % self.sound_port)
         except Exception as e:
             print("I2S sound on port %s failed: %r" % (self.sound_port, e))
@@ -269,6 +271,12 @@ class Platform:
             self.close_sound()
             self.sound_port = port
             self.sound_failed = False
+
+    def sound_warm(self):
+        """Open the I2S now (the game starting with SOUND ON), so the first
+        sound in flight doesn't wait for it to settle."""
+        if self.sound_ok and self.synth is None:
+            self._open_sound()
 
     def set_volume(self, v):
         self.volume = v

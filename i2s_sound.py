@@ -39,7 +39,9 @@ except ImportError:
 RATE = 11025            # samples a second, mono 16 bit: the BBC Micro's sounds are low-fi
 LEAD_MS = 120           # written ahead of what plays: rides out a garbage collection (~45 ms)
 CHUNK = 512             # samples made at a time (the buffer, reused)
-IBUF = 8192             # bytes the I2S driver buffers (~370 ms): more than LEAD_MS
+IBUF = 8192             # bytes the I2S driver buffers (it keeps 16-bit stereo: ~186 ms)
+SETTLE_MS = 250         # after opening, its buffers are all in use for about that long, so a
+                        # write waits (measured: 43-67 ms frames): nothing written till then
 MAX_VOICES = 4          # parts playing at once (the BBC Micro had 4 channels)
 PORT = 2                # the hexpansion port, as BadgeRadio's default
 PORTS = (1, 2, 3, 4, 5, 6)
@@ -51,6 +53,13 @@ PHASE, INC, AMP, VALUE, RAND = 0, 1, 2, 3, 4
 
 if sys.implementation.name == "micropython":
     import micropython
+
+    @micropython.viper
+    def _clear(buf: ptr16, n: int):
+        i = 0
+        while i < n:
+            buf[i] = 0
+            i += 1
 
     @micropython.viper
     def _square(buf: ptr16, pos: int, n: int, st: ptr32):
@@ -111,6 +120,10 @@ if sys.implementation.name == "micropython":
         st[3] = val
         st[4] = int(s)
 else:
+    def _clear(buf, n):
+        for i in range(n):
+            buf[i] = 0
+
     def _square(buf, pos, n, st):
         phase, inc, amp = st[0], st[1], st[2]
         for i in range(pos, pos + n):
@@ -182,6 +195,11 @@ class Synth:
         self.written = 0        # samples written since t0
         self.seed = SEED
         self.level = sfx.VOLUMES[sfx.VOLUME_DEFAULT]    # the height at level 126
+        self.hold = None        # nothing written before this time (ms), or None
+
+    def settle(self, ms=SETTLE_MS):
+        """Just opened: write nothing for ms (sounds asked for meanwhile start then)."""
+        self.hold = self.clock() + ms
 
     def set_volume(self, v):
         """Options > VOLUME, 1-11 (sfx.VOLUMES): from each sound's next step."""
@@ -212,6 +230,10 @@ class Synth:
 
     def step(self):
         """Write what plays before LEAD_MS from now (each frame)."""
+        if self.hold is not None:
+            if ticks_diff(self.hold, self.clock()) > 0:
+                return
+            self.hold = None
         if self.t0 is None:
             if not self.voices:
                 return
@@ -237,8 +259,7 @@ class Synth:
         """The next n samples of every voice, mixed into buf. Returns how many
         to write: n, or fewer if every voice ended before it."""
         buf = self.buf
-        for i in range(n):
-            buf[i] = 0
+        _clear(buf, n)
         done = False
         last = 0
         for v in self.voices:

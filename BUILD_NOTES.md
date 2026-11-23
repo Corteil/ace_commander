@@ -1590,3 +1590,10 @@ what is now `ace.py` (renamed in build 50).
    noise, voices, channels, keeping ahead, every sound of both tables, VOLUME, MUTED, SOUND
    PORT), the Pi and Tufty host tests. **PC only: not yet heard on the badge**; the frame-time
    cost of the viper loops isn't measured.
+   Build 145 on the badge (2026-11-23, MAX98357A on port 2, played from the REPL): each 551-sample
+   write first blocked as long as it plays (46 ms): the firmware keeps 16-bit stereo in DMA
+   (`IBUF` 8 KB = ~186 ms) and right after opening all of it is in use, so the first sound cost
+   43-67 ms. Now the I2S opens at start with SOUND ON (`Platform.sound_warm`) and `Synth.settle()`
+   writes nothing for `SETTLE_MS` (250 ms) after opening; the buffer clear is viper too
+   (`_clear`). Measured: a sound's first frame 0.6-1.9 ms (the lead written), then 0.3-0.7 ms a
+   frame; about 60 bytes of garbage a frame while playing (memoryview slices, voices).
