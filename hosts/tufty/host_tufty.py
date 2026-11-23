@@ -70,8 +70,8 @@ class Host:
         self.rect = rect
         self.buttons = buttons
         self.pad = pad
-        self.buzzer = buzzer    # a Qwiic buzzer found at start (_buzzer), or None
         self.real_pad = pad     # the Pad found at start
+        self.buzzer = buzzer    # a buzzer found at start (_buzzer: SparkFun or Modulino), or None
         self.pad_off = False    # DEBUG > GAMEPAD OFF: the Pad ignored in combat practice
         self.waits = {}         # button -> when it went down alone (PAIR_WAIT), on self.clock
         self.typed = set()      # the buttons down last frame while typing (dialog_tufty)
@@ -255,9 +255,10 @@ class Host:
             self.ace = _module("ace")
             self.loaded = self.ace.AceCommander()     # started once LOAD_HOLD is up
             self.loaded.platform.ck = _module("cockpit")    # to draw the text entry
-            if self.buzzer is not None:     # sound (build 140)
+            if self.buzzer is not None:     # sound (builds 140, 146)
                 self.loaded.platform.buzzer = self.buzzer
                 self.loaded.platform.sound_ok = True
+                self.loaded._apply_volume()     # options.json's VOLUME
             if self.real_pad is not None:   # DEBUG > DISPLAY > GAMEPAD can switch it
                 self.loaded.platform.gamepad = True
                 self.loaded.platform.host = self
@@ -388,14 +389,16 @@ def _pad():
 
 
 def _buzzer():
-    """A SparkFun Qwiic Buzzer on the Qw/ST port (the Pad's bus), or None (build 140)."""
+    """A SparkFun Qwiic Buzzer or an Arduino Modulino Buzzer on the Qw/ST port
+    (the Pad's bus), or None (builds 140, 146)."""
     try:
         from machine import I2C, Pin
-        from ace_commander import buzzer
+        import buzzer_tufty
         i2c = I2C(0, sda=Pin(PAD_SDA), scl=Pin(PAD_SCL), freq=400000)
-        if buzzer.find(i2c):
-            print("Qwiic buzzer on the Qw/ST port")
-            return buzzer.Buzzer(i2c)
+        b = buzzer_tufty.open_buzzer(i2c)   # SparkFun Qwiic or Arduino Modulino (build 146)
+        if b is not None:
+            print("%s on the Qw/ST port" % type(b).__name__)
+        return b
     except Exception:
         pass
     return None

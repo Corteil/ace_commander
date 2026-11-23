@@ -145,7 +145,8 @@ class Host:
         if sound:                           # --sound (build 140): sfx.py's sounds by pygame
             try:
                 import sound_pi
-                self.player = sound_pi.Player(pygame, importlib.import_module(PKG + ".sfx"))
+                self.player = sound_pi.Player(pygame, importlib.import_module(PKG + ".sfx"),
+                                              importlib.import_module(PKG + ".i2s_sound"))
             except Exception as e:
                 print("no sound:", e)
         if self.player is not None:
@@ -153,6 +154,9 @@ class Host:
             p.sound_ok = True
             p.sound = self.player.play
             p.sound_step = self.player.step
+            p.set_volume = self.player.set_volume       # Options > VOLUME (build 145)
+            p.sound_stop = self.player.stop
+            self.app._apply_volume()        # options.json's, read before the player was there
         self.clock = pygame.time.Clock()
         self.running = True
         self.frames = 0

@@ -105,6 +105,8 @@ TILT_FLIPS = ("NORMAL", "UP/DOWN FLIPPED", "L/R FLIPPED", "BOTH FLIPPED")
 INVERT_PITCH = False    # False: joystick up raises the nose. True: up dives.
 SHOW_FRAME_TIME = True  # small frame time (ms) at the top of the flight screen, to start with
 DEBUG_ROWS = 7          # DEBUG page lines shown at once, the chosen one in the middle
+VOLUME_MAX = 11         # Options > VOLUME 1-11 (build 145): as sfx.VOLUME_MAX and
+VOLUME_DEFAULT = 8      # VOLUME_DEFAULT (not imported here: sfx costs heap without sound)
 USE_LEDS = True         # flash the badge's LEDs red when hit (else a ring on screen)
 FAST_FRAMES = True      # on the title screen, in flight and in the viewer, don't wait
                         # 50 ms between frames
@@ -369,7 +371,8 @@ class AceCommander(PLATFORM.App):
         self.jump_lit = False            # the last write was a jump flash
         self.jump_rgb = DUST_RGB         # their colour at full brightness
         self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
-        self.use_sound = True            # SOUND: ON / OFF (build 140), where there is sound
+        self.use_sound = True            # SOUND: ON / MUTED (builds 140, 145), where there is sound
+        self.volume = VOLUME_DEFAULT     # VOLUME: 1-11 (build 145), where the device has it
         self.use_picker = False          # TEXT ENTRY: the letter picker (picker.py) rather than
                                          # the badge's own dialog (build 124, an option)
         self.old_hardcore = False        # options.json's HARDCORE from before build 74
@@ -385,6 +388,8 @@ class AceCommander(PLATFORM.App):
         self.od_msg = None               # and what the last cheat did
         self.od_msg_t = 0.0
         self._load_options()
+        if self.use_sound and hasattr(self.platform, "sound_warm"):
+            self.platform.sound_warm()      # the badge's I2S open now, settled by the first sound
         c = self.cmdr
         if c is not None and c.hardcore is None:    # a save from before build 74:
             c.hardcore = self.old_hardcore          # HARDCORE was an option then
@@ -1140,7 +1145,7 @@ class AceCommander(PLATFORM.App):
         return False
 
     def _sound_ok(self):
-        """The device can play sounds (Platform.sound: the Pi, a Qwiic buzzer)."""
+        """The device can play sounds (Platform.sound: the Pi, the badge's I2S)."""
         return getattr(self.platform, "sound_ok", False)
 
     def _play(self, name):
@@ -1148,9 +1153,14 @@ class AceCommander(PLATFORM.App):
         if self.use_sound and self._sound_ok():
             self.platform.sound(name)
 
+    def _apply_volume(self):
+        """Options > VOLUME to the device, if it has one (build 145)."""
+        if hasattr(self.platform, "set_volume"):
+            self.platform.set_volume(self.volume)
+
     def _sounds(self):
         """Each frame: the flight's sounds (Game.sfx) to the device, and its
-        player moved on (a buzzer plays one tone at a time)."""
+        player moved on (the badge's I2S writes what plays next)."""
         g = self.game
         if g is not None and g.sounds:
             if self.mode == "flight" and not self.paused:
@@ -1778,8 +1788,13 @@ class AceCommander(PLATFORM.App):
             items.append("CONSTRICTOR: " + ("2 MIN" if self.cmdr.quick_con else "ORIGINAL"))
         if self.platform.leds:
             items.append("LEDS: " + ("ON" if self.use_leds else "OFF"))
-        if self._sound_ok():        # the Pi, or a Qwiic buzzer found (build 140)
-            items.append("SOUND: " + ("ON" if self.use_sound else "OFF"))
+        if self._sound_ok():        # the Pi, or the badge's I2S (builds 140, 145)
+            items.append("SOUND: " + ("ON" if self.use_sound else "MUTED"))
+            if self.use_sound and hasattr(self.platform, "set_volume"):    # (build 145)
+                items.append("VOLUME: %d" % self.volume)
+            port = getattr(self.platform, "sound_port", None)
+            if port is not None and self.use_sound:     # where the I2S amp is (build 145)
+                items.append("SOUND PORT: %d" % port)
         if getattr(self.platform, "picker_choice", False):    # the badge: its own or the picker
             items.append("TEXT ENTRY: " + ("PICKER" if self.use_picker else "BADGE"))
         if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose data, from the next start
@@ -1846,11 +1861,25 @@ class AceCommander(PLATFORM.App):
             if not self.use_leds:
                 self._leds_release()
             self._save_options()
+        elif item.startswith("SOUND PORT"):    # 1-6, left back (build 145)
+            p = self.platform
+            p.set_sound_port((p.sound_port - 1 + (-1 if left else 1)) % 6 + 1)
+            self._save_options()
+            self._play("beep")      # heard if the amp is on this port
+        elif item.startswith("VOLUME"):        # 1-11, left quieter; stops at the ends
+            v = max(1, min(VOLUME_MAX, self.volume + (-1 if left else 1)))
+            if v != self.volume:
+                self.volume = v
+                self._apply_volume()
+                self._save_options()
+            self._play("beep")      # at the new volume
         elif item.startswith("SOUND"):
-            self.use_sound = not self.use_sound
+            self.use_sound = not self.use_sound     # ON / MUTED
             self._save_options()
             if self.use_sound:
-                self._play("tick")
+                self._play("beep")
+            elif hasattr(self.platform, "sound_stop"):
+                self.platform.sound_stop()          # muted: at once
         elif item.startswith("TEXT ENTRY"):
             self.use_picker = not self.use_picker
             self._save_options()
@@ -1870,6 +1899,14 @@ class AceCommander(PLATFORM.App):
                 self.use_picker = d["picker"]
             if isinstance(d.get("sound"), bool):
                 self.use_sound = d["sound"]
+            v = d.get("volume")
+            if isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= VOLUME_MAX:
+                self.volume = v
+                self._apply_volume()
+            sp = d.get("sound_port")
+            if (isinstance(sp, int) and not isinstance(sp, bool) and 1 <= sp <= 6
+                    and getattr(self.platform, "sound_port", None) is not None):
+                self.platform.set_sound_port(sp)
             k = d.get("tilt_flip")
             if isinstance(k, int) and not isinstance(k, bool) and 0 <= k < len(TILT_FLIPS):
                 self.tilt_flip = k
@@ -1892,6 +1929,8 @@ class AceCommander(PLATFORM.App):
                 f.write(json.dumps({"tilt": self.use_tilt, "tilt_flip": self.tilt_flip,
                                     "leds": self.use_leds, "picker": self.use_picker,
                                     "sound": self.use_sound,
+                                    "volume": self.volume,
+                                    "sound_port": getattr(self.platform, "sound_port", None),
                                     "practice_level": self.p_level,
                                     "practice_hardcore": self.p_hardcore,
                                     "own": self.own_ships, "egg": self.egg,

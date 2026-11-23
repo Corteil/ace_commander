@@ -1567,3 +1567,57 @@ what is now `ace.py` (renamed in build 50).
    and letting go resets it. (Was: once a second while held.)
    **Release 0.4.3** (2026-11-22): builds 140-144 (sound, ENERGY LOW, the fixed scooping height,
    FUEL FULL); the Pi zip's README names --sound.
+   **Build 145** (Brian, 2026-11-23: a MAX98357A I2S amp on port 2; "can this be used for
+   sound for ace instead of the buzzer, remove the buzzer code"; "needs a volume control and
+   mute on the options menu"; "make it 11"). Built from `plans/I2S_SOUND.md`. `i2s_sound.py`:
+   `Synth` plays `sfx.py`'s sounds as they go (nothing stored), one voice per part (at most 4;
+   the lowest priority goes first), a sound restarting its channel (`sfx.CHANNELS`), square waves
+   from a 16.16 phase and noise from xorshift, mixed into one reused 512-sample buffer, 11025 Hz
+   mono 16 bit. Each frame `step()` writes only what plays before `LEAD_MS` (120 ms) from now, so
+   the I2S buffer (`IBUF` 8 KB, ~370 ms) is never full and the frame doesn't wait; after a long
+   frame it starts again from now (the gap is silence); nothing is written while idle (the
+   firmware's I2S has `auto_clear`: it sends silence when it runs dry). Inner loops are viper on
+   the badge, plain Python on a PC (same numbers). `open_i2s(port)` as BadgeRadio: I2S 0 on the
+   port's HS1 BCLK, HS2 LRC, HS3 DIN, opened small and closed first. `platform_tildagon`: sound
+   whenever `machine.I2S` exists (an amp can't be detected), opened on the first sound, closed in
+   `minimise` (so BadgeRadio can have it); a port that won't open stays silent until SOUND PORT
+   changes. Options: SOUND: ON / MUTED (muting cuts off what plays: `sound_stop`), VOLUME: 1-11
+   (`sfx.VOLUMES`, about 4 dB a step, 11 one past 10; stops at the ends; beeps at the new
+   level), SOUND PORT: 1-6 (wraps; beeps), the last two hidden while muted; saved as "volume" and
+   "sound_port". The Pi has VOLUME too (sounds made at the loudest, channels turned down).
+   **The Qwiic buzzer is gone** (`buzzer.py`, `_find_buzzer`, the Tufty's `_buzzer`): the Tufty
+   has no sound now (no free I2S pins). Tests: `test_sound.py` (pitch, levels, rests, mixing,
+   noise, voices, channels, keeping ahead, every sound of both tables, VOLUME, MUTED, SOUND
+   PORT), the Pi and Tufty host tests. **PC only: not yet heard on the badge**; the frame-time
+   cost of the viper loops isn't measured.
+   Build 145 on the badge (2026-11-23, MAX98357A on port 2, played from the REPL): each 551-sample
+   write first blocked as long as it plays (46 ms): the firmware keeps 16-bit stereo in DMA
+   (`IBUF` 8 KB = ~186 ms) and right after opening all of it is in use, so the first sound cost
+   43-67 ms. Now the I2S opens at start with SOUND ON (`Platform.sound_warm`) and `Synth.settle()`
+   writes nothing for `SETTLE_MS` (250 ms) after opening; the buffer clear is viper too
+   (`_clear`). Measured: a sound's first frame 0.6-1.9 ms (the lead written), then 0.3-0.7 ms a
+   frame; about 60 bytes of garbage a frame while playing (memoryview slices, voices).
+   **Build 146** (Brian, 2026-11-23: "are they the same sounds on the pi build?" — "yes and add
+   back sound for the tufty build"; "use the sparkfun buzzer or the arduino modulino buzzer").
+   The Pi now makes its sounds with the badge's synthesiser (`i2s_sound.Synth.render`, at the
+   mixer's 22050 Hz and VOLUME 11, then turned down by VOLUME): exact pitches (its own square
+   waves rounded the period to whole samples: 1838-2100 Hz all came out 2205 Hz, 700 Hz 735),
+   the same noise and mixing; 15 sounds in 0.13 s at start on the Pi 5. `test_sound` checks
+   `render` gives the very samples the badge streams. The Tufty's sound is back as a host file,
+   `hosts/tufty/buzzer_tufty.py` (in `HOST_FILES`; `i2s_sound.py` is `BADGE_ONLY` now): the
+   build 140 SparkFun Qwiic Buzzer (0x34) or, if not, an **Arduino Modulino Buzzer** (7-bit
+   0x1E, Arduino's 0x3C; from arduino-modulino-mpy: one `writeto` of 8 bytes a tone, frequency
+   then ms, each 32-bit little-endian, all zeros to stop; no volume; nothing under 180 Hz, so
+   lower notes are raised to 180), on the Qw/ST port (`host_tufty._buzzer`, `open_buzzer`).
+   VOLUME 1-11 maps onto the SparkFun's 1-4 (8 gives its old default 3); MUTED stops it. Tests:
+   `hosts/tufty/tests/test_buzzer_tufty.py` (new, in run_all), the Tufty host test. **Neither
+   buzzer tried for real** (PC only).
+   **Build 147** (Brian, 2026-11-23, on the Tufty with the Modulino: "is there no way for the
+   static sound on the tufty"). Seven test bursts from the REPL (a new random pitch every 20, 5,
+   3, 2 or 1 ms; 250-1333 Hz or 200-8000 Hz): Brian couldn't tell 3 ms from 2 ms, and the wide
+   range "sounded like bleeps with static". So noise steps on a Tufty buzzer now change pitch
+   every `NOISE_FAST` (3 ms) from a `machine.Timer` (soft callback, `Buzzer._tick`), over the
+   same pitches as before (rate / 16 to rate / 3, 80-4000 Hz); on only during a noise step
+   (`_slow` turns it off at a tone, a rest, the end, stop). Without a timer (a PC) the old
+   way: a new pitch each frame at most (`NOISE_STEP`). Both buzzers. About 333 I2C writes a
+   second while noise plays (each ~0.25 ms). Tests in test_buzzer_tufty.

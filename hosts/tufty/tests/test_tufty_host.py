@@ -303,7 +303,7 @@ assert any(platform_tufty.LEDS[i][0] > 100 for i in range(1, 13)), "the hit ligh
 assert badge.lights and badge.lights[-1] > 0.3, "and the case lights"
 shot("tufty_hit")
 print("Tufty host: title, new commander, docked, launch, flight, dashboard, LED border: ok")
-# a Qwiic buzzer on the Qw/ST port (build 140): the game's sounds go to it
+# a buzzer on the Qw/ST port (builds 140, 146: SparkFun or Modulino): the game's sounds go to it
 assert not h.app.platform.sound_ok and not any(i.startswith("SOUND") for i in h.app._settings(False))
 
 
@@ -311,6 +311,8 @@ class FakeBuzzer:
     def __init__(self):
         self.played = []
         self.steps = 0
+        self.volume = None
+        self.stopped = 0
 
     def play(self, name):
         self.played.append(name)
@@ -318,13 +320,25 @@ class FakeBuzzer:
     def step(self):
         self.steps += 1
 
+    def set_volume(self, v):
+        self.volume = v
+
+    def stop(self):
+        self.stopped += 1
+
 
 fb = FakeBuzzer()
 make(None, fb)
 a = h.app
-assert a.platform.sound_ok and "SOUND: ON" in a._settings(False)
+items = a._settings(False)
+assert a.platform.sound_ok and "SOUND: ON" in items and "VOLUME: %d" % a.volume in items, items
+assert fb.volume == a.volume, "options.json's VOLUME given to the buzzer"
+assert not any(i.startswith("SOUND PORT") for i in items), "no port to choose"
 frames(2)
 assert fb.steps > 0, "moved on each frame"
+a._change("VOLUME", True)
+assert fb.volume == a.volume
+a._change("VOLUME", False)
 a.mode = "menu"
 a.menu = a.choices().index("COMBAT PRACTICE")
 press("B"); press("B")      # practice's page, then fly
@@ -332,5 +346,8 @@ assert a.mode == "flight", a.mode
 a.game.sfx("explode")
 frames(1)
 assert "explode" in fb.played, fb.played
-print("Tufty: a Qwiic buzzer plays the game's sounds: ok")
+a._change("SOUND: ON", False)
+assert fb.stopped == 1, "MUTED stops it"
+a._change("SOUND: MUTED", False)
+print("Tufty: a buzzer plays the game's sounds, VOLUME, MUTED: ok")
 print("ALL TUFTY HOST TESTS PASSED")
