@@ -1597,3 +1597,18 @@ what is now `ace.py` (renamed in build 50).
    writes nothing for `SETTLE_MS` (250 ms) after opening; the buffer clear is viper too
    (`_clear`). Measured: a sound's first frame 0.6-1.9 ms (the lead written), then 0.3-0.7 ms a
    frame; about 60 bytes of garbage a frame while playing (memoryview slices, voices).
+   **Build 146** (Brian, 2026-11-23: "are they the same sounds on the pi build?" — "yes and add
+   back sound for the tufty build"; "use the sparkfun buzzer or the arduino modulino buzzer").
+   The Pi now makes its sounds with the badge's synthesiser (`i2s_sound.Synth.render`, at the
+   mixer's 22050 Hz and VOLUME 11, then turned down by VOLUME): exact pitches (its own square
+   waves rounded the period to whole samples: 1838-2100 Hz all came out 2205 Hz, 700 Hz 735),
+   the same noise and mixing; 15 sounds in 0.13 s at start on the Pi 5. `test_sound` checks
+   `render` gives the very samples the badge streams. The Tufty's sound is back as a host file,
+   `hosts/tufty/buzzer_tufty.py` (in `HOST_FILES`; `i2s_sound.py` is `BADGE_ONLY` now): the
+   build 140 SparkFun Qwiic Buzzer (0x34) or, if not, an **Arduino Modulino Buzzer** (7-bit
+   0x1E, Arduino's 0x3C; from arduino-modulino-mpy: one `writeto` of 8 bytes a tone, frequency
+   then ms, each 32-bit little-endian, all zeros to stop; no volume; nothing under 180 Hz, so
+   lower notes are raised to 180), on the Qw/ST port (`host_tufty._buzzer`, `open_buzzer`).
+   VOLUME 1-11 maps onto the SparkFun's 1-4 (8 gives its old default 3); MUTED stops it. Tests:
+   `hosts/tufty/tests/test_buzzer_tufty.py` (new, in run_all), the Tufty host test. **Neither
+   buzzer tried for real** (PC only).

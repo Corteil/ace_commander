@@ -172,6 +172,14 @@ for _ in range(i2s_sound.SETTLE_MS // 40):
 assert out.calls == 0, "settling: nothing written"
 run(s, 400)
 assert len(out.samples) == RATE * 100 // 1000 and s.hold is None, "then all of it"
+# render (the Pi's, build 146): the same samples the badge streams
+sfx.SOUNDS = sfx.OWN
+for name in ("laser", "explode", "jump", "ecm"):
+    out, s = synth()
+    s.play(name)
+    run(s, sfx.length(name) + 400)
+    r = i2s_sound.Synth(None).render(name)
+    assert list(r) == out.samples, (name, len(r), len(out.samples))
 # VOLUME: the height, from the next sound (or step)
 for v, want in ((1, sfx.VOLUMES[1]), (11, sfx.VOLUMES[11]), (0, sfx.VOLUMES[1]), (99, sfx.VOLUMES[11])):
     out, s = synth()

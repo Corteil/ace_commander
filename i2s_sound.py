@@ -222,6 +222,18 @@ class Synth:
                     break
         self.voices = vs
 
+    def render(self, name):
+        """The whole of one sound, as 16-bit samples (array 'h'): the Pi makes
+        each of its sounds this way at start (build 146), so both play the
+        same. Not for the badge: a sound at once costs heap."""
+        out = array("h")
+        self.voices = []
+        self.play(name)
+        while self.voices:
+            n = self._make(CHUNK)
+            out.extend(self.buf[:n])
+        return out
+
     def playing(self):
         return bool(self.voices)
 
