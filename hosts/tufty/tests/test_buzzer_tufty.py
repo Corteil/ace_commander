@@ -139,4 +139,55 @@ assert mb.writes[-1] == bytes(8), "level 0: a rest"
 m.stop()
 assert mb.writes[-1] == bytes(8) and m.steps is None
 print("Arduino Modulino Buzzer: found, tones, low notes, rests, stop: ok")
+
+
+# ---- fast noise by a timer (build 147): a new pitch every NOISE_FAST ms, then off
+class FakeTimer:
+    PERIODIC = 1
+
+    def __init__(self):
+        self.on = False
+        self.inits = 0
+
+    def init(self, period, mode, callback):
+        assert period == buzzer.NOISE_FAST and mode == self.PERIODIC
+        self.on, self.cb = True, callback
+        self.inits += 1
+
+    def deinit(self):
+        self.on = False
+
+    def fire(self, n):
+        for _ in range(n):
+            if self.on:
+                self.cb(self)
+
+
+ft = FakeTimer()
+mb = FakeModulino()
+m = buzzer.ModulinoBuzzer(mb, timer=ft)
+sfx.SOUNDS = {"bang": (3, [(-4000, 100), (-4000, 100), (1000, 50)]), "tone": (1, [(800, 100)])}
+now[0] = 9000
+m.play("bang")
+assert ft.on and ft.inits == 1 and len(mb.writes) == 2, "noise: the timer on, a pitch at once"
+ft.fire(30)
+assert len(mb.writes) == 32, "a pitch a tick"
+pitches = [tone(w)[0] for w in mb.writes[1:]]
+assert all(250 <= f <= 1333 for f in pitches) and len(set(pitches)) > 10, "random, 250-1333 Hz"
+assert all(tone(w)[1] == buzzer.NOISE_FAST + 5 for w in mb.writes[1:]), "each a little longer"
+now[0] += 100; m.step()
+assert ft.on and ft.inits == 1, "the next noise step: the timer carries on"
+now[0] += 120                       # past the noise, into the tone: ticks write nothing
+n = len(mb.writes)
+ft.fire(5)
+assert len(mb.writes) == n, "the step is over: no more pitches"
+m.step()
+assert not ft.on and tone(mb.writes[-1])[0] == 1000, "the tone: the timer off"
+m.play("bang")
+assert ft.on
+m.stop()
+assert not ft.on and mb.writes[-1] == bytes(8), "stopped (MUTED): off"
+m.play("bang"); now[0] += 300; m.step()
+assert not ft.on and m.steps is None, "the sound over: off"
+print("fast noise by a timer: every %d ms, 250-1333 Hz, off after: ok" % buzzer.NOISE_FAST)
 print("ALL TUFTY BUZZER TESTS PASSED")

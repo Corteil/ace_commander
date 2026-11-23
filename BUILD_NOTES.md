@@ -1612,3 +1612,12 @@ what is now `ace.py` (renamed in build 50).
    VOLUME 1-11 maps onto the SparkFun's 1-4 (8 gives its old default 3); MUTED stops it. Tests:
    `hosts/tufty/tests/test_buzzer_tufty.py` (new, in run_all), the Tufty host test. **Neither
    buzzer tried for real** (PC only).
+   **Build 147** (Brian, 2026-11-23, on the Tufty with the Modulino: "is there no way for the
+   static sound on the tufty"). Seven test bursts from the REPL (a new random pitch every 20, 5,
+   3, 2 or 1 ms; 250-1333 Hz or 200-8000 Hz): Brian couldn't tell 3 ms from 2 ms, and the wide
+   range "sounded like bleeps with static". So noise steps on a Tufty buzzer now change pitch
+   every `NOISE_FAST` (3 ms) from a `machine.Timer` (soft callback, `Buzzer._tick`), over the
+   same pitches as before (rate / 16 to rate / 3, 80-4000 Hz); on only during a noise step
+   (`_slow` turns it off at a tone, a rest, the end, stop). Without a timer (a PC) the old
+   way: a new pitch each frame at most (`NOISE_STEP`). Both buzzers. About 333 I2C writes a
+   second while noise plays (each ~0.25 ms). Tests in test_buzzer_tufty.

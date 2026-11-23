@@ -33,7 +33,9 @@ REG_FREQ = 0x03
 REG_ACTIVE = 0x08
 MODULINO = 0x1E             # an Arduino Modulino Buzzer (build 146): 0x3C in Arduino's
 MODULINO_MIN = 180          # 8-bit form; 8 bytes a tone, no volume, nothing under 180 Hz
-NOISE_STEP = 20             # ms a pitch lasts in a noise burst
+NOISE_STEP = 20             # ms a pitch lasts in a noise burst, changed each frame
+NOISE_FAST = 3              # with a timer: a new pitch every 3 ms, heard as static (Brian,
+                            # build 147: 3 and 2 ms alike; 250-1333 Hz better than 200-8000)
 VOLUME = 3                  # 1 quiet ... 4 loudest
 
 
@@ -41,13 +43,22 @@ def open_buzzer(i2c):
     """The buzzer on this bus: a SparkFun Qwiic Buzzer, else an Arduino
     Modulino Buzzer, else None (build 146)."""
     if find(i2c):
-        return Buzzer(i2c)
+        return Buzzer(i2c, timer=_timer())
     try:
         if MODULINO in i2c.scan():
-            return ModulinoBuzzer(i2c)
+            return ModulinoBuzzer(i2c, timer=_timer())
     except Exception:
         pass
     return None
+
+
+def _timer():
+    """A software timer for noise (machine.Timer), or None (a PC)."""
+    try:
+        from machine import Timer
+        return Timer()
+    except Exception:
+        return None
 
 
 def find(i2c):
@@ -61,8 +72,14 @@ def find(i2c):
 
 
 class Buzzer:
-    def __init__(self, i2c, volume=VOLUME):
+    def __init__(self, i2c, volume=VOLUME, timer=None):
+        """timer: a machine.Timer for fast noise (build 147); None: a new
+        pitch each frame at most (NOISE_STEP)."""
         self.i2c = i2c
+        self.timer = timer
+        self.fast = False       # the timer is running (a noise step now)
+        self.lo = self.hi = 0   # its pitches
+        self.tick = self._tick  # (made once: a bound method is a new object each time)
         self.volume = volume
         self.steps = None       # the sound playing: its steps,
         self.i = 0              # the one now,
@@ -106,6 +123,7 @@ class Buzzer:
             if self.i >= len(steps):
                 self.steps = None
                 self.prio = -1
+                self._slow()
                 self._write(REG_ACTIVE, 0)
                 return
             self.end += steps[self.i][1]
@@ -114,15 +132,28 @@ class Buzzer:
         level = st[2] if len(st) > 2 else 126
         vol = 0 if level <= 0 else min(self.volume, 1 + level * self.volume // 127)
         left = ticks_diff(self.end, now)
-        if f < 0 and vol:       # noise: a new pitch round its rate every NOISE_STEP
+        if f < 0 and vol:       # noise: random pitches round its rate
+            r = -f
+            if self.timer is not None:      # every NOISE_FAST ms, by the timer
+                if self.i != self.shown:
+                    self.vol = vol
+                    self.lo = max(80, r // 16)
+                    self.hi = max(160, min(4000, r // 3))
+                    self.shown = self.i
+                    self._tick(None)
+                    if not self.fast:
+                        self.timer.init(period=NOISE_FAST, mode=self.timer.PERIODIC,
+                                        callback=self.tick)
+                        self.fast = True
+                return
             if self.i != self.shown or ticks_diff(now, self.next_noise) >= 0:
-                r = -f
                 self.vol = vol
                 self._tone(random.randint(max(80, r // 16), max(160, min(4000, r // 3))),
                            min(NOISE_STEP, left))
                 self.next_noise = now + NOISE_STEP
                 self.shown = self.i
             return
+        self._slow()
         if self.i == self.shown:
             return
         self.shown = self.i
@@ -135,7 +166,26 @@ class Buzzer:
     def stop(self):
         self.steps = None
         self.prio = -1
+        self._slow()
         self._write(REG_ACTIVE, 0)
+
+    def _slow(self):
+        """No noise step now: the timer off."""
+        if self.fast:
+            self.fast = False
+            try:
+                self.timer.deinit()
+            except Exception:
+                pass
+
+    def _tick(self, _t):
+        """The timer (a soft callback, between bytecodes): the next random
+        pitch, while the noise step lasts and nothing else has taken over."""
+        if not self.fast and _t is not None:
+            return
+        if self.steps is None or not self.ok or ticks_diff(ticks_ms(), self.end) >= 0:
+            return              # step() moves on (and stops the timer) next frame
+        self._tone(random.randint(self.lo, self.hi), NOISE_FAST + 5)
 
     def _tone(self, f, ms):
         b = self.buf
@@ -164,8 +214,8 @@ class ModulinoBuzzer(Buzzer):
     but a level 0 step is still a rest) and plays nothing under 180 Hz, so
     lower notes are raised to that."""
 
-    def __init__(self, i2c, volume=VOLUME):
-        Buzzer.__init__(self, i2c, volume)
+    def __init__(self, i2c, volume=VOLUME, timer=None):
+        Buzzer.__init__(self, i2c, volume, timer)
         self.buf = bytearray(8)
         self._write(REG_ACTIVE, 0)
 
