@@ -46,12 +46,11 @@ DATA = tempfile.mkdtemp(prefix="ace_tufty_")    # one for both hosts: the game f
                                                 # path when its module first loads
 
 
-def make(pad, buzzer=None):
+def make(pad):
     """A Tufty host, loaded (through its loading screen) and its game started."""
     global h
     data = DATA
-    h = host_tufty.Host(screen, badge, bw.color, bw.shape, bw.font, bw.rect, buttons, pad, data,
-                        buzzer=buzzer)
+    h = host_tufty.Host(screen, badge, bw.color, bw.shape, bw.font, bw.rect, buttons, pad, data)
     assert h.app is None
     h.update()
     assert h.app is None and h.done == 1 and h.letters is not None
@@ -303,34 +302,7 @@ assert any(platform_tufty.LEDS[i][0] > 100 for i in range(1, 13)), "the hit ligh
 assert badge.lights and badge.lights[-1] > 0.3, "and the case lights"
 shot("tufty_hit")
 print("Tufty host: title, new commander, docked, launch, flight, dashboard, LED border: ok")
-# a Qwiic buzzer on the Qw/ST port (build 140): the game's sounds go to it
+# no sound on the Tufty (build 145: the Qwiic buzzer was dropped): no SOUND line
 assert not h.app.platform.sound_ok and not any(i.startswith("SOUND") for i in h.app._settings(False))
-
-
-class FakeBuzzer:
-    def __init__(self):
-        self.played = []
-        self.steps = 0
-
-    def play(self, name):
-        self.played.append(name)
-
-    def step(self):
-        self.steps += 1
-
-
-fb = FakeBuzzer()
-make(None, fb)
-a = h.app
-assert a.platform.sound_ok and "SOUND: ON" in a._settings(False)
-frames(2)
-assert fb.steps > 0, "moved on each frame"
-a.mode = "menu"
-a.menu = a.choices().index("COMBAT PRACTICE")
-press("B"); press("B")      # practice's page, then fly
-assert a.mode == "flight", a.mode
-a.game.sfx("explode")
-frames(1)
-assert "explode" in fb.played, fb.played
-print("Tufty: a Qwiic buzzer plays the game's sounds: ok")
+print("Tufty: no sound, no SOUND line: ok")
 print("ALL TUFTY HOST TESTS PASSED")

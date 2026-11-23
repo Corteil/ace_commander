@@ -1,13 +1,13 @@
-"""The game's sounds (builds 140-142): each a short run of tones, so a Qwiic
-buzzer (the badge, the Tufty: buzzer.py) and the Pi (hosts/pi/sound_pi.py)
-play the same tunes.
+"""The game's sounds (builds 140-142): each a short run of tones, so the
+badge (an I2S amp on a hexpansion port: i2s_sound.py, build 145) and the Pi
+(hosts/pi/sound_pi.py) play the same tunes.
 
-SOUNDS[name] = (priority, part, part...): parts play together (the buzzer
-plays only the first). A part is a list of steps (Hz, ms) or (Hz, ms, level
-0-126): Hz 0 is a rest, a negative Hz noise changing that many times a
-second. A sound playing on the buzzer is cut short only by one of the same or
-higher priority. CHANNELS[name]: sounds sharing a channel cut each other off
-on the Pi (Elite's flush); a name not there has a channel of its own.
+SOUNDS[name] = (priority, part, part...): parts play together. A part is a
+list of steps (Hz, ms) or (Hz, ms, level 0-126): Hz 0 is a rest, a negative Hz
+noise changing that many times a second. The priority picks which voices go
+when too many play at once (i2s_sound.MAX_VOICES). CHANNELS[name]: sounds
+sharing a channel cut each other off (Elite's flush); a name not there has a
+channel of its own.
 
 With Elite's data (content.OWN False) and elite_sfx.py made from your own
 copy of the source (tools/import_sfx.py, gitignored), Elite's sounds are used,
@@ -18,6 +18,13 @@ launching and docking; the device plays them (Platform.sound) or not.
 """
 
 NOISE = -3000           # noise changing 3000 times a second
+
+# Options > VOLUME 1-11 (build 145; it goes to 11): a square wave's height (of
+# 32767) at level 126, about 4 dB a step. ace.py keeps its own VOLUME_MAX and
+# VOLUME_DEFAULT (not importing this table when there is no sound): the same.
+VOLUMES = (0, 190, 300, 480, 760, 1200, 1900, 3000, 4800, 7600, 12000, 19000)
+VOLUME_MAX = 11
+VOLUME_DEFAULT = 8
 
 
 def _zap(n):

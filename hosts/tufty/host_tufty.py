@@ -61,7 +61,7 @@ def _mkdirs(path):
 
 class Host:
     def __init__(self, screen, badge, color, shape, font, rect, buttons, pad=None,
-                 data_dir=DATA_DIR, buzzer=None):
+                 data_dir=DATA_DIR):
         """buttons: {"A": BUTTON_A, "B": ..., "C": ..., "UP": ..., "DOWN": ...}
         (Badgeware's constants). pad: a qwstpad.QwSTPad, or None."""
         self.screen = screen
@@ -70,7 +70,6 @@ class Host:
         self.rect = rect
         self.buttons = buttons
         self.pad = pad
-        self.buzzer = buzzer    # a Qwiic buzzer found at start (_buzzer), or None
         self.real_pad = pad     # the Pad found at start
         self.pad_off = False    # DEBUG > GAMEPAD OFF: the Pad ignored in combat practice
         self.waits = {}         # button -> when it went down alone (PAIR_WAIT), on self.clock
@@ -255,9 +254,6 @@ class Host:
             self.ace = _module("ace")
             self.loaded = self.ace.AceCommander()     # started once LOAD_HOLD is up
             self.loaded.platform.ck = _module("cockpit")    # to draw the text entry
-            if self.buzzer is not None:     # sound (build 140)
-                self.loaded.platform.buzzer = self.buzzer
-                self.loaded.platform.sound_ok = True
             if self.real_pad is not None:   # DEBUG > DISPLAY > GAMEPAD can switch it
                 self.loaded.platform.gamepad = True
                 self.loaded.platform.host = self
@@ -387,20 +383,6 @@ def _pad():
         return None
 
 
-def _buzzer():
-    """A SparkFun Qwiic Buzzer on the Qw/ST port (the Pad's bus), or None (build 140)."""
-    try:
-        from machine import I2C, Pin
-        from ace_commander import buzzer
-        i2c = I2C(0, sda=Pin(PAD_SDA), scl=Pin(PAD_SCL), freq=400000)
-        if buzzer.find(i2c):
-            print("Qwiic buzzer on the Qw/ST port")
-            return buzzer.Buzzer(i2c)
-    except Exception:
-        pass
-    return None
-
-
 def start(ns):
     """ns: the app's globals. Badgeware's names come from there or builtins
     (it sets builtins.BUTTON_A and so on: MicroPython keeps those in an override
@@ -417,4 +399,4 @@ def start(ns):
     buttons = {"A": get("BUTTON_A"), "B": get("BUTTON_B"), "C": get("BUTTON_C"),
                "UP": get("BUTTON_UP"), "DOWN": get("BUTTON_DOWN")}
     return Host(get("screen"), get("badge"), get("color"), get("shape"), get("font"),
-                get("rect"), buttons, _pad(), buzzer=_buzzer())
+                get("rect"), buttons, _pad())

@@ -1,6 +1,6 @@
 """The Pi's sounds (builds 140-141): the game's sound table (sfx.py, Elite's
 with its data) played as square waves and noise through pygame's mixer, the
-same tunes a Qwiic buzzer plays on the badge and the Tufty. Each sound is made
+same tunes the badge plays on an I2S amp (i2s_sound.py). Each sound is made
 once, at start; its parts are mixed together.
 
 run.py makes a Player with --sound and gives the platform its play() and
@@ -11,7 +11,8 @@ import array
 import random
 
 RATE = 22050
-LEVEL = 6000            # of 32767, at level 126: square waves are loud
+LEVEL = 19000           # of 32767, at level 126, made at the loudest (sfx.VOLUMES[11]):
+                        # Options > VOLUME turns the channels down (build 145)
 
 
 class Player:
@@ -30,6 +31,8 @@ class Player:
                 keys.append(k)
         pygame.mixer.set_num_channels(max(8, len(keys)))
         self.channels = {k: pygame.mixer.Channel(i) for i, k in enumerate(keys)}
+        self.volume = 1.0
+        self.set_volume(sfx.VOLUME_DEFAULT)
         self.sounds = {}
         for name in names:
             self.sounds[name] = pygame.mixer.Sound(buffer=self._make(sfx.SOUNDS[name][1:]))
@@ -73,10 +76,22 @@ class Player:
             out = st
         return out.tobytes()
 
+    def set_volume(self, v):
+        """Options > VOLUME 1-11: the same heights as the badge's (sfx.VOLUMES)."""
+        v = max(1, min(self.sfx.VOLUME_MAX, v))
+        self.volume = self.sfx.VOLUMES[v] / float(LEVEL)
+        for c in self.channels.values():
+            c.set_volume(self.volume)
+
+    def stop(self):
+        self.pg.mixer.stop()
+
     def play(self, name):
         s = self.sounds.get(name)
         if s is not None:
-            self.channels[self.sfx.CHANNELS.get(name, name)].play(s)
+            c = self.channels[self.sfx.CHANNELS.get(name, name)]
+            c.play(s)
+            c.set_volume(self.volume)       # (play can reset it)
 
     def step(self):
         pass                # the mixer plays on by itself

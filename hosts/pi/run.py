@@ -153,6 +153,9 @@ class Host:
             p.sound_ok = True
             p.sound = self.player.play
             p.sound_step = self.player.step
+            p.set_volume = self.player.set_volume       # Options > VOLUME (build 145)
+            p.sound_stop = self.player.stop
+            self.app._apply_volume()        # options.json's, read before the player was there
         self.clock = pygame.time.Clock()
         self.running = True
         self.frames = 0

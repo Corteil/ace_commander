@@ -32,6 +32,12 @@ owner_name:
       .sound_ok                 optional: True if it can play sfx.py's sounds, with
                                 .sound(name) to start one and .sound_step() each
                                 frame (build 140); missing or False: no SOUND line
+      .sound_port               optional: the hexpansion port the I2S amp is on
+                                (1-6, build 145), with .set_sound_port(n); missing
+                                or None: no SOUND PORT line
+      .set_volume(v)            optional: Options > VOLUME, 1-11 (build 145);
+                                missing: no VOLUME line
+      .sound_stop()             optional: cut off what is playing (SOUND: MUTED)
     owner_name()                the device owner's name, or None
 """
 import asyncio
@@ -221,34 +227,67 @@ class Platform:
         self.picker_choice = True   # Options > TEXT ENTRY: its own dialog or the letter picker
         self.fast = scheduler is not None
         self.anchor = self._grow_heap()
-        self.buzzer = self._find_buzzer()   # a Qwiic buzzer on a hexpansion port (build 140)
-        self.sound_ok = self.buzzer is not None
-
-    @staticmethod
-    def _find_buzzer():
-        """A SparkFun Qwiic Buzzer on any of the six hexpansion ports' I2C buses
-        (a hexpansion with a Qwiic connector), or None."""
-        try:
-            from machine import I2C
+        try:        # an I2S amp or DAC on a hexpansion port (build 145): can't be
+            from machine import I2S     # detected, so Options > SOUND PORT says where
+            self.sound_ok = I2S is not None
         except ImportError:
+            self.sound_ok = False
+        self.sound_port = 2 if self.sound_ok else None  # (i2s_sound.PORT; ace.py sets the saved one)
+        self.synth = None           # i2s_sound.Synth, made on the first sound
+        self.i2s = None             # its machine.I2S
+        self.sound_failed = False   # the port wouldn't open: silent until it changes
+        self.volume = 8             # Options > VOLUME 1-11 (sfx.VOLUME_DEFAULT; ace.py sets it)
+
+    def _open_sound(self):
+        """The synthesiser on the SOUND PORT's I2S, the first time a sound plays."""
+        if self.sound_failed:
             return None
-        for port in range(1, 7):
+        try:
+            from . import i2s_sound
+            self.i2s = i2s_sound.open_i2s(self.sound_port)
+            self.synth = i2s_sound.Synth(self.i2s)
+            self.synth.set_volume(self.volume)
+            print("I2S sound on hexpansion port %d" % self.sound_port)
+        except Exception as e:
+            print("I2S sound on port %s failed: %r" % (self.sound_port, e))
+            self.sound_failed = True
+            self.close_sound()
+        return self.synth
+
+    def close_sound(self):
+        """Give I2S back (leaving the game, or a new port), so other apps can use it."""
+        self.synth = None
+        if self.i2s is not None:
             try:
-                i2c = I2C(port)
-                if 0x34 not in i2c.scan() or i2c.readfrom_mem(0x34, 0, 1)[0] != 0x5E:
-                    continue    # (buzzer.ADDRESS, its ID: checked before importing the
-            except Exception:   # player and its sounds, which cost heap)
-                continue
-            from . import buzzer
-            print("Qwiic buzzer on hexpansion port %d" % port)
-            return buzzer.Buzzer(i2c)
-        return None
+                self.i2s.deinit()
+            except Exception:
+                pass
+            self.i2s = None
+
+    def set_sound_port(self, port):
+        if port != self.sound_port:
+            self.close_sound()
+            self.sound_port = port
+            self.sound_failed = False
+
+    def set_volume(self, v):
+        self.volume = v
+        if self.synth is not None:
+            self.synth.set_volume(v)
+
+    def sound_stop(self):
+        """SOUND: MUTED cuts off what is playing."""
+        if self.synth is not None:
+            self.synth.stop()
 
     def sound(self, name):
-        self.buzzer.play(name)
+        s = self.synth or self._open_sound()
+        if s is not None:
+            s.play(name)
 
     def sound_step(self):
-        self.buzzer.step()
+        if self.synth is not None:
+            self.synth.step()
 
     @staticmethod
     def _grow_heap():
@@ -426,6 +465,7 @@ class Platform:
     def minimise(self):
         """Leave the game: the host (the loading screen) is the app the
         scheduler knows; the game is its own host only on a PC (the tests)."""
+        self.close_sound()
         if self.host is not self.app:
             self.host.minimise()
         else:

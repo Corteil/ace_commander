@@ -1567,3 +1567,26 @@ what is now `ace.py` (renamed in build 50).
    and letting go resets it. (Was: once a second while held.)
    **Release 0.4.3** (2026-11-22): builds 140-144 (sound, ENERGY LOW, the fixed scooping height,
    FUEL FULL); the Pi zip's README names --sound.
+   **Build 145** (Brian, 2026-11-23: a MAX98357A I2S amp on port 2; "can this be used for
+   sound for ace instead of the buzzer, remove the buzzer code"; "needs a volume control and
+   mute on the options menu"; "make it 11"). Built from `plans/I2S_SOUND.md`. `i2s_sound.py`:
+   `Synth` plays `sfx.py`'s sounds as they go (nothing stored), one voice per part (at most 4;
+   the lowest priority goes first), a sound restarting its channel (`sfx.CHANNELS`), square waves
+   from a 16.16 phase and noise from xorshift, mixed into one reused 512-sample buffer, 11025 Hz
+   mono 16 bit. Each frame `step()` writes only what plays before `LEAD_MS` (120 ms) from now, so
+   the I2S buffer (`IBUF` 8 KB, ~370 ms) is never full and the frame doesn't wait; after a long
+   frame it starts again from now (the gap is silence); nothing is written while idle (the
+   firmware's I2S has `auto_clear`: it sends silence when it runs dry). Inner loops are viper on
+   the badge, plain Python on a PC (same numbers). `open_i2s(port)` as BadgeRadio: I2S 0 on the
+   port's HS1 BCLK, HS2 LRC, HS3 DIN, opened small and closed first. `platform_tildagon`: sound
+   whenever `machine.I2S` exists (an amp can't be detected), opened on the first sound, closed in
+   `minimise` (so BadgeRadio can have it); a port that won't open stays silent until SOUND PORT
+   changes. Options: SOUND: ON / MUTED (muting cuts off what plays: `sound_stop`), VOLUME: 1-11
+   (`sfx.VOLUMES`, about 4 dB a step, 11 one past 10; stops at the ends; beeps at the new
+   level), SOUND PORT: 1-6 (wraps; beeps), the last two hidden while muted; saved as "volume" and
+   "sound_port". The Pi has VOLUME too (sounds made at the loudest, channels turned down).
+   **The Qwiic buzzer is gone** (`buzzer.py`, `_find_buzzer`, the Tufty's `_buzzer`): the Tufty
+   has no sound now (no free I2S pins). Tests: `test_sound.py` (pitch, levels, rests, mixing,
+   noise, voices, channels, keeping ahead, every sound of both tables, VOLUME, MUTED, SOUND
+   PORT), the Pi and Tufty host tests. **PC only: not yet heard on the badge**; the frame-time
+   cost of the viper loops isn't measured.

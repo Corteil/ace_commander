@@ -53,6 +53,11 @@ Other devices are in `hosts/`: the Pi, and the Tufty 2350 since build 109 (`host
   (the badge's settings). The interface is at the top of the file; a host gives
   `config.platform` its own module with the same names (the Pi: `hosts/pi/platform_pi.py`).
   Imported only when `config.platform` is None.
+- `i2s_sound.py` - the game's sounds (`sfx.py`) on an I2S amp or DAC on a hexpansion port
+  (build 145; replaced the Qwiic buzzer): `Synth` makes square waves and noise as they play
+  (viper inner loops on the badge), writing only ~`LEAD_MS` ahead each frame; `open_i2s(port)`
+  as BadgeRadio (HS1 BCLK, HS2 LRC, HS3 DIN). Opened on the first sound, closed by `minimise`.
+  Options: SOUND ON / MUTED, VOLUME 1-11 (`sfx.VOLUMES`), SOUND PORT 1-6 (default 2).
 - `layout.py` - how flight is laid out (build 105, platform layer step 4; imports nothing):
   `Layout` (the badge's: round 240 screen, all 3D view, the round HUD) with the view's and
   tunnels' half sizes, `dust_x` (the stardust's spread: `Game.dust_x`), `leds` (False: being

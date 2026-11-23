@@ -138,6 +138,12 @@ else:
     assert set(hs.player.sounds) == set(hs.ace.sfx.SOUNDS if hasattr(hs.ace, "sfx") else
                                         __import__(run.PKG + ".sfx").sfx.SOUNDS)
     hs.app.platform.sound("laser")
+    assert "VOLUME: 8" in hs.app._settings(False), "Options > VOLUME (build 145)"
+    hs.app._change("VOLUME: 8", False)
+    sp = sys.modules["sound_pi"]
+    assert abs(hs.player.volume - hs.player.sfx.VOLUMES[9] / float(sp.LEVEL)) < 1e-6, "VOLUME 9"
+    hs.app._change("SOUND: ON", False)      # muted: the mixer stops
+    hs.app._change("SOUND: MUTED", False)
     print("--sound: %d sounds, SOUND line: ok" % len(hs.player.sounds))
 assert h.player is None and not any(i.startswith("SOUND") for i in h.app._settings(False)), \
     "without --sound: none"

@@ -1,6 +1,6 @@
 # Plan: I2S sound on the badge
 
-Status: **plan only, 2026-11-22** (Brian: "make plans for I2S sound on the badge"). Written
+Status: **built as build 145 (2026-11-23), not yet heard on the badge**; was plan only, 2026-11-22 (Brian: "make plans for I2S sound on the badge"). Written
 against `main` at 2763e98 (release 0.4.3, builds up to 144). Nothing built yet.
 
 Today the badge plays the game's sounds only on a SparkFun Qwiic Buzzer (`buzzer.py`, build
