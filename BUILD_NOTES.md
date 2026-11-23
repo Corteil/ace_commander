@@ -1621,3 +1621,5 @@ what is now `ace.py` (renamed in build 50).
    (`_slow` turns it off at a tone, a rest, the end, stop). Without a timer (a PC) the old
    way: a new pitch each frame at most (`NOISE_STEP`). Both buzzers. About 333 I2C writes a
    second while noise plays (each ~0.25 ms). Tests in test_buzzer_tufty.
+   **Release 0.4.4** (2026-11-23): builds 145-147 (I2S sound on the badge with VOLUME 1-11 and
+   MUTED, the Pi's sounds made as the badge's, the Tufty's SparkFun or Modulino buzzer).
