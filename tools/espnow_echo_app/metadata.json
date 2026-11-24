@@ -1,0 +1,7 @@
+{
+    "name": "ESP-NOW Echo",
+    "category": "Apps",
+    "author": "Corteil",
+    "description": "Ace Commander multiplayer link test: sends every ESP-NOW test packet back to its sender.",
+    "version": "1"
+}

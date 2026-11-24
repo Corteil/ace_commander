@@ -42,6 +42,12 @@ as unicast at this range, so a game can broadcast to everyone.
 **3 m apart (2026-11-24, as far as both USB cables reach):** the same again, 0 lost in
 600; medians 4.6 / 4.9 / 4.6 / 4.9 ms, maxima 9.9 / 10.8 / 11.3 / 12.9 ms.
 
+**Range on battery: the badge reboots when its USB is pulled** (2026-11-24), so an echo
+started over USB dies with it (the first "far" run got nothing, and nothing back at the
+desk either). `tools/espnow_echo_app/` is echo() as a badge app, started from the badge's
+own menu after unplugging: copy its four files and `tools/espnow_link.py` to
+`/apps/espnow_echo/`. It answers from the app's background task (polled every ~2 ms).
+
 Still to record: ping further than 3 m (the echo badge on battery), with one badge in a pocket, and with Wi-Fi
 connected on one badge (both must then be on that network's channel); whether running
 it upsets the badge's own Wi-Fi.
