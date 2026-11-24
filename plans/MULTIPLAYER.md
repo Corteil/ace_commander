@@ -39,7 +39,10 @@ isn't yet proof). Ping, 150 packets each at 15/s:
 So one way is ~2.5 ms: far inside a frame (~18 ms+ on the badge). Broadcast is as good
 as unicast at this range, so a game can broadcast to everyone.
 
-Still to record: ping across a room, with one badge in a pocket, and with Wi-Fi
+**3 m apart (2026-11-24, as far as both USB cables reach):** the same again, 0 lost in
+600; medians 4.6 / 4.9 / 4.6 / 4.9 ms, maxima 9.9 / 10.8 / 11.3 / 12.9 ms.
+
+Still to record: ping further than 3 m (the echo badge on battery), with one badge in a pocket, and with Wi-Fi
 connected on one badge (both must then be on that network's channel); whether running
 it upsets the badge's own Wi-Fi.
 
