@@ -16,7 +16,7 @@ tests/install/
 tests/shots/
 game_data.py
 debug.txt
-key_guide.pdf
+key_guide*.pdf
 
 # made by tools/build_mpy.py
 build/

@@ -381,8 +381,9 @@ After the escape pod (crash or Esc) the docking scene flies the ESCAPE POD in, t
 67: `_fly_in(pod=True)` / `_pick_tunnel(pod)`). The ship you fly is `_ship_name()` (always the Cobra
 Mk III until ship types are built): the tunnels, the Repair Shop and the chase view (`Game.ship_name`)
 all ask there.
-The printable key guide is `tools/make_key_guide.py` (writes key_guide.pdf, gitignored): change it
-when a key changes. The number row is f0-f9:
+The printable key guides are `tools/make_key_guide.py` (`--platform badge|pi|tufty|all`: key_guide.pdf,
+key_guide_pi.pdf (two pages), key_guide_tufty.pdf, gitignored; `make_release.py` puts the Pi's and the
+Tufty's in their zips as KEY_GUIDE.pdf): change them when a key changes. The number row is f0-f9:
 in flight 1-4 the views, 5 galactic chart, 6 local chart, 7 the target's (or here's) system data, 8
 Market Prices, 9 Commander Status, 0 Inventory. Docked (`DOCK_KEYS`, build 69): 1 launch, 2 / 8 market, 3
 market on the first good in the hold (Elite's Sell Cargo), 4 equip ship, 5 galactic chart, 6 local
