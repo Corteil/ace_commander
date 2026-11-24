@@ -1,0 +1,13 @@
+[app]
+name = "ESP-NOW Echo"
+category = "Apps"
+
+[entry]
+class = "EspnowEcho"
+
+[metadata]
+author = "Corteil"
+license = "MIT"
+url = "https://github.com/Corteil/ace_commander"
+description = "Ace Commander multiplayer link test: sends every ESP-NOW test packet back to its sender."
+version = "1"
