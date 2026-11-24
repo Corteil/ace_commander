@@ -524,6 +524,20 @@ def _rot3(x, y, z, ca, sa, cb, sb):
     return x * cb - y * sb, x * sb + y * cb, z
 
 
+class Anchor:
+    """Multiplayer (plans/MULTIPLAYER.md): where a world shared with other players
+    is. You never move (as Elite), so each device keeps the shared world's origin
+    (x, y, z) and its axes (m: its x, y and z axes as rows, in your coordinates,
+    the layout of Obj.m) and turns and slides them with everything else
+    (Game._rotate, _yaw). Then your pose in the shared world, and anyone else's in
+    yours, are a matrix product away: Game.world_pose, Game.place. Floats: one
+    object, so no garbage worth counting on the badge."""
+
+    def __init__(self):
+        self.x = self.y = self.z = 0.0
+        self.m = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+
+
 class Space:
     """The star system a commander flies in: a planet and a sun (spheres, as a
     centre and a radius) and a space station, an Obj that is kept out of
@@ -668,6 +682,47 @@ class Game:
         if self.view:
             self._into_view(self.view, True)
 
+    def set_anchor(self, x, y, z, m):
+        """Start a shared world with you at (x, y, z) in it, your side, roof and
+        nose (m, rows, as Obj.m) given in its coordinates."""
+        a = self.anchor = Anchor()
+        # the world's axes in yours: the transpose of your axes in the world's
+        a.m[:] = [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]]
+        # the world's origin in yours: minus your position, in your axes
+        a.x = -(x * m[0] + y * m[1] + z * m[2])
+        a.y = -(x * m[3] + y * m[4] + z * m[5])
+        a.z = -(x * m[6] + y * m[7] + z * m[8])
+
+    def world_pose(self):
+        """Your (x, y, z) and axes (side, roof, nose as rows, 9 numbers) in the
+        shared world, or None without one (set_anchor)."""
+        a = self.anchor
+        if a is None:
+            return None
+        m = a.m
+        # a point v of yours is at (v.side, v.roof, v.nose) in the world, the
+        # world's axes being m's rows; you are at minus the origin, so:
+        x = -(a.x * m[0] + a.y * m[1] + a.z * m[2])
+        y = -(a.x * m[3] + a.y * m[4] + a.z * m[5])
+        z = -(a.x * m[6] + a.y * m[7] + a.z * m[8])
+        # your axes are (1,0,0), (0,1,0), (0,0,1): in the world, m's columns
+        return x, y, z, [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]]
+
+    def place(self, o, x, y, z, m):
+        """Put o (an Obj) where a pose in the shared world puts it in yours:
+        (x, y, z) and axes m (rows, the world's coordinates)."""
+        a = self.anchor
+        w = a.m
+        o.x = a.x + x * w[0] + y * w[3] + z * w[6]
+        o.y = a.y + x * w[1] + y * w[4] + z * w[7]
+        o.z = a.z + x * w[2] + y * w[5] + z * w[8]
+        om = o.m
+        for i in (0, 3, 6):
+            p, q, r = m[i], m[i + 1], m[i + 2]
+            om[i] = p * w[0] + q * w[3] + r * w[6]
+            om[i + 1] = p * w[1] + q * w[4] + r * w[7]
+            om[i + 2] = p * w[2] + q * w[5] + r * w[8]
+
     def _into_view(self, view, back=False):
         if back and view >= 2:
             view = 5 - view         # left undoes right and right undoes left
@@ -714,6 +769,7 @@ class Game:
         self.objs = []
         self.new = []      # objects created during a step, added at its end
         self.booms = []
+        self.anchor = None  # multiplayer: the shared world's origin and axes (set_anchor)
         self.tick = 0
         self.frame = 0
         # dust and explosion dots are whole numbers: see _rotate
@@ -1573,6 +1629,8 @@ class Game:
                     sp.station.z -= fwd
             for o in self.objs:
                 o.z -= fwd
+            if self.anchor is not None:
+                self.anchor.z -= fwd
             for boom in self.booms:
                 for p in boom.parts:
                     p[2] -= ifwd
@@ -1612,6 +1670,22 @@ class Game:
                 for i in (0, 3, 6):
                     m[i], m[i + 1], m[i + 2] = _rot3(m[i], m[i + 1], m[i + 2],
                                                      fca, fsa, fcb, fsb)
+        an = self.anchor
+        if an is not None:
+            # exact sines, not the rounded whole-number ones: those don't quite square
+            # to 1, so what they turn slowly grows or shrinks (unseen alone, but two
+            # badges' worlds would drift apart)
+            fca = math.cos(a)
+            fsa = math.sin(a)
+            fcb = math.cos(b)
+            fsb = math.sin(b)
+            an.x, an.y, an.z = _rot3(an.x, an.y, an.z, fca, fsa, fcb, fsb)
+            an.z -= fwd
+            m = an.m
+            for i in (0, 3, 6):
+                m[i], m[i + 1], m[i + 2] = _rot3(m[i], m[i + 1], m[i + 2], fca, fsa, fcb, fsb)
+            if self.tick % 32 == 0:
+                _ortho(an.m)
         for o in self.objs:
             x = int(o.x * 4)
             y = int(o.y * 4)
@@ -1692,6 +1766,12 @@ class Game:
                 m = st.m
                 for i in (0, 3, 6):
                     m[i], m[i + 2] = turn(m[i], m[i + 2])
+        an = self.anchor
+        if an is not None:
+            an.x, an.z = turn(an.x, an.z)
+            m = an.m
+            for i in (0, 3, 6):
+                m[i], m[i + 2] = turn(m[i], m[i + 2])
         for o in self.objs:
             o.x, o.z = turn(o.x, o.z)
             m = o.m

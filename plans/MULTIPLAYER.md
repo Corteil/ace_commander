@@ -84,6 +84,25 @@ link (UDP, or through a bridge below).
 The game talks to one small interface (`send(bytes)`, `receive()`), so the transport
 can change underneath.
 
+## Built: the shared world and the pose packet (branch multiplayer-pose)
+
+- `game.Anchor` / `Game.set_anchor(x, y, z, m)` / `world_pose()` / `place(o, x, y, z, m)`:
+  each device keeps the shared world's origin and axes in its own coordinates, turned
+  and slid with everything else in `_rotate` / `_yaw` (cleared by `reset`). It uses exact
+  sines: the game's whole-number ones don't square to 1, so objects grow or shrink a
+  little each turn (55 units in 400 frames, unseen alone) and two worlds would drift.
+  Without an anchor it costs one `is not None` a frame.
+- `netplay.py`: the 32-byte POSE packet (magic, player, seq, position in quarter units,
+  nose and roof times 16384, speed, flags FIRING / DEAD), packed into a buffer made once;
+  `read_pose` remakes the side axis and can fill a given list; `newer` for the seq wrap.
+- `tests/test_net_pose.py`: out 5,000 units and back lands within 0.00001; two Games
+  (a duel's start: z -1000 facing +z, z +1000 facing -z) see each other dead ahead,
+  and after both fly about agree on distance and angle; through a packet within 0.07 units.
+
+Next: a duel mode using them (the practice arena, no NPCs; send a pose each frame
+or 15 a second, show the other's ship from the latest pose, moved on by its speed
+between packets), then shots and hits.
+
 ## The game (suggestion)
 
 1. A duel in the combat practice arena, no NPCs: each device flies its own ship and
