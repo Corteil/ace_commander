@@ -55,7 +55,10 @@ and ~100 ms, so the delay and losses are the app's, not the distance: **an app o
 gets its background task only between frames (~100 ms), and ESP-NOW's default receive
 buffer (~500 bytes) overflows meanwhile.** For the game: read the radio in the frame
 loop or from `ESPNow.irq`, with a bigger `rxbuf`. The app now answers from `irq` with
-`rxbuf=4096` (not yet on the badge): repeat at 10 m to see the radio's own round trip.
+`rxbuf=4096`; **at the same 10 m spot, app on screen:** 90 packets each, broadcast 1 lost
+of 90 (32 B and 64 B), unicast none; round trips median 9.3-9.7 ms, p95 18-23, max 22-33 ms.
+The extra ~5 ms over the desk test is the callback waiting for a gap in drawing, still well
+under a frame. So the game's link: broadcast from the frame loop, receive by `irq`.
 
 Still to record: further than 10 m, with one badge in a pocket, and with Wi-Fi
 connected on one badge (both must then be on that network's channel); whether running
