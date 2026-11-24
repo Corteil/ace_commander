@@ -20,6 +20,8 @@ Made in build/release/ (gitignored):
     ace_commander-badge-V.tar         the tarball as GitHub would make it (checked < 600 KB)
     ace_commander-tufty-V.zip         unzip into the TUFTY drive's apps/ folder
     ace_commander-pi-V.zip            unzip anywhere; python3 ace_commander/hosts/pi/run.py
+Each zip holds its device's key guide as ace_commander/KEY_GUIDE.pdf (tools/make_key_guide.py;
+needs ReportLab and the DejaVu fonts).
 The GitHub release itself (notes, the two zips) is made afterwards, with gh.
 """
 import argparse
@@ -50,7 +52,7 @@ PI_README = """Ace Commander {v} for the Raspberry Pi (or any computer with Pyth
 
 Options: --layout elite (a 3D view over a dashboard; F10 switches), --full (full screen),
 --sound (the game's sounds; Options > SOUND turns them off), --debug (the DEBUG menu). Keys: arrows steer, F1-F6 are the badge's buttons A-F, and the
-rest are Elite's keys; a game pad works too. Saves go in ~/.local/share/ace_commander/.
+rest are Elite's keys; a game pad works too. Every key and pad button: KEY_GUIDE.pdf. Saves go in ~/.local/share/ace_commander/.
 A desktop shortcut: Exec=python3 /path/to/ace_commander/hosts/pi/run.py
 """
 
@@ -110,6 +112,12 @@ def build_badge(v):
     return out
 
 
+def key_guide(platform, folder):
+    """The device's key guide into folder, as KEY_GUIDE.pdf."""
+    import make_key_guide
+    make_key_guide.make(platform, os.path.join(folder, "KEY_GUIDE.pdf"))
+
+
 def zip_dir(path, folder, arc_root, skip=()):
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
         for root, dirs, files in os.walk(folder):
@@ -128,6 +136,7 @@ def build_tufty(v):
     if r.returncode != 0:
         sys.exit("build_tufty failed:\n%s%s" % (r.stdout, r.stderr))
     folder = os.path.join(REPO, "build", "tufty", "ace_commander")
+    key_guide("tufty", folder)
     path = os.path.join(OUT, "ace_commander-tufty-%s.zip" % v)
     zip_dir(path, folder, "ace_commander")
     print("tufty: %s, %d KB" % (os.path.basename(path), os.path.getsize(path) // 1024))
@@ -150,6 +159,7 @@ def build_pi(v):
         shutil.copy2(os.path.join(REPO, f), dst)
     with open(os.path.join(stage, "README_PI.txt"), "w") as f:
         f.write(PI_README.format(v=v))
+    key_guide("pi", stage)
     path = os.path.join(OUT, "ace_commander-pi-%s.zip" % v)
     zip_dir(path, stage, "ace_commander")
     print("pi: %s, %d KB" % (os.path.basename(path), os.path.getsize(path) // 1024))
