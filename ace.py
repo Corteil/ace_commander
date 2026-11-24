@@ -309,6 +309,9 @@ class AceCommander(PLATFORM.App):
         self.p_level = 1        # combat practice's level (options.json)
         self.p_hardcore = False # combat practice's own HARDCORE, apart from the commander's
         self.p_sel = 0          # the combat practice page's line: 0 LEVEL, 1 HARDCORE
+        self.duel = None        # a duel (duel.py), made the first time DUEL is chosen
+        self.dueling = False    # the flight is a duel's
+        self.duel_err = None    # the radio wouldn't open: why
         self.n_hardcore = False # the new-commander page's HARDCORE
         self.n_sel = 0          # and its line: 0 NAME (build 89), 1 LEVEL, 2 HARDCORE
         self.game = None
@@ -625,6 +628,8 @@ class AceCommander(PLATFORM.App):
                 self.title.step(dt)
         elif self.mode == "practice":
             self._update_practice(cancel, confirm)
+        elif self.mode == "duel":
+            self._update_duel(dt, cancel, confirm)
         elif self.mode == "level":
             if cancel:
                 self.mode = "menu"
@@ -700,6 +705,12 @@ class AceCommander(PLATFORM.App):
                 self._leds_release()
             if flying and PERF_LOG:
                 self._perf(delta, _diff(_us(), t0) / 1000.0)
+        if self.dueling:            # paused too: the other player keeps hearing us
+            if self.mode == "flight" and self.game is not None:
+                self.duel.flight_step(self.game, dt)
+            else:                   # left the flight: the game is practice's again
+                self.duel.stop(self.game)
+                self.dueling = False
         self._sounds()
         pad.end_frame()
         # the keyboard's A-F are the badge's buttons for the next frame's keys:
@@ -716,6 +727,8 @@ class AceCommander(PLATFORM.App):
                 items.append("QUIT")
             return items
         items = ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS"]
+        if getattr(self.platform, "radio", None) is not None:
+            items.insert(2, "DUEL")     # two players (duel.py): only with a radio
         if self.cmdr is not None:
             items.insert(0, "CONTINUE")
         if TITLE_QUIT:
@@ -738,6 +751,14 @@ class AceCommander(PLATFORM.App):
         elif item == "COMBAT PRACTICE":
             self.p_sel = 0
             self.mode = "practice"      # its level and HARDCORE first
+        elif item == "DUEL":
+            if self.duel is None and self.duel_err is None:
+                try:
+                    from . import duel
+                    self.duel = duel.Duel(self.platform.radio())
+                except Exception as e:      # no radio after all: the page says why
+                    self.duel_err = str(e)[:60] or e.__class__.__name__
+            self.mode = "duel"
         elif item == "OPTIONS":
             self.omenu = 0
             self.mode = "options"
@@ -768,6 +789,42 @@ class AceCommander(PLATFORM.App):
             self._save_options()
         elif confirm:
             self._start_flight(False)
+
+    def _update_duel(self, dt, cancel, confirm):
+        """The DUEL page: looking for the other player; C flies (alone until they
+        come), F goes back to the title screen."""
+        if cancel:
+            self.mode = "menu"
+            return
+        if self.duel is None:
+            return
+        self.duel.lobby_step(dt)
+        if confirm:
+            self.game = None        # a fresh flight: a practice one left part-way is dropped
+            self._start_flight(False)
+            self.duel.start(self.game)
+            self.dueling = True
+
+    def _draw_duel(self, ctx):
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        text = cockpit.text
+        text(ctx, "DUEL", 0, -70, 18, cockpit.WHITE)
+        d = self.duel
+        if d is None:
+            text(ctx, "NO RADIO", 0, -20, 17, cockpit.RED)
+            text(ctx, (self.duel_err or "")[:28], 0, 5, 11, cockpit.GREY)
+            text(ctx, "F: back", 0, 80, 12, cockpit.GREY)
+            return
+        if d.found:
+            text(ctx, "PLAYER FOUND", 0, -20, 17, cockpit.GREEN)
+            text(ctx, "flying: waiting for you" if d.peer_flying else "on the DUEL page",
+                 0, 5, 11, cockpit.GREY)
+        else:
+            dots = "." * (1 + (_ms() // 500) % 3)
+            text(ctx, "SEARCHING" + dots, 0, -20, 17, cockpit.YELLOW)
+            text(ctx, "open DUEL on the other one", 0, 5, 11, cockpit.GREY)
+        text(ctx, "no other ships; shots not yet", 0, 40, 11, cockpit.GREY)
+        text(ctx, "C: fly   F: back", 0, 80, 12, cockpit.GREY)
 
     def _draw_practice(self, ctx):
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
@@ -3068,6 +3125,8 @@ class AceCommander(PLATFORM.App):
             self._draw_level(ctx)
         elif self.mode == "practice":
             self._draw_practice(ctx)
+        elif self.mode == "duel":
+            self._draw_duel(ctx)
         elif self.mode == "docked":
             self.dock.draw(ctx)
             self._draw_find(ctx)

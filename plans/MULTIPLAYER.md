@@ -99,9 +99,26 @@ can change underneath.
   (a duel's start: z -1000 facing +z, z +1000 facing -z) see each other dead ahead,
   and after both fly about agree on distance and angle; through a packet within 0.07 units.
 
-Next: a duel mode using them (the practice arena, no NPCs; send a pose each frame
-or 15 a second, show the other's ship from the latest pose, moved on by its speed
-between packets), then shots and hits.
+## Built: DUEL (same branch)
+
+- Title screen DUEL (only when the platform has `radio()`: the badge always; the Pi with
+  `run.py --duel [PORT]`; not the Tufty yet). Its page says HELLO 4 times a second and
+  shows SEARCHING / PLAYER FOUND; C flies (alone until the other comes), F back.
+- `duel.py` (imported only when DUEL is chosen): slots by id (smaller id at z -1000
+  facing +z, the other at z +1000 facing -z), `Game.quiet` (no waves or rocks), its
+  pose 15 times a second, the other's ship as kind "player" (not "ship", so the AI,
+  missiles, the energy bomb, encounters and mass lock leave it; not rammed or shot yet),
+  placed from its last pose moved on by its speed; older packets dropped; 3 s silent
+  "LINK LOST" (the ship goes), then "LINK BACK"; fly again (reset) puts you back at
+  your start; leaving the flight ends the duel.
+- Links: `net_espnow.py` (badge: broadcast, rxbuf 4096, read every frame) and
+  `hosts/pi/net_udp.py` (UDP broadcast, a random id per run; two windows on one Pi play).
+- `tests/test_duel.py`: two Games on a pretend radio (finding, slots, the same distance
+  both ways, half the packets lost, late packets, LINK LOST / BACK, reset, stop) and the
+  app's DUEL page and flight. A sees B a frame behind (~14 units at starting speed).
+
+Not yet on a badge. Next: shots and hits (the shooter decides, sends a HIT with damage;
+the target takes it and sends DEAD), then the Tufty (UDP on its Wi-Fi) and the Pi bridge.
 
 ## The game (suggestion)
 

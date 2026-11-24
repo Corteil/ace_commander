@@ -465,7 +465,7 @@ class Obj:
 
     def __init__(self, bp, kind, x, y, z):
         self.bp = bp
-        self.kind = kind    # "ship", "missile", "pmissile", "rock" or "can"
+        self.kind = kind    # "ship", "missile", "pmissile", "rock", "can" or "player" (duel.py)
         self.x = x
         self.y = y
         self.z = z
@@ -812,6 +812,8 @@ class Game:
         self.auto_done = None  # the last ship auto_missile fired at
         if not hasattr(self, "practice_upgrades"):
             self.practice_upgrades = False  # waves drop upgrade canisters (ace sets it)
+        if not hasattr(self, "quiet"):
+            self.quiet = False  # no waves or rocks: a duel's empty arena (duel.py; ace sets it)
         self.upgrade_n = 0     # the upgrades fitted so far (UPGRADES)
         self.wave_hold = 0.0   # waiting for the upgrade canister to be collected (UPGRADE_WAIT)
         self.wave_wait = 0.0   # the countdown to the next wave (WAVE_WAIT), while > 0
@@ -1594,7 +1596,8 @@ class Game:
             self._collide()
             self._weapons(dt, fire, missile)
             self._regen(dt)
-            self._director(dt)
+            if not self.quiet:
+                self._director(dt)
             self._hyper(dt)
 
         if self.new:
@@ -1798,6 +1801,8 @@ class Game:
             o.beam -= dt
         m = o.m
         kind = o.kind
+        if kind == "player":    # another player's ship: duel.py moves it, from their packets
+            return
         if kind == "ship":
             # Steering is the costly part, and makes a lot of work for the
             # garbage collector, so a ship only re-plans every few frames,
@@ -2027,7 +2032,7 @@ class Game:
 
     def _collide(self):
         for o in self.objs:
-            if o.dead or o.kind == "missile" or o.kind == "pmissile":
+            if o.dead or o.kind == "missile" or o.kind == "pmissile" or o.kind == "player":
                 continue
             r = o.bp.radius * 0.7 + 60.0
             if abs(o.z) > r:
@@ -2186,8 +2191,9 @@ class Game:
             best = None
             best_z = LASER_RANGE
             for o in (self.objs if self.looking else ()):   # off a space view: no hits
-                if o.dead or o.kind == "pmissile" or o.z <= 30 or o.z >= best_z or o.upgrade:
-                    continue    # (a practice upgrade canister can't be shot)
+                if (o.dead or o.kind == "pmissile" or o.z <= 30 or o.z >= best_z or o.upgrade
+                        or o.kind == "player"):
+                    continue    # (a practice upgrade canister can't be shot; another player not yet)
                 lim = o.z * AIM_ASSIST
                 lim *= lim
                 if lim < o.bp.area:

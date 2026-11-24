@@ -48,14 +48,14 @@ pkg, mod = load()
 a = pkg.AceCommander()
 assert a.overlays == [] and len(mod.SHIPS) == 31
 assert not a.use_tilt, "joystick steering is the default"
-assert a.cmdr is None and a.choices() == ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS"]
+assert a.cmdr is None and a.choices() == ["NEW COMMANDER", "COMBAT PRACTICE", "DUEL", "SHIP VIEWER", "OPTIONS"]
 c = frame(a); fits(c)
 assert [t[0] for t in c.texts] == ["< NEW COMMANDER >"], "one piece of text on the title screen"
 assert c.calls.get("line_to", 0) > 5, "and a ship"
 tick(a, fresh=["JOYRIGHT"]); assert a.menu == 1
 assert [t[0] for t in frame(a).texts] == ["< COMBAT PRACTICE >"]
 tick(a, fresh=["JOYLEFT"]); assert a.menu == 0
-tick(a, fresh=["JOYLEFT"]); assert a.menu == 3, "wraps round"
+tick(a, fresh=["JOYLEFT"]); assert a.menu == 4, "wraps round"
 tick(a, fresh=["JOYRIGHT"]); assert a.menu == 0
 tick(a, fresh=["JOYDOWN"]); assert a.menu == 1    # up and down work as well
 tick(a, fresh=["JOYUP"]); assert a.menu == 0

@@ -78,7 +78,7 @@ LASER_COLOURS = {
 # enemy missiles are orange like enemy lasers (all enemy fire), yours light purple
 UPGRADE_RGB = GREEN     # a practice upgrade canister (game.UPGRADES), on screen and radar
 COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": ORANGE, "pmissile": LIGHT_PURPLE,
-          "station": WHITE}
+          "station": WHITE, "player": (0.3, 0.9, 1)}     # player: another player's ship (duel.py)
 PLANET = (0.35, 0.6, 1)
 # each system's planet is one of these, picked from its number (Space.planet):
 # (the disc's colour, its outline's)
