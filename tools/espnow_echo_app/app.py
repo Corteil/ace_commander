@@ -10,7 +10,7 @@ the badge restarts. Needs espnow_link.py in this folder.
 import time
 
 import app
-from async_helpers import sleep_ms
+from asyncio import sleep_ms
 from events.input import Buttons, BUTTON_TYPES
 
 from . import espnow_link as link
@@ -20,15 +20,31 @@ class EspnowEcho(app.App):
     def __init__(self):
         super().__init__()
         self.buttons = Buttons(self)
-        self.e, sta, self.ch = link.radio()
-        self.mac = link.mac_str(sta.config("mac"))
         self.peers = set()
         self.n = 0
         self.last = None            # ticks_ms of the last packet
         self.running = True
+        self.error = None           # shown on screen instead of crashing
+        self.e = None
+        self.mac, self.ch = "?", 0
+        self.start()
+
+    def start(self):
+        """The radio; any error goes on the screen (and to serial)."""
+        try:
+            self.e, sta, self.ch = link.radio()
+            self.mac = link.mac_str(sta.config("mac"))
+            self.error = None
+        except Exception as err:
+            import sys
+            sys.print_exception(err)
+            self.error = repr(err)[:60]
 
     async def background_task(self):
         while self.running:
+            if self.e is None:
+                await sleep_ms(500)
+                continue
             got = False
             for _ in range(8):
                 host, msg = self.e.irecv(0)
@@ -40,11 +56,18 @@ class EspnowEcho(app.App):
                     self.last = time.ticks_ms()
             await sleep_ms(0 if got else 2)
 
+    def _retry(self):
+        if self.buttons.get(BUTTON_TYPES["CONFIRM"]):
+            self.buttons.clear()
+            self.start()
+
     def update(self, delta):
         if self.buttons.get(BUTTON_TYPES["CANCEL"]):
             self.buttons.clear()
             self.running = False
             self.minimise()
+        elif self.e is None:
+            self._retry()
 
     def draw(self, ctx):
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
@@ -53,6 +76,14 @@ class EspnowEcho(app.App):
         ctx.font_size = 24
         ctx.rgb(0.2, 1, 0.4).move_to(0, -60).text("ESP-NOW ECHO")
         ctx.font_size = 16
+        if self.error:
+            ctx.rgb(1, 0.3, 0.3).move_to(0, -20).text("RADIO FAILED")
+            ctx.font_size = 12
+            ctx.move_to(0, 5).text(self.error[:30])
+            ctx.move_to(0, 22).text(self.error[30:60])
+            ctx.font_size = 16
+            ctx.rgb(0.8, 0.8, 0.8).move_to(0, 60).text("C: try again  F: leave")
+            return
         ctx.rgb(0.8, 0.8, 0.8).move_to(0, -30).text(self.mac)
         ctx.move_to(0, -10).text("channel %d" % self.ch)
         ctx.font_size = 36
