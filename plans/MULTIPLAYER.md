@@ -48,7 +48,16 @@ desk either). `tools/espnow_echo_app/` is echo() as a badge app, started from th
 own menu after unplugging: copy its four files and `tools/espnow_link.py` to
 `/apps/espnow_echo/`. It answers from the app's background task (polled every ~2 ms).
 
-Still to record: ping further than 3 m (the echo badge on battery), with one badge in a pocket, and with Wi-Fi
+**10 m with a door in between (2026-11-24, the echo badge on battery running the app):**
+the link holds. 60 packets each with a 250 ms reply window: broadcast and unicast both
+5% lost, round trips ~96 ms median (30-133). At the desk the same app gave 33% / 4% lost
+and ~100 ms, so the delay and losses are the app's, not the distance: **an app on screen
+gets its background task only between frames (~100 ms), and ESP-NOW's default receive
+buffer (~500 bytes) overflows meanwhile.** For the game: read the radio in the frame
+loop or from `ESPNow.irq`, with a bigger `rxbuf`. The app now answers from `irq` with
+`rxbuf=4096` (not yet on the badge): repeat at 10 m to see the radio's own round trip.
+
+Still to record: further than 10 m, with one badge in a pocket, and with Wi-Fi
 connected on one badge (both must then be on that network's channel); whether running
 it upsets the badge's own Wi-Fi.
 

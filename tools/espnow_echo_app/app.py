@@ -2,8 +2,9 @@
 battery (plans/MULTIPLAYER.md). The badge reboots when its USB is pulled, so an
 echo started over USB dies; start this from the badge's menu instead.
 
-Every test packet heard goes straight back to its sender, from the background
-task (polled every couple of ms, so the round trip stays short). The screen shows
+Every test packet heard goes straight back to its sender, from the receive
+callback (and the background task as a fallback): an app's background task only runs
+between frames, ~100 ms on screen, which overflowed ESP-NOW's small receive buffer. The screen shows
 the count and when the last one came. F (cancel) leaves; the radio stays on until
 the badge restarts. Needs espnow_link.py in this folder.
 """
@@ -35,26 +36,37 @@ class EspnowEcho(app.App):
             self.e, sta, self.ch = link.radio()
             self.mac = link.mac_str(sta.config("mac"))
             self.error = None
+            try:
+                self.e.config(rxbuf=4096)   # default ~500 bytes: drops packets between frames
+            except Exception:
+                pass
+            # answer from the receive callback (run between Python steps, even
+            # mid-frame); the background task stays as a fallback
+            self.e.irq(self._irq)
         except Exception as err:
             import sys
             sys.print_exception(err)
             self.error = repr(err)[:60]
+
+    def _irq(self, e):
+        self._drain()
+
+    def _drain(self):
+        while True:
+            host, msg = self.e.irecv(0)
+            if msg is None:
+                return
+            if link.echo_one(self.e, self.peers, host, msg):
+                self.n += 1
+                self.last = time.ticks_ms()
 
     async def background_task(self):
         while self.running:
             if self.e is None:
                 await sleep_ms(500)
                 continue
-            got = False
-            for _ in range(8):
-                host, msg = self.e.irecv(0)
-                if msg is None:
-                    break
-                got = True
-                if link.echo_one(self.e, self.peers, host, msg):
-                    self.n += 1
-                    self.last = time.ticks_ms()
-            await sleep_ms(0 if got else 2)
+            self._drain()
+            await sleep_ms(5)
 
     def _retry(self):
         if self.buttons.get(BUTTON_TYPES["CONFIRM"]):
@@ -65,6 +77,8 @@ class EspnowEcho(app.App):
         if self.buttons.get(BUTTON_TYPES["CANCEL"]):
             self.buttons.clear()
             self.running = False
+            if self.e is not None:
+                self.e.irq(None)
             self.minimise()
         elif self.e is None:
             self._retry()
