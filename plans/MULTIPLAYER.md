@@ -1,6 +1,6 @@
 # Multiplayer combat (plan, 2026-11-24)
 
-Nothing built yet but the link tests. Brian's choices so far are marked; the rest
+Nothing built yet but the link tests (run on two badges 2026-11-24: works). Brian's choices so far are marked; the rest
 are suggestions.
 
 ## First: the link tests (`tools/espnow_link.py`)
@@ -8,7 +8,7 @@ are suggestions.
 Do two badges talk straight to each other over ESP-NOW, how fast, and how much is
 lost? The firmware has `espnow` (MicroPython's default `MICROPY_PY_ESPNOW` 1, not
 turned off for the Tildagon board) and freezes `aioespnow` (`tildagon/manifest.py`),
-but nothing has run on a badge yet. **Ask Brian before copying or running on a badge.**
+and both badges run it (below). **Ask Brian before copying or running on a badge.**
 
     mpremote connect PORT fs cp tools/espnow_link.py :/espnow_link.py
     mpremote connect PORT exec "import espnow_link; espnow_link.check()"
@@ -24,9 +24,24 @@ but nothing has run on a badge yet. **Ask Brian before copying or running on a b
 - `tests/test_espnow_link.py` runs the same code on the PC with a pretend radio (in
   `tests/run_all.py`). It proves the test's logic, not the radio.
 
-What to record from the badges: CHECK output from both; ping's table with the
-badges close together, across a room, and with one in a pocket; whether running it
-upsets the badge's own Wi-Fi.
+**First run (2026-11-24, both badges on the desk side by side, neither on Wi-Fi,
+channel 1):** CHECK OK on both (7c:4f:ad:33:7a:c0 and 64:e8:33:72:25:2c; ~1.69 MB free
+heap, no garbage per send; the receive figure was taken with nothing arriving, so it
+isn't yet proof). Ping, 150 packets each at 15/s:
+
+| run | lost | rtt ms min / median / p95 / max |
+|---|---|---|
+| broadcast 32 B | 0 | 3.7 / 4.9 / 8.6 / 10.8 |
+| broadcast 64 B | 0 | 4.1 / 5.2 / 10.0 / 17.1 |
+| unicast 32 B | 0 | 3.8 / 4.8 / 8.1 / 11.1 |
+| unicast 64 B | 0 | 4.0 / 5.1 / 9.8 / 11.8 |
+
+So one way is ~2.5 ms: far inside a frame (~18 ms+ on the badge). Broadcast is as good
+as unicast at this range, so a game can broadcast to everyone.
+
+Still to record: ping across a room, with one badge in a pocket, and with Wi-Fi
+connected on one badge (both must then be on that network's channel); whether running
+it upsets the badge's own Wi-Fi.
 
 Next tests, once that works: the same inside the game's frame loop (the game drawing
 while sending and receiving, frame time and garbage per frame), and the Pi on the
