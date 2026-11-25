@@ -378,6 +378,7 @@ class AceCommander(PLATFORM.App):
         self.jump_rgb = DUST_RGB         # their colour at full brightness
         self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
         self.use_sound = True            # SOUND: ON / MUTED (builds 140, 145), where there is sound
+        self.use_names = True            # NAMES: SHOWN / HIDDEN, multiplayer's name labels (build 164)
         self.volume = VOLUME_DEFAULT     # VOLUME: 1-11 (build 145), where the device has it
         self.use_picker = False          # TEXT ENTRY: the letter picker (picker.py) rather than
                                          # the badge's own dialog (build 124, an option)
@@ -2118,6 +2119,8 @@ class AceCommander(PLATFORM.App):
             port = getattr(self.platform, "sound_port", None)
             if port is not None and self.use_sound:     # where the I2S amp is (build 145)
                 items.append("SOUND PORT: %d" % port)
+        if getattr(self.platform, "radio", None) is not None:   # multiplayer's (build 164)
+            items.append("NAMES: " + ("SHOWN" if self.use_names else "HIDDEN"))
         if getattr(self.platform, "picker_choice", False):    # the badge: its own or the picker
             items.append("TEXT ENTRY: " + ("PICKER" if self.use_picker else "BADGE"))
         if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose data, from the next start
@@ -2147,6 +2150,9 @@ class AceCommander(PLATFORM.App):
         elif item in ("SAVE COMMANDER", "COMMANDER SAVED"):
             if not left:
                 self._save_now()
+        elif item.startswith("NAMES"):     # the other players' names over their ships
+            self.use_names = cockpit.SHOW_NAMES = not self.use_names
+            self._save_options()
         elif item.startswith("NAME"):
             if not left:
                 self._open_name(self.cmdr.name, self._set_name)
@@ -2222,6 +2228,8 @@ class AceCommander(PLATFORM.App):
                 self.use_picker = d["picker"]
             if isinstance(d.get("sound"), bool):
                 self.use_sound = d["sound"]
+            if isinstance(d.get("names"), bool):
+                self.use_names = cockpit.SHOW_NAMES = d["names"]
             v = d.get("volume")
             if isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= VOLUME_MAX:
                 self.volume = v
@@ -2251,7 +2259,7 @@ class AceCommander(PLATFORM.App):
             with open(options_path(), "w") as f:
                 f.write(json.dumps({"tilt": self.use_tilt, "tilt_flip": self.tilt_flip,
                                     "leds": self.use_leds, "picker": self.use_picker,
-                                    "sound": self.use_sound,
+                                    "sound": self.use_sound, "names": self.use_names,
                                     "volume": self.volume,
                                     "sound_port": getattr(self.platform, "sound_port", None),
                                     "practice_level": self.p_level,

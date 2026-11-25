@@ -1863,3 +1863,16 @@ what is now `ace.py` (renamed in build 50).
    frame 56-61 ms (56-64), update 15-19 ms (16-21); slow frames about the same or a few
    more (53-103 against 53-92: one run each, not enough to tell). Not yet played by hand,
    and the main game (docking, the sun, practice) only by the PC tests.
+   Brian played build 164 by hand (four badges, Capture Flag): "game play seems ok"; the
+   logs had no tracebacks or radio errors, frames 52-95 ms (about 75; build 161's station
+   game ~100), still 2-3 collections a minute of 200-330 ms.
+   **Build 165** (Brian, 2026-11-25: "the flags do not need to be labeled", "add a number
+   to repeated names", "have an option to drop player names"). The flags (CTF's rings) have
+   no label; a carrier still has NAME *FLAG*. Two players with one name (two JAMESONs, the
+   default, seen in that game): `Duel._number_names` gives the one with the lowest radio
+   address the name and the others NAME 2, NAME 3 (`Player.base` as sent, `Player.name` /
+   `Duel.name` as shown, `Duel.my_name` sent); every badge hears the same names and
+   addresses, so all number them alike; not while flying. Options and in-flight Settings,
+   where there is a radio: NAMES: SHOWN / HIDDEN (`AceCommander.use_names`, options.json
+   "names", `cockpit.SHOW_NAMES`); hidden leaves only a carrier's *FLAG*. Tests in
+   test_multiplayer.py; test_find's "no NAME line in flight" now looks for "NAME:".

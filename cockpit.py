@@ -1103,12 +1103,18 @@ def _world(ctx, g):
     _draw_world(ctx, g)
 
 
+SHOW_NAMES = True   # Options > NAMES (build 164): HIDDEN leaves only a flag carrier's *FLAG*
+
+
 def _draw_obj(ctx, g, o):
     """One object, with another player's name under it and its laser if firing."""
     drawn = draw_ship(ctx, o, UPGRADE_RGB if o.upgrade else o.rgb)
-    if drawn and o.label and o.z > INEAR and not g.over:    # another player: their name
+    label = o.label
+    if label and not SHOW_NAMES:    # names hidden: only who has a flag
+        label = "*FLAG*" if label.endswith("*FLAG*") else None
+    if drawn and label and o.z > INEAR and not g.over:      # another player: their name
         z = int(o.z)
-        text(ctx, o.label, int(o.x) * IFOCAL // z,
+        text(ctx, label, int(o.x) * IFOCAL // z,
              -(int(o.y) * IFOCAL // z) + o.bp.isize * IFOCAL // z + 8, 10, o.rgb or WHITE)
     if o.beam > 0:
         _enemy_beam(ctx, o)

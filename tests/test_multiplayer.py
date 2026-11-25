@@ -1038,6 +1038,56 @@ b_ = world_of(M.g[0], s_)
 check("ints: the other player's ship moves on between poses and with them", 18 < math.dist(a_, b_) * 1.0
       and math.dist(b_, wpos(M.g[1])) < 30, "%.0f %.0f" % (math.dist(a_, b_), math.dist(b_, wpos(M.g[1]))))
 
+# ---- repeated names are numbered alike on every badge; the flags aren't named ---------
+air = Air()
+same = [duel.Duel(Link(air, bytes([2, 0, 0, 0, 15, i])), n, 1)
+        for i, n in ((3, "JAMESON"), (1, "JAMESON"), (2, "ANN"), (4, "JAMESON"))]
+for _ in range(8):
+    for d_ in same:
+        d_.lobby_step(DT)
+views = [sorted([d_.name] + [p.name for p in d_.lobby()]) for d_ in same]
+check("repeated names numbered by address", views[0] == ["ANN", "JAMESON", "JAMESON 2", "JAMESON 3"],
+      str(views[0]))
+check("every badge numbers them alike", all(v == views[0] for v in views))
+check("by address: the lowest keeps the name", same[1].name == "JAMESON" and same[0].name == "JAMESON 2"
+      and same[3].name == "JAMESON 3" and same[2].name == "ANN")
+sent = []
+same[0].link.send = lambda msg: sent.append(bytes(msg))
+same[0].lobby_step(1.0)
+check("the name sent is the badge's own", any(b"JAMESON  " in m and b"JAMESON 2" not in m for m in sent))
+m = Match(duel.CTF, 2)
+check("the flags have no labels", all(r.label is None for r in m.d[0].rings))
+
+# ---- Options > NAMES: the other players' names hidden, a flag carrier's *FLAG* kept ---
+g = m.g[1]
+o = game.Obj(g.types["VIPER"], "player", 0.0, 0.0, 800.0)
+o.label = "ANN"
+g.over = False
+
+
+def labels():
+    c = bs.CountCtx()
+    cockpit._draw_obj(c, g, o)
+    return [t[0] for t in c.texts]
+
+
+check("names shown", labels() == ["ANN"], str(labels()))
+cockpit.SHOW_NAMES = False
+check("names hidden", labels() == [], str(labels()))
+o.label = "ANN *FLAG*"
+check("hidden, but who has a flag still shows", labels() == ["*FLAG*"], str(labels()))
+cockpit.SHOW_NAMES = True
+a = ace_commander.AceCommander()
+a.platform.radio = lambda: Link(Air(), b"\x02\0\0\0\x10\x01")
+check("NAMES on the Options page with a radio", "NAMES: SHOWN" in a._settings(False))
+a._change("NAMES: SHOWN", False)
+check("NAMES: HIDDEN hides them", not a.use_names and not cockpit.SHOW_NAMES
+      and "NAMES: HIDDEN" in a._settings(False))
+b = ace_commander.AceCommander()
+check("and is kept (options.json)", not b.use_names and not cockpit.SHOW_NAMES)
+b._change("NAMES: HIDDEN", False)
+check("shown again", b.use_names and cockpit.SHOW_NAMES)
+
 if fails:
     print("%d FAILED: %s" % (len(fails), ", ".join(fails)))
     sys.exit(1)

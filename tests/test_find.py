@@ -204,7 +204,7 @@ for _ in range(300):
         break
 e._open("status")
 assert "COMMANDER ZAPHOD" in texts(e)
-assert not any(t.startswith("NAME") for t in e._settings(True)), "not in flight"
+assert not any(t.startswith("NAME:") for t in e._settings(True)), "not in flight"
 del sys.modules["settings"]
 # TEXT ENTRY: PICKER (build 124): the letter picker on the badge's own controls
 e.pad.keyboard = False

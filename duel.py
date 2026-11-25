@@ -363,7 +363,8 @@ class Player:
 
     def __init__(self, ident):
         self.id = ident
-        self.name = "?"
+        self.name = "?"         # as shown: their own name, numbered if another has it too
+        self.base = "?"         # as they sent it (Duel._number_names)
         self.colour = 0
         self.role = LOBBY
         self.mode = DUEL
@@ -513,8 +514,32 @@ class Duel:
 
     def set_me(self, name, colour):
         """The commander's name and ship colour, sent in every HELLO."""
-        self.name = str(name).upper()[:NAME_LEN] or "JAMESON"
+        self.my_name = self.name = str(name).upper()[:NAME_LEN] or "JAMESON"
         self.colour = colour if isinstance(colour, int) and 0 <= colour < 32 else 0
+        if hasattr(self, "players"):
+            self._number_names()
+
+    def _number_names(self):
+        """Two or more players with one name (two JAMESONs): the one with the lowest
+        radio address keeps it, the others are NAME 2, NAME 3... (Brian, 2026-11-25).
+        Every badge hears the same names and addresses, so all number them alike;
+        not while flying, so nobody is renamed in a game."""
+        if self.flying:
+            return
+        everyone = [(self.link.id, self.my_name, None)]
+        for p in self.players.values():
+            if p.t < GONE:
+                everyone.append((p.id, p.base, p))
+        everyone.sort(key=lambda e: e[0])
+        seen = {}
+        for ident, base, p in everyone:
+            n = seen.get(base, 0) + 1
+            seen[base] = n
+            shown = base if n == 1 else base[:NAME_LEN - 2] + " " + str(n)
+            if p is None:
+                self.name = shown
+            else:
+                p.name = shown
 
     @property
     def other(self):
@@ -890,7 +915,7 @@ class Duel:
         else:
             teams = (0, 1, 0, 1)
         struct.pack_into(FMT, self.hello, 0, netplay.MAGIC, kind, role, self.colour, self.mode,
-                         target, _name_bytes(self.name), self._ids(), self.team_pref,
+                         target, _name_bytes(self.my_name), self._ids(), self.team_pref,
                          self.options(), bytes(teams[:MAX_PLAYERS]),
                          self.lives & 0xFF, self.defend_colour & 0xFF, self.teamopt())
         self.link.send(self.hello)
@@ -932,7 +957,10 @@ class Duel:
                 p = Player(hid)     # a copy: the radio reuses its buffer
                 self.players[hid] = p
             p.t = 0.0
-            p.name = name.decode().strip() or "?"
+            nm = name.decode().strip() or "?"
+            if nm != p.base:    # a new player or a new name: number any repeats again
+                p.base = p.name = nm
+                self._number_names()
             p.colour = colour
             if kind == END_PKT:
                 if self.flying and self.by_id.get(hid) is p:
@@ -1683,7 +1711,7 @@ class Duel:
             for k in (0, 1):
                 o = game.Obj(bp, "mark", 0.0, 0.0, 0.0)
                 o.rgb = TEAM_RGB[k]
-                o.label = TEAM_NAMES[k] + " FLAG"
+                o.label = None      # the flags aren't named (Brian, 2026-11-25)
                 o.world = (0, 0, int(RING_Z) if k else -int(RING_Z))
                 self.rings[k] = o
                 self.marks.append(o)
