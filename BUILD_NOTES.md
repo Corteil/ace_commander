@@ -1793,3 +1793,19 @@ what is now `ace.py` (renamed in build 50).
    laser, pirate fire, the host's laser in a raid, a missile). Recharging adds to both.
    test_multiplayer's station section runs as without Elite's ship data even where it is on
    disc (`sys.modules["ace_commander.ship_data"] = None`), so it passes on both. PC only.
+   **Build 161** (a STATION CO-OP host crashed on the badge with four playing, 2026-11-25:
+   `ValueError: ESPNow.recv(): buffer error` in `net_espnow.Link.recv`, and the firmware's
+   own ESP-NOW service crashed with it). Read from the firmware (`system/espnow/service.py`,
+   started at boot) and MicroPython 1.28's `modespnow.c`: the service's background task reads
+   every packet too, from the one radio into the one class buffer, so it took some of ours;
+   the radio writes a packet in three pieces from the Wi-Fi task, and a read between them
+   raises "buffer error" and leaves the buffer out of step; `rxbuf` applies only when ESP-NOW
+   starts, which the service had done (so RXBUF never applied); the service turns Wi-Fi power
+   saving on (dropping packets) every 10 s unless someone listens. `net_espnow.Link` now pauses
+   the service's reader (cancels its task; started again by `close()`, from
+   `Platform.minimise`; opened again on use), listens for its event so the radio stays awake,
+   restarts ESP-NOW so RXBUF applies, reads only as many packets as `stats()[3]` (rx_packets,
+   counted once a packet is all written) says, and restarts the radio on a buffer error
+   instead of crashing. Test: `tests/test_net_espnow.py` (pretend radio and service). On four
+   badges over the REPL (the service not running there): 4096 bytes, no errors, every counted
+   packet read. Not yet in a real game.
