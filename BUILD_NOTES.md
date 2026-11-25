@@ -1760,3 +1760,11 @@ what is now `ace.py` (renamed in build 50).
    (`Duel.lives_lost`); at the number the player is out till the next match (OUT: NO LIVES
    LEFT). Before that the end screen's last line says "n LIVES LEFT   F: leave". A whole side
    out ends it as before. Tests in test_multiplayer. PC only.
+   **Build 157** (Brian, 2026-11-25: "defenders colour should be configurable"). CONVOY RAID
+   and STATION RAID have a DEFENDERS line on HOSTING: any of the ship paints
+   (`cockpit.SHIP_COLOURS`, RED by default, `duel.DEFEND_COLOUR`), drawn in that colour;
+   `Duel.step_defend_colour`. The raiders stay blue, or are red when the defenders are blue or
+   cyan (`duel.raid_rgb`, `BLUES`). HELLO and START carry it (54 bytes, the last byte);
+   the ships in flight, the radar and the party lists on HOSTING and JOINING use it
+   (`Duel.team_rgb`). Other team modes keep red and blue. With eight lines (STATION RAID)
+   the HOSTING page is closer packed. Tests in test_multiplayer. PC only.

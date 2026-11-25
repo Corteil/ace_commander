@@ -877,6 +877,8 @@ class AceCommander(PLATFORM.App):
                     d.choose_team(1 - d.my_team())
                 elif row == "pirates":
                     d.step_pirates(step)
+                elif row == "colour":
+                    d.step_defend_colour(step)
                 elif row == "station":
                     d.step_station(step)
                 elif row == "time":
@@ -901,6 +903,8 @@ class AceCommander(PLATFORM.App):
             rows.append("team")
         if dm.GUARDED[d.mode]:
             rows.append("pirates")
+        if dm.RAIDED[d.mode]:           # the defenders' colour
+            rows.append("colour")
         if dm.STATIONED[d.mode]:        # which station, how long, growing waves, lives
             rows += ["station", "time", "waves", "lives"]
         return rows
@@ -911,9 +915,11 @@ class AceCommander(PLATFORM.App):
         from . import duel as dm
         text = cockpit.text
         mode = d.mode if d.role == dm.HOST else (d.host_p.mode if d.host_p is not None else 0)
+        dcol = d.defend_colour if d.role == dm.HOST else (
+            d.host_p.defend_colour if d.host_p is not None else dm.DEFEND_COLOUR)
         for i, (name, colour, slot, t) in enumerate(d.party()):
             if dm.TEAMED[mode]:
-                rgb = dm.TEAM_RGB[t]
+                rgb = dm.raid_rgb(dcol, t) if dm.RAIDED[mode] else dm.TEAM_RGB[t]
                 name = "%s  %s" % (name[:12], dm.team_label(mode, t))
             else:
                 rgb = cockpit.ship_rgb(colour)
@@ -962,7 +968,7 @@ class AceCommander(PLATFORM.App):
             rows = self._host_rows(d)
             sel = rows[self.d_row] if self.d_row < len(rows) else "mode"
             many = len(rows) > 3            # the station modes: closer together
-            step = 13 if many else 15
+            step = 12 if len(rows) >= 8 else (13 if many else 15)
             y = -68
             for row in rows:
                 if row == "mode":
@@ -972,6 +978,8 @@ class AceCommander(PLATFORM.App):
                 elif row == "pirates":
                     v = d.pirates_setting()
                     v = "PIRATES: " + (dm.LEVEL_NAMES[v] if v >= 0 else "OFF")
+                elif row == "colour":
+                    v = "DEFENDERS: " + cockpit.SHIP_COLOURS[d.defend_colour][0]
                 elif row == "station":
                     v = dm.station_name(d.station_i)
                 elif row == "time":
@@ -981,13 +989,15 @@ class AceCommander(PLATFORM.App):
                 else:
                     v = "LIVES: " + (str(d.lives) if d.lives else "UNLIMITED")
                 on = row == sel
-                text(ctx, ("< %s >" if on else "%s") % v, 0, y, (12 if many else 13) if on else 11,
-                     cockpit.GREEN if on else cockpit.GREY)
+                rgb = cockpit.GREEN if on else cockpit.GREY
+                if row == "colour":     # in the colour itself
+                    rgb = cockpit.ship_rgb(d.defend_colour)
+                text(ctx, ("< %s >" if on else "%s") % v, 0, y, (12 if many else 13) if on else 11, rgb)
                 y += step
                 if row == "mode" and len(rows) < 6:     # (no room with the station's lines)
                     text(ctx, dm.MODE_NOTES[d.mode], 0, y - 2, 10, cockpit.YELLOW)
                     y += 11 if many else 12
-            self._draw_party(ctx, d, y + 4, 12 if many else 14)
+            self._draw_party(ctx, d, y + 4, 11 if len(rows) >= 8 else (12 if many else 14))
             ok, why = d.can_start()
             if ok:
                 text(ctx, "C: start   F: stop", 0, 80, 12, cockpit.GREY)
@@ -1006,7 +1016,8 @@ class AceCommander(PLATFORM.App):
                 y = -46
                 t = d.my_team()
                 if t is not None:       # left / right asks for the other team
-                    text(ctx, "< YOU: %s >" % dm.team_label(o.mode, t), 0, y, 13, dm.TEAM_RGB[t])
+                    text(ctx, "< YOU: %s >" % dm.team_label(o.mode, t), 0, y, 13,
+                         dm.raid_rgb(o.defend_colour, t) if dm.RAIDED[o.mode] else dm.TEAM_RGB[t])
                     y += 16
                 if dm.GUARDED[o.mode]:
                     on = o.opts & dm.OPT_PIRATES or dm.COOPED[o.mode]
