@@ -80,6 +80,7 @@ PMISSILE_SPEED = 1700.0
 TURN_RATE = 1.1            # how fast enemy ships can turn, radians per second
 BREAK_DIST = 900.0         # enemies peel away when this close
 DESPAWN = 14000.0
+RAM_AGAIN = 1.0         # seconds before ramming another player's ship hurts again (duel.py)
 RADAR_RANGE = 10000.0
 MAX_OBJECTS = 14
 
@@ -465,7 +466,7 @@ class Obj:
 
     def __init__(self, bp, kind, x, y, z):
         self.bp = bp
-        self.kind = kind    # "ship", "missile", "pmissile", "rock" or "can"
+        self.kind = kind    # "ship", "missile", "pmissile", "rock", "can" or "player" (duel.py)
         self.x = x
         self.y = y
         self.z = z
@@ -482,6 +483,12 @@ class Obj:
         self.target = None  # what a player missile is chasing
         self.good = None    # a splinter: the good it holds (a canister: None, any of several)
         self.upgrade = False    # a practice upgrade canister (Game.practice_upgrades)
+        self.rgb = None         # another player's ship: its paint (duel.py), else None
+        self.label = None       # and their name, drawn under it
+        self.ram_t = 0.0        # another player's ship: no ramming damage again until 0
+        self.ghost = False      # a missile at another player: shown only, their game decides
+        self.net_id = 0         # a missile to or from another player: its number (duel.py)
+        self.ecmed = False      # an enemy missile destroyed by your ECM
         self.role = "pirate"    # ships: "pirate", "trader", "police" or "hunter"
         self.dest = "station"   # a trader's: where it is making for, "station" or "planet"
         self.prey = None        # a pirate's: the trader it is after (None: you)
@@ -522,6 +529,20 @@ def _rot3(x, y, z, ca, sa, cb, sb):
     cb, sb: the same turn as Game._rotate does in whole numbers."""
     y, z = y * ca - z * sa, y * sa + z * ca
     return x * cb - y * sb, x * sb + y * cb, z
+
+
+class Anchor:
+    """Multiplayer (plans/MULTIPLAYER.md): where a world shared with other players
+    is. You never move (as Elite), so each device keeps the shared world's origin
+    (x, y, z) and its axes (m: its x, y and z axes as rows, in your coordinates,
+    the layout of Obj.m) and turns and slides them with everything else
+    (Game._rotate, _yaw). Then your pose in the shared world, and anyone else's in
+    yours, are a matrix product away: Game.world_pose, Game.place. Floats: one
+    object, so no garbage worth counting on the badge."""
+
+    def __init__(self):
+        self.x = self.y = self.z = 0.0
+        self.m = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
 
 
 class Space:
@@ -668,6 +689,57 @@ class Game:
         if self.view:
             self._into_view(self.view, True)
 
+    def set_anchor(self, x, y, z, m):
+        """Start a shared world with you at (x, y, z) in it, your side, roof and
+        nose (m, rows, as Obj.m) given in its coordinates."""
+        a = self.anchor = Anchor()
+        # the world's axes in yours: the transpose of your axes in the world's
+        a.m[:] = [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]]
+        # the world's origin in yours: minus your position, in your axes
+        a.x = -(x * m[0] + y * m[1] + z * m[2])
+        a.y = -(x * m[3] + y * m[4] + z * m[5])
+        a.z = -(x * m[6] + y * m[7] + z * m[8])
+
+    def world_pose(self):
+        """Your (x, y, z) and axes (side, roof, nose as rows, 9 numbers) in the
+        shared world, or None without one (set_anchor)."""
+        a = self.anchor
+        if a is None:
+            return None
+        m = a.m
+        # a point v of yours is at (v.side, v.roof, v.nose) in the world, the
+        # world's axes being m's rows; you are at minus the origin, so:
+        x = -(a.x * m[0] + a.y * m[1] + a.z * m[2])
+        y = -(a.x * m[3] + a.y * m[4] + a.z * m[5])
+        z = -(a.x * m[6] + a.y * m[7] + a.z * m[8])
+        # your axes are (1,0,0), (0,1,0), (0,0,1): in the world, m's columns
+        return x, y, z, [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]]
+
+    def world_point(self, x, y, z):
+        """A point of yours (x, y, z) in the shared world (set_anchor)."""
+        a = self.anchor
+        m = a.m
+        x -= a.x
+        y -= a.y
+        z -= a.z
+        return (x * m[0] + y * m[1] + z * m[2], x * m[3] + y * m[4] + z * m[5],
+                x * m[6] + y * m[7] + z * m[8])
+
+    def place(self, o, x, y, z, m):
+        """Put o (an Obj) where a pose in the shared world puts it in yours:
+        (x, y, z) and axes m (rows, the world's coordinates)."""
+        a = self.anchor
+        w = a.m
+        o.x = a.x + x * w[0] + y * w[3] + z * w[6]
+        o.y = a.y + x * w[1] + y * w[4] + z * w[7]
+        o.z = a.z + x * w[2] + y * w[5] + z * w[8]
+        om = o.m
+        for i in (0, 3, 6):
+            p, q, r = m[i], m[i + 1], m[i + 2]
+            om[i] = p * w[0] + q * w[3] + r * w[6]
+            om[i + 1] = p * w[1] + q * w[4] + r * w[7]
+            om[i + 2] = p * w[2] + q * w[5] + r * w[8]
+
     def _into_view(self, view, back=False):
         if back and view >= 2:
             view = 5 - view         # left undoes right and right undoes left
@@ -714,6 +786,7 @@ class Game:
         self.objs = []
         self.new = []      # objects created during a step, added at its end
         self.booms = []
+        self.anchor = None  # multiplayer: the shared world's origin and axes (set_anchor)
         self.tick = 0
         self.frame = 0
         # dust and explosion dots are whole numbers: see _rotate
@@ -756,6 +829,9 @@ class Game:
         self.auto_done = None  # the last ship auto_missile fired at
         if not hasattr(self, "practice_upgrades"):
             self.practice_upgrades = False  # waves drop upgrade canisters (ace sets it)
+        if not hasattr(self, "quiet"):
+            self.quiet = False  # no waves or rocks: a duel's empty arena (duel.py; ace sets it)
+            self.net = None     # a duel (duel.py): told of hits on, and missiles at, another player
         self.upgrade_n = 0     # the upgrades fitted so far (UPGRADES)
         self.wave_hold = 0.0   # waiting for the upgrade canister to be collected (UPGRADE_WAIT)
         self.wave_wait = 0.0   # the countdown to the next wave (WAVE_WAIT), while > 0
@@ -1376,6 +1452,7 @@ class Game:
         for o in self.objs:
             if o.kind == "missile" and not o.dead:
                 o.dead = True
+                o.ecmed = True
                 self._boom(o.x, o.y, o.z, 8)
                 n += 1
         if n:
@@ -1398,6 +1475,7 @@ class Game:
         for o in self.objs:
             if o.kind == "missile" and not o.dead:
                 o.dead = True
+                o.ecmed = True
                 self._boom(o.x, o.y, o.z, 8)
         self.ecm_t = 0.5
         self.shield = max(0.0, self.shield - ECM_COST)
@@ -1538,7 +1616,8 @@ class Game:
             self._collide()
             self._weapons(dt, fire, missile)
             self._regen(dt)
-            self._director(dt)
+            if not self.quiet:
+                self._director(dt)
             self._hyper(dt)
 
         if self.new:
@@ -1573,6 +1652,8 @@ class Game:
                     sp.station.z -= fwd
             for o in self.objs:
                 o.z -= fwd
+            if self.anchor is not None:
+                self.anchor.z -= fwd
             for boom in self.booms:
                 for p in boom.parts:
                     p[2] -= ifwd
@@ -1612,6 +1693,22 @@ class Game:
                 for i in (0, 3, 6):
                     m[i], m[i + 1], m[i + 2] = _rot3(m[i], m[i + 1], m[i + 2],
                                                      fca, fsa, fcb, fsb)
+        an = self.anchor
+        if an is not None:
+            # exact sines, not the rounded whole-number ones: those don't quite square
+            # to 1, so what they turn slowly grows or shrinks (unseen alone, but two
+            # badges' worlds would drift apart)
+            fca = math.cos(a)
+            fsa = math.sin(a)
+            fcb = math.cos(b)
+            fsb = math.sin(b)
+            an.x, an.y, an.z = _rot3(an.x, an.y, an.z, fca, fsa, fcb, fsb)
+            an.z -= fwd
+            m = an.m
+            for i in (0, 3, 6):
+                m[i], m[i + 1], m[i + 2] = _rot3(m[i], m[i + 1], m[i + 2], fca, fsa, fcb, fsb)
+            if self.tick % 32 == 0:
+                _ortho(an.m)
         for o in self.objs:
             x = int(o.x * 4)
             y = int(o.y * 4)
@@ -1692,6 +1789,12 @@ class Game:
                 m = st.m
                 for i in (0, 3, 6):
                     m[i], m[i + 2] = turn(m[i], m[i + 2])
+        an = self.anchor
+        if an is not None:
+            an.x, an.z = turn(an.x, an.z)
+            m = an.m
+            for i in (0, 3, 6):
+                m[i], m[i + 2] = turn(m[i], m[i + 2])
         for o in self.objs:
             o.x, o.z = turn(o.x, o.z)
             m = o.m
@@ -1718,6 +1821,10 @@ class Game:
             o.beam -= dt
         m = o.m
         kind = o.kind
+        if kind == "player":    # another player's ship: duel.py moves it, from their packets
+            if o.ram_t > 0:
+                o.ram_t -= dt
+            return
         if kind == "ship":
             # Steering is the costly part, and makes a lot of work for the
             # garbage collector, so a ship only re-plans every few frames,
@@ -1900,6 +2007,8 @@ class Game:
                     self._boom(o.x, o.y, o.z, 8)
                     self.sfx("crash")   # a missile exploding: Elite's EXNO3 (TA34)
                     o.dead = True
+                    if o.ghost:         # at another player: their game says what it did
+                        return
                     self._provoke(t)
                     t.energy -= MISSILE_DAMAGE
                     t.hit = 0.2
@@ -1949,6 +2058,8 @@ class Game:
         for o in self.objs:
             if o.dead or o.kind == "missile" or o.kind == "pmissile":
                 continue
+            if o.kind == "player" and o.ram_t > 0:
+                continue        # just rammed: not again every frame
             r = o.bp.radius * 0.7 + 60.0
             if abs(o.z) > r:
                 continue
@@ -1988,6 +2099,9 @@ class Game:
             self.sfx("crash")
             self._hurt(10.0 + self.speed * 0.5)
             self.speed *= 0.4
+            if o.kind == "player":  # another player: each game hurts its own ship (they see
+                o.ram_t = RAM_AGAIN     # the crash too); not again for a moment
+                continue
             o.energy -= 60.0
             if o.energy <= 0:
                 self._kill(o)
@@ -2043,7 +2157,7 @@ class Game:
         best = None
         best_r = cone * cone
         for o in self.objs:
-            if o.kind != "ship" or o.dead or o.z < 100:
+            if (o.kind != "ship" and o.kind != "player") or o.dead or o.z < 100:
                 continue
             r = (o.x * o.x + o.y * o.y) / (o.z * o.z)
             if r < best_r:
@@ -2065,6 +2179,10 @@ class Game:
             o.target = launch
             o.t = 8.0
             self.new.append(o)
+            if launch.kind == "player":     # at another player: theirs flies it at them (duel.py)
+                o.ghost = True
+                if self.net is not None:
+                    self.net.missile_fired(o)
             self.say("MISSILE AWAY", 1.0)
             self.sfx("missile")
 
@@ -2117,6 +2235,12 @@ class Game:
                     best_z = o.z
             if best is None and self.space is not None and self.looking:
                 self._hit_station()
+            if best is not None and best.kind == "player":
+                best.hit = 0.12     # another player: their game takes the damage (duel.py)
+                self.sfx("hit")
+                if self.net is not None:
+                    self.net.laser_hit(self.laser_damage)
+                best = None
             if best is not None and best.role == "constrictor" and self.laser != "military":
                 self._provoke(best)     # its shields shrug off anything but a military laser
                 best = None

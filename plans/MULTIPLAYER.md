@@ -84,6 +84,78 @@ link (UDP, or through a bridge below).
 The game talks to one small interface (`send(bytes)`, `receive()`), so the transport
 can change underneath.
 
+## Built: the shared world and the pose packet (branch multiplayer-pose)
+
+- `game.Anchor` / `Game.set_anchor(x, y, z, m)` / `world_pose()` / `place(o, x, y, z, m)`:
+  each device keeps the shared world's origin and axes in its own coordinates, turned
+  and slid with everything else in `_rotate` / `_yaw` (cleared by `reset`). It uses exact
+  sines: the game's whole-number ones don't square to 1, so objects grow or shrink a
+  little each turn (55 units in 400 frames, unseen alone) and two worlds would drift.
+  Without an anchor it costs one `is not None` a frame.
+- `netplay.py`: the 32-byte POSE packet (magic, player, seq, position in quarter units,
+  nose and roof times 16384, speed, flags FIRING / DEAD), packed into a buffer made once;
+  `read_pose` remakes the side axis and can fill a given list; `newer` for the seq wrap.
+- `tests/test_net_pose.py`: out 5,000 units and back lands within 0.00001; two Games
+  (a duel's start: z -1000 facing +z, z +1000 facing -z) see each other dead ahead,
+  and after both fly about agree on distance and angle; through a packet within 0.07 units.
+
+## Built: DUEL (same branch)
+
+- **Lobby, host and join (Brian, 2026-11-25):** everyone on the DUEL page says HELLO
+  4 times a second with their commander's name (`cmdr_name`) and ship paint
+  (`cmdr.colour`, `cockpit.SHIP_COLOURS`) and what they are doing (LOBBY / HOST / JOIN /
+  FLYING, and for whom). The lobby page lists HOST A GAME, a JOIN line for each open
+  game, and who is there; a host takes the first guest to ask (the game then shows as
+  full); the host sees the guest's name in their colour and C starts: START to the guest
+  (repeated for 1 s) and both fly at once, host from START[0], guest from START[1], 8000
+  apart (2000 was too close: Brian), as far as practice's ships come in, on the radar. The
+  other ship is drawn in its owner's paint with their name under it (`Obj.rgb`,
+  `Obj.label`; the radar and both dashboards use the colour). This replaced slots by id
+  and the "start again when the other starts flying" fix.
+- **Leaving (Brian, 2026-11-25: when the host leaves, the game ends):** leaving the flight
+  sends END three times. The host leaving ends the guest's game: back to the lobby, which
+  shows HOST LEFT for 4 s; if every END is lost, the host's next HELLO from the lobby does
+  it; a host not heard for 10 s (battery, window closed) ends it as HOST LOST. **The guest
+  leaving ends the host's game too** (Brian): back to the lobby, "<NAME> LEFT" (or LOST).
+- **Combat (Brian, 2026-11-25: damage, lasers, missiles, ramming; the ECM by hand):**
+  a laser hit is the shooter's to decide: HIT (damage x16) and the target takes it
+  (`Game._hurt`); its beam shows on the target's screen when its nose points at them
+  (pose flag FIRING). A missile is the target's: MISSILE (number, launch point and way,
+  sent 3 times) and the target's game flies it as an enemy missile; it says GONE (hit, or
+  its ECM) and the shooter's harmless copy (`Obj.ghost`) goes ("ECM" if it was that).
+  Ramming: each game hurts its own ship, not again for `RAM_AGAIN` s. The ECM is by hand
+  (`rules.manual_ecm` while dueling): E on a keyboard, both speed buttons, **B on the
+  badge** (Brian: the energy bomb can't touch the other player), LB on the Pi pad.
+  Destroyed: the pose flag DEAD; the other sees the explosion and "<NAME> DESTROYED k-d";
+  fly again (C) starts you at your end. Players can be locked and fired at like ships
+  (`_pick`), but the AI, the energy bomb and encounters still leave them alone.
+  `tests/test_duel_combat.py`.
+- **Rounds and loadout (Brian, 2026-11-25):** every round starts both ships the same
+  (`Duel.loadout`: shields and energy full, an ECM, a full missile rack, lasers cool, no
+  energy bomb since B is the ECM; the ECM was missing before: `_start_flight` thought the
+  new game wasn't fresh). Destroyed: the duel's own end screen (DESTROYED / BY <NAME> in
+  their colour / the score / C: next round / F: leave duel; `Duel.over_lines`, drawn by
+  cockpit instead of GAME OVER). C sends NEXT (the round number, 3 times) and both go
+  back to their ends with fresh loadouts, "ROUND n"; the score is kept.
+- Title screen DUEL (only when the platform has `radio()`: the badge always; the Pi with
+  `run.py --duel [PORT]`; not the Tufty yet). Its page says HELLO 4 times a second and
+  shows SEARCHING / PLAYER FOUND; C flies (alone until the other comes), F back.
+- `duel.py` (imported only when DUEL is chosen): slots by id (smaller id at z -1000
+  facing +z, the other at z +1000 facing -z), `Game.quiet` (no waves or rocks), its
+  pose 15 times a second, the other's ship as kind "player" (not "ship", so the AI,
+  missiles, the energy bomb, encounters and mass lock leave it; not rammed or shot yet),
+  placed from its last pose moved on by its speed; older packets dropped; 3 s silent
+  "LINK LOST" (the ship goes), then "LINK BACK"; fly again (reset) puts you back at
+  your start; leaving the flight ends the duel.
+- Links: `net_espnow.py` (badge: broadcast, rxbuf 4096, read every frame) and
+  `hosts/pi/net_udp.py` (UDP broadcast, a random id per run; two windows on one Pi play).
+- `tests/test_duel.py`: two Games on a pretend radio (finding, slots, the same distance
+  both ways, half the packets lost, late packets, LINK LOST / BACK, reset, stop) and the
+  app's DUEL page and flight. A sees B a frame behind (~14 units at starting speed).
+
+Not yet on a badge. Next: shots and hits (the shooter decides, sends a HIT with damage;
+the target takes it and sends DEAD), then the Tufty (UDP on its Wi-Fi) and the Pi bridge.
+
 ## The game (suggestion)
 
 1. A duel in the combat practice arena, no NPCs: each device flies its own ship and

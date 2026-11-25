@@ -97,7 +97,7 @@ def blip_colour(ck, o):
         if o.role == "police":
             return ck.POLICE_BLUE
         return ck.WHITE
-    return ck.COLOUR[o.kind]
+    return o.rgb or ck.COLOUR[o.kind]
 
 
 def _stalk(ctx, bx, by, h, size):
@@ -249,7 +249,7 @@ def draw_view_overlay(ctx, ck, g, L, ms=None):
     if g.view and not getattr(g, "autodock", False):
         ck.text(ctx, ck.VIEW_NAMES[g.view] + " VIEW", 0, -hh + 10, 9, ck.GREY)
     sp = g.space
-    if sp is None:                   # combat practice: wave (yellow) and score (white)
+    if sp is None and getattr(g, "net", None) is None:     # practice: wave and score (not a duel)
         wave, score = str(g.wave), str(g.score)
         width = (len(wave) + len(score)) * 10 - 6 + 9
         x = -width / 2.0
@@ -268,6 +268,8 @@ def draw_view_overlay(ctx, ck, g, L, ms=None):
         ck.text(ctx, "ship and cargo lost", 0, -2, 13, ck.WHITE)
         ck.text(ctx, "C: to the station" if g.again.endswith("station") else g.again, 0, 22, 12, ck.GREY)
         ck.text(ctx, "F: title screen", 0, 38, 12, ck.GREY)
+    elif g.over and getattr(g, "net", None) is not None:     # a duel's own end screen
+        ck.draw_duel_over(ctx, g, -60)
     elif g.over:
         ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -50, 200, 100).fill()
         ck.text(ctx, "GAME OVER", 0, -30, 26, ck.RED)

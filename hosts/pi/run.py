@@ -114,7 +114,7 @@ class Host:
     screen. The window can be any size: everything scales to fit."""
 
     def __init__(self, scale=2, full=None, save_dir=None, debug=False, log_keys=False, layout=None,
-                 sound=False):
+                 sound=False, duel=None):
         pygame.init()
         pygame.display.set_caption("Ace Commander")
         self.leds = platform_pi.LEDS    # the ring the game writes, drawn round the screen
@@ -157,6 +157,9 @@ class Host:
             p.set_volume = self.player.set_volume       # Options > VOLUME (build 145)
             p.sound_stop = self.player.stop
             self.app._apply_volume()        # options.json's, read before the player was there
+        if duel:                            # --duel: DUEL on the title screen, over UDP
+            import net_udp
+            self.app.platform.radio = lambda: net_udp.Link(duel)
         self.clock = pygame.time.Clock()
         self.running = True
         self.frames = 0
@@ -438,9 +441,12 @@ def main(argv=None):
     ap.add_argument("--sound", action="store_true", help="the game's sounds (Options > SOUND too)")
     ap.add_argument("--log-keys", action="store_true", help="print every key and the button it becomes")
     ap.add_argument("--frames", type=int, default=None, help="stop after this many frames")
+    ap.add_argument("--duel", type=int, nargs="?", const=47001, default=None, metavar="PORT",
+                    help="DUEL on the title screen: two players over UDP broadcast (two windows "
+                         "on one Pi, or two computers on one network); PORT default 47001")
     args = ap.parse_args(argv)
     Host(args.scale, args.full, debug=args.debug, log_keys=args.log_keys,
-         layout=args.layout, sound=args.sound).run(args.frames)
+         layout=args.layout, sound=args.sound, duel=args.duel).run(args.frames)
 
 
 if __name__ == "__main__":

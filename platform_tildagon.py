@@ -33,6 +33,8 @@ owner_name:
                                 .sound(name) to start one and .sound_step() each
                                 frame (build 140); missing or False: no SOUND line
       .sound_port               optional: the hexpansion port the I2S amp is on
+      .radio()                  optional: a link for a duel (duel.py: .id, .send(msg),
+                                .recv()); missing: no DUEL on the title screen
                                 (1-6, build 145), with .set_sound_port(n); missing
                                 or None: no SOUND PORT line
       .set_volume(v)            optional: Options > VOLUME, 1-11 (build 145);
@@ -469,6 +471,11 @@ class Platform:
                 except Exception:
                     a.fast = False              # firmware differs: stay on the normal path
             await render_update()
+
+    def radio(self):
+        """ESP-NOW broadcast (net_espnow.py), opened the first time a duel is."""
+        from . import net_espnow
+        return net_espnow.Link()
 
     def minimise(self):
         """Leave the game: the host (the loading screen) is the app the

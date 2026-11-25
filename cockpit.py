@@ -78,7 +78,7 @@ LASER_COLOURS = {
 # enemy missiles are orange like enemy lasers (all enemy fire), yours light purple
 UPGRADE_RGB = GREEN     # a practice upgrade canister (game.UPGRADES), on screen and radar
 COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": ORANGE, "pmissile": LIGHT_PURPLE,
-          "station": WHITE}
+          "station": WHITE, "player": (0.3, 0.9, 1)}     # player: another player's ship (duel.py)
 PLANET = (0.35, 0.6, 1)
 # each system's planet is one of these, picked from its number (Space.planet):
 # (the disc's colour, its outline's)
@@ -439,6 +439,16 @@ SHIP_COLOURS = (
     ("BLUE", (0.35, 0.5, 1)),
     ("PURPLE", (0.75, 0.4, 1)),
 )
+
+
+def draw_duel_over(ctx, g, top):
+    """A duel's end screen when you are destroyed (duel.Duel.over_lines), in a dark box
+    from y = top: the badge's HUD and both dashboards (dash_pi, dash_tufty) draw it."""
+    ctx.rgba(0, 0, 0, 0.8).rectangle(-100, top, 200, 120).fill()
+    y = top + 20
+    for s, size, rgb in g.net.over_lines():
+        text(ctx, s, 0, y, size, rgb)
+        y += size + 8
 
 
 def ship_rgb(i):
@@ -1142,7 +1152,11 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
 
 
     for o in g.objs:
-        draw_ship(ctx, o, UPGRADE_RGB if o.upgrade else None)
+        drawn = draw_ship(ctx, o, UPGRADE_RGB if o.upgrade else o.rgb)
+        if drawn and o.label and o.z > INEAR and not g.over:    # another player: their name
+            z = int(o.z)
+            text(ctx, o.label, int(o.x) * IFOCAL // z,
+                 -(int(o.y) * IFOCAL // z) + o.bp.isize * IFOCAL // z + 8, 10, o.rgb or WHITE)
         if o.beam > 0:
             _enemy_beam(ctx, o)
 
@@ -1806,7 +1820,7 @@ def _hud(ctx, g, ms=None, ring=True):
             else:
                 ctx.rgb(*WHITE)
         else:
-            ctx.rgb(*(UPGRADE_RGB if o.upgrade else COLOUR[o.kind]))
+            ctx.rgb(*(UPGRADE_RGB if o.upgrade else o.rgb or COLOUR[o.kind]))
         if h >= 0:
             ctx.rectangle(bx, by - h, 1, h).fill()
         else:
@@ -1836,8 +1850,8 @@ def _hud(ctx, g, ms=None, ring=True):
             _planet_gauge(ctx, sp)
 
     # combat practice: wave (yellow) and score (white), as one centred row of
-    # digits; a commander's flight has neither
-    if sp is None:
+    # digits; a commander's flight has neither, nor a duel (its score is on its end screen)
+    if sp is None and getattr(g, "net", None) is None:
         wave = str(g.wave)
         score = str(g.score)
         width = (len(wave) + len(score)) * 10 - 6 + 9
@@ -1859,6 +1873,8 @@ def _hud(ctx, g, ms=None, ring=True):
         text(ctx, "C: to the station" if g.again.endswith("station") else g.again,
              0, 30, 12, GREY)
         text(ctx, "F: title screen", 0, 46, 12, GREY)
+    elif g.over and getattr(g, "net", None) is not None:     # a duel's own end screen
+        draw_duel_over(ctx, g, -52)
     elif g.over:
         ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -42, 200, 100).fill()
         text(ctx, "GAME OVER", 0, -22, 26, RED)

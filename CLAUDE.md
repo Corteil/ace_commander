@@ -69,6 +69,10 @@ Other devices are in `hosts/`: the Pi, and the Tufty 2350 since build 109 (`host
 - `game.py` - game rules, including the star system (`Space`, `Game.enter`). No badge
   imports, so it runs on a PC.
 - `cockpit.py` - flight view, HUD, radar. Built from rectangles (see Speed).
+- `duel.py`, `netplay.py`, `net_espnow.py` - multiplayer (2026-11-24, `plans/MULTIPLAYER.md`):
+  DUEL on the title screen when `platform.radio()` exists; `Game.set_anchor` / `world_pose`
+  / `place` keep a shared world; the 32-byte pose packet; ESP-NOW broadcast on the badge
+  (`hosts/pi/net_udp.py` on the Pi with `--duel`). The other player is kind "player".
 - `viewer.py` - ship viewer. `bench.py` - the speed test (DEBUG > DISPLAY > SPEED TEST since build 72;
   imported only when it is opened, since 2026-11-20).
 - `title.py` - title screen: block-letter name from rectangles, tumbling ship, one menu line.
