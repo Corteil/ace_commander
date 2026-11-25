@@ -1876,3 +1876,8 @@ what is now `ace.py` (renamed in build 50).
    where there is a radio: NAMES: SHOWN / HIDDEN (`AceCommander.use_names`, options.json
    "names", `cockpit.SHOW_NAMES`); hidden leaves only a carrier's *FLAG*. Tests in
    test_multiplayer.py; test_find's "no NAME line in flight" now looks for "NAME:".
+   Build 165 played by hand (four badges, duels; two named JAMESON): confirmed by Brian,
+   NAMES: HIDDEN hides the names. The logs: no tracebacks or radio errors; the lobby showed
+   "BRIAN, JAMESON 2, THOMAS" and each badge agreed who was JAMESON 2 (a badge that had
+   joined before hearing the other JAMESON renamed its host while waiting, as designed:
+   not once flying); duel frames 41-75 ms.
