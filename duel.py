@@ -12,7 +12,7 @@ second with their commander's name, ship colour (cockpit.SHIP_COLOURS) and what
 they are doing: in the LOBBY, HOSTing a game, JOINing one, or FLYING. One player
 hosts; another joins that host; the host sees who joined and starts: START goes
 to the guest (a few times, in case one is lost) and both fly at once, the host
-from START[0], the guest from START[1], 2000 apart and facing. In flight each
+from START[0], the guest from START[1], 8000 apart and facing. In flight each
 sends its pose (netplay.py) SEND_HZ times a second; the other's ship (kind
 "player") is drawn where its last pose and speed put it now. Nothing heard for
 LOST seconds: "LINK LOST", the ship goes until it comes back. Shots and hits are
@@ -37,8 +37,11 @@ SEND_HZ = 15                # poses a second in flight (the link test's rate)
 LOST = 3.0                  # seconds without a packet: the other player is gone
 GONE = 3.0                  # on the page: seconds without a HELLO before they leave the list
 NAME_LEN = 16
-# where each side starts in the shared world: (x, y, z, nose x, y, z); host 0, guest 1
-START = ((0.0, 0.0, -1000.0, 0.0, 0.0, 1.0), (0.0, 0.0, 1000.0, 0.0, 0.0, -1.0))
+# where each side starts in the shared world: (x, y, z, nose x, y, z); host 0, guest 1.
+# 8000 apart (Brian, 2026-11-25: 2000 started too close): as far as practice's ships
+# come in (6000-9000), on the radar (10000), facing
+START_Z = 4000.0
+START = ((0.0, 0.0, -START_Z, 0.0, 0.0, 1.0), (0.0, 0.0, START_Z, 0.0, 0.0, -1.0))
 START_SPEED = 14.0          # as a new flight (Game.reset)
 
 

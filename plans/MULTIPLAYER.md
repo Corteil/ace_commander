@@ -107,7 +107,8 @@ can change underneath.
   FLYING, and for whom). The lobby page lists HOST A GAME, a JOIN line for each open
   game, and who is there; a host takes the first guest to ask (the game then shows as
   full); the host sees the guest's name in their colour and C starts: START to the guest
-  (repeated for 1 s) and both fly at once, host from START[0], guest from START[1]. The
+  (repeated for 1 s) and both fly at once, host from START[0], guest from START[1], 8000
+  apart (2000 was too close: Brian), as far as practice's ships come in, on the radar. The
   other ship is drawn in its owner's paint with their name under it (`Obj.rgb`,
   `Obj.label`; the radar and both dashboards use the colour). This replaced slots by id
   and the "start again when the other starts flying" fix.

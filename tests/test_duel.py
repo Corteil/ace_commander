@@ -213,7 +213,7 @@ check("back: LINK BACK and the ship again", ga.msg == "LINK BACK" and len(player
 # fly again (Game.reset) puts you back at your end
 ga.reset()
 both(2)
-check("reset: back at the start", math.dist(ga.world_pose()[:3], (0, 0, -1000)) < 50
+check("reset: back at the start", math.dist(ga.world_pose()[:3], (0, 0, -duel.START_Z)) < 50
       and len(player(ga)) == 1)
 
 # stop: practice's game again, and back in the lobby
@@ -290,7 +290,7 @@ hd.start_game()
 for _ in range(3):
     bs.tick(b)
 check("app join: HAL's START flies the guest from START[1]", b.mode == "flight" and b.dueling
-      and b.duel.slot == 1 and math.dist(b.game.world_pose()[:3], (0, 0, 1000)) < 50)
+      and b.duel.slot == 1 and math.dist(b.game.world_pose()[:3], (0, 0, duel.START_Z)) < 50)
 
 print()
 if fails:
