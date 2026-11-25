@@ -1699,3 +1699,12 @@ what is now `ace.py` (renamed in build 50).
    `fill_hull`). In flight, ships beyond the station are drawn before it and it is drawn solid
    over them (`cockpit._draw_space(..., g)`, `_draw_obj`), and it is solid wherever it is over
    the planet's or sun's filled disc (before: only over the planet's outline). PC renders only.
+   **Build 152** (Brian, 2026-11-25: "Can see the spokes line entering the wheel on the halo
+   render"). The Halo (the game's own DODO) had its ring's six pieces black out what is behind
+   them only side-on (`HIDES_SIDE_ON`), so seen at a slant a spoke's end was drawn across a
+   nearer piece of the ring. Now `HIDES_ALWAYS` (tools/make_original_ships.py, original_ships.py
+   remade): a piece nearer than the middle hides what is behind it, in flight, on the title
+   screen and in the Ship Viewer. Seen dead face-on the spokes still meet the ring's inner wall
+   in its middle, which is right (and no piece is nearer than the middle then, so none fills).
+   Cost: up to three more fills a frame close to a Halo (about 2 ms each on the badge, from the
+   earlier measurements); Elite's Dodo is one convex shape and is unchanged. PC renders only.
