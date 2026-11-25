@@ -69,8 +69,11 @@ A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves 
     shield recharges, and they go back to attacking. The game is lost if the station is
     destroyed or more than 3 pirates dock; held for the time, it is won.
     The host picks the station (the game's Drum or Halo, and Elite's Coriolis or Dodo when
-    Elite's data is loaded), the time (2, 3 or 5 minutes), steady or growing waves, and the
-    pirates' skill.
+    Elite's data is loaded), the time (2, 3 or 5 minutes), steady or growing waves, the
+    pirates' skill and LIVES. A destroyed defender waits 10 seconds (the time penalty), then
+    launches from the station through its launch tunnel. With LIVES: ONE a destroyed player
+    is out until the next match: every defender out loses the station (in the raid, every
+    raider out holds it).
   - **STATION RAID**: red defends the station, blue raids it, with the same choices and the
     same help for outnumbered defenders as the convoy raid.
   Except in a duel, a destroyed ship comes back after 5 seconds at its team's start (behind

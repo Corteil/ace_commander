@@ -88,7 +88,7 @@ BEAM_CONE = 0.98            # their laser drawn at you when their nose is this c
 # name (16 bytes, ASCII, padded with spaces), guests (the host's: 3 ids, NO_ID if none),
 # the team we'd like (NO_TEAM: any), options (the host's: OPT_PIRATES), each slot's team
 # (the host's: 4 bytes, slot 0 first)
-FMT = "<2sBBBB6s16s18sBB4s"
+FMT = "<2sBBBB6s16s18sBB4sB"     # ... and more of the host's options (OPT2_ONE_LIFE)
 NO_TEAM = 255
 OPT_PIRATES = 1             # CONVOY RAID: pirates on the raiders' side (the host's choice)
 # the pirates' skill (the host's choice, build 151): the game's level, EASY / NORMAL / HARD
@@ -97,6 +97,7 @@ LEVEL_NAMES = ("EASY", "NORMAL", "HARD")
 # options bits 3-4: the station modes' time (STATION_TIMES), bit 5: growing waves, bits 6-7:
 # the station (STATIONS)
 OPT_GROW = 32
+OPT2_ONE_LIFE = 1           # the station modes: destroyed, you are out till the next match
 LOBBY, HOST, JOIN, FLYING = 0, 1, 2, 3
 NO_ID = b"\x00" * 6
 HELLO_EVERY = 0.25          # seconds between HELLOs on the lobby pages
@@ -173,6 +174,12 @@ DOCK_LIMIT = 3              # more than this many pirates docked: the station is
 STATION_SHIELD = 1000.0
 SHIELD_WAIT = 5.0
 SHIELD_RECHARGE = 20.0
+# a defender destroyed in a station mode waits STATION_PENALTY seconds (the time penalty),
+# then launches from the station: the launch tunnel (ace.py), out of the slot (Brian,
+# 2026-11-25). With LIVES: ONE nobody comes back: all the defenders out, the station is
+# lost; in a raid, all the raiders out, it is held.
+STATION_PENALTY = 10.0
+LAUNCH_OUT = 300.0          # launched this far out in front of the slot
 GROW_EVERY = 60.0           # growing waves: one more pirate a wave each this many seconds
 DOCKED = 4                  # NPCS flags: this ship docked (gone, no explosion)
 # the stations to defend: (role, whose): the game's own Drum and Halo, and Elite's Coriolis
@@ -343,6 +350,7 @@ class Player:
         self.team_pref = NO_TEAM    # the team they'd like
         self.teams = (0, 1, 0, 1)   # a host's: each slot's team
         self.opts = OPT_PIRATES     # a host's options
+        self.opts2 = 0
         self.t = 0.0            # seconds since last heard
         self.slot = 0
         self.ship = None        # their ship in our game (an Obj, kind "player")
@@ -375,6 +383,8 @@ class Duel:
         self.time_i = 1         # the station modes: how long (STATION_TIMES), 3 minutes
         self.growing = True     # and whether the waves grow
         self.station_i = 0      # and which station (STATIONS)
+        self.one_life = False   # and LIVES: ONE (OPT2_ONE_LIFE)
+        self.wants_launch = False   # destroyed, penalty served: ace shows the launch tunnel
         self.teams = [0, 1, 0, 1]   # in a game: each slot's team
         self.roster = {}        # in a game: slot -> Player, everyone but us
         self.by_id = {}         # and id -> Player
@@ -416,6 +426,7 @@ class Duel:
         self.carrier = [NOBODY, NOBODY]     # who has each team's flag
         self.hp = 255           # the convoy's (or station's) energy, 0-255
         self.docked = 0         # the station modes: pirates that have docked
+        self.out = set()        # one life: the slots destroyed this match
         self.shield_b = 255     # and the station's shield, 0-255 (STATE)
         self.shield = self.shield_max = STATION_SHIELD  # the host's, in energy
         self.shield_quiet = 0.0     # host: seconds since the station was last hit
@@ -446,6 +457,14 @@ class Duel:
     def team_of(self, slot):
         """A slot's team in this game (as chosen in the lobby); 0 for all with no teams."""
         return self.teams[slot] & 1 if TEAMED[self.mode] else 0
+
+    def _side_out(self, team):
+        """One life: every player on team (still here) is out."""
+        if not (self.one_life and STATIONED[self.mode]):
+            return False
+        slots = [self.slot] + list(self.roster)
+        side = [s for s in slots if self.team_of(s) == team]
+        return bool(side) and all(s in self.out for s in side)
 
     def _counts(self):
         """(defenders, raiders): how many players on each team now (us included)."""
@@ -559,6 +578,19 @@ class Duel:
         self.time_i = min(len(STATION_TIMES) - 1, (opts >> 3) & 3)
         self.growing = bool(opts & OPT_GROW)
         self.station_i = (opts >> 6) & 3
+
+    def set_one_life(self, on):
+        self.one_life = bool(on)
+        self.hello_t = 0.0
+
+    def launches(self):
+        """True if we come back by launching from the station (a station mode's defender)."""
+        return STATIONED[self.mode] and self.team_of(self.slot) == 0
+
+    def launched(self, g):
+        """ace: the launch tunnel is over: out of the station's slot, into the fight."""
+        self.wants_launch = False
+        self._respawn(g, launch=True)
 
     def step_time(self, step):
         self.time_i = (self.time_i + step) % len(STATION_TIMES)
@@ -753,7 +785,8 @@ class Duel:
             teams = (0, 1, 0, 1)
         struct.pack_into(FMT, self.hello, 0, netplay.MAGIC, kind, role, self.colour, self.mode,
                          target, _name_bytes(self.name), self._ids(), self.team_pref,
-                         self.options(), bytes(teams[:MAX_PLAYERS]))
+                         self.options(), bytes(teams[:MAX_PLAYERS]),
+                         OPT2_ONE_LIFE if self.one_life else 0)
         self.link.send(self.hello)
 
     def _send_start(self):
@@ -786,7 +819,7 @@ class Duel:
             if (kind != HELLO and kind != START_PKT and kind != END_PKT) or len(msg) < size:
                 continue
             (_, _, role, colour, mode, target, name, ids, pref, opts,
-             teams) = struct.unpack_from(FMT, msg, 0)
+             teams, opts2) = struct.unpack_from(FMT, msg, 0)
             hid = bytes(host)
             p = self.players.get(hid)
             if p is None:
@@ -807,6 +840,7 @@ class Duel:
                     self.start_ids = guests
                     self.teams = [t & 1 for t in bytes(teams)]
                     self._take_options(opts)
+                    self.one_life = bool(opts2 & OPT2_ONE_LIFE)
                 continue
             p.role = role
             p.mode = mode
@@ -814,6 +848,7 @@ class Duel:
             if role == HOST or role == FLYING:
                 p.teams = tuple(t & 1 for t in bytes(teams))
                 p.opts = opts
+                p.opts2 = opts2
             p.target = bytes(target)
             p.guests = guests if role == HOST or role == FLYING else ()
             if self.role == HOST and not self.flying:
@@ -1258,11 +1293,16 @@ class Duel:
         p = self.roster.get(slot)
         return p.name if p is not None else "?"
 
+    def _is_out(self, slot):
+        return self.one_life and STATIONED[self.mode] and slot in self.out
+
     def _killed(self, victim, by):
         """Someone (victim, a slot) was destroyed by `by`: the host scores it; all say it."""
         g = self.g
         if self.mode == DUEL:
             return              # a duel counts what it sees (flight_step)
+        if self.one_life and STATIONED[self.mode]:
+            self.out.add(victim)        # one life: out till the next match
         if self.slot == 0 and self.result == 0:
             scores, team, carrier = list(self.scores), list(self.team), list(self.carrier)
             if by < MAX_PLAYERS and by != victim:
@@ -1458,7 +1498,7 @@ class Duel:
         else:
             g.say(MODE_NAMES[self.mode], 2.0)
 
-    def _respawn(self, g, keep_npcs=True):
+    def _respawn(self, g, keep_npcs=True, launch=False):
         """You at your start (after being destroyed, or a new match); the arena's rings,
         convoy and the host's ships kept where they are in the shared world."""
         keep = []
@@ -1476,12 +1516,17 @@ class Duel:
         g.quiet = True
         g.objs[:] = []
         g.speed = START_SPEED
-        g.set_anchor(*spawn_pose(self.mode, self.slot, self.mtime, self.team_of(self.slot),
-                                 self._mate(self.slot)))
+        if launch and self.convoy is not None:     # out of the station's slot (+z), facing out
+            z = self.convoy.bp.front + LAUNCH_OUT + 250.0 * self._mate(self.slot)
+            g.set_anchor(*_pose(0.0, 0.0, z, 0.0, 0.0, 1.0))
+        else:
+            g.set_anchor(*spawn_pose(self.mode, self.slot, self.mtime, self.team_of(self.slot),
+                                     self._mate(self.slot)))
         self.loadout(g)
         self.ghosts = {}
         self.incoming = {}
         self.dead_here = False
+        self.wants_launch = False
         self.respawn_t = 0.0
         self.last_by = NOBODY
         self.last_by_t = 99.0
@@ -1567,6 +1612,8 @@ class Duel:
     def respawn_time(self):
         """How long we wait to come back: RESPAWN, but in a raid the defenders sooner and
         the raiders longer for each one they have more (so the defenders aren't overwhelmed)."""
+        if self.launches():
+            return STATION_PENALTY      # the time penalty, then the launch tunnel
         if not RAIDED[self.mode]:
             return RESPAWN
         if self.team_of(self.slot) == 0:
@@ -1607,9 +1654,14 @@ class Duel:
                     ("C: next round", 12, ck.GREY), ("F: leave duel", 12, ck.GREY))
         by = self.last_by if self.last_by_t < 10 else NOBODY
         who = ("BY " + self._name(by)) if by < MAX_PLAYERS else ("BY PIRATES" if by == NPC_SRC else "")
+        if self._is_out(self.slot):
+            when = ("OUT: ONE LIFE", 14, ck.YELLOW)
+        elif self.launches():
+            when = ("LAUNCH IN %d" % (int(self.respawn_t) + 1), 14, ck.WHITE)
+        else:
+            when = ("BACK IN %d" % (int(self.respawn_t) + 1), 14, ck.WHITE)
         return (("DESTROYED", 24, ck.RED), (who, 13, self._rgb(by) if by < MAX_PLAYERS else ck.WHITE),
-                ("BACK IN %d" % (int(self.respawn_t) + 1), 14, ck.WHITE),
-                ("F: leave game", 12, ck.GREY))
+                when, ("F: leave game", 12, ck.GREY))
 
     def _result_lines(self, ck):
         r = self.result
@@ -1624,7 +1676,9 @@ class Duel:
             if STATIONED[self.mode]:
                 head = "STATION HELD" if k == 0 else "STATION LOST"
                 why = ("PIRATES DOCKED %d" % self.docked) if self.docked > DOCK_LIMIT else (
-                    "PIRATES DESTROYED %d" % sum(self.scores))
+                    "DEFENDERS ALL OUT" if k == 1 and self._side_out(0) else (
+                        "RAIDERS ALL OUT" if k == 0 and self._side_out(1) else
+                        "PIRATES DESTROYED %d" % sum(self.scores)))
             else:
                 head = "CONVOY ARRIVED" if k == 0 else "CONVOY LOST"
                 why = "PIRATES DESTROYED %d" % sum(self.scores)
@@ -1779,11 +1833,14 @@ class Duel:
                 self._killed(self.slot, by)
         elif not g.over:
             self.dead_here = False
-        if g.over and self.mode != DUEL:
+        if g.over and self.mode != DUEL and not self._is_out(self.slot) and not self.wants_launch:
             self.respawn_t -= dt
             if self.respawn_t <= 0:
-                self._respawn(g)
-                return
+                if self.launches():
+                    self.wants_launch = True    # ace: the launch tunnel, then launched()
+                else:
+                    self._respawn(g)
+                    return
         if self.result and self.result_t > 0:
             self.result_t -= dt
             if self.result_t <= 0 and host:     # the next match
@@ -1806,6 +1863,12 @@ class Duel:
                 if c is not None and c.dead:
                     self._set_state(self.match, 2, self.mtime, self.scores, self.team,
                                     self.carrier, 0)
+                elif self._side_out(0):         # one life, every defender out: lost
+                    self._set_state(self.match, 2, self.mtime, self.scores, self.team,
+                                    self.carrier, self.hp)
+                elif RAIDED[m] and self._side_out(1):   # every raider out: held
+                    self._set_state(self.match, 1, self.mtime, self.scores, self.team,
+                                    self.carrier, self.hp)
                 elif self.docked > DOCK_LIMIT:      # too many got in: the station is lost
                     self._set_state(self.match, 2, self.mtime, self.scores, self.team,
                                     self.carrier, self.hp)

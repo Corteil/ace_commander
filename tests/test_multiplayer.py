@@ -723,6 +723,98 @@ duel._STATION_BPS.clear()
 check("station: a guest without it sees the game's own instead", duel.station_blueprint(3).name == "DODO"
       and duel.station_blueprint(3).title == "HALO STATION")
 
+# ---- station modes: defenders launch from the station; one life (build 155) ---------------------
+M = Match(duel.SCOOP, 2, seed=30)
+M.fly(5)
+M.g[1]._hurt(1000.0)
+M.fly(2)
+check("launch: a destroyed defender's end screen: LAUNCH IN 10", [l[0] for l in M.d[1].over_lines()][2] == "LAUNCH IN 10",
+      str(M.d[1].over_lines()))
+M.fly(int((duel.STATION_PENALTY - 1) / DT))
+check("launch: the time penalty: still waiting after 9 s", M.g[1].over and not M.d[1].wants_launch)
+M.fly(int(1.5 / DT))
+check("launch: then it asks for the launch tunnel (still destroyed meanwhile)", M.d[1].wants_launch and M.g[1].over)
+M.fly(int(3 / DT))
+check("launch: and waits for it (no respawn by itself)", M.d[1].wants_launch and M.g[1].over)
+M.d[1].launched(M.g[1])
+st_w = world_of(M.g[0], kind(M.g[0], "convoy")[0])
+p_ = wpos(M.g[1])
+check("launch: out in front of the station's slot, facing out", not M.g[1].over
+      and abs(p_[0]) < 1 and abs(p_[1]) < 1 and p_[2] > 200 and M.g[1].world_pose()[3][8] > 0.99, str(p_))
+M = Match(duel.SRAID, 2, seed=31)
+M.fly(5)
+check("launch: a raider doesn't launch from the station", not M.d[1].launches() and M.d[0].launches())
+M.g[1]._hurt(1000.0)
+M.fly(int((duel.RESPAWN + 0.5) / DT))
+check("launch: the raider is back by itself, out in space", not M.g[1].over and not M.d[1].wants_launch
+      and math.dist(wpos(M.g[1]), (0, 0, 0)) > 4000)
+
+# one life
+air = Air()
+ds = [duel.Duel(Link(air, bytes([2, 0, 0, 0, 11, i + 1])), NAMES[i], 1) for i in range(2)]
+ds[0].host(duel.SCOOP)
+ds[0].set_one_life(True)
+for _ in range(8):
+    for d_ in ds:
+        d_.lobby_step(DT)
+ds[1].join(ds[1].hosts()[0])
+for _ in range(8):
+    for d_ in ds:
+        d_.lobby_step(DT)
+check("one life: the guest's page has it", ds[1].host_p.opts2 & duel.OPT2_ONE_LIFE)
+M = Match(duel.SCOOP, 2, seed=32)
+for d_ in M.d:
+    d_.one_life = True
+M.fly(5)
+M.g[1]._hurt(1000.0)
+M.fly(int((duel.STATION_PENALTY + 2) / DT))
+check("one life: destroyed, out: no launch, still destroyed", M.g[1].over and not M.d[1].wants_launch
+      and [l[0] for l in M.d[1].over_lines()][2] == "OUT: ONE LIFE")
+check("one life: everyone knows", all(1 in d_.out for d_ in M.d) and M.d[0].result == 0)
+M.g[0]._hurt(1000.0)
+M.fly(3)
+check("one life: every defender out: STATION LOST, DEFENDERS ALL OUT", M.d[0].result == 2 and M.d[1].result == 2
+      and [l[0] for l in M.d[1].over_lines()][:3] == ["STATION LOST", "YOU LOSE", "DEFENDERS ALL OUT"],
+      str(M.d[1].over_lines()))
+M.fly(int((duel.RESULT_FOR + 1) / DT))
+check("one life: the next match: everyone back in", all(not g_.over and not d_.out for d_, g_ in zip(M.d, M.g)))
+M = Match(duel.SRAID, 2, seed=33)
+for d_ in M.d:
+    d_.one_life = True
+M.fly(5)
+M.g[1]._hurt(1000.0)
+M.fly(3)
+check("one life raid: every raider out: STATION HELD, RAIDERS ALL OUT", M.d[0].result == 1
+      and [l[0] for l in M.d[0].over_lines()][:3] == ["STATION HELD", "YOU WIN", "RAIDERS ALL OUT"],
+      str(M.d[0].over_lines()))
+
+# through the app: the launch tunnel
+air = Air()
+mine = Link(air, bytes([2, 0, 0, 0, 12, 1]))
+a = ace_commander.AceCommander()
+a.platform.radio = lambda: mine
+bs.choose(a, "MULTIPLAYER")
+bs.tick(a, fresh=["CONFIRM"])
+a.duel.set_mode(duel.SCOOP)
+bs.tick(a)
+bs.tick(a, fresh=["CONFIRM"])
+bs.tick(a)
+check("app launch: station co-op alone", a.mode == "flight" and a.duel.mode == duel.SCOOP)
+a.game._hurt(1000.0)
+for _ in range(int((duel.STATION_PENALTY + 0.5) / DT)):
+    bs.tick(a)
+check("app launch: after the time penalty, the launch tunnel", a.mode == "mlaunch" and a.dueling)
+c = bs.CountCtx()
+a.draw(c)
+t0 = a.duel.mtime
+for _ in range(int(ace_commander.ace.LAUNCH_TIME / DT) + 3):
+    bs.tick(a)
+check("app launch: the game ran on through the tunnel", a.duel.mtime > t0 + 2)
+check("app launch: out of the slot, flying", a.mode == "flight" and not a.game.over
+      and wpos(a.game)[2] > 200 and a.dueling)
+a._to_title()
+bs.tick(a)
+
 # ---- packet sizes: the NPCS packet fits ESP-NOW's 250 bytes --------------------------------
 import struct
 check("sizes: every packet fits ESP-NOW (250 bytes)",

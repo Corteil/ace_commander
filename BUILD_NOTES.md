@@ -1740,3 +1740,17 @@ what is now `ace.py` (renamed in build 50).
    20 a second; back up, the dockers still outside go back to attacking. STATE 24 bytes (the
    shield, 0-255); STATION SHIELDS DOWN / UP said to everyone; HUD's second line SHIELD n%
    DOCKED n/3 (red with the shield down). Tests in test_multiplayer. PC only.
+   **Build 155** (Brian, 2026-11-25: "Defending Player respawn launch from the station, just
+   the tunnel screen, there should be time penalty and one life option"). Station modes: a
+   destroyed defender waits `STATION_PENALTY` 10 s (the end screen says LAUNCH IN n), then
+   `Duel.wants_launch`; ace shows the launch tunnel (new mode "mlaunch", `_mp_launch`: a
+   `cockpit.Tunnel` for the station being defended, your ship in your colours, LAUNCH_TIME, C
+   skips; `flight_step` and, while destroyed, `Game.step` keep running so the radio stays up
+   and the host's pirates fly on), then `Duel.launched` puts you `LAUNCH_OUT` 300 in front of
+   the slot, facing out (teammates 250 further each). Raiders (station raid) come back as
+   before. HOSTING has a LIVES line in the station modes (UNLIMITED / ONE; HELLO 53 bytes, the
+   new last byte `OPT2_ONE_LIFE`); the mode's note line is left out when there are 6 or more
+   lines. One life: destroyed, you are out till the next match (OUT: ONE LIFE; every device
+   keeps `Duel.out` from KILLED); every defender out: STATION LOST (DEFENDERS ALL OUT); in the
+   raid every raider out: STATION HELD (RAIDERS ALL OUT). Tests in test_multiplayer, one
+   through the app. PC only.

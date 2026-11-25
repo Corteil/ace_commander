@@ -211,6 +211,13 @@ to be a new large design".
   it is down; unhit for 5 s it recharges 20 a second, and those still outside turn back.
   STATE carries it; HUD: SHIELD n%  DOCKED n/3.
 
+- **Build 155: launching, the time penalty, one life.** In the station modes a destroyed
+  defender waits `STATION_PENALTY` (10 s), then ace shows the launch tunnel (mode "mlaunch",
+  the radio and the host's game still running) and it comes out of the slot, facing out.
+  Raiders come back as before. LIVES: ONE (HELLO's new last byte, `OPT2_ONE_LIFE`): destroyed,
+  out till the next match (`Duel.out`, kept by everyone from KILLED); the host ends it when a
+  whole side is out (defenders: lost; raiders: held).
+
 Not yet on badges: the frame time with three other ships, eight pirates and the convoy (92
 lines in 6 parts close up) needs measuring; and how busy the radio is with four (each sends
 15 poses a second; the host also 10 NPCS and 4 STATE).

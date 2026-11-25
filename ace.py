@@ -686,6 +686,19 @@ class AceCommander(PLATFORM.App):
                     self.game.over = True   # every launch is a new flight
                 self.docked = False
                 self._start_flight(True)
+        elif self.mode == "mlaunch":   # multiplayer: a defender launching from the station
+            self.launch_t += dt
+            g = self.game
+            self._leds_station(cockpit.tunnel_glow(min(1.0, self.launch_t / LAUNCH_TIME),
+                                                   self.tunnel))
+            if g is not None and g.over:
+                g.step(dt, 0.0, 0.0, 0.0, False, False)     # the host's pirates fly on
+            if g is None or not g.over or not self.duel.wants_launch:
+                self.mode = "flight"    # a new match put us back already
+            elif confirm or self.launch_t >= LAUNCH_TIME:
+                self._leds_release()
+                self.duel.launched(g)
+                self.mode = "flight"
         elif self.mode == "docking":
             self.dock_t += dt
             self._leds_station(cockpit.dock_glow(min(1.0, self.dock_t / DOCK_TIME), self.tunnel))
@@ -709,8 +722,10 @@ class AceCommander(PLATFORM.App):
             if flying and PERF_LOG:
                 self._perf(delta, _diff(_us(), t0) / 1000.0)
         if self.dueling:            # paused too: the other player keeps hearing us
-            if self.mode == "flight" and self.game is not None:
+            if (self.mode == "flight" or self.mode == "mlaunch") and self.game is not None:
                 self.duel.flight_step(self.game, dt)
+                if self.duel.wants_launch and self.mode == "flight":
+                    self._mp_launch()   # a station's defender: back by the launch tunnel
             if self.duel.ended is not None:     # the other player left (Brian): the game ends,
                 self.duel.stop(self.game)       # back to the lobby, which says why
                 self.dueling = False
@@ -718,7 +733,7 @@ class AceCommander(PLATFORM.App):
                 self.fsub = None
                 self.d_sel = 0
                 self.mode = "duel"
-            elif self.mode != "flight":         # we left the flight: practice's game again
+            elif self.mode != "flight" and self.mode != "mlaunch":  # we left the flight: practice's again
                 self.duel.stop(self.game)
                 self.dueling = False
         self._sounds()
@@ -866,8 +881,10 @@ class AceCommander(PLATFORM.App):
                     d.step_station(step)
                 elif row == "time":
                     d.step_time(step)
-                else:
+                elif row == "waves":
                     d.set_growing(not d.growing)
+                else:
+                    d.set_one_life(not d.one_life)
             elif confirm:
                 d.start_game()      # (nothing until enough have joined)
         elif hit("left") or hit("right"):   # joining: left / right changes our team
@@ -884,8 +901,8 @@ class AceCommander(PLATFORM.App):
             rows.append("team")
         if dm.GUARDED[d.mode]:
             rows.append("pirates")
-        if dm.STATIONED[d.mode]:        # which station, how long, growing waves
-            rows += ["station", "time", "waves"]
+        if dm.STATIONED[d.mode]:        # which station, how long, growing waves, lives
+            rows += ["station", "time", "waves", "lives"]
         return rows
 
     def _draw_party(self, ctx, d, top, step=14):
@@ -959,13 +976,15 @@ class AceCommander(PLATFORM.App):
                     v = dm.station_name(d.station_i)
                 elif row == "time":
                     v = "TIME: %d MIN" % (dm.STATION_TIMES[d.time_i] // 60)
-                else:
+                elif row == "waves":
                     v = "WAVES: " + ("GROWING" if d.growing else "STEADY")
+                else:
+                    v = "LIVES: " + ("ONE" if d.one_life else "UNLIMITED")
                 on = row == sel
                 text(ctx, ("< %s >" if on else "%s") % v, 0, y, (12 if many else 13) if on else 11,
                      cockpit.GREEN if on else cockpit.GREY)
                 y += step
-                if row == "mode":
+                if row == "mode" and len(rows) < 6:     # (no room with the station's lines)
                     text(ctx, dm.MODE_NOTES[d.mode], 0, y - 2, 10, cockpit.YELLOW)
                     y += 11 if many else 12
             self._draw_party(ctx, d, y + 4, 12 if many else 14)
@@ -998,6 +1017,9 @@ class AceCommander(PLATFORM.App):
                     text(ctx, "%s  %d MIN  %s" % (dm.station_name((o.opts >> 6) & 3),
                                                   dm.STATION_TIMES[min(2, (o.opts >> 3) & 3)] // 60,
                                                   "GROWING" if o.opts & dm.OPT_GROW else "STEADY"),
+                         0, y, 10, cockpit.GREY)
+                    y += 12
+                    text(ctx, "LIVES: " + ("ONE" if o.opts2 & dm.OPT2_ONE_LIFE else "UNLIMITED"),
                          0, y, 10, cockpit.GREY)
                     y += 14
                 self._draw_party(ctx, d, y + 2)
@@ -1597,6 +1619,21 @@ class AceCommander(PLATFORM.App):
                                 cockpit.ship_rgb(c.colour if c is not None else 0))
             self.tunnel.park([types[n] for n in game.parked_ships(gov, tech) if n in types],
                              random)
+
+    def _mp_launch(self):
+        """Multiplayer (duel.py's station modes): a destroyed defender's time penalty is
+        over: the launch tunnel of the station being defended, then out of its slot."""
+        from . import duel as dm
+        d = self.duel
+        self.tunnel = cockpit.Tunnel(d.station_i, dm.STATIONS[d.station_i][0])
+        g = self.game
+        bp = g.types.get(g.ship_name) if g is not None else None
+        if bp is not None:
+            self.tunnel.fly(bp, d._rgb(d.slot))
+        self.launch_t = 0.0
+        self.paused = False
+        self.fsub = None
+        self.mode = "mlaunch"
 
     def _launch(self):
         self._play("launch")
@@ -3323,6 +3360,9 @@ class AceCommander(PLATFORM.App):
         elif self.mode == "launch":
             cockpit.draw_tunnel(ctx, min(1.0, self.launch_t / LAUNCH_TIME), self.launch_t,
                                 cockpit.station_colour(self._government()), False, self.tunnel)
+        elif self.mode == "mlaunch":
+            cockpit.draw_tunnel(ctx, min(1.0, self.launch_t / LAUNCH_TIME), self.launch_t,
+                                cockpit.station_colour(None), False, self.tunnel)
         elif self.mode == "docking":
             cockpit.draw_tunnel(ctx, min(1.0, self.dock_t / DOCK_TIME), self.dock_t,
                                 cockpit.station_colour(self._government()), True, self.tunnel)
