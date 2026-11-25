@@ -220,6 +220,8 @@ def draw_view_overlay(ctx, g, ms=None):
         ck.text(ctx, "ship and cargo lost", 0, -2, 13, ck.WHITE)
         ck.text(ctx, "C: to the station" if g.again.endswith("station") else g.again, 0, 22, 12, ck.GREY)
         ck.text(ctx, "F: title screen", 0, 38, 12, ck.GREY)
+    elif g.over and getattr(g, "net", None) is not None:     # a duel's own end screen
+        ck.draw_duel_over(ctx, g, -60)
     elif g.over:
         ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -50, 200, 100).fill()
         ck.text(ctx, "GAME OVER", 0, -30, 26, ck.RED)

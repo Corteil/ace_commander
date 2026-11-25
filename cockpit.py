@@ -441,6 +441,16 @@ SHIP_COLOURS = (
 )
 
 
+def draw_duel_over(ctx, g, top):
+    """A duel's end screen when you are destroyed (duel.Duel.over_lines), in a dark box
+    from y = top: the badge's HUD and both dashboards (dash_pi, dash_tufty) draw it."""
+    ctx.rgba(0, 0, 0, 0.8).rectangle(-100, top, 200, 120).fill()
+    y = top + 20
+    for s, size, rgb in g.net.over_lines():
+        text(ctx, s, 0, y, size, rgb)
+        y += size + 8
+
+
 def ship_rgb(i):
     """The colour of paint number i (SHIP_COLOURS), cyan if unknown."""
     return SHIP_COLOURS[i][1] if isinstance(i, int) and 0 <= i < len(SHIP_COLOURS) else ME_RGB
@@ -1864,11 +1874,7 @@ def _hud(ctx, g, ms=None, ring=True):
              0, 30, 12, GREY)
         text(ctx, "F: title screen", 0, 46, 12, GREY)
     elif g.over and getattr(g, "net", None) is not None:     # a duel's own end screen
-        ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -52, 200, 120).fill()
-        y = -32
-        for s, size, rgb in g.net.over_lines():
-            text(ctx, s, 0, y, size, rgb)
-            y += size + 8
+        draw_duel_over(ctx, g, -52)
     elif g.over:
         ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -42, 200, 100).fill()
         text(ctx, "GAME OVER", 0, -22, 26, RED)
