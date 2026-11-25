@@ -57,14 +57,16 @@ A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves 
     3 captures wins. The compass points at the ring to fly to.
   - **CONVOY CO-OP**: 1 to 4 players guard a big freighter on its way to a station
     (2½ minutes) from waves of pirates; it must arrive. The compass points at the convoy.
+    The host picks the pirates' skill (PIRATES: EASY, NORMAL or HARD).
   - **CONVOY RAID**: red guards the convoy, blue raids it, player against player. The host
-    picks PIRATES ON (a few pirates on blue's side, only while blue has fewer players) or OFF.
+    picks PIRATES OFF, or their skill (a few pirates on blue's side, only while blue has
+    fewer players).
     So the defenders aren't overwhelmed, they come back after 3 seconds, and for each raider
     more than there are defenders the convoy is tougher and the raiders wait 2 seconds longer.
   Except in a duel, a destroyed ship comes back after 5 seconds at its team's start (behind
   its own ring in Capture Flag); a won match shows the result for 10 seconds, then the next
   starts. The host leaving ends the game; a guest leaving drops out of it.
-- **Ship viewer**: every ship in the game, turning.
+- **Ship viewer**: every ship in the game, turning, and the convoy's freighter.
 - **Options**: steering (joystick or tilt), CONTROLS (flip the flight controls up / down,
   left / right or both), your commander's name, the docking style, how soon mission 1's
   target turns up, and the badge's LEDs.
