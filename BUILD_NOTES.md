@@ -1881,3 +1881,11 @@ what is now `ace.py` (renamed in build 50).
    "BRIAN, JAMESON 2, THOMAS" and each badge agreed who was JAMESON 2 (a badge that had
    joined before hearing the other JAMESON renamed its host while waiting, as designed:
    not once flying); duel frames 41-75 ms.
+   **Build 166** (Brian, 2026-11-25: "freeze the names once joined"). `Duel._number_names`
+   keeps the names of our party (joined and accepted: the host and its guests; hosting:
+   ourselves and our guests) as they are; anyone heard after is numbered round them (the
+   lowest number not taken). So a badge that joined JAMESON before hearing a second one
+   keeps calling its host JAMESON, and the newcomer is JAMESON 2 to it. Badges outside the
+   party still number by address, so they may see the names the other way round (the
+   newcomer calls itself JAMESON); inside the party everyone agrees. Test in
+   test_multiplayer.py.

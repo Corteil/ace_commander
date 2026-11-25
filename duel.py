@@ -522,20 +522,36 @@ class Duel:
     def _number_names(self):
         """Two or more players with one name (two JAMESONs): the one with the lowest
         radio address keeps it, the others are NAME 2, NAME 3... (Brian, 2026-11-25).
+        Names in our party are kept as they are (build 166).
         Every badge hears the same names and addresses, so all number them alike;
         not while flying, so nobody is renamed in a game."""
         if self.flying:
             return
-        everyone = [(self.link.id, self.my_name, None)]
+        # once joined (or hosting with guests), the party's names stay as they were
+        # (Brian, 2026-11-25): anyone heard after is numbered round them
+        party = []
+        if self.role == HOST and self.guests:
+            party = list(self.guests)
+        elif self.role == JOIN and self.accepted():
+            h = self.host_p
+            party = [h] + [self.players[g] for g in h.guests if g in self.players]
+        taken = set(p.name for p in party)
+        everyone = []
+        if party:
+            taken.add(self.name)
+        else:
+            everyone.append((self.link.id, self.my_name, None))
         for p in self.players.values():
-            if p.t < GONE:
+            if p.t < GONE and p not in party:
                 everyone.append((p.id, p.base, p))
         everyone.sort(key=lambda e: e[0])
-        seen = {}
         for ident, base, p in everyone:
-            n = seen.get(base, 0) + 1
-            seen[base] = n
-            shown = base if n == 1 else base[:NAME_LEN - 2] + " " + str(n)
+            n = 1
+            shown = base
+            while shown in taken:
+                n += 1
+                shown = base[:NAME_LEN - 2] + " " + str(n)
+            taken.add(shown)
             if p is None:
                 self.name = shown
             else:

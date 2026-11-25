@@ -1088,6 +1088,32 @@ check("and is kept (options.json)", not b.use_names and not cockpit.SHOW_NAMES)
 b._change("NAMES: HIDDEN", False)
 check("shown again", b.use_names and cockpit.SHOW_NAMES)
 
+# ---- names frozen once joined: a JAMESON heard later doesn't rename our host -----------
+air = Air()
+fz = [duel.Duel(Link(air, bytes([2, 0, 0, 0, 16, 3])), "JAMESON", 1),
+      duel.Duel(Link(air, bytes([2, 0, 0, 0, 16, 5])), "THOMAS", 1)]
+
+
+def lob_fz(n=8):
+    for _ in range(n):
+        for d_ in fz:
+            d_.lobby_step(DT)
+
+
+fz[0].host(duel.DUEL)
+lob_fz()
+fz[1].join(fz[1].hosts()[0])
+lob_fz()
+check("joined: the host is JAMESON", fz[1].accepted() and fz[1].host_p.name == "JAMESON")
+fz.append(duel.Duel(Link(air, bytes([2, 0, 0, 0, 16, 1])), "JAMESON", 1))   # a lower address
+lob_fz()
+others = sorted(p.name for p in fz[1].lobby())
+check("joined: our host keeps its name, the newcomer is numbered", fz[1].host_p.name == "JAMESON"
+      and others == ["JAMESON", "JAMESON 2"], str(others))
+check("hosting with a guest: our own name kept too", fz[0].name == "JAMESON")
+check("the newcomer, in no party, numbers by address", fz[2].name == "JAMESON"
+      and sorted(p.name for p in fz[2].lobby()) == ["JAMESON 2", "THOMAS"])
+
 if fails:
     print("%d FAILED: %s" % (len(fails), ", ".join(fails)))
     sys.exit(1)
