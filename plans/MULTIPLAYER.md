@@ -115,8 +115,8 @@ can change underneath.
 - **Leaving (Brian, 2026-11-25: when the host leaves, the game ends):** leaving the flight
   sends END three times. The host leaving ends the guest's game: back to the lobby, which
   shows HOST LEFT for 4 s; if every END is lost, the host's next HELLO from the lobby does
-  it; a host not heard for 10 s (battery, window closed) ends it as HOST LOST. The guest
-  leaving: the host flies on alone, "<NAME> LEFT" (Brian to say if that should end too).
+  it; a host not heard for 10 s (battery, window closed) ends it as HOST LOST. **The guest
+  leaving ends the host's game too** (Brian): back to the lobby, "<NAME> LEFT" (or LOST).
 - Title screen DUEL (only when the platform has `radio()`: the badge always; the Pi with
   `run.py --duel [PORT]`; not the Tufty yet). Its page says HELLO 4 times a second and
   shows SEARCHING / PLAYER FOUND; C flies (alone until the other comes), F back.

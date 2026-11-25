@@ -279,18 +279,42 @@ for _ in range(int(duel.LOST / DT) + 3):
     gj.step(DT, 0.0, 0.0, 0.0, False, False)
     j.flight_step(gj, DT)
 check("host silent 3 s: LINK LOST, the game goes on", gj.msg == "LINK LOST" and j.ended is None)
-for _ in range(int((duel.HOST_GONE - duel.LOST) / DT) + 3):
+for _ in range(int((duel.GONE_END - duel.LOST) / DT) + 3):
     gj.step(DT, 0.0, 0.0, 0.0, False, False)
     j.flight_step(gj, DT)
 check("host silent 10 s: HOST LOST, the game ends", j.ended == "HOST LOST", str(j.ended))
 
-# the guest leaves: the host flies on alone
+# the guest leaves: the host's game ends too (Brian)
 air_, h, gh, j, gj = pair(11)
 fly2(h, gh, j, gj, 10)
 j.stop(gj)
-fly2(h, gh, j, gj, 3)
-check("guest leaves: the host flies on, GUESTB LEFT, the ship gone",
-      h.flying and h.ended is None and gh.msg == "GUESTB LEFT" and player(gh) == [], gh.msg)
+h._hear()                           # the END
+check("guest leaves: the host's game ends, GUESTB LEFT", h.ended == "GUESTB LEFT", str(h.ended))
+h.stop(gh)
+check("  the host is back in the lobby, told why", h.role == duel.LOBBY and not h.flying
+      and h.notice == "GUESTB LEFT")
+
+# the guest's ENDs lost: its lobby HELLO ends the host's game
+air_, h, gh, j, gj = pair(13)
+fly2(h, gh, j, gj, 10)
+air_.drop = lambda msg: msg[2] == duel.END_PKT
+j.stop(gj)
+fly2(h, gh, j, gj, int(duel.HELLO_EVERY / DT) + 3)
+check("guest's ENDs lost: its HELLO ends the host's game", h.ended == "GUESTB LEFT", str(h.ended))
+
+# the guest goes silent: GUESTB LOST after GONE_END
+air_, h, gh, j, gj = pair(15)
+fly2(h, gh, j, gj, 10)
+air_.drop = lambda msg: True
+for _ in range(int(duel.GONE_END / DT) + 3):
+    gh.step(DT, 0.0, 0.0, 0.0, False, False)
+    h.flight_step(gh, DT)
+check("guest silent 10 s: GUESTB LOST, the host's game ends", h.ended == "GUESTB LOST", str(h.ended))
+
+# around the start, HELLOs from before START aren't taken for leaving
+air_, h, gh, j, gj = pair(17)
+fly2(h, gh, j, gj, int(1.5 / DT))
+check("no false end around the start", h.ended is None and j.ended is None and h.flying and j.flying)
 
 # ---- through the app: DUEL, the lobby, hosting, the other joins, start, back to the title
 air2 = Air()

@@ -709,7 +709,7 @@ class AceCommander(PLATFORM.App):
         if self.dueling:            # paused too: the other player keeps hearing us
             if self.mode == "flight" and self.game is not None:
                 self.duel.flight_step(self.game, dt)
-            if self.duel.ended is not None:     # the host left (Brian): the game ends,
+            if self.duel.ended is not None:     # the other player left (Brian): the game ends,
                 self.duel.stop(self.game)       # back to the lobby, which says why
                 self.dueling = False
                 self.paused = False

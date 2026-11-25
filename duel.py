@@ -15,8 +15,9 @@ to the guest (a few times, in case one is lost) and both fly at once, the host
 from START[0], the guest from START[1], 8000 apart and facing. In flight each
 sends its pose (netplay.py) SEND_HZ times a second; the other's ship (kind
 "player") is drawn where its last pose and speed put it now. Nothing heard for
-LOST seconds: "LINK LOST", the ship goes until it comes back. Shots and hits are
-not built yet.
+LOST seconds: "LINK LOST", the ship goes until it comes back. Either player
+leaving (END, or GONE_END seconds unheard) ends the game for both: back to the
+lobby, which says why. Shots and hits are not built yet.
 """
 import struct
 
@@ -37,7 +38,7 @@ START_FOR = 1.0             # the host repeats START this long, every START_EVER
 START_EVERY = 0.1
 SEND_HZ = 15                # poses a second in flight (the link test's rate)
 LOST = 3.0                  # seconds without a packet: the other player is gone
-HOST_GONE = 10.0            # the guest, this long without the host: the game ends ("HOST LOST")
+GONE_END = 10.0             # this long without the other player: the game ends ("... LOST")
 NOTICE_FOR = 4.0            # seconds the lobby shows why a duel ended
 GONE = 3.0                  # on the page: seconds without a HELLO before they leave the list
 NAME_LEN = 16
@@ -105,7 +106,6 @@ class Duel:
         self.pose_age = 0.0     # seconds since that pose
         self.last_seq = None
         self.lost = False
-        self.left = False       # hosting: the guest said goodbye (END)
         self.ended = None       # why the duel ended for us (the host left): the game goes back
         self.notice = None      # to the lobby, which shows this for NOTICE_FOR seconds
         self.notice_t = 0.0
@@ -198,6 +198,11 @@ class Duel:
                          self.other.id, _name_bytes(self.name))
         self.link.send(self.hello)
 
+    def _left(self, word="LEFT"):
+        """'HOST LEFT' for a guest, '<NAME> LEFT' for a host."""
+        o = self.other
+        return ("HOST " if self.role == JOIN or o is None else o.name + " ") + word
+
     def _end(self, why):
         """The duel is over for us (the game sees .ended and goes back to the lobby)."""
         if self.ended is None:
@@ -235,15 +240,14 @@ class Duel:
                 if (self.role == HOST and not self.flying and role == JOIN and target == me
                         and (self.other is None or self.other is p)):
                     self.other = p          # our guest (the first to ask)
-                elif (self.flying and self.role == JOIN and self.other is p
-                      and (role == LOBBY or role == JOIN or (role == HOST and target != me))):
-                    self._end("HOST LEFT")  # our host is back in the lobby: its END was lost
+                elif (self.flying and self.other is p and role != FLYING
+                      and not (role == HOST and target == me)
+                      and not (role == JOIN and target == me)):
+                    self._end(self._left())     # back in the lobby: their END was lost
+                    # (a HELLO naming us is from before START: not leaving)
             elif kind == END_PKT:
                 if self.flying and self.other is p and target == me:
-                    if self.role == JOIN:
-                        self._end("HOST LEFT")      # the host leaving ends the game (Brian)
-                    else:
-                        self.left = True            # the guest left: the host flies on alone
+                    self._end(self._left())     # either leaving ends the game (Brian)
             elif self.role == JOIN and self.other is p and target == me and not self.flying:
                 self.go = True              # our host started: fly
 
@@ -270,7 +274,6 @@ class Duel:
         self.flying = True
         self.go = False
         self.ended = None
-        self.left = False
         self.last_seq = None
         self.pose = None
         self.lost = False
@@ -283,9 +286,9 @@ class Duel:
             g.say("VS " + self.other.name, 2.0)
 
     def stop(self, g):
-        """Out of the arena (to the title, or the host left): practice's game again; back
-        to the lobby. Leaving, say so (END), so the other knows at once: a host leaving
-        ends the guest's game; a guest leaving, the host flies on alone."""
+        """Out of the arena (to the title, or the other left): practice's game again; back
+        to the lobby. Leaving, say so (END), so the other knows at once: either leaving
+        ends the other's game too (Brian, 2026-11-25)."""
         if self.flying and self.other is not None and self.ended is None:
             for _ in range(END_TIMES):
                 self._send(END_PKT, self.role)
@@ -333,14 +336,8 @@ class Duel:
             netplay.pack_pose(self.buf, self.slot, self.seq, g.world_pose(), g.speed, flags)
             self.link.send(self.buf)
         o = self.other
-        if self.role == JOIN and o is not None and o.t >= HOST_GONE:
-            self._end("HOST LOST")      # not heard for a long while: gone without a word
-        if self.left and o is not None:     # hosting: the guest said goodbye
-            self.left = False
-            g.say(o.name + " LEFT", 2.0)
-            self.other = None
-            self.pose = None
-            o = None
+        if o is not None and o.t >= GONE_END:
+            self._end(self._left("LOST"))   # not heard for a long while: gone without a word
         # show theirs
         if self.pose is None or o is None or o.t >= LOST:
             if self.ship is not None:
