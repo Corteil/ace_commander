@@ -884,7 +884,7 @@ class AceCommander(PLATFORM.App):
                 elif row == "waves":
                     d.set_growing(not d.growing)
                 else:
-                    d.set_one_life(not d.one_life)
+                    d.step_lives(step)
             elif confirm:
                 d.start_game()      # (nothing until enough have joined)
         elif hit("left") or hit("right"):   # joining: left / right changes our team
@@ -979,7 +979,7 @@ class AceCommander(PLATFORM.App):
                 elif row == "waves":
                     v = "WAVES: " + ("GROWING" if d.growing else "STEADY")
                 else:
-                    v = "LIVES: " + ("ONE" if d.one_life else "UNLIMITED")
+                    v = "LIVES: " + (str(d.lives) if d.lives else "UNLIMITED")
                 on = row == sel
                 text(ctx, ("< %s >" if on else "%s") % v, 0, y, (12 if many else 13) if on else 11,
                      cockpit.GREEN if on else cockpit.GREY)
@@ -1019,7 +1019,7 @@ class AceCommander(PLATFORM.App):
                                                   "GROWING" if o.opts & dm.OPT_GROW else "STEADY"),
                          0, y, 10, cockpit.GREY)
                     y += 12
-                    text(ctx, "LIVES: " + ("ONE" if o.opts2 & dm.OPT2_ONE_LIFE else "UNLIMITED"),
+                    text(ctx, "LIVES: " + (str(o.opts2) if o.opts2 else "UNLIMITED"),
                          0, y, 10, cockpit.GREY)
                     y += 14
                 self._draw_party(ctx, d, y + 2)

@@ -218,6 +218,10 @@ to be a new large design".
   out till the next match (`Duel.out`, kept by everyone from KILLED); the host ends it when a
   whole side is out (defenders: lost; raiders: held).
 
+- **Build 156: fixed lives.** LIVES is UNLIMITED, 1, 2, 3 or 5 (HELLO's last byte is the
+  number); each device counts every player's deaths from KILLED (`Duel.lives_lost`), out at
+  the number; the end screen says how many are left.
+
 Not yet on badges: the frame time with three other ships, eight pirates and the convoy (92
 lines in 6 parts close up) needs measuring; and how busy the radio is with four (each sends
 15 poses a second; the host also 10 NPCS and 4 STATE).

@@ -749,11 +749,17 @@ M.fly(int((duel.RESPAWN + 0.5) / DT))
 check("launch: the raider is back by itself, out in space", not M.g[1].over and not M.d[1].wants_launch
       and math.dist(wpos(M.g[1]), (0, 0, 0)) > 4000)
 
-# one life
+# fixed lives
 air = Air()
 ds = [duel.Duel(Link(air, bytes([2, 0, 0, 0, 11, i + 1])), NAMES[i], 1) for i in range(2)]
 ds[0].host(duel.SCOOP)
-ds[0].set_one_life(True)
+seq = []
+for _ in range(5):
+    ds[0].step_lives(1)
+    seq.append(ds[0].lives)
+check("lives: right goes 1, 2, 3, 5, UNLIMITED", seq == [1, 2, 3, 5, 0], str(seq))
+ds[0].step_lives(1)
+ds[0].step_lives(1)             # 2
 for _ in range(8):
     for d_ in ds:
         d_.lobby_step(DT)
@@ -761,30 +767,43 @@ ds[1].join(ds[1].hosts()[0])
 for _ in range(8):
     for d_ in ds:
         d_.lobby_step(DT)
-check("one life: the guest's page has it", ds[1].host_p.opts2 & duel.OPT2_ONE_LIFE)
+check("lives: the guest's page has 2", ds[1].host_p.opts2 == 2)
 M = Match(duel.SCOOP, 2, seed=32)
 for d_ in M.d:
-    d_.one_life = True
+    d_.lives = 2
 M.fly(5)
 M.g[1]._hurt(1000.0)
-M.fly(int((duel.STATION_PENALTY + 2) / DT))
-check("one life: destroyed, out: no launch, still destroyed", M.g[1].over and not M.d[1].wants_launch
-      and [l[0] for l in M.d[1].over_lines()][2] == "OUT: ONE LIFE")
-check("one life: everyone knows", all(1 in d_.out for d_ in M.d) and M.d[0].result == 0)
-M.g[0]._hurt(1000.0)
+M.fly(2)
+check("lives 2: destroyed once: 1 LIFE LEFT, and launches again", M.d[1].lives_left() == 1
+      and M.d[1].over_lines()[3][0].startswith("1 LIFE LEFT"), str(M.d[1].over_lines()))
+M.fly(int((duel.STATION_PENALTY + 1) / DT))
+check("lives 2: then the launch", M.d[1].wants_launch)
+M.d[1].launched(M.g[1])
 M.fly(3)
-check("one life: every defender out: STATION LOST, DEFENDERS ALL OUT", M.d[0].result == 2 and M.d[1].result == 2
+M.g[1]._hurt(1000.0)
+M.fly(int((duel.STATION_PENALTY + 2) / DT))
+check("lives 2: destroyed twice, out: no launch, still destroyed", M.g[1].over and not M.d[1].wants_launch
+      and [l[0] for l in M.d[1].over_lines()][2] == "OUT: NO LIVES LEFT")
+check("lives 2: everyone knows", all(1 in d_.out for d_ in M.d) and M.d[0].result == 0)
+M.g[0]._hurt(1000.0)            # the host's first...
+M.fly(int((duel.STATION_PENALTY + 1) / DT))
+check("lives 2: the host launches again", M.d[0].wants_launch and M.d[0].result == 0)
+M.d[0].launched(M.g[0])
+M.fly(2)
+M.g[0]._hurt(1000.0)            # ...and second
+M.fly(3)
+check("lives: every defender out: STATION LOST, DEFENDERS ALL OUT", M.d[0].result == 2 and M.d[1].result == 2
       and [l[0] for l in M.d[1].over_lines()][:3] == ["STATION LOST", "YOU LOSE", "DEFENDERS ALL OUT"],
       str(M.d[1].over_lines()))
 M.fly(int((duel.RESULT_FOR + 1) / DT))
-check("one life: the next match: everyone back in", all(not g_.over and not d_.out for d_, g_ in zip(M.d, M.g)))
+check("lives: the next match: everyone back in", all(not g_.over and not d_.out for d_, g_ in zip(M.d, M.g)))
 M = Match(duel.SRAID, 2, seed=33)
 for d_ in M.d:
-    d_.one_life = True
+    d_.lives = 1
 M.fly(5)
 M.g[1]._hurt(1000.0)
 M.fly(3)
-check("one life raid: every raider out: STATION HELD, RAIDERS ALL OUT", M.d[0].result == 1
+check("lives 1, raid: every raider out: STATION HELD, RAIDERS ALL OUT", M.d[0].result == 1
       and [l[0] for l in M.d[0].over_lines()][:3] == ["STATION HELD", "YOU WIN", "RAIDERS ALL OUT"],
       str(M.d[0].over_lines()))
 

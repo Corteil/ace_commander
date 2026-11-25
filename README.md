@@ -71,8 +71,8 @@ A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves 
     The host picks the station (the game's Drum or Halo, and Elite's Coriolis or Dodo when
     Elite's data is loaded), the time (2, 3 or 5 minutes), steady or growing waves, the
     pirates' skill and LIVES. A destroyed defender waits 10 seconds (the time penalty), then
-    launches from the station through its launch tunnel. With LIVES: ONE a destroyed player
-    is out until the next match: every defender out loses the station (in the raid, every
+    launches from the station through its launch tunnel. With LIVES set to 1, 2, 3 or 5, a player who has
+    been destroyed that many times is out until the next match: every defender out loses the station (in the raid, every
     raider out holds it).
   - **STATION RAID**: red defends the station, blue raids it, with the same choices and the
     same help for outnumbered defenders as the convoy raid.

@@ -1754,3 +1754,9 @@ what is now `ace.py` (renamed in build 50).
    keeps `Duel.out` from KILLED); every defender out: STATION LOST (DEFENDERS ALL OUT); in the
    raid every raider out: STATION HELD (RAIDERS ALL OUT). Tests in test_multiplayer, one
    through the app. PC only.
+   **Build 156** (Brian, 2026-11-25: "Or fixed lifes"). LIVES in the station modes is now
+   UNLIMITED, 1, 2, 3 or 5 (`duel.LIVES_CHOICES`, `Duel.lives`, `step_lives`; HELLO's last byte
+   is the number, `OPT2_ONE_LIFE` gone). Every device counts each slot's deaths from KILLED
+   (`Duel.lives_lost`); at the number the player is out till the next match (OUT: NO LIVES
+   LEFT). Before that the end screen's last line says "n LIVES LEFT   F: leave". A whole side
+   out ends it as before. Tests in test_multiplayer. PC only.
