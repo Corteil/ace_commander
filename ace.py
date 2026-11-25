@@ -709,7 +709,14 @@ class AceCommander(PLATFORM.App):
         if self.dueling:            # paused too: the other player keeps hearing us
             if self.mode == "flight" and self.game is not None:
                 self.duel.flight_step(self.game, dt)
-            else:                   # left the flight: the game is practice's again
+            if self.duel.ended is not None:     # the host left (Brian): the game ends,
+                self.duel.stop(self.game)       # back to the lobby, which says why
+                self.dueling = False
+                self.paused = False
+                self.fsub = None
+                self.d_sel = 0
+                self.mode = "duel"
+            elif self.mode != "flight":         # we left the flight: practice's game again
                 self.duel.stop(self.game)
                 self.dueling = False
         self._sounds()
@@ -861,7 +868,9 @@ class AceCommander(PLATFORM.App):
                     cockpit.GREEN if on else cockpit.GREY)
                 text(ctx, ("< %s >" if on else "%s") % rows[i][:18], 0, y, 14 if on else 12, rgb)
             others = d.lobby()
-            if others:
+            if d.notice:                # why the last duel ended
+                text(ctx, d.notice, 0, 62, 12, cockpit.RED)
+            elif others:
                 names = ", ".join(p.name for p in others[:3]) + ("..." if len(others) > 3 else "")
                 text(ctx, "HERE: " + names[:26], 0, 62, 10, cockpit.GREY)
             else:

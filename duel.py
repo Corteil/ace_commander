@@ -24,6 +24,8 @@ from . import game, netplay
 
 HELLO = 2
 START_PKT = 3
+END_PKT = 4                 # leaving the duel (sent END_TIMES times: one may be lost)
+END_TIMES = 3
 # MAGIC, kind, role, colour, flags, target id (6 bytes; the host's for JOIN, the guest's
 # for HOST and START), name (16 bytes, ASCII, padded with spaces)
 FMT = "<2sBBBB6s16s"
@@ -35,6 +37,8 @@ START_FOR = 1.0             # the host repeats START this long, every START_EVER
 START_EVERY = 0.1
 SEND_HZ = 15                # poses a second in flight (the link test's rate)
 LOST = 3.0                  # seconds without a packet: the other player is gone
+HOST_GONE = 10.0            # the guest, this long without the host: the game ends ("HOST LOST")
+NOTICE_FOR = 4.0            # seconds the lobby shows why a duel ended
 GONE = 3.0                  # on the page: seconds without a HELLO before they leave the list
 NAME_LEN = 16
 # where each side starts in the shared world: (x, y, z, nose x, y, z); host 0, guest 1.
@@ -101,6 +105,10 @@ class Duel:
         self.pose_age = 0.0     # seconds since that pose
         self.last_seq = None
         self.lost = False
+        self.left = False       # hosting: the guest said goodbye (END)
+        self.ended = None       # why the duel ended for us (the host left): the game goes back
+        self.notice = None      # to the lobby, which shows this for NOTICE_FOR seconds
+        self.notice_t = 0.0
 
     def set_me(self, name, colour):
         """The commander's name and ship colour, sent in every HELLO."""
@@ -160,6 +168,10 @@ class Duel:
     def lobby_step(self, dt):
         """The DUEL page, each frame: say HELLO now and then, hear everyone."""
         self._age(dt)
+        if self.notice_t > 0:
+            self.notice_t -= dt
+            if self.notice_t <= 0:
+                self.notice = None
         self.hello_t -= dt
         if self.hello_t <= 0:
             self.hello_t = HELLO_EVERY
@@ -179,9 +191,17 @@ class Duel:
         self.link.send(self.hello)
 
     def _send_start(self):
-        struct.pack_into(FMT, self.hello, 0, netplay.MAGIC, START_PKT, HOST, self.colour, 0,
+        self._send(START_PKT, HOST)
+
+    def _send(self, kind, role):
+        struct.pack_into(FMT, self.hello, 0, netplay.MAGIC, kind, role, self.colour, 0,
                          self.other.id, _name_bytes(self.name))
         self.link.send(self.hello)
+
+    def _end(self, why):
+        """The duel is over for us (the game sees .ended and goes back to the lobby)."""
+        if self.ended is None:
+            self.ended = why
 
     def _hear(self):
         """Read every packet waiting."""
@@ -199,7 +219,7 @@ class Duel:
             if kind == netplay.POSE:
                 self._hear_pose(host, msg)
                 continue
-            if (kind != HELLO and kind != START_PKT) or len(msg) < size:
+            if (kind != HELLO and kind != START_PKT and kind != END_PKT) or len(msg) < size:
                 continue
             _, _, role, colour, _, target, name = struct.unpack_from(FMT, msg, 0)
             p = self.players.get(bytes(host))
@@ -215,6 +235,15 @@ class Duel:
                 if (self.role == HOST and not self.flying and role == JOIN and target == me
                         and (self.other is None or self.other is p)):
                     self.other = p          # our guest (the first to ask)
+                elif (self.flying and self.role == JOIN and self.other is p
+                      and (role == LOBBY or role == JOIN or (role == HOST and target != me))):
+                    self._end("HOST LEFT")  # our host is back in the lobby: its END was lost
+            elif kind == END_PKT:
+                if self.flying and self.other is p and target == me:
+                    if self.role == JOIN:
+                        self._end("HOST LEFT")      # the host leaving ends the game (Brian)
+                    else:
+                        self.left = True            # the guest left: the host flies on alone
             elif self.role == JOIN and self.other is p and target == me and not self.flying:
                 self.go = True              # our host started: fly
 
@@ -240,6 +269,8 @@ class Duel:
         self.slot = 1 if self.role == JOIN else 0
         self.flying = True
         self.go = False
+        self.ended = None
+        self.left = False
         self.last_seq = None
         self.pose = None
         self.lost = False
@@ -252,7 +283,16 @@ class Duel:
             g.say("VS " + self.other.name, 2.0)
 
     def stop(self, g):
-        """Out of the arena (to the title): practice's game again; back to the lobby."""
+        """Out of the arena (to the title, or the host left): practice's game again; back
+        to the lobby. Leaving, say so (END), so the other knows at once: a host leaving
+        ends the guest's game; a guest leaving, the host flies on alone."""
+        if self.flying and self.other is not None and self.ended is None:
+            for _ in range(END_TIMES):
+                self._send(END_PKT, self.role)
+        if self.ended is not None:
+            self.notice = self.ended
+            self.notice_t = NOTICE_FOR
+        self.ended = None
         if g is not None:
             g.quiet = False
             g.anchor = None
@@ -292,8 +332,16 @@ class Duel:
             flags = netplay.DEAD if g.over else 0
             netplay.pack_pose(self.buf, self.slot, self.seq, g.world_pose(), g.speed, flags)
             self.link.send(self.buf)
-        # show theirs
         o = self.other
+        if self.role == JOIN and o is not None and o.t >= HOST_GONE:
+            self._end("HOST LOST")      # not heard for a long while: gone without a word
+        if self.left and o is not None:     # hosting: the guest said goodbye
+            self.left = False
+            g.say(o.name + " LEFT", 2.0)
+            self.other = None
+            self.pose = None
+            o = None
+        # show theirs
         if self.pose is None or o is None or o.t >= LOST:
             if self.ship is not None:
                 if self.ship in g.objs:

@@ -221,6 +221,77 @@ da.stop(ga)
 check("stop: no anchor, not quiet, no other ship", ga.anchor is None and not ga.quiet and player(ga) == [])
 check("stop: back in the lobby", da.role == duel.LOBBY and da.other is None and not da.flying)
 
+# ---- leaving (Brian, 2026-11-25: when the host leaves, the game ends)
+
+
+def pair(seed):
+    """A started duel: (air, host Duel, host Game, guest Duel, guest Game)."""
+    air_ = Air()
+    h = duel.Duel(Link(air_, ID(30 + seed)), "HOSTA", 1)
+    j = duel.Duel(Link(air_, ID(40 + seed)), "GUESTB", 4)
+    h.host()
+    lobby([h, j])
+    j.join(j.hosts()[0])
+    lobby([h, j])
+    h.start_game()
+    gh, gj = flight(seed), flight(seed + 1)
+    h.start(gh)
+    lobby([j], 2)
+    j.start(gj)
+    return air_, h, gh, j, gj
+
+
+def fly2(h, gh, j, gj, n):
+    for _ in range(n):
+        for g_, d_ in ((gh, h), (gj, j)):
+            if d_.flying:
+                g_.step(DT, 0.0, 0.0, 0.0, False, False)
+                d_.flight_step(g_, DT)
+            else:
+                d_.lobby_step(DT)
+
+
+air_, h, gh, j, gj = pair(5)
+fly2(h, gh, j, gj, 10)
+check("leave: guest sees the host", len(player(gj)) == 1 and j.ended is None)
+h.stop(gh)                          # the host goes to the title
+j._hear()                           # the END, before any HELLO from the host's lobby
+check("host leaves: the guest's game ends, HOST LEFT", j.ended == "HOST LEFT", str(j.ended))
+j.stop(gj)
+check("  the guest is back in the lobby, told why", j.role == duel.LOBBY and not j.flying
+      and j.notice == "HOST LEFT" and gj.anchor is None)
+lobby([j], int(duel.NOTICE_FOR / DT) + 2)
+check("  the notice goes after a while", j.notice is None)
+
+# every END lost: the host's lobby HELLO ends it anyway
+air_, h, gh, j, gj = pair(7)
+fly2(h, gh, j, gj, 10)
+air_.drop = lambda msg: msg[2] == duel.END_PKT
+h.stop(gh)
+fly2(h, gh, j, gj, int(duel.HELLO_EVERY / DT) + 3)
+check("ENDs lost: the host's HELLO from the lobby ends it", j.ended == "HOST LEFT", str(j.ended))
+
+# the host goes silent (battery, window closed): HOST LOST after HOST_GONE
+air_, h, gh, j, gj = pair(9)
+fly2(h, gh, j, gj, 10)
+air_.drop = lambda msg: True
+for _ in range(int(duel.LOST / DT) + 3):
+    gj.step(DT, 0.0, 0.0, 0.0, False, False)
+    j.flight_step(gj, DT)
+check("host silent 3 s: LINK LOST, the game goes on", gj.msg == "LINK LOST" and j.ended is None)
+for _ in range(int((duel.HOST_GONE - duel.LOST) / DT) + 3):
+    gj.step(DT, 0.0, 0.0, 0.0, False, False)
+    j.flight_step(gj, DT)
+check("host silent 10 s: HOST LOST, the game ends", j.ended == "HOST LOST", str(j.ended))
+
+# the guest leaves: the host flies on alone
+air_, h, gh, j, gj = pair(11)
+fly2(h, gh, j, gj, 10)
+j.stop(gj)
+fly2(h, gh, j, gj, 3)
+check("guest leaves: the host flies on, GUESTB LEFT, the ship gone",
+      h.flying and h.ended is None and gh.msg == "GUESTB LEFT" and player(gh) == [], gh.msg)
+
 # ---- through the app: DUEL, the lobby, hosting, the other joins, start, back to the title
 air2 = Air()
 mine, theirs = Link(air2, ID(1)), Link(air2, ID(9))
@@ -291,6 +362,20 @@ for _ in range(3):
     bs.tick(b)
 check("app join: HAL's START flies the guest from START[1]", b.mode == "flight" and b.dueling
       and b.duel.slot == 1 and math.dist(b.game.world_pose()[:3], (0, 0, duel.START_Z)) < 50)
+hg = flight(6)
+hd.start(hg)
+for _ in range(5):
+    hg.step(DT, 0.0, 0.0, 0.0, False, False)
+    hd.flight_step(hg, DT)
+    bs.tick(b)
+hd.stop(hg)                             # HAL leaves
+for _ in range(3):
+    bs.tick(b)
+c = bs.CountCtx()
+b.draw(c)
+check("app join: HAL leaves, the guest is back in the lobby saying so",
+      b.mode == "duel" and not b.dueling and b.duel.role == duel.LOBBY
+      and "HOST LEFT" in [t[0] for t in c.texts], str([t[0] for t in c.texts]))
 
 print()
 if fails:
