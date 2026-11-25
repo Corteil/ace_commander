@@ -1863,6 +1863,12 @@ def _hud(ctx, g, ms=None, ring=True):
         text(ctx, "C: to the station" if g.again.endswith("station") else g.again,
              0, 30, 12, GREY)
         text(ctx, "F: title screen", 0, 46, 12, GREY)
+    elif g.over and getattr(g, "net", None) is not None:     # a duel's own end screen
+        ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -52, 200, 120).fill()
+        y = -32
+        for s, size, rgb in g.net.over_lines():
+            text(ctx, s, 0, y, size, rgb)
+            y += size + 8
     elif g.over:
         ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -42, 200, 100).fill()
         text(ctx, "GAME OVER", 0, -22, 26, RED)

@@ -130,6 +130,13 @@ can change underneath.
   fly again (C) starts you at your end. Players can be locked and fired at like ships
   (`_pick`), but the AI, the energy bomb and encounters still leave them alone.
   `tests/test_duel_combat.py`.
+- **Rounds and loadout (Brian, 2026-11-25):** every round starts both ships the same
+  (`Duel.loadout`: shields and energy full, an ECM, a full missile rack, lasers cool, no
+  energy bomb since B is the ECM; the ECM was missing before: `_start_flight` thought the
+  new game wasn't fresh). Destroyed: the duel's own end screen (DESTROYED / BY <NAME> in
+  their colour / the score / C: next round / F: leave duel; `Duel.over_lines`, drawn by
+  cockpit instead of GAME OVER). C sends NEXT (the round number, 3 times) and both go
+  back to their ends with fresh loadouts, "ROUND n"; the score is kept.
 - Title screen DUEL (only when the platform has `radio()`: the badge always; the Pi with
   `run.py --duel [PORT]`; not the Tufty yet). Its page says HELLO 4 times a second and
   shows SEARCHING / PLAYER FOUND; C flies (alone until the other comes), F back.

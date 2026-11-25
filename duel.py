@@ -41,6 +41,10 @@ GONE_PKT = 7
 GONE_FMT = "<2sBBB"
 GONE_HIT, GONE_ECM = 1, 2
 AGAIN = 3
+# rounds (Brian, 2026-11-25): the one destroyed presses C for the next round; NEXT (its
+# number, sent AGAIN times) puts both back at their ends with a fresh loadout
+NEXT_PKT = 8
+NEXT_FMT = "<2sBBH"
 BEAM_CONE = 0.98            # their laser drawn at you when their nose is this close to you
 # MAGIC, kind, role, colour, flags, target id (6 bytes; the host's for JOIN, the guest's
 # for HOST and START), name (16 bytes, ASCII, padded with spaces)
@@ -130,6 +134,7 @@ class Duel:
         self.dead_here = False  # we are destroyed (counted once)
         self.kills = 0          # times we destroyed them, and they us, this duel
         self.deaths = 0
+        self.round = 1
         self.pkt = bytearray(struct.calcsize(MISSILE_FMT))     # combat packets, made once
         self.ended = None       # why the duel ended for us (the host left): the game goes back
         self.notice = None      # to the lobby, which shows this for NOTICE_FOR seconds
@@ -305,6 +310,13 @@ class Duel:
             self.incoming[n] = mo
             g.say("INCOMING MISSILE")
             g.sfx("incoming")
+        elif kind == NEXT_PKT and len(msg) >= struct.calcsize(NEXT_FMT):
+            n = struct.unpack_from(NEXT_FMT, msg, 0)[3]
+            if n > self.round:          # they pressed C: both back to the start
+                self.round = n
+                g.reset()
+                self.start(g)
+                g.say("ROUND %d" % n, 2.0)
         elif kind == GONE_PKT and len(msg) >= struct.calcsize(GONE_FMT):
             _, _, n, why = struct.unpack_from(GONE_FMT, msg, 0)
             gm = self.ghosts.pop(n, None)
@@ -381,12 +393,37 @@ class Duel:
         g.set_anchor(*start_pose(self.slot))
         g.net = self
         g.rules.manual_ecm = True   # the ECM by hand in a duel (Brian, 2026-11-25)
+        self.loadout(g)
         self.g = g
         self.ghosts = {}
         self.incoming = {}
         self.flags = 0
         if self.other is not None and not self.deaths and not self.kills:
             g.say("VS " + self.other.name, 2.0)
+
+    def loadout(self, g):
+        """Every round starts the same for both (Brian): shields and energy full, an ECM,
+        a full missile rack, the lasers cool, nothing armed or locked."""
+        g.ecm = True
+        g.missiles = g.max_missiles if g.missile_bp else 0
+        g.shield = 100.0
+        g.hull = 100.0
+        g.heat = 0.0
+        g.hot = False
+        g.armed = False
+        g.lock = None
+        g.locked = False
+        g.bombs = 0             # no energy bomb: B is the ECM
+
+    def over_lines(self):
+        """The end screen when we are destroyed: (text, size, rgb) lines."""
+        from . import cockpit as ck
+        o = self.other
+        return (("DESTROYED", 24, ck.RED),
+                ("BY " + (o.name if o is not None else "?"), 13,
+                 ck.ship_rgb(o.colour) if o is not None else ck.WHITE),
+                ("%d - %d" % (self.kills, self.deaths), 14, ck.WHITE),
+                ("C: next round", 12, ck.GREY), ("F: leave duel", 12, ck.GREY))
 
     def stop(self, g):
         """Out of the arena (to the title, or the other left): practice's game again; back
@@ -408,6 +445,7 @@ class Duel:
                 g.objs.remove(self.ship)
         self.g = None
         self.kills = self.deaths = 0
+        self.round = 1
         self.ship = None
         self.pose = None
         self.flying = False
@@ -416,8 +454,16 @@ class Duel:
 
     def flight_step(self, g, dt):
         """Each flight frame, after Game.step (paused too, so the link stays up)."""
-        if g.anchor is None:            # the game was reset (fly again): back to your end
-            self.start(g)
+        if g.anchor is None:            # the game was reset: C after being destroyed
+            if self.dead_here and self.other is not None:   # the next round, for both
+                self.round += 1
+                struct.pack_into(NEXT_FMT, self.pkt, 0, netplay.MAGIC, NEXT_PKT, 0, self.round)
+                for _ in range(AGAIN):
+                    self.link.send(memoryview(self.pkt)[:struct.calcsize(NEXT_FMT)])
+                self.start(g)
+                g.say("ROUND %d" % self.round, 2.0)
+            else:
+                self.start(g)
             self.ship = None
         self._age(dt)
         self.pose_age += dt

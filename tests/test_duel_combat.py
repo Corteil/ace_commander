@@ -197,6 +197,83 @@ check("again: B is back at its end, A sees it again", len(player(ga)) == 1 and
       math.dist(gb.world_pose()[:3], (0, 0, 1000)) < 50 and db.deaths == 1)
 check("again: the ECM is still by hand after flying again", gb.rules.manual_ecm)
 
+# ---- the loadout: every duel ship has an ECM and a full rack (Brian: "ECM should be enabled")
+air, da, ga, db, gb = pair()
+for g_ in (ga, gb):
+    g_.ecm = False
+    g_.missiles = 0
+    g_.reset()
+    g_.anchor = None
+frames(1)
+check("loadout: both have an ECM, a full rack, no bomb (B is the ECM)",
+      all(g_.ecm and g_.missiles == g_.max_missiles and g_.bombs == 0 for g_ in (ga, gb)))
+check("loadout: the ECM fires", gb.fire_ecm() and gb.msg == "ECM")
+
+# ---- rounds: B destroyed; its end screen; C: both back to their ends, fresh loadouts
+air, da, ga, db, gb = pair()
+frames(40, a_ctl=(0.5, 0.3, 1.0, False, False), b_ctl=(0.0, 0.0, 1.0, False, False))
+ga._hurt(60.0)
+ga.missiles = 1
+gb._hurt(1000.0)
+frames(3)
+lines = [l[0] for l in db.over_lines()]
+check("end screen: DESTROYED BY ANN, the score, next round", lines[:3] == ["DESTROYED", "BY ANN", "0 - 1"]
+      and "C: next round" in lines and "F: leave duel" in lines, str(lines))
+a_moved = math.dist(ga.world_pose()[:3], (0, 0, -1000))
+gb.reset()                          # B presses C (ace does Game.reset)
+frames(3)
+check("round 2: B at its end", math.dist(gb.world_pose()[:3], (0, 0, 1000)) < 80 and not gb.over)
+check("round 2: A back at its end too", a_moved > 200 and math.dist(ga.world_pose()[:3], (0, 0, -1000)) < 80,
+      "A had moved %.0f; now %.0f off" % (a_moved, math.dist(ga.world_pose()[:3], (0, 0, -1000))))
+check("round 2: A's loadout fresh (shields, energy, missiles, ECM)",
+      ga.shield == 100.0 and ga.hull == 100.0 and ga.missiles == ga.max_missiles and ga.ecm)
+check("round 2: both say ROUND 2, one round only (NEXT came 3 times)",
+      ga.msg == "ROUND 2" and gb.msg == "ROUND 2" and da.round == 2 and db.round == 2,
+      "%s / %s %d %d" % (ga.msg, gb.msg, da.round, db.round))
+check("round 2: the score is kept", (da.kills, da.deaths, db.kills, db.deaths) == (1, 0, 0, 1))
+check("round 2: each sees the other again", len(player(ga)) == 1 and len(player(gb)) == 1)
+
+# ---- through the app: the end screen, and C for the next round
+a = ace_commander.AceCommander()
+air2 = Air()
+mine, theirs = Link(air2, bytes([2, 0, 0, 0, 0, 3])), Link(air2, bytes([2, 0, 0, 0, 0, 4]))
+a.platform.radio = lambda: mine
+bs.choose(a, "DUEL")
+hd = duel.Duel(theirs, "HAL", 1)
+hd.host()
+for _ in range(10):
+    hd.lobby_step(DT)
+    bs.tick(a)
+bs.tick(a, fresh=["JOYDOWN"])
+bs.tick(a, fresh=["CONFIRM"])
+for _ in range(10):
+    hd.lobby_step(DT)
+    bs.tick(a)
+hd.start_game()
+hg = flight(9)
+hd.start(hg)
+for _ in range(5):
+    hg.step(DT, 0.0, 0.0, 0.0, False, False)
+    hd.flight_step(hg, DT)
+    bs.tick(a)
+check("app: a duel ship has an ECM", a.game.ecm and a.game.missiles == a.game.max_missiles)
+a.game._hurt(1000.0)
+bs.tick(a)
+c = bs.CountCtx()
+a.draw(c)
+texts = [t[0] for t in c.texts]
+check("app: the duel's end screen, not GAME OVER", "DESTROYED" in texts and "BY HAL" in texts
+      and "GAME OVER" not in texts, str(texts))
+for _ in range(20):
+    bs.tick(a)                      # (the C that hits isn't taken at once, as in practice)
+bs.tick(a, fresh=["CONFIRM"])
+for _ in range(3):
+    hg.step(DT, 0.0, 0.0, 0.0, False, False)
+    hd.flight_step(hg, DT)
+    bs.tick(a)
+check("app: C starts round 2 for both", not a.game.over and a.duel.round == 2 and hd.round == 2,
+      "%s %d %d" % (a.game.over, a.duel.round, hd.round))
+
 # ---- stop: practice's rules again
 da.stop(ga)
 check("stop: the ECM back to practice's own, no duel hooked in",
