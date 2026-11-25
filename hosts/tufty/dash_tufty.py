@@ -67,7 +67,7 @@ def _bar(ctx, col, row, label, frac, rgb):
 
 
 def _blip_colour(o):
-    if o.kind == "ship":
+    if o.kind == "ship" or (o.kind == "npc" and o.rgb is None):   # (npc: a host's pirate, duel.py)
         if o.role == "pirate" or o.state == "attack" or o.state == "break":
             return ck.RED
         if o.role == "police":
@@ -114,19 +114,17 @@ def _scanner(ctx, g):
                 h = STICK if h > STICK else (-4 if h < -4 else h)
                 ctx.rgb(*ck.station_colour(sp.gov))
                 _stalk(ctx, x * SC_RX // R, SC_Y - z * SC_RY // R, h, 5)
-        if not sp.witch:
-            _compass(ctx, sp)
+    t = ck.compass_target(g)
+    if t is not None:
+        _compass(ctx, t)
 
 
-def _compass(ctx, sp):
+def _compass(ctx, t):
+    """t: what to point at (cockpit.compass_target): the planet, station or a mode's target."""
     ctx.rgb(*ck.RADAR_GRID)     # as the scanner (build 139)
     for px, py in _COMPASS:
         ctx.rectangle(px, py, 1.5, 1.5).fill()
-    st = sp.station
-    if sp.safe and st is not None:
-        x, y, z, rgb = st.x, st.y, st.z, ck.station_colour(sp.gov)
-    else:
-        x, y, z, rgb = sp.px, sp.py, sp.pz, ck.PLANET
+    x, y, z, rgb = t
     d = math.sqrt(x * x + y * y + z * z)
     if d < 1:
         return
@@ -208,6 +206,8 @@ def draw_view_overlay(ctx, g, ms=None):
         x += ck.number(ctx, g.wave, x, -hh + 4, ck._BIG, -1) + 9
         ctx.rgb(*ck.WHITE)
         ck.number(ctx, g.score, x, -hh + 4, ck._BIG, -1)
+    elif sp is None:                 # multiplayer: its score along the top (duel.Duel.hud)
+        ck.draw_net_line(ctx, g, -hh + 10)
     if ms is not None:
         ctx.rgb(*ck.GREY)
         ck.number(ctx, ms, ck.VIEW_HW - 4, -hh + 3, ck._SMALL, 1)
@@ -220,7 +220,7 @@ def draw_view_overlay(ctx, g, ms=None):
         ck.text(ctx, "ship and cargo lost", 0, -2, 13, ck.WHITE)
         ck.text(ctx, "C: to the station" if g.again.endswith("station") else g.again, 0, 22, 12, ck.GREY)
         ck.text(ctx, "F: title screen", 0, 38, 12, ck.GREY)
-    elif g.over and getattr(g, "net", None) is not None:     # a duel's own end screen
+    elif getattr(g, "net", None) is not None and g.net.showing(g):   # multiplayer's end screen
         ck.draw_duel_over(ctx, g, -60)
     elif g.over:
         ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -50, 200, 100).fill()

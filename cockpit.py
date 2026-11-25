@@ -78,7 +78,8 @@ LASER_COLOURS = {
 # enemy missiles are orange like enemy lasers (all enemy fire), yours light purple
 UPGRADE_RGB = GREEN     # a practice upgrade canister (game.UPGRADES), on screen and radar
 COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": ORANGE, "pmissile": LIGHT_PURPLE,
-          "station": WHITE, "player": (0.3, 0.9, 1)}     # player: another player's ship (duel.py)
+          "station": WHITE, "player": (0.3, 0.9, 1),     # player: another player's ship (duel.py)
+          "npc": WHITE, "convoy": YELLOW, "mark": GREY}   # the host's ships, the convoy, rings
 PLANET = (0.35, 0.6, 1)
 # each system's planet is one of these, picked from its number (Space.planet):
 # (the disc's colour, its outline's)
@@ -1726,17 +1727,39 @@ def _planet_gauge(ctx, sp):
     ctx.rgb(*(RED if a < 5 else CYAN)).rectangle(-25, -94, a, 4).fill()
 
 
-def _compass(ctx, sp):
+def compass_target(g):
+    """(x, y, z, rgb) the compass points at: the planet, the station in its safe zone,
+    or in multiplayer what the mode wants (duel.Duel.compass); None for nothing."""
+    sp = g.space
+    if sp is not None:
+        if sp.witch:
+            return None
+        st = sp.station
+        if sp.safe and st is not None:
+            return st.x, st.y, st.z, station_colour(sp.gov)
+        return sp.px, sp.py, sp.pz, PLANET
+    net = getattr(g, "net", None)
+    t = net.compass() if net is not None else None
+    if t is None:
+        return None
+    o, rgb = t
+    return o.x, o.y, o.z, rgb
+
+
+def draw_net_line(ctx, g, y):
+    """Multiplayer's line along the top (duel.Duel.hud): the score, or the convoy's."""
+    net = getattr(g, "net", None)
+    if net is None:
+        return
+    for s, x, rgb in net.hud():
+        text(ctx, s, x, y, 12, rgb)
+
+
+def _compass(ctx, t):
     ctx.rgb(*RADAR_GRID)        # its ring as bright as the radar's (build 139)
     for px, py in _COMPASS:
         ctx.rectangle(px, py, 1.5, 1.5).fill()
-    st = sp.station
-    if sp.safe and st is not None:
-        x, y, z = st.x, st.y, st.z
-        rgb = station_colour(sp.gov)
-    else:
-        x, y, z = sp.px, sp.py, sp.pz
-        rgb = PLANET
+    x, y, z, rgb = t
     d = math.sqrt(x * x + y * y + z * z)
     if d < 1:
         return
@@ -1812,7 +1835,9 @@ def _hud(ctx, g, ms=None, ring=True):
             h = 22
         elif h < -6:
             h = -6
-        if o.kind == "ship":    # hostile ships red, the police blue, traders white
+        if o.rgb is not None and not o.upgrade:     # another player's, the convoy, a ring
+            ctx.rgb(*o.rgb)
+        elif o.kind == "ship" or o.kind == "npc":   # hostile ships red, the police blue, traders white
             if hostile(o):
                 ctx.rgb(*RED)
             elif o.role == "police":
@@ -1826,6 +1851,9 @@ def _hud(ctx, g, ms=None, ring=True):
         else:
             ctx.rectangle(bx, by, 1, -h).fill()
         ctx.rectangle(bx - 1, by - h - 1, 3, 3).fill()
+    t = compass_target(g)       # nothing to point at in witchspace
+    if t is not None:
+        _compass(ctx, t)
     sp = g.space
     if sp is not None:
         st = sp.station     # far off it is beyond cheap whole numbers, so check first
@@ -1842,8 +1870,6 @@ def _hud(ctx, g, ms=None, ring=True):
                 else:
                     ctx.rectangle(bx, by, 1, -h).fill()
                 ctx.rectangle(bx - 2, by - h - 2, 5, 5).fill()
-        if not sp.witch:        # nothing to point at in witchspace
-            _compass(ctx, sp)
         if g.cabin > COOL_CABIN:
             _sun_gauges(ctx, g, sp)
         elif not sp.witch:
@@ -1860,6 +1886,8 @@ def _hud(ctx, g, ms=None, ring=True):
         x += number(ctx, g.wave, x, -102, _BIG, -1) + 9
         ctx.rgb(*WHITE)
         number(ctx, g.score, x, -102, _BIG, -1)
+    elif sp is None:        # multiplayer: its score along the top
+        draw_net_line(ctx, g, -98)
     if ms is not None:      # frame time in ms, small, just above
         ctx.rgb(*GREY)
         number(ctx, ms, 0, -114, _SMALL)
@@ -1873,7 +1901,7 @@ def _hud(ctx, g, ms=None, ring=True):
         text(ctx, "C: to the station" if g.again.endswith("station") else g.again,
              0, 30, 12, GREY)
         text(ctx, "F: title screen", 0, 46, 12, GREY)
-    elif g.over and getattr(g, "net", None) is not None:     # a duel's own end screen
+    elif getattr(g, "net", None) is not None and g.net.showing(g):   # multiplayer's end screen
         draw_duel_over(ctx, g, -52)
     elif g.over:
         ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -42, 200, 100).fill()

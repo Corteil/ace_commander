@@ -1,6 +1,6 @@
-"""A duel (duel.py): the lobby, hosting and joining, names and ship colours, then two
-players' Games flying with a pretend radio between them, and the DUEL pages through
-the real app. Proves the game's side; the radio itself was measured on two badges
+"""A duel (duel.py): the lobby, hosting and joining (up to four in a game), names and
+ship colours, then two players' Games flying with a pretend radio between them, and the
+MULTIPLAYER pages through the real app. Proves the game's side; the radio itself was measured on two badges
 (plans/MULTIPLAYER.md). Uses the game's own ship data, so it runs without Elite's files."""
 import math, os, random, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -97,11 +97,32 @@ lobby([da, db, dc])
 check("join: the host has B as its guest, with name and colour",
       da.other is not None and da.other.name == "BOB" and da.other.colour == 5)
 check("join: B knows it is accepted", db.accepted())
-check("join: the game is full: C no longer sees it", dc.hosts() == [])
-dc.join(next(p for p in dc.lobby() if p.name == "ALICE"))     # tries anyway
+check("join: room for more: C still sees the game, 2 of 4", [p.name for p in dc.hosts()] == ["ALICE"]
+      and len(dc.hosts()[0].guests) == 1)
+dc.join(dc.hosts()[0])
 lobby([da, db, dc])
-check("full: C is not taken; B stays the guest", da.other.name == "BOB" and not dc.accepted())
+check("join: C is the second guest", [p.name for p in da.guests] == ["BOB", "CAROL"] and dc.accepted())
+check("join: everyone sees who is in it, in order", [n for n, c, s in db.party()] == ["ALICE", "BOB", "CAROL"]
+      and [n for n, c, s in dc.party()] == ["ALICE", "BOB", "CAROL"])
+check("mode: a duel can't start with three", da.can_start() == (False, "2 players only")
+      and not da.start_game())
+extra = [duel.Duel(Link(air, ID(20 + i)), "X%d" % i, 1) for i in range(2)]
+lobby([da, db, dc] + extra)
+extra[0].join(extra[0].hosts()[0])
+lobby([da, db, dc] + extra)
+check("full: a third guest makes four; then nobody else sees it", extra[0].accepted()
+      and extra[1].hosts() == [] and len(da.guests) == 3)
+extra[1].join(next(p for p in extra[1].lobby() if p.name == "ALICE"))     # tries anyway
+lobby([da, db, dc] + extra)
+check("full: a fifth is not taken", not extra[1].accepted() and len(da.guests) == 3)
+for d_ in extra:
+    d_.leave()
 dc.leave()
+lobby([da, db, dc] + extra, 2)       # they say so
+air.links = air.links[:3]
+lobby([da, db, dc])
+check("leave: C and the others back out: B alone is the guest", [p.name for p in da.guests] == ["BOB"]
+      and not dc.accepted())
 
 # ---- the host starts; START reaches the guest even when the first ones are lost
 lost = [0]
@@ -193,13 +214,14 @@ check("lossy: still where it should be", abs(d_ab - d_w) < gb.speed * game.SPEED
 
 # a late (older) pose is ignored; a stranger's pose is ignored
 old = bytearray(netplay.SIZE)
-netplay.pack_pose(old, 1, (da.last_seq - 5) & 0xFFFF, (0.0, 0.0, 99999.0, duel.start_pose(1)[3]), 0)
+netplay.pack_pose(old, 1, (da.other.last_seq - 5) & 0xFFFF, (0.0, 0.0, 99999.0, duel.start_pose(1)[3]), 0)
 la.inbox.append((lb.id, bytes(old)))
 far = bytearray(netplay.SIZE)
-netplay.pack_pose(far, 1, (da.last_seq + 5) & 0xFFFF, (0.0, 0.0, 99999.0, duel.start_pose(1)[3]), 0)
+netplay.pack_pose(far, 1, (da.other.last_seq + 5) & 0xFFFF, (0.0, 0.0, 99999.0, duel.start_pose(1)[3]), 0)
 la.inbox.append((lc.id, bytes(far)))
 both(1)
-check("late pose and a stranger's pose ignored", da.pose is not None and abs(da.pose[2] - 99999.0) > 1)
+check("late pose and a stranger's pose ignored", da.other.pose is not None
+      and abs(da.other.pose[2] - 99999.0) > 1)
 
 # the link goes quiet: LINK LOST, the ship goes; it comes back: LINK BACK
 air.drop = lambda msg: True
@@ -320,9 +342,9 @@ check("no false end around the start", h.ended is None and j.ended is None and h
 air2 = Air()
 mine, theirs = Link(air2, ID(1)), Link(air2, ID(9))
 a = ace_commander.AceCommander()
-check("app: DUEL on the title screen", "DUEL" in a.choices())
+check("app: MULTIPLAYER on the title screen", "MULTIPLAYER" in a.choices())
 a.platform.radio = lambda: mine
-bs.choose(a, "DUEL")
+bs.choose(a, "MULTIPLAYER")
 check("app: the lobby", a.mode == "duel" and a.duel is not None and a.duel.role == duel.LOBBY)
 check("app: the commander's name goes to the others",
       a.duel.name == ace_commander.ace.cmdr_name(a.cmdr).upper()[:16])
@@ -374,7 +396,7 @@ air3 = Air()
 mine3, host3 = Link(air3, ID(2)), Link(air3, ID(8))
 b = ace_commander.AceCommander()
 b.platform.radio = lambda: mine3
-bs.choose(b, "DUEL")
+bs.choose(b, "MULTIPLAYER")
 hd = duel.Duel(host3, "HAL", 1)
 hd.host()
 for _ in range(10):

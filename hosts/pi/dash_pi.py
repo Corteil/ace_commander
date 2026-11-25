@@ -91,7 +91,7 @@ def _indicator(ctx, ck, col, row, label, v):
 
 def blip_colour(ck, o):
     """The round HUD's rule: hostile ships red, the police blue, other ships white."""
-    if o.kind == "ship":
+    if o.kind == "ship" or (o.kind == "npc" and o.rgb is None):   # (npc: a host's pirate, duel.py)
         if ck.hostile(o):
             return ck.RED
         if o.role == "police":
@@ -136,17 +136,14 @@ def _scanner(ctx, ck, g, L):
             _stalk(ctx, st.x * rx / R, SC_Y - st.z * SC_RY / R, h, 4)
 
 
-def _compass(ctx, ck, sp, L):
-    """Elite's compass: the planet (the station in its safe zone), a solid dot when it
-    is ahead of you, a dim one when behind."""
+def _compass(ctx, ck, t, L):
+    """Elite's compass: the planet (the station in its safe zone; in multiplayer what
+    the mode wants: cockpit.compass_target), a solid dot when it is ahead of you, a dim
+    one when behind."""
     ctx.rgb(*SCAN_RGB)
     for px, py in L.compass_ring:
         ctx.rectangle(px - 0.6, py - 0.6, 1.2, 1.2).fill()
-    st = sp.station
-    if sp.safe and st is not None:
-        x, y, z, rgb = st.x, st.y, st.z, ck.station_colour(sp.gov)
-    else:
-        x, y, z, rgb = sp.px, sp.py, sp.pz, ck.PLANET
+    x, y, z, rgb = t
     d = math.sqrt(x * x + y * y + z * z)
     if d < 1:
         return
@@ -231,8 +228,9 @@ def draw_dashboard(ctx, ck, g, L, stick=(0.0, 0.0)):
     _lamp(ctx, ck, sx, sy, "S", sp is not None and sp.safe, ck.GREEN)
     _lamp(ctx, ck, ex, ey, "E", g.ecm_t > 0, ECM_RGB)
     _scanner(ctx, ck, g, L)
-    if sp is not None and not sp.witch:
-        _compass(ctx, ck, sp, L)
+    t = ck.compass_target(g)
+    if t is not None:
+        _compass(ctx, ck, t, L)
 
 
 def draw_view_overlay(ctx, ck, g, L, ms=None):
@@ -257,6 +255,8 @@ def draw_view_overlay(ctx, ck, g, L, ms=None):
         x += ck.number(ctx, g.wave, x, -hh + 4, ck._BIG, -1) + 9
         ctx.rgb(*ck.WHITE)
         ck.number(ctx, g.score, x, -hh + 4, ck._BIG, -1)
+    elif sp is None:                 # multiplayer: its score along the top (duel.Duel.hud)
+        ck.draw_net_line(ctx, g, -hh + 10)
     if ms is not None:
         ctx.rgb(*ck.GREY)
         ck.number(ctx, ms, hw - 4, -hh + 3, ck._SMALL, 1)
@@ -268,7 +268,7 @@ def draw_view_overlay(ctx, ck, g, L, ms=None):
         ck.text(ctx, "ship and cargo lost", 0, -2, 13, ck.WHITE)
         ck.text(ctx, "C: to the station" if g.again.endswith("station") else g.again, 0, 22, 12, ck.GREY)
         ck.text(ctx, "F: title screen", 0, 38, 12, ck.GREY)
-    elif g.over and getattr(g, "net", None) is not None:     # a duel's own end screen
+    elif getattr(g, "net", None) is not None and g.net.showing(g):   # multiplayer's end screen
         ck.draw_duel_over(ctx, g, -60)
     elif g.over:
         ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -50, 200, 100).fill()

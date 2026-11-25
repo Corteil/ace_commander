@@ -48,7 +48,7 @@ pkg, mod = load()
 a = pkg.AceCommander()
 assert a.overlays == [] and len(mod.SHIPS) == 31
 assert not a.use_tilt, "joystick steering is the default"
-assert a.cmdr is None and a.choices() == ["NEW COMMANDER", "COMBAT PRACTICE", "DUEL", "SHIP VIEWER", "OPTIONS"]
+assert a.cmdr is None and a.choices() == ["NEW COMMANDER", "COMBAT PRACTICE", "MULTIPLAYER", "SHIP VIEWER", "OPTIONS"]
 c = frame(a); fits(c)
 assert [t[0] for t in c.texts] == ["< NEW COMMANDER >"], "one piece of text on the title screen"
 assert c.calls.get("line_to", 0) > 5, "and a ship"

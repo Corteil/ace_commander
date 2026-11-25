@@ -310,7 +310,8 @@ class AceCommander(PLATFORM.App):
         self.p_hardcore = False # combat practice's own HARDCORE, apart from the commander's
         self.p_sel = 0          # the combat practice page's line: 0 LEVEL, 1 HARDCORE
         self.duel = None        # a duel (duel.py), made the first time DUEL is chosen
-        self.dueling = False    # the flight is a duel's
+        self.dueling = False    # the flight is a multiplayer game's
+        self.d_mode = 0         # the mode the next game hosted starts on (duel.MODE_NAMES)
         self.duel_err = None    # the radio wouldn't open: why
         self.d_sel = 0          # the duel lobby's line: 0 HOST A GAME, then a JOIN for each host
         self.n_hardcore = False # the new-commander page's HARDCORE
@@ -736,7 +737,7 @@ class AceCommander(PLATFORM.App):
             return items
         items = ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS"]
         if getattr(self.platform, "radio", None) is not None:
-            items.insert(2, "DUEL")     # two players (duel.py): only with a radio
+            items.insert(2, "MULTIPLAYER")     # up to four players (duel.py): only with a radio
         if self.cmdr is not None:
             items.insert(0, "CONTINUE")
         if TITLE_QUIT:
@@ -759,7 +760,7 @@ class AceCommander(PLATFORM.App):
         elif item == "COMBAT PRACTICE":
             self.p_sel = 0
             self.mode = "practice"      # its level and HARDCORE first
-        elif item == "DUEL":
+        elif item == "MULTIPLAYER":
             if self.duel is None and self.duel_err is None:
                 try:
                     from . import duel
@@ -804,10 +805,11 @@ class AceCommander(PLATFORM.App):
             self._start_flight(False)
 
     def _update_duel(self, dt, cancel, confirm):
-        """The DUEL pages (Brian, 2026-11-25: a lobby, one player hosts). In the
-        lobby up / down picks HOST A GAME or a host to join and C chooses; hosting,
-        C starts once someone has joined; joining, the host starts it. F goes back:
-        to the lobby, then the title screen."""
+        """The MULTIPLAYER pages (duel.py; Brian, 2026-11-25: a lobby, one player
+        hosts, up to four play). In the lobby up / down picks HOST A GAME or a game to
+        join and C chooses; hosting, left / right picks the mode and C starts once
+        enough have joined; joining, the host starts it. F goes back: to the lobby,
+        then the title screen."""
         from . import duel as dm
         d = self.duel
         if d is None:
@@ -835,13 +837,32 @@ class AceCommander(PLATFORM.App):
                 self.d_sel = (self.d_sel + 1) % n
             elif confirm:
                 if self.d_sel == 0:
-                    d.host()
+                    d.host(self.d_mode)
                 else:
                     d.join(hosts[self.d_sel - 1])
         elif cancel:
             d.leave()
-        elif confirm and d.role == dm.HOST:
-            d.start_game()          # (nothing until someone has joined)
+        elif d.role == dm.HOST:
+            if hit("left") or hit("right"):
+                d.set_mode(d.mode + (-1 if hit("left") else 1))
+                self.d_mode = d.mode        # the next game starts on it too
+            elif confirm:
+                d.start_game()      # (nothing until enough have joined)
+
+    def _draw_party(self, ctx, d, top):
+        """Who is in the game hosted or joined: a line each, in their colour (their
+        team's in a team mode)."""
+        from . import duel as dm
+        text = cockpit.text
+        mode = d.mode if d.role == dm.HOST else (d.host_p.mode if d.host_p is not None else 0)
+        for i, (name, colour, slot) in enumerate(d.party()):
+            if dm.TEAMED[mode]:
+                t = dm.team_of(mode, slot)
+                rgb = dm.TEAM_RGB[t]
+                name = "%s  %s" % (name[:12], dm.TEAM_NAMES[t])
+            else:
+                rgb = cockpit.ship_rgb(colour)
+            text(ctx, name[:18], 0, top + i * 16, 12, rgb)
 
     def _draw_duel(self, ctx):
         from . import duel as dm
@@ -849,59 +870,64 @@ class AceCommander(PLATFORM.App):
         text = cockpit.text
         d = self.duel
         if d is None:
-            text(ctx, "DUEL", 0, -70, 18, cockpit.WHITE)
+            text(ctx, "MULTIPLAYER", 0, -70, 18, cockpit.WHITE)
             text(ctx, "NO RADIO", 0, -20, 17, cockpit.RED)
             text(ctx, (self.duel_err or "")[:28], 0, 5, 11, cockpit.GREY)
             text(ctx, "F: back", 0, 80, 12, cockpit.GREY)
             return
         me = cockpit.ship_rgb(d.colour)
+        dots = "." * (1 + (_ms() // 500) % 3)
         if d.role == dm.LOBBY:
-            text(ctx, "DUEL LOBBY", 0, -78, 17, cockpit.WHITE)
-            text(ctx, d.name, 0, -58, 12, me)
+            text(ctx, "MULTIPLAYER", 0, -80, 17, cockpit.WHITE)
+            text(ctx, d.name, 0, -62, 12, me)
             hosts = d.hosts()
             rows = ["HOST A GAME"] + ["JOIN " + p.name for p in hosts]
             top = max(0, min(self.d_sel - 2, len(rows) - 4))
             for i in range(top, min(len(rows), top + 4)):
-                y = -30 + (i - top) * 22
+                y = -38 + (i - top) * 20
                 on = i == self.d_sel
                 rgb = cockpit.ship_rgb(hosts[i - 1].colour) if i and not on else (
                     cockpit.GREEN if on else cockpit.GREY)
                 text(ctx, ("< %s >" if on else "%s") % rows[i][:18], 0, y, 14 if on else 12, rgb)
+            if self.d_sel:          # the game picked: its mode and how full it is
+                p = hosts[self.d_sel - 1]
+                text(ctx, "%s  %d/%d" % (dm.MODE_NAMES[p.mode], 1 + len(p.guests), dm.MODE_MAX[p.mode]),
+                     0, 44, 11, cockpit.YELLOW)
             others = d.lobby()
-            if d.notice:                # why the last duel ended
+            if d.notice:                # why the last game ended
                 text(ctx, d.notice, 0, 62, 12, cockpit.RED)
             elif others:
                 names = ", ".join(p.name for p in others[:3]) + ("..." if len(others) > 3 else "")
                 text(ctx, "HERE: " + names[:26], 0, 62, 10, cockpit.GREY)
             else:
-                dots = "." * (1 + (_ms() // 500) % 3)
                 text(ctx, "nobody else yet" + dots, 0, 62, 10, cockpit.YELLOW)
             text(ctx, "C: choose   F: back", 0, 82, 12, cockpit.GREY)
         elif d.role == dm.HOST:
-            text(ctx, "HOSTING", 0, -70, 18, cockpit.WHITE)
-            text(ctx, d.name, 0, -48, 12, me)
-            o = d.other
-            if o is not None:
-                text(ctx, o.name, 0, -10, 17, cockpit.ship_rgb(o.colour))
-                text(ctx, "has joined", 0, 12, 12, cockpit.GREY)
-                text(ctx, "C: start   F: stop", 0, 80, 12, cockpit.GREY)
+            text(ctx, "HOSTING", 0, -82, 16, cockpit.WHITE)
+            text(ctx, "< %s >" % dm.MODE_NAMES[d.mode], 0, -62, 14, cockpit.GREEN)
+            text(ctx, dm.MODE_NOTES[d.mode], 0, -46, 10, cockpit.YELLOW)
+            self._draw_party(ctx, d, -26)
+            ok, why = d.can_start()
+            if ok:
+                text(ctx, "C: start   F: stop", 0, 82, 12, cockpit.GREY)
             else:
-                dots = "." * (1 + (_ms() // 500) % 3)
-                text(ctx, "waiting for a player" + dots, 0, 0, 12, cockpit.YELLOW)
-                text(ctx, "F: stop", 0, 80, 12, cockpit.GREY)
+                text(ctx, ("waiting: " + why + dots) if not d.guests else why, 0, 60, 11,
+                     cockpit.YELLOW)
+                text(ctx, "F: stop", 0, 82, 12, cockpit.GREY)
         else:
-            text(ctx, "JOINING", 0, -70, 18, cockpit.WHITE)
-            o = d.other
-            text(ctx, o.name if o is not None else "?", 0, -40, 17,
-                 cockpit.ship_rgb(o.colour) if o is not None else cockpit.GREY)
+            text(ctx, "JOINING", 0, -82, 16, cockpit.WHITE)
+            o = d.host_p
             if o is None or o.t >= dm.GONE:
+                text(ctx, o.name if o is not None else "?", 0, -40, 17, cockpit.GREY)
                 text(ctx, "HOST GONE", 0, 0, 14, cockpit.RED)
             elif d.accepted():
-                text(ctx, "waiting for the host", 0, -5, 12, cockpit.GREEN)
-                text(ctx, "to start", 0, 12, 12, cockpit.GREEN)
+                text(ctx, dm.MODE_NAMES[o.mode], 0, -62, 14, cockpit.GREEN)
+                self._draw_party(ctx, d, -40)
+                text(ctx, "waiting for the host" + dots, 0, 60, 11, cockpit.GREEN)
             else:
+                text(ctx, o.name, 0, -40, 17, cockpit.ship_rgb(o.colour))
                 text(ctx, "asking to join...", 0, 0, 12, cockpit.YELLOW)
-            text(ctx, "F: leave", 0, 80, 12, cockpit.GREY)
+            text(ctx, "F: leave", 0, 82, 12, cockpit.GREY)
 
     def _draw_practice(self, ctx):
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
@@ -1703,8 +1729,8 @@ class AceCommander(PLATFORM.App):
                     self._restore()     # back to the last save, as in the original
             if confirm and self.career:
                 self._dock()
-            elif confirm:
-                g.reset()
+            elif confirm and not (self.dueling and not self.duel.again_by_c()):
+                g.reset()       # (multiplayer but a duel: you come back by yourself)
                 self.jump_to = None
                 self.banked = 0
                 self.banked_cash = 0

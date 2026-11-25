@@ -82,6 +82,10 @@ BREAK_DIST = 900.0         # enemies peel away when this close
 DESPAWN = 14000.0
 RAM_AGAIN = 1.0         # seconds before ramming another player's ship hurts again (duel.py)
 RADAR_RANGE = 10000.0
+# multiplayer's kinds of object (duel.py): another player's ship, a ship of the host's
+# game, the convoy (the host's), a ring or marker; the first three can be shot at
+NET_KINDS = ("player", "npc", "convoy", "mark")
+NET_TARGETS = ("player", "npc", "convoy")
 MAX_OBJECTS = 14
 
 # A commander's flight is in a star system: a planet, a sun and a space station
@@ -489,6 +493,14 @@ class Obj:
         self.ghost = False      # a missile at another player: shown only, their game decides
         self.net_id = 0         # a missile to or from another player: its number (duel.py)
         self.ecmed = False      # an enemy missile destroyed by your ECM
+        # multiplayer (duel.py): on your side (no lock, your lasers pass by it), the
+        # player slot a ship is, a host's pirate's type and its target, who hit it last
+        self.friend = False
+        self.net_slot = 0
+        self.net_type = 0
+        self.net_prey = None
+        self.net_killer = 0
+        self.shot = 0.0     # > 0 just after this ship fired at something not you
         self.role = "pirate"    # ships: "pirate", "trader", "police" or "hunter"
         self.dest = "station"   # a trader's: where it is making for, "station" or "planet"
         self.prey = None        # a pirate's: the trader it is after (None: you)
@@ -1819,9 +1831,11 @@ class Game:
             o.hit -= dt
         if o.beam > 0:
             o.beam -= dt
+        if o.shot > 0:
+            o.shot -= dt
         m = o.m
         kind = o.kind
-        if kind == "player":    # another player's ship: duel.py moves it, from their packets
+        if kind in NET_KINDS:   # multiplayer's (duel.py): moved from packets, or fixed
             if o.ram_t > 0:
                 o.ram_t -= dt
             return
@@ -1839,7 +1853,7 @@ class Game:
             dt = o.think_t
             o.think_t = 0.0
         d = math.sqrt(o.x * o.x + o.y * o.y + o.z * o.z)
-        if d > DESPAWN:
+        if d > DESPAWN and self.net is None:    # (multiplayer: the host's pirates are for all)
             o.dead = True
             return
         if d < 1.0:
@@ -1868,7 +1882,8 @@ class Game:
             prey = o.prey
             if prey is not None and (prey.dead or (o.state != "attack" and o.state != "break")):
                 o.prey = prey = None
-            if prey is None and o.role == "pirate" and o.state == "attack" and self.space is not None:
+            if prey is None and o.role == "pirate" and o.state == "attack" and (
+                    self.space is not None or self.net is not None):
                 prey = o.prey = self._pick_prey(o, d)
             if prey is not None:    # after a trader
                 px, py, pz = prey.x - o.x, prey.y - o.y, prey.z - o.z
@@ -1897,7 +1912,11 @@ class Game:
                         if (abs(px) < ENEMY_REACH and abs(py) < ENEMY_REACH and abs(pz) < ENEMY_REACH
                                 and bp.laser and aim > 0.96 and o.cool <= 0):
                             o.cool = _rnd(0.5, 1.1)
-                            if random.random() < 0.5:
+                            o.shot = 0.2
+                            if prey.kind == "player":   # another player's: their game is hurt
+                                if random.random() < min(0.7, 0.3 + 0.05 * self.wave) * self.aim_k:
+                                    self.net.npc_hits(prey, (3.0 + bp.laser * 2.5) * self.damage_k)
+                            elif random.random() < 0.5:
                                 prey.energy -= 3.0 + bp.laser * 2.5
                                 prey.hit = 0.12
                                 if prey.state == "trade":
@@ -2058,7 +2077,9 @@ class Game:
         for o in self.objs:
             if o.dead or o.kind == "missile" or o.kind == "pmissile":
                 continue
-            if o.kind == "player" and o.ram_t > 0:
+            if o.kind == "mark":
+                continue        # a ring or a marker (duel.py): flown through
+            if o.ram_t > 0 and o.kind in NET_KINDS:
                 continue        # just rammed: not again every frame
             r = o.bp.radius * 0.7 + 60.0
             if abs(o.z) > r:
@@ -2099,8 +2120,8 @@ class Game:
             self.sfx("crash")
             self._hurt(10.0 + self.speed * 0.5)
             self.speed *= 0.4
-            if o.kind == "player":  # another player: each game hurts its own ship (they see
-                o.ram_t = RAM_AGAIN     # the crash too); not again for a moment
+            if o.kind in NET_KINDS:     # another player's, or the host's: each game hurts its
+                o.ram_t = RAM_AGAIN     # own ship (they see the crash too); not again for a moment
                 continue
             o.energy -= 60.0
             if o.energy <= 0:
@@ -2157,7 +2178,7 @@ class Game:
         best = None
         best_r = cone * cone
         for o in self.objs:
-            if (o.kind != "ship" and o.kind != "player") or o.dead or o.z < 100:
+            if (o.kind != "ship" and o.kind not in NET_TARGETS) or o.dead or o.z < 100 or o.friend:
                 continue
             r = (o.x * o.x + o.y * o.y) / (o.z * o.z)
             if r < best_r:
@@ -2179,10 +2200,12 @@ class Game:
             o.target = launch
             o.t = 8.0
             self.new.append(o)
-            if launch.kind == "player":     # at another player: theirs flies it at them (duel.py)
+            if launch.kind == "player" or launch.kind == "npc":     # theirs flies it (duel.py)
                 o.ghost = True
                 if self.net is not None:
-                    self.net.missile_fired(o)
+                    self.net.missile_fired(o, launch)
+            elif self.net is not None:
+                launch.net_killer = 0       # the host's own, at its own ship
             self.say("MISSILE AWAY", 1.0)
             self.sfx("missile")
 
@@ -2224,8 +2247,9 @@ class Game:
             best = None
             best_z = LASER_RANGE
             for o in (self.objs if self.looking else ()):   # off a space view: no hits
-                if o.dead or o.kind == "pmissile" or o.z <= 30 or o.z >= best_z or o.upgrade:
-                    continue    # (a practice upgrade canister can't be shot)
+                if (o.dead or o.kind == "pmissile" or o.z <= 30 or o.z >= best_z or o.upgrade
+                        or o.friend or o.kind == "mark"):
+                    continue    # (a practice upgrade canister can't be shot, nor a friend)
                 lim = o.z * AIM_ASSIST
                 lim *= lim
                 if lim < o.bp.area:
@@ -2235,12 +2259,17 @@ class Game:
                     best_z = o.z
             if best is None and self.space is not None and self.looking:
                 self._hit_station()
-            if best is not None and best.kind == "player":
-                best.hit = 0.12     # another player: their game takes the damage (duel.py)
+            if best is not None and (best.kind == "player" or best.kind == "npc"):
+                best.hit = 0.12     # another player's, or the host's: their game takes it (duel.py)
                 self.sfx("hit")
                 if self.net is not None:
-                    self.net.laser_hit(self.laser_damage)
+                    if best.kind == "player":
+                        self.net.laser_hit(best, self.laser_damage)
+                    else:
+                        self.net.npc_laser(best, self.laser_damage)
                 best = None
+            if best is not None and self.net is not None:
+                best.net_killer = 0         # the host's own hit
             if best is not None and best.role == "constrictor" and self.laser != "military":
                 self._provoke(best)     # its shields shrug off anything but a military laser
                 best = None
@@ -2514,7 +2543,10 @@ class Game:
 
     def _pick_prey(self, o, d):
         """The trader pirate o should go for instead of you: the nearest one
-        to it, if nearer than you and within PREY_RANGE; else None."""
+        to it, if nearer than you and within PREY_RANGE; else None. In multiplayer
+        (duel.py) the host's pirates go for the convoy or any player."""
+        if self.net is not None:
+            return self.net.prey_for(o)
         best = None
         best_d2 = min(d, PREY_RANGE)
         best_d2 *= best_d2

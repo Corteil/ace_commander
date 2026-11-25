@@ -156,6 +156,46 @@ can change underneath.
 Not yet on a badge. Next: shots and hits (the shooter decides, sends a HIT with damage;
 the target takes it and sends DEAD), then the Tufty (UDP on its Wi-Fi) and the Pi bridge.
 
+## Built: up to four players and modes (build 148, 2026-11-25)
+
+Brian: "make it support up to four players. Modes Free for all, teams and capture the flag.
+Protect the convoy ship from pirates." Capture the flag: "Two rings in teams colours set
+distance apart. To capture the flag you must fly through the ring the changes colour and you
+must fly back to your ring and pass though to score. Destroyed ship spawn close/behind to
+their home ring after a set time." The convoy: "could be coop or p v p. Convoy ship will need
+to be a new large design".
+
+- **Lobby:** DUEL on the title screen is MULTIPLAYER. The host picks the mode (left / right)
+  and takes the first three to join; HELLO carries the mode and the host's guests (46 bytes),
+  so the lobby shows each game's mode and how full it is, and the guests see who else is in.
+  START carries the guests in order: slot 0 the host, 1-3 the guests. Team modes: even slots
+  RED, odd BLUE. Each mode has its least and most players (`MODE_MIN`, `MODE_MAX`).
+- **Modes:** DUEL (unchanged), FREE FOR ALL (10 kills), TEAMS (10 team kills, no friendly
+  fire), CAPTURE FLAG (rings 10000 apart; through the other's ring takes its flag, the ring
+  goes grey; back through your own scores; 3 wins), CONVOY CO-OP and CONVOY RAID (the HAULER,
+  `convoy_ship.py`, flies 12000 units in 150 s to a station; pirates every 25 s; it arriving
+  is red's / everyone's win, it destroyed the raiders' / pirates'). Not a duel: back after 5 s
+  at your start; a result for 10 s, then the next match (scores, flags and convoy afresh).
+- **Who decides:** your game what hits you (as the duel); the host everything shared, said
+  in STATE (22 bytes, 4 a second and at once on a change): match, result, time, per-slot
+  scores, team scores, the flag carriers, the convoy's energy. Others ask: CLAIM (through a
+  ring), KILLED (by whom: the last hit within 10 s). The convoy's place is worked out from
+  the match time on every device; only its energy is sent.
+- **The pirates** are ordinary ships in the host's game, so they fight as practice's do.
+  `Game._pick_prey` asks `Duel.prey_for`: the convoy (twice as likely), the host or another
+  player (not raiders in a raid); a pirate shot by a guest turns on that guest. Their poses go
+  out in NPCS (ten a second; 22 bytes each, at most 10 a packet, 224 bytes); a destroyed one
+  is sent with DEAD for half a second so the others see it explode. The others' copies are
+  kind "npc": hits go to the host (NPC_HIT), missiles too (MISSILE with `NPC_BIT`: the host
+  flies it and says GONE). A pirate's hit on another player is a HIT from `NPC_SRC`.
+- **Leaving:** the host leaving ends the game for everyone (as before); a guest leaving drops
+  out ("<NAME> LEFT"), and the game ends when nobody else is left, except CONVOY CO-OP.
+- `tests/test_multiplayer.py`: four players in each mode on a pretend radio.
+
+Not yet on badges: the frame time with three other ships, eight pirates and the convoy (92
+lines in 6 parts close up) needs measuring; and how busy the radio is with four (each sends
+15 poses a second; the host also 10 NPCS and 4 STATE).
+
 ## The game (suggestion)
 
 1. A duel in the combat practice arena, no NPCs: each device flies its own ship and

@@ -1628,3 +1628,36 @@ what is now `ace.py` (renamed in build 50).
    and ramming do damage, the E.C.M. by hand (B); rounds with a fresh loadout and the score;
    either leaving ends it. The Pi duels over UDP with --duel. Key guides for the Pi and Tufty
    in their zips.
+   **Build 148** (Brian, 2026-11-25: "make it support up to four players. Modes Free for all,
+   teams and capture the flag. Protect the convoy ship from pirates"; capture the flag: "Two
+   rings in teams colours set distance apart ... fly through the ring then changes colour and
+   you must fly back to your ring and pass though to score. Destroyed ship spawn close/behind
+   to their home ring after a set time"; the convoy "could be coop or p v p. Convoy ship will
+   need to be a new large design"). DUEL on the title screen is now **MULTIPLAYER**; the host
+   picks the mode (left / right on HOSTING) and takes up to three guests (`duel.MAX_PLAYERS`);
+   slot 0 is the host, then the guests in the order they joined; in team modes even slots are
+   RED and odd BLUE. Modes (`duel.MODE_NAMES`): DUEL (as before: two, rounds by C), FREE FOR
+   ALL (`FFA_WIN` 10 kills), TEAMS (`TEAM_WIN` 10, no friendly fire: a teammate is
+   `Obj.friend`, not locked or hit), CAPTURE FLAG (rings `RING_Z` 5000 either side of the
+   middle, `RING_PASS` 460 to count as through; a ring goes grey while its flag is away;
+   `CTF_WIN` 3; a carrier destroyed: the flag goes home; the compass points at the ring to
+   fly to), CONVOY CO-OP (1-4 players guard the new HAULER, `convoy_ship.py` from
+   `tools/make_convoy_ship.py`, on a straight run of `CONVOY_TIME` 150 s to a station; pirate
+   waves every `WAVE_EVERY` 25 s) and CONVOY RAID (red defends, blue raids; the pirates are
+   blue's friends). Except a duel, destroyed ships come back after `RESPAWN` 5 s at their
+   start (`spawn_pose`; behind the home ring in Capture Flag, by the convoy for defenders); a
+   result shows `RESULT_FOR` 10 s, then the next match. **The host decides** the score, the
+   flags, the convoy and the pirates (`STATE` 4 a second and on a change; `CLAIM` for a ring
+   passed, `KILLED` with who did it, the last hit within 10 s); the pirates are ordinary ships
+   in the host's game (`Game._pick_prey` asks `Duel.prey_for`: the convoy, the host or another
+   player), sent as `NPCS` 10 a second (22 bytes each, up to 10 in a packet: 224 bytes, inside
+   ESP-NOW's 250); the others draw them as kind "npc" and send hits (`NPC_HIT`) and missiles
+   (`MISSILE` with `NPC_BIT`) to the host. A pirate hitting another player sends that player a
+   `HIT` (who: `NPC_SRC`). HIT and MISSILE now name their target's slot. The host respawning
+   keeps its pirates where they were in the shared world. Leaving: the host ends it for all; a
+   guest drops out, and it ends when nobody else is left (CONVOY CO-OP goes on alone). HUD: the
+   score (or the convoy's energy and time left) along the top (`cockpit.draw_net_line`, the Pi
+   and Tufty dashboards too); the compass (`cockpit.compass_target`) on all three. Tests:
+   `tests/test_multiplayer.py` (new, in run_all; four Games on a pretend radio), test_duel and
+   test_duel_combat updated. **PC only: not yet on badges** (and nothing yet known of the
+   frame time with four ships, the convoy close up (92 lines, 6 parts) or 8 pirates).

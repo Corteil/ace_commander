@@ -40,14 +40,27 @@ A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves 
 - **Combat practice**: endless waves of ships, with nothing kept. Pick the level
   (EASY, NORMAL, HARD) and HARDCORE on its page before you fly; practice's HARDCORE is
   its own, apart from your commander's. The practice ship has an E.C.M.
-- **Duel**: two badges fight each other over the badge's own radio (ESP-NOW: no Wi-Fi
-  network needed; tested to 10 m through a door). Everyone on the DUEL page is listed with
-  their commander's name and ship colour. One player picks **HOST A GAME**, the other
-  **JOIN** and the host's name; the host presses C and both launch, 8000 apart and facing
-  each other, in an arena with no other ships. Lasers, missiles and ramming do damage; the
-  E.C.M. fires only by hand (**B** in a duel, instead of the energy bomb). Destroyed: C
-  starts the next round, both back at their ends with full shields, missiles and E.C.M.;
-  the score is kept. Either player leaving ends the duel for both.
+- **Multiplayer**: up to four badges play over the badge's own radio (ESP-NOW: no Wi-Fi
+  network needed; tested to 10 m through a door). Everyone on the MULTIPLAYER page is listed
+  with their commander's name and ship colour. One player picks **HOST A GAME** and a mode
+  (left / right), up to three others **JOIN** the host's name, and the host presses C to
+  launch everyone. Lasers, missiles and ramming do damage; the E.C.M. fires only by hand (**B**,
+  instead of the energy bomb). The modes:
+  - **DUEL**: two players, 8000 apart and facing. Destroyed: C starts the next round, both
+    back at their ends with full shields, missiles and E.C.M.; the score is kept.
+  - **FREE FOR ALL**: everyone against everyone; 10 kills wins.
+  - **TEAMS**: red against blue (the host's team is red; players join red, blue, red, blue);
+    no friendly fire; 10 team kills wins.
+  - **CAPTURE FLAG**: red and blue teams, each with a ring in its colour. Fly through the
+    other team's ring to take its flag (the ring goes grey and your name shows *FLAG*), then
+    back through your own ring to score. A carrier destroyed drops the flag: it goes home.
+    3 captures wins. The compass points at the ring to fly to.
+  - **CONVOY CO-OP**: 1 to 4 players guard a big freighter on its way to a station
+    (2½ minutes) from waves of pirates; it must arrive. The compass points at the convoy.
+  - **CONVOY RAID**: red guards the convoy, blue raids it, with a few pirates on blue's side.
+  Except in a duel, a destroyed ship comes back after 5 seconds at its team's start (behind
+  its own ring in Capture Flag); a won match shows the result for 10 seconds, then the next
+  starts. The host leaving ends the game; a guest leaving drops out of it.
 - **Ship viewer**: every ship in the game, turning.
 - **Options**: steering (joystick or tilt), CONTROLS (flip the flight controls up / down,
   left / right or both), your commander's name, the docking style, how soon mission 1's
@@ -202,8 +215,8 @@ the rest of the keyboard works as the Keyboard Hexpansion. A game pad (Xbox, Pla
 8BitDo...) flies with analogue sticks: left stick power and yaw, right stick pitch and roll,
 triggers missile and fire, bumpers E.C.M. and energy bomb, D-pad views; docked it works as the
 badge, and the screens name its buttons. Saves go in `~/.local/share/ace_commander/`.
-With `--duel`, DUEL is on the title screen: two windows on one Pi, or two computers on one
-network, duel over UDP (a Pi can't yet duel a badge).
+With `--duel`, MULTIPLAYER is on the title screen: windows on one Pi, or computers on one
+network, play over UDP (a Pi can't yet play a badge).
 Work in progress: see `hosts/pi/PLAN.md`.
 
 ## For developers
