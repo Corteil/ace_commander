@@ -117,6 +117,19 @@ can change underneath.
   shows HOST LEFT for 4 s; if every END is lost, the host's next HELLO from the lobby does
   it; a host not heard for 10 s (battery, window closed) ends it as HOST LOST. **The guest
   leaving ends the host's game too** (Brian): back to the lobby, "<NAME> LEFT" (or LOST).
+- **Combat (Brian, 2026-11-25: damage, lasers, missiles, ramming; the ECM by hand):**
+  a laser hit is the shooter's to decide: HIT (damage x16) and the target takes it
+  (`Game._hurt`); its beam shows on the target's screen when its nose points at them
+  (pose flag FIRING). A missile is the target's: MISSILE (number, launch point and way,
+  sent 3 times) and the target's game flies it as an enemy missile; it says GONE (hit, or
+  its ECM) and the shooter's harmless copy (`Obj.ghost`) goes ("ECM" if it was that).
+  Ramming: each game hurts its own ship, not again for `RAM_AGAIN` s. The ECM is by hand
+  (`rules.manual_ecm` while dueling): E on a keyboard, both speed buttons, **B on the
+  badge** (Brian: the energy bomb can't touch the other player), LB on the Pi pad.
+  Destroyed: the pose flag DEAD; the other sees the explosion and "<NAME> DESTROYED k-d";
+  fly again (C) starts you at your end. Players can be locked and fired at like ships
+  (`_pick`), but the AI, the energy bomb and encounters still leave them alone.
+  `tests/test_duel_combat.py`.
 - Title screen DUEL (only when the platform has `radio()`: the badge always; the Pi with
   `run.py --duel [PORT]`; not the Tufty yet). Its page says HELLO 4 times a second and
   shows SEARCHING / PLAYER FOUND; C flies (alone until the other comes), F back.

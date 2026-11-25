@@ -356,6 +356,12 @@ for _ in range(10):
     bs.tick(a)
 ps = player(a.game)
 check("app: ZED's ship in the arena, in ZED's paint", len(ps) == 1 and ps[0].rgb == cockpit.ship_rgb(3))
+bombs = a.game.bombs
+a.game.ecm = True
+a.game.ecm_t = 0.0
+bs.tick(a, fresh=["B"])
+check("app: B fires the ECM in a duel, not the energy bomb (Brian)", a.game.ecm_t > 0
+      and a.game.bombs == bombs and a.game.msg == "ECM", "%s %.2f" % (a.game.msg, a.game.ecm_t))
 a._to_title()
 bs.tick(a)
 check("app: to the title ends the duel", not a.dueling and not a.game.quiet and a.game.anchor is None)

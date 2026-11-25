@@ -15,9 +15,10 @@ to the guest (a few times, in case one is lost) and both fly at once, the host
 from START[0], the guest from START[1], 8000 apart and facing. In flight each
 sends its pose (netplay.py) SEND_HZ times a second; the other's ship (kind
 "player") is drawn where its last pose and speed put it now. Nothing heard for
-LOST seconds: "LINK LOST", the ship goes until it comes back. Either player
+LOST seconds: "LINK LOST", the ship goes until it comes back. Combat: see HIT_PKT
+below; the ECM is by hand; the score shows when either is destroyed. Either player
 leaving (END, or GONE_END seconds unheard) ends the game for both: back to the
-lobby, which says why. Shots and hits are not built yet.
+lobby, which says why.
 """
 import struct
 
@@ -27,6 +28,20 @@ HELLO = 2
 START_PKT = 3
 END_PKT = 4                 # leaving the duel (sent END_TIMES times: one may be lost)
 END_TIMES = 3
+# combat (Brian, 2026-11-25: lasers, missiles, ramming; the ECM by hand). Who decides:
+# a laser hit, the shooter (HIT: damage times 16); a missile, its target, whose game flies
+# it as an enemy missile (MISSILE: number, where and which way it was launched; it says
+# GONE when it hit or its ECM got it; the shooter shows a harmless copy till then);
+# ramming, each game for its own ship. Missile packets go AGAIN times (one may be lost).
+HIT_PKT = 5
+HIT_FMT = "<2sBBH"
+MISSILE_PKT = 6
+MISSILE_FMT = "<2sBBiiihhh"
+GONE_PKT = 7
+GONE_FMT = "<2sBBB"
+GONE_HIT, GONE_ECM = 1, 2
+AGAIN = 3
+BEAM_CONE = 0.98            # their laser drawn at you when their nose is this close to you
 # MAGIC, kind, role, colour, flags, target id (6 bytes; the host's for JOIN, the guest's
 # for HOST and START), name (16 bytes, ASCII, padded with spaces)
 FMT = "<2sBBBB6s16s"
@@ -106,6 +121,16 @@ class Duel:
         self.pose_age = 0.0     # seconds since that pose
         self.last_seq = None
         self.lost = False
+        self.g = None           # the Game while flying (hits and missiles arrive any time)
+        self.missile_n = 0      # numbers for our missiles
+        self.ghosts = {}        # number -> our missile's harmless copy, till they say GONE
+        self.incoming = {}      # number -> their missile, flown here at us
+        self.seen_missiles = []     # numbers already launched here (repeats ignored)
+        self.flags = 0          # their last pose's flags (netplay.FIRING, DEAD)
+        self.dead_here = False  # we are destroyed (counted once)
+        self.kills = 0          # times we destroyed them, and they us, this duel
+        self.deaths = 0
+        self.pkt = bytearray(struct.calcsize(MISSILE_FMT))     # combat packets, made once
         self.ended = None       # why the duel ended for us (the host left): the game goes back
         self.notice = None      # to the lobby, which shows this for NOTICE_FOR seconds
         self.notice_t = 0.0
@@ -224,6 +249,9 @@ class Duel:
             if kind == netplay.POSE:
                 self._hear_pose(host, msg)
                 continue
+            if kind >= HIT_PKT:
+                self._hear_combat(host, kind, msg)
+                continue
             if (kind != HELLO and kind != START_PKT and kind != END_PKT) or len(msg) < size:
                 continue
             _, _, role, colour, _, target, name = struct.unpack_from(FMT, msg, 0)
@@ -251,6 +279,74 @@ class Duel:
             elif self.role == JOIN and self.other is p and target == me and not self.flying:
                 self.go = True              # our host started: fly
 
+    def _hear_combat(self, host, kind, msg):
+        o = self.other
+        g = self.g
+        if o is None or host != o.id or g is None or not self.flying:
+            return              # not the player we duel, or not flying
+        o.t = 0.0
+        if kind == HIT_PKT and len(msg) >= struct.calcsize(HIT_FMT):
+            g._hurt(struct.unpack_from(HIT_FMT, msg, 0)[3] / 16.0)
+        elif kind == MISSILE_PKT and len(msg) >= struct.calcsize(MISSILE_FMT):
+            _, _, n, x, y, z, nx, ny, nz = struct.unpack_from(MISSILE_FMT, msg, 0)
+            if n in self.seen_missiles or g.missile_bp is None or g.over:
+                return          # a repeat
+            self.seen_missiles.append(n)
+            if len(self.seen_missiles) > 16:
+                self.seen_missiles.pop(0)
+            k = 1.0 / 16384
+            m = [0.0] * 9
+            game._look(m, *game._unit(nx * k, ny * k, nz * k))
+            mo = game.Obj(g.missile_bp, "missile", 0.0, 0.0, 0.0)
+            g.place(mo, x * 0.25, y * 0.25, z * 0.25, m)
+            mo.t = 12.0
+            mo.net_id = n
+            g.objs.append(mo)
+            self.incoming[n] = mo
+            g.say("INCOMING MISSILE")
+            g.sfx("incoming")
+        elif kind == GONE_PKT and len(msg) >= struct.calcsize(GONE_FMT):
+            _, _, n, why = struct.unpack_from(GONE_FMT, msg, 0)
+            gm = self.ghosts.pop(n, None)
+            if gm is not None and not gm.dead:
+                gm.dead = True
+                g._boom(gm.x, gm.y, gm.z, 8)
+                if why == GONE_ECM:
+                    g.say("ECM")
+                    g.sfx("ecm")
+
+    # called by the Game (g.net) ------------------------------------------------------
+
+    def laser_hit(self, damage):
+        """Our laser hit their ship: they take the damage."""
+        if self.other is None:
+            return
+        d = int(damage * 16)
+        struct.pack_into(HIT_FMT, self.pkt, 0, netplay.MAGIC, HIT_PKT, 1,
+                         0 if d < 0 else (65535 if d > 65535 else d))
+        self.link.send(memoryview(self.pkt)[:struct.calcsize(HIT_FMT)])
+
+    def missile_fired(self, o):
+        """We launched missile o at them: their game flies it (o is a harmless copy)."""
+        g = self.g
+        if g is None or g.anchor is None:
+            return
+        self.missile_n = self.missile_n % 255 + 1
+        n = o.net_id = self.missile_n
+        self.ghosts[n] = o
+        x, y, z = g.world_point(o.x, o.y, o.z)
+        m = g.world_pose()[3]
+        struct.pack_into(MISSILE_FMT, self.pkt, 0, netplay.MAGIC, MISSILE_PKT, n,
+                         int(x * 4), int(y * 4), int(z * 4),
+                         netplay._s(m[6]), netplay._s(m[7]), netplay._s(m[8]))
+        for _ in range(AGAIN):
+            self.link.send(self.pkt)
+
+    def _gone(self, n, why):
+        struct.pack_into(GONE_FMT, self.pkt, 0, netplay.MAGIC, GONE_PKT, n, why)
+        for _ in range(AGAIN):
+            self.link.send(memoryview(self.pkt)[:struct.calcsize(GONE_FMT)])
+
     def _hear_pose(self, host, msg):
         o = self.other
         if o is None or host != o.id:
@@ -264,6 +360,7 @@ class Duel:
             return              # late: an older pose than the one we have
         self.last_seq = seq
         self.pose = (r[2], r[3], r[4], r[6])
+        self.flags = r[7]
         self.pose_age = 0.0
 
     # ---- flying ----------------------------------------------------------------------
@@ -282,7 +379,13 @@ class Duel:
         g.objs[:] = []
         g.speed = START_SPEED
         g.set_anchor(*start_pose(self.slot))
-        if self.other is not None:
+        g.net = self
+        g.rules.manual_ecm = True   # the ECM by hand in a duel (Brian, 2026-11-25)
+        self.g = g
+        self.ghosts = {}
+        self.incoming = {}
+        self.flags = 0
+        if self.other is not None and not self.deaths and not self.kills:
             g.say("VS " + self.other.name, 2.0)
 
     def stop(self, g):
@@ -299,8 +402,12 @@ class Duel:
         if g is not None:
             g.quiet = False
             g.anchor = None
+            g.net = None
+            g.rules.manual_ecm = g.rules.hardcore   # practice's own again
             if self.ship is not None and self.ship in g.objs:
                 g.objs.remove(self.ship)
+        self.g = None
+        self.kills = self.deaths = 0
         self.ship = None
         self.pose = None
         self.flying = False
@@ -332,9 +439,22 @@ class Duel:
             if self.send_t < 0:
                 self.send_t = 0.0
             self.seq = (self.seq + 1) & 0xFFFF
-            flags = netplay.DEAD if g.over else 0
+            flags = (netplay.DEAD if g.over else 0) | (netplay.FIRING if g.beam > 0 else 0)
             netplay.pack_pose(self.buf, self.slot, self.seq, g.world_pose(), g.speed, flags)
             self.link.send(self.buf)
+        for n in list(self.incoming):   # their missiles here: hit us, or our ECM got them
+            mo = self.incoming[n]
+            if mo.dead:
+                del self.incoming[n]
+                self._gone(n, GONE_ECM if mo.ecmed else GONE_HIT)
+        for n in list(self.ghosts):     # our copies that reached them, or ran out
+            if self.ghosts[n].dead:
+                del self.ghosts[n]
+        if g.over and not self.dead_here:
+            self.dead_here = True
+            self.deaths += 1
+        elif not g.over:
+            self.dead_here = False
         o = self.other
         if o is not None and o.t >= GONE_END:
             self._end(self._left("LOST"))   # not heard for a long while: gone without a word
@@ -350,6 +470,15 @@ class Duel:
         if self.lost:
             self.lost = False
             g.say("LINK BACK", 1.5)
+        if self.flags & netplay.DEAD:   # they are destroyed: an explosion, once
+            if self.ship is not None and self.ship in g.objs:
+                s = self.ship
+                g.objs.remove(s)
+                g._boom(s.x, s.y, s.z, 8 + 2 * min(s.bp.explosions, 6))
+                g.sfx("explode")
+                self.kills += 1
+                g.say("%s DESTROYED  %d-%d" % (o.name, self.kills, self.deaths), 3.0)
+            return
         if self.ship is None:
             bp = g.types.get(g.ship_name)     # practice flies a Cobra Mk III: so do they
             if bp is None:
@@ -366,3 +495,8 @@ class Duel:
         v = speed * game.SPEED_K * self.pose_age
         g.place(s, x + m[6] * v, y + m[7] * v, z + m[8] * v, m)
         s.speed = speed
+        if self.flags & netplay.FIRING:     # their laser: drawn at you if they are aiming at you
+            d = (s.x * s.x + s.y * s.y + s.z * s.z) ** 0.5
+            sm = s.m        # their nose as we see it (m is the world's)
+            if d > 1 and -(s.x * sm[6] + s.y * sm[7] + s.z * sm[8]) / d > BEAM_CONE:
+                s.beam = 0.1

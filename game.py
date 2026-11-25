@@ -80,6 +80,7 @@ PMISSILE_SPEED = 1700.0
 TURN_RATE = 1.1            # how fast enemy ships can turn, radians per second
 BREAK_DIST = 900.0         # enemies peel away when this close
 DESPAWN = 14000.0
+RAM_AGAIN = 1.0         # seconds before ramming another player's ship hurts again (duel.py)
 RADAR_RANGE = 10000.0
 MAX_OBJECTS = 14
 
@@ -484,6 +485,10 @@ class Obj:
         self.upgrade = False    # a practice upgrade canister (Game.practice_upgrades)
         self.rgb = None         # another player's ship: its paint (duel.py), else None
         self.label = None       # and their name, drawn under it
+        self.ram_t = 0.0        # another player's ship: no ramming damage again until 0
+        self.ghost = False      # a missile at another player: shown only, their game decides
+        self.net_id = 0         # a missile to or from another player: its number (duel.py)
+        self.ecmed = False      # an enemy missile destroyed by your ECM
         self.role = "pirate"    # ships: "pirate", "trader", "police" or "hunter"
         self.dest = "station"   # a trader's: where it is making for, "station" or "planet"
         self.prey = None        # a pirate's: the trader it is after (None: you)
@@ -710,6 +715,16 @@ class Game:
         # your axes are (1,0,0), (0,1,0), (0,0,1): in the world, m's columns
         return x, y, z, [m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]]
 
+    def world_point(self, x, y, z):
+        """A point of yours (x, y, z) in the shared world (set_anchor)."""
+        a = self.anchor
+        m = a.m
+        x -= a.x
+        y -= a.y
+        z -= a.z
+        return (x * m[0] + y * m[1] + z * m[2], x * m[3] + y * m[4] + z * m[5],
+                x * m[6] + y * m[7] + z * m[8])
+
     def place(self, o, x, y, z, m):
         """Put o (an Obj) where a pose in the shared world puts it in yours:
         (x, y, z) and axes m (rows, the world's coordinates)."""
@@ -816,6 +831,7 @@ class Game:
             self.practice_upgrades = False  # waves drop upgrade canisters (ace sets it)
         if not hasattr(self, "quiet"):
             self.quiet = False  # no waves or rocks: a duel's empty arena (duel.py; ace sets it)
+            self.net = None     # a duel (duel.py): told of hits on, and missiles at, another player
         self.upgrade_n = 0     # the upgrades fitted so far (UPGRADES)
         self.wave_hold = 0.0   # waiting for the upgrade canister to be collected (UPGRADE_WAIT)
         self.wave_wait = 0.0   # the countdown to the next wave (WAVE_WAIT), while > 0
@@ -1436,6 +1452,7 @@ class Game:
         for o in self.objs:
             if o.kind == "missile" and not o.dead:
                 o.dead = True
+                o.ecmed = True
                 self._boom(o.x, o.y, o.z, 8)
                 n += 1
         if n:
@@ -1458,6 +1475,7 @@ class Game:
         for o in self.objs:
             if o.kind == "missile" and not o.dead:
                 o.dead = True
+                o.ecmed = True
                 self._boom(o.x, o.y, o.z, 8)
         self.ecm_t = 0.5
         self.shield = max(0.0, self.shield - ECM_COST)
@@ -1804,6 +1822,8 @@ class Game:
         m = o.m
         kind = o.kind
         if kind == "player":    # another player's ship: duel.py moves it, from their packets
+            if o.ram_t > 0:
+                o.ram_t -= dt
             return
         if kind == "ship":
             # Steering is the costly part, and makes a lot of work for the
@@ -1987,6 +2007,8 @@ class Game:
                     self._boom(o.x, o.y, o.z, 8)
                     self.sfx("crash")   # a missile exploding: Elite's EXNO3 (TA34)
                     o.dead = True
+                    if o.ghost:         # at another player: their game says what it did
+                        return
                     self._provoke(t)
                     t.energy -= MISSILE_DAMAGE
                     t.hit = 0.2
@@ -2034,8 +2056,10 @@ class Game:
 
     def _collide(self):
         for o in self.objs:
-            if o.dead or o.kind == "missile" or o.kind == "pmissile" or o.kind == "player":
+            if o.dead or o.kind == "missile" or o.kind == "pmissile":
                 continue
+            if o.kind == "player" and o.ram_t > 0:
+                continue        # just rammed: not again every frame
             r = o.bp.radius * 0.7 + 60.0
             if abs(o.z) > r:
                 continue
@@ -2075,6 +2099,9 @@ class Game:
             self.sfx("crash")
             self._hurt(10.0 + self.speed * 0.5)
             self.speed *= 0.4
+            if o.kind == "player":  # another player: each game hurts its own ship (they see
+                o.ram_t = RAM_AGAIN     # the crash too); not again for a moment
+                continue
             o.energy -= 60.0
             if o.energy <= 0:
                 self._kill(o)
@@ -2130,7 +2157,7 @@ class Game:
         best = None
         best_r = cone * cone
         for o in self.objs:
-            if o.kind != "ship" or o.dead or o.z < 100:
+            if (o.kind != "ship" and o.kind != "player") or o.dead or o.z < 100:
                 continue
             r = (o.x * o.x + o.y * o.y) / (o.z * o.z)
             if r < best_r:
@@ -2152,6 +2179,10 @@ class Game:
             o.target = launch
             o.t = 8.0
             self.new.append(o)
+            if launch.kind == "player":     # at another player: theirs flies it at them (duel.py)
+                o.ghost = True
+                if self.net is not None:
+                    self.net.missile_fired(o)
             self.say("MISSILE AWAY", 1.0)
             self.sfx("missile")
 
@@ -2193,9 +2224,8 @@ class Game:
             best = None
             best_z = LASER_RANGE
             for o in (self.objs if self.looking else ()):   # off a space view: no hits
-                if (o.dead or o.kind == "pmissile" or o.z <= 30 or o.z >= best_z or o.upgrade
-                        or o.kind == "player"):
-                    continue    # (a practice upgrade canister can't be shot; another player not yet)
+                if o.dead or o.kind == "pmissile" or o.z <= 30 or o.z >= best_z or o.upgrade:
+                    continue    # (a practice upgrade canister can't be shot)
                 lim = o.z * AIM_ASSIST
                 lim *= lim
                 if lim < o.bp.area:
@@ -2205,6 +2235,12 @@ class Game:
                     best_z = o.z
             if best is None and self.space is not None and self.looking:
                 self._hit_station()
+            if best is not None and best.kind == "player":
+                best.hit = 0.12     # another player: their game takes the damage (duel.py)
+                self.sfx("hit")
+                if self.net is not None:
+                    self.net.laser_hit(self.laser_damage)
+                best = None
             if best is not None and best.role == "constrictor" and self.laser != "military":
                 self._provoke(best)     # its shields shrug off anything but a military laser
                 best = None

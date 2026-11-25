@@ -1766,8 +1766,11 @@ class AceCommander(PLATFORM.App):
                     else:
                         self.zero = None
                         self.d_t = None
-            if hit(BTN_BOMB) and g.energy_bomb() and self.career and self.cmdr is not None:
-                self._extra(self.cmdr, "bomb", False)     # used up
+            if hit(BTN_BOMB):
+                if self.dueling:    # B is the ECM in a duel (Brian, 2026-11-25): the bomb
+                    g.fire_ecm()    # can't touch the other player anyway
+                elif g.energy_bomb() and self.career and self.cmdr is not None:
+                    self._extra(self.cmdr, "bomb", False)     # used up
             roll, jy = self._steer(tilt, STICK, True)
         yaw = 0.0
         an = self.analog
