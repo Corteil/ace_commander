@@ -1817,3 +1817,24 @@ what is now `ace.py` (renamed in build 50).
    firmware's service kept the radio awake for our listener. Frames averaged 90-108 ms (about
    10 a second) on all four, HUD 32-35 ms of it (its text lines), and 5-7 frames in 100 were
    collections of 140-340 ms. Not yet improved.
+   **Build 163** (Brian, 2026-11-25: "do both and remove convoy label", "use integer maths").
+   The convoy has no label either. Multiplayer's HUD line is gauges and rectangle digits, no
+   text (`Duel.hud_rows`, drawn by `cockpit.draw_net_line`; `hud()` keeps the text for the
+   tests): the station modes a yellow energy bar, the time left as m:ss, a cyan shield bar
+   and DOCK_LIMIT marks lit red per pirate docked; the convoy modes its bar and the clock;
+   TEAMS / CAPTURE FLAG the two team scores in their colours; FREE FOR ALL your kills, a bar,
+   the best. (The screen reader no longer reads it.) Whole-number placement: `Game.anchor_ints`
+   (the anchor as ints once a frame: axes x 16384 and x 4096), `Game.place_i` (ints in, only
+   o.m's nine values floats; ~65 floats a call before), `netplay.read_pose_i`; remote ships
+   and the host's pirates are placed only when a pose comes and coast along their nose in
+   `Game._think` between (your own flight already moves every object); the rings and station
+   every MARK_FRAMES (12) frames, the convoy every CONVOY_FRAMES (3); the host packs its
+   pirates' poses in ints and stops copying lists each frame. Measured on the badge (three
+   games on one badge, MicroPython's gc.mem_alloc): multiplayer's own garbage 6.6 KB (host)
+   / 9.3 KB (guest) a frame -> 2.0 KB; `Game.step` (the shared rules, mostly the pirates'
+   AI) is now the largest, 4.9-6.6 KB. A scripted game on all four badges (`bot.py` over the
+   REPL: the real Duel, Game and ESP-NOW link, a bot pilot, every frame drawn; no LEDs, sound
+   or input, the app not running), STATION CO-OP, four players, eight pirates, 60 s, the
+   same script on both builds: build 162 averaged 83-90 ms a frame (draw 63-65, update 20-27),
+   a collection every 20-21 frames; build 163 56-64 ms (draw 39-42, update 16-21), every
+   33-43 frames. Not yet played by hand.
