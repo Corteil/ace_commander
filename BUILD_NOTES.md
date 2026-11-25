@@ -1809,3 +1809,11 @@ what is now `ace.py` (renamed in build 50).
    instead of crashing. Test: `tests/test_net_espnow.py` (pretend radio and service). On four
    badges over the REPL (the service not running there): 4096 bytes, no errors, every counted
    packet read. Not yet in a real game.
+   **Build 162** (Brian, 2026-11-25: "the station does not need to be named"). The station
+   modes' station and the convoy's end station have no label (the convoy keeps CONVOY). The
+   HUD's STATION % is rounded: on the badge (32-bit floats) its own energy, the total less
+   the shield, came out a hair under full unhurt, showing 99% (seen in the four-badge test).
+   That test (four badges, STATION CO-OP, build 161): no crash, no radio restarts; the
+   firmware's service kept the radio awake for our listener. Frames averaged 90-108 ms (about
+   10 a second) on all four, HUD 32-35 ms of it (its text lines), and 5-7 frames in 100 were
+   collections of 140-340 ms. Not yet improved.

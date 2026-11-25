@@ -1667,8 +1667,7 @@ class Duel:
             st = g.types.get("CORIOLIS") or g.types.get("DODO")
             if st is not None:
                 o = game.Obj(st, "mark", 0.0, 0.0, 0.0)
-                o.world = (0.0, 0.0, convoy_z(CONVOY_TIME) + 1500.0)
-                o.label = "STATION"
+                o.world = (0.0, 0.0, convoy_z(CONVOY_TIME) + 1500.0)   # (no name: Brian, build 162)
                 self.marks.append(o)
         if GUARDED[self.mode]:
             c = self.convoy
@@ -1687,7 +1686,7 @@ class Duel:
                 c.role = "trader"
                 c.state = "trade"
                 c.rgb = CONVOY_RGB
-                c.label = "STATION" if STATIONED[self.mode] else "CONVOY"
+                c.label = None if STATIONED[self.mode] else "CONVOY"   # a station isn't named (build 162)
                 c.friend = not (RAIDED[self.mode] and self.team_of(self.slot) == 1)
                 self.convoy = c
             if not c.dead and self.hp > 0:
@@ -1990,8 +1989,10 @@ class Duel:
                 elif c is not None:
                     if STATIONED[m]:
                         self._shield_step(g, c, dt)
+                    # rounded (build 162): the badge's floats are 32-bit, and its own energy
+                    # worked out as total less shield is a hair under full when unhurt (99%)
                     e = self.hull(c)
-                    hp = max(1, int(e * 255 / c.max_energy)) if e > 0 else 0
+                    hp = min(255, max(1, int(e * 255 / c.max_energy + 0.5))) if e > 0 else 0
                     if hp != self.hp:
                         self.hp = hp
                         self.hud_cache = None

@@ -295,7 +295,8 @@ cg = [o for o in kind(M.g[1], "npc") if o.net_id == 0]
 check("coop: the convoy for both (the host's own; the guest's a copy)", len(ch) == 1 and len(cg) == 1
       and ch[0].bp.name == "CONVOY" and ch[0].friend and cg[0].friend)
 check("coop: both agree where it is", math.dist(world_of(M.g[0], ch[0]), world_of(M.g[1], cg[0])) < 5)
-check("coop: the station at the end", any(o.label == "STATION" for o in kind(M.g[0], "mark")))
+check("coop: the station at the end, not named", any(o.bp.name in ("CORIOLIS", "DODO") and not o.label
+                                                     for o in kind(M.g[0], "mark")))
 check("coop: everyone starts by the convoy", all(math.dist(wpos(g_), world_of(M.g[0], ch[0])) < 2500 for g_ in M.g))
 check("coop: the other player is a friend", kind(M.g[0], "player")[0].friend)
 check("coop: the convoy can't be hit by its defenders", M.g[0]._pick(5.0) is not ch[0])
@@ -605,7 +606,7 @@ M.fly(5)
 sh = kind(M.g[0], "convoy")
 sg = [o for o in kind(M.g[1], "npc") if o.net_id == 0]
 check("station: the host's station and the guest's copy, the Drum by default",
-      len(sh) == 1 and len(sg) == 1 and sh[0].bp.name == "CORIOLIS" and sh[0].label == "STATION"
+      len(sh) == 1 and len(sg) == 1 and sh[0].bp.name == "CORIOLIS" and not sh[0].label
       and sh[0].max_energy == duel.STATION_ENERGY)
 check("station: at the middle of the world for both", math.dist(world_of(M.g[0], sh[0]), (0, 0, 0)) < 5
       and math.dist(world_of(M.g[1], sg[0]), (0, 0, 0)) < 5)
@@ -696,6 +697,16 @@ st.energy = 0
 st.dead = True
 M.fly(3)
 check("station: destroyed: STATION LOST", M.d[0].result == 2)
+# unhurt, but its own energy a hair under full (a 32-bit float's error on the badge): 100%
+M = Match(duel.SCOOP, 2, seed=25)
+M.fly(1)
+st = kind(M.g[0], "convoy")[0]
+st.energy -= 0.0002
+M.d[0].shield += 0.0002     # (the hit taken by the shield: its own energy as before)
+M.d[0].last_energy = st.energy
+M.fly(1)
+check("station: unhurt but a hair under full is still 100%", M.d[0].hp == 255
+      and M.d[1].hud()[0][0].startswith("STATION 100%"), str(M.d[1].hud()))
 # growing waves
 M = Match(duel.SCOOP, 1, seed=23)
 M.d[0].mtime = 125.0
