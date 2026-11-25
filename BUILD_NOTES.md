@@ -1729,3 +1729,14 @@ what is now `ace.py` (renamed in build 50).
    now have a second line), the view label below that. Tests in test_multiplayer (options to
    the guest, the station for both, dockers closing in and docking, the limit, time up,
    destroyed, growing waves, the raid, Elite's four with a stand-in ship_data). PC only.
+   **Build 154** (Brian, 2026-11-25: "the shield must be destroyed before a pirate ship can
+   dock"). The station modes' station has a shield (`STATION_SHIELD` 1000; in a raid scaled as
+   its energy is). The host's `Duel._shield_step` sees each frame's hits as the station's lost
+   energy (whoever made them: the host's pirates, lasers, missiles, the guests' NPC_HIT) and
+   gives back what the shield takes. Pirates that mean to dock (`Obj.net_docker`, every other
+   one) attack the station (`net_prey` "c") while the shield is up, and only with it down turn
+   to dock (state "trade", "dock"); `dock_target` gives no station while the shield is up, so
+   even one at the slot can't dock. Unhit for `SHIELD_WAIT` 5 s it recharges `SHIELD_RECHARGE`
+   20 a second; back up, the dockers still outside go back to attacking. STATE 24 bytes (the
+   shield, 0-255); STATION SHIELDS DOWN / UP said to everyone; HUD's second line SHIELD n%
+   DOCKED n/3 (red with the shield down). Tests in test_multiplayer. PC only.

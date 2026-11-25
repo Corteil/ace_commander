@@ -206,6 +206,11 @@ to be a new large design".
   destroyed: lost. The options byte carries skill, time, waves and station; STATE the
   docked count. HUD: STATION energy and time, DOCKED n/3 below.
 
+- **Build 154: the station's shield.** Hits take the shield first (1000, as much more as
+  the energy in a raid); the would-be dockers batter it while it is up and fly in only once
+  it is down; unhit for 5 s it recharges 20 a second, and those still outside turn back.
+  STATE carries it; HUD: SHIELD n%  DOCKED n/3.
+
 Not yet on badges: the frame time with three other ships, eight pirates and the convoy (92
 lines in 6 parts close up) needs measuring; and how busy the radio is with four (each sends
 15 poses a second; the host also 10 NPCS and 4 STATE).

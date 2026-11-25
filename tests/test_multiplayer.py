@@ -605,29 +605,68 @@ check("station: the host's station and the guest's copy, the Drum by default",
 check("station: at the middle of the world for both", math.dist(world_of(M.g[0], sh[0]), (0, 0, 0)) < 5
       and math.dist(world_of(M.g[1], sg[0]), (0, 0, 0)) < 5)
 check("station: the HUD", M.d[1].hud()[0][0] in ("STATION 100%  3:00", "STATION 100%  2:59")
-      and M.d[1].hud()[1][0] == "DOCKED 0/3", str(M.d[1].hud()))
+      and M.d[1].hud()[1][0] == "SHIELD 100%  DOCKED 0/3", str(M.d[1].hud()))
 check("station: no convoy, no end-station marker", not [o for o in kind(M.g[0], "mark")])
 M.fly(int((duel.WAVE_FIRST + 1) / DT))
 pir = kind(M.g[0], "ship")
-dockers = [o for o in pir if o.net_prey == "dock"]
-check("station: a wave from all round, half making to dock", len(pir) >= 2 and len(dockers) == (len(pir) + 1) // 2
-      and all(o.state == "trade" for o in dockers), "%d %d" % (len(pir), len(dockers)))
-z0 = [math.dist(world_of(M.g[0], o), (0, 0, 0)) for o in dockers]
-M.fly(int(4 / DT))
-z1 = [math.dist(world_of(M.g[0], o), (0, 0, 0)) for o in dockers if not o.dead]
-check("station: the dockers close in", sum(z1) / len(z1) < sum(z0) / len(z0) - 300, "%s -> %s" % (z0, z1))
-# put one at the slot: it docks
-o = dockers[0]
+dockers = [o for o in pir if o.net_docker]
+check("station: a wave from all round, half meaning to dock", len(pir) >= 2 and len(dockers) == (len(pir) + 1) // 2,
+      "%d %d" % (len(pir), len(dockers)))
+check("station: shield up: the dockers attack it first", all(o.state != "trade" and o.net_prey == "c"
+                                                             for o in dockers))
 s_ = sh[0]
+e0 = s_.energy
+o = dockers[0]
+o.x, o.y, o.z = s_.x, s_.y, s_.z + 60.0     # right at the slot: shield up, no docking
+o.state = "trade"
+o.net_prey = "dock"
+M.fly(2)
+check("station: with the shield up a pirate at the slot can't dock", not o.dead and M.d[0].docked == 0
+      and o.state == "attack")
+# hits take the shield first, not the station's energy
+s_.energy -= 300.0
+M.fly(int(0.4 / DT))
+check("station: hits take the shield first", s_.energy == e0 and M.d[0].shield == duel.STATION_SHIELD - 300.0
+      and M.d[1].shield_b < 255, "%.0f %.0f %d" % (s_.energy, M.d[0].shield, M.d[1].shield_b))
+s_.energy -= 800.0              # more than the shield has left: the rest hurts it
+M.fly(3)
+check("station: shield down, the rest hurts the station", M.d[0].shield == 0 and s_.energy == e0 - 100.0
+      and M.d[1].shield_b == 0, "%.0f %.0f" % (M.d[0].shield, s_.energy))
+check("station: SHIELDS DOWN told to both", M.g[0].msg == "STATION SHIELDS DOWN" and M.g[1].msg == "STATION SHIELDS DOWN",
+      "%s / %s" % (M.g[0].msg, M.g[1].msg))
+check("station: shield down: the dockers fly in to dock", all(o.state == "trade" and o.net_prey == "dock"
+                                                              for o in dockers if not o.dead and o.net_prey != 1))
+M.d[0]._spawn_pirates(M.g[0])     # a fresh wave, far out
+M.fly(2)
+fresh = [o for o in kind(M.g[0], "ship") if o.net_docker and o not in dockers]
+check("station: a new wave's dockers come straight in to dock", fresh and all(o.state == "trade" for o in fresh))
+z0 = [math.dist(world_of(M.g[0], o), (0, 0, 0)) for o in fresh]
+M.fly(int(3 / DT))
+z1 = [math.dist(world_of(M.g[0], o), (0, 0, 0)) for o in fresh if not o.dead]
+check("station: the dockers close in", z1 and sum(z1) / len(z1) < sum(z0) / len(z0) - 200, "%s -> %s" % (z0, z1))
+# put one at the slot: it docks
+o = fresh[0]
+n0 = M.d[0].docked
 seen = [x for x in kind(M.g[1], "npc") if x.net_id == o.net_id]
 o.x, o.y, o.z = s_.x, s_.y, s_.z + 60.0
 booms = len(M.g[1].booms)
 M.fly(int(0.5 / DT))
-check("station: a pirate docked: gone, counted for both, told", o.dead and o.docked and M.d[0].docked == 1
-      and M.d[1].docked == 1 and M.g[1].msg == "PIRATE DOCKED 1/3", "%d %d %s" % (M.d[0].docked, M.d[1].docked, M.g[1].msg))
+check("station: a pirate docked: gone, counted for both, told", o.dead and o.docked and M.d[0].docked == n0 + 1
+      and M.d[1].docked == n0 + 1 and M.g[1].msg == "PIRATE DOCKED %d/3" % (n0 + 1),
+      "%d %d %d %s" % (n0, M.d[0].docked, M.d[1].docked, M.g[1].msg))
 check("station: the guest's copy went without an explosion", seen and seen[0].dead
       and len(M.g[1].booms) <= booms)
 check("station: no score for a docking", sum(M.d[0].scores) == 0)
+# left alone, the shield comes back, and the dockers go back to attacking
+for x in kind(M.g[0], "ship"):
+    x.dead = True
+M.fly(int((duel.SHIELD_WAIT + 2) / DT))
+check("station: unhit, the shield recharges: SHIELDS UP", M.d[0].shield > 0 and M.d[1].shield_b > 0
+      and "STATION SHIELDS UP" in (M.g[1].msg, M.g[0].msg), "%.0f %s" % (M.d[0].shield, M.g[1].msg))
+M.d[0].shield = 0.0
+M.d[0].shield_quiet = -99.0
+M.d[0]._spawn_pirates(M.g[0])
+M.fly(2)
 M.d[0].docked = duel.DOCK_LIMIT
 d2 = [x for x in kind(M.g[0], "ship") if x.net_prey == "dock"] or [x for x in kind(M.g[0], "ship")]
 x = d2[0]
@@ -669,7 +708,8 @@ check("station raid: the raider starts out from the station", math.dist(wpos(M.g
 e0 = kind(M.g[0], "convoy")[0].energy
 M.d[1].npc_laser(sg, 100.0)
 M.fly(1)
-check("station raid: the hit counts", kind(M.g[0], "convoy")[0].energy == e0 - 100.0)
+check("station raid: the hit counts (on the shield first)", kind(M.g[0], "convoy")[0].energy == e0
+      and M.d[0].shield == M.d[0].shield_max - 100.0)
 # Elite's stations, when its ship data is here
 import types
 fake = types.ModuleType("ace_commander.ship_data")

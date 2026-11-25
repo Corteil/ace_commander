@@ -502,6 +502,7 @@ class Obj:
         self.net_killer = 0
         self.shot = 0.0     # > 0 just after this ship fired at something not you
         self.docked = False     # it reached the station it was flying to (and is gone)
+        self.net_docker = False     # a pirate that means to dock (duel.py's station modes)
         self.role = "pirate"    # ships: "pirate", "trader", "police" or "hunter"
         self.dest = "station"   # a trader's: where it is making for, "station" or "planet"
         self.prey = None        # a pirate's: the trader it is after (None: you)

@@ -74,7 +74,7 @@ CLAIM_PKT = 11              # through a ring (Capture Flag): TAKE or CAPTURE, th
 CLAIM_FMT = "<2sBBBH"
 TAKE, CAPTURE = 1, 2
 STATE_PKT = 12              # the host's: match, result, time x10, scores, team scores, flags, convoy
-STATE_FMT = "<2sBBBHhhhhhhBBBB"
+STATE_FMT = "<2sBBBHhhhhhhBBBBB"
 NPCS_PKT = 13               # the host's ships: count, then NPC_FMT each
 NPCS_HEAD = "<2sBB"
 NPC_FMT = "<BBBBhhhhhhhhh"  # id, type (game.PIRATES), flags, speed, x y z / 8, nose, roof x 16384
@@ -166,6 +166,13 @@ CONVOY_ENERGY = 1500.0
 STATION_ENERGY = 2500.0
 STATION_TIMES = (120.0, 180.0, 300.0)   # how long to hold it: the host picks (2, 3 or 5 min)
 DOCK_LIMIT = 3              # more than this many pirates docked: the station is lost
+# the station's shield (Brian, 2026-11-25: "the shield must be destroyed before a pirate
+# ship can dock"): hits take it first; while it is up the would-be dockers attack the
+# station, and only with it down do they fly in to dock. Unhit for SHIELD_WAIT seconds it
+# recharges SHIELD_RECHARGE a second, and those still outside go back to attacking.
+STATION_SHIELD = 1000.0
+SHIELD_WAIT = 5.0
+SHIELD_RECHARGE = 20.0
 GROW_EVERY = 60.0           # growing waves: one more pirate a wave each this many seconds
 DOCKED = 4                  # NPCS flags: this ship docked (gone, no explosion)
 # the stations to defend: (role, whose): the game's own Drum and Halo, and Elite's Coriolis
@@ -409,6 +416,10 @@ class Duel:
         self.carrier = [NOBODY, NOBODY]     # who has each team's flag
         self.hp = 255           # the convoy's (or station's) energy, 0-255
         self.docked = 0         # the station modes: pirates that have docked
+        self.shield_b = 255     # and the station's shield, 0-255 (STATE)
+        self.shield = self.shield_max = STATION_SHIELD  # the host's, in energy
+        self.shield_quiet = 0.0     # host: seconds since the station was last hit
+        self.last_energy = None     # host: its energy last frame (to see hits)
         self.respawn_t = 0.0
         self.last_by = NOBODY   # who last hurt us, and how long ago
         self.last_by_t = 99.0
@@ -569,11 +580,62 @@ class Duel:
         return STATION_TIMES[self.time_i] if STATIONED[self.mode] else CONVOY_TIME
 
     def dock_target(self, o):
-        """Game: the station a docking pirate (o.net_prey "dock") is making for, or None."""
+        """Game: the station a docking pirate (o.net_prey "dock") is making for, or None:
+        none while its shield is up."""
         c = self.convoy
-        if o.net_prey == "dock" and STATIONED[self.mode] and c is not None and not c.dead:
+        if (o.net_prey == "dock" and STATIONED[self.mode] and c is not None and not c.dead
+                and self.shield_b == 0):
             return c
         return None
+
+    @staticmethod
+    def _shield_say(was, now):
+        if now == 0 and was > 0:
+            return "STATION SHIELDS DOWN"
+        if now > 0 and was == 0:
+            return "STATION SHIELDS UP"
+        return None
+
+    def _shield_step(self, g, c, dt):
+        """Host: the station's shield takes its hits first (the game takes them from its
+        energy; given back here), recharges when it has been left alone, and sends the
+        would-be dockers in only while it is down."""
+        if self.last_energy is None:
+            self.last_energy = c.energy
+        lost = self.last_energy - c.energy
+        if lost > 0:
+            self.shield_quiet = 0.0
+            if self.shield > 0:
+                take = lost if lost < self.shield else self.shield
+                self.shield -= take
+                c.energy += take
+        else:
+            self.shield_quiet += dt
+            if self.shield_quiet >= SHIELD_WAIT and self.shield < self.shield_max:
+                self.shield += SHIELD_RECHARGE * dt
+                if self.shield > self.shield_max:
+                    self.shield = self.shield_max
+        self.last_energy = c.energy
+        sb = 0 if self.shield <= 0 else max(1, int(self.shield * 255 / self.shield_max))
+        if sb != self.shield_b:
+            say = self._shield_say(self.shield_b, sb)
+            if say:
+                g.say(say, 2.5)
+                self.state_t = 0.0      # tell everyone at once
+            self.shield_b = sb
+            self.hud_cache = None
+        down = sb == 0
+        for o in self.npcs.values():
+            if not o.net_docker or o.dead:
+                continue
+            if down and (o.state == "attack" or o.state == "break") and o.net_prey == "c":
+                o.state = "trade"       # in to dock
+                o.net_prey = "dock"
+                o.prey = None
+            elif not down and o.state == "trade":
+                o.state = "attack"      # shields up again: back to battering it
+                o.net_prey = "c"
+                o.prey = None
 
     def pirates_setting(self):
         """The PIRATES line: -1 off, else their level (0-2)."""
@@ -840,7 +902,7 @@ class Duel:
             self._killed(p.slot, by)
         elif kind == STATE_PKT and p.slot == 0 and len(msg) >= struct.calcsize(STATE_FMT):
             v = struct.unpack_from(STATE_FMT, msg, 0)
-            self._set_state(v[2], v[3], v[4] / 10.0, v[5:9], v[9:11], v[11:13], v[13], v[14])
+            self._set_state(v[2], v[3], v[4] / 10.0, v[5:9], v[9:11], v[11:13], v[13], v[14], v[15])
         elif kind == NPCS_PKT and p.slot == 0:
             self._hear_npcs(msg)
         elif self.slot == 0 and kind == NPC_HIT_PKT and len(msg) >= struct.calcsize(NPC_HIT_FMT):
@@ -1133,10 +1195,10 @@ class Duel:
             g.place(o, x, y, z, _pose(0, 0, 0, -dx, -dy, -dz)[3])
             o.role = "pirate"
             o.state = "attack"
-            if station and i % 2 == 0:  # makes to dock (Game._think's trade, Duel.dock_target)
-                o.state = "trade"
+            if station and i % 2 == 0:  # means to dock: attacks the station till its shield
+                o.net_docker = True     # is down, then docks (_shield_step, Duel.dock_target)
                 o.dest = "station"
-                o.net_prey = "dock"
+                o.net_prey = "c"
             o.speed = bp.speed * 0.5
             o.leveled = True            # as the game does for its own (Game.step)
             o.energy *= g.energy_k
@@ -1255,7 +1317,7 @@ class Duel:
         self._set_state(self.match, self._winner(scores, team), self.mtime, scores, team,
                         carrier, self.hp)
 
-    def _set_state(self, match, result, t, scores, team, carrier, hp, docked=None):
+    def _set_state(self, match, result, t, scores, team, carrier, hp, docked=None, shield=None):
         """The host's word (made here if we host, or heard in STATE): say what changed."""
         g = self.g
         if self.slot != 0:
@@ -1294,6 +1356,10 @@ class Duel:
                         g.objs.remove(c)
                         g._boom(c.x, c.y, c.z, 20)
                         g.sfx("explode")
+        if shield is not None and shield != self.shield_b:
+            if not new_match:
+                say = self._shield_say(self.shield_b, shield) or say
+            self.shield_b = shield
         if docked is not None and docked != self.docked:
             if docked > self.docked and not new_match:
                 say = "PIRATE DOCKED %d/%d" % (docked, DOCK_LIMIT)
@@ -1318,7 +1384,7 @@ class Duel:
                          self.match & 0xFF, self.result, min(65535, int(self.mtime * 10)),
                          self.scores[0], self.scores[1], self.scores[2], self.scores[3],
                          self.team[0], self.team[1], self.carrier[0], self.carrier[1], self.hp,
-                         min(255, self.docked))
+                         min(255, self.docked), self.shield_b)
         self.link.send(self.state_buf)
 
     def _new_match(self, g):
@@ -1458,6 +1524,9 @@ class Duel:
                 if self.slot == 0:
                     c = game.Obj(bp, "convoy", 0.0, 0.0, 0.0)
                     c.energy = c.max_energy = self.convoy_energy()
+                    if STATIONED[self.mode]:    # its shield, as much tougher in a raid
+                        self.shield = self.shield_max = STATION_SHIELD * c.max_energy / STATION_ENERGY
+                        self.last_energy = c.energy
                 else:
                     c = game.Obj(bp, "npc", 0.0, 0.0, 0.0)
                     c.net_id = 0
@@ -1597,8 +1666,8 @@ class Duel:
         elif STATIONED[m]:
             left = max(0, int(self.guard_time() - self.mtime))
             c = (("STATION %d%%  %d:%02d" % (self.hp * 100 // 255, left // 60, left % 60), 0, CONVOY_RGB),
-                 ("DOCKED %d/%d" % (self.docked, DOCK_LIMIT), 0,
-                  ck.RED if self.docked >= DOCK_LIMIT else ck.WHITE, 13))
+                 ("SHIELD %d%%  DOCKED %d/%d" % (self.shield_b * 100 // 255, self.docked, DOCK_LIMIT), 0,
+                  ck.RED if self.docked >= DOCK_LIMIT or self.shield_b == 0 else ck.WHITE, 13))
         else:
             left = max(0, int(CONVOY_TIME - self.mtime))
             c = (("CONVOY %d%%  %d:%02d" % (self.hp * 100 // 255, left // 60, left % 60), 0,
@@ -1744,6 +1813,8 @@ class Duel:
                     self._set_state(self.match, 1, self.mtime, self.scores, self.team,
                                     self.carrier, self.hp)
                 elif c is not None:
+                    if STATIONED[m]:
+                        self._shield_step(g, c, dt)
                     hp = max(1, int(c.energy * 255 / c.max_energy)) if c.energy > 0 else 0
                     if hp != self.hp:
                         self.hp = hp
