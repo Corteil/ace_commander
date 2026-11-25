@@ -782,7 +782,7 @@ class AceCommander(PLATFORM.App):
         elif item == "SHIP VIEWER":
             self.zero = None
             if self.viewer is None:
-                self.viewer = viewer.Viewer(SHIPS)
+                self.viewer = viewer.Viewer(viewer.with_convoy(SHIPS))     # and the convoy's
             self.mode = "viewer"
 
     def _update_practice(self, cancel, confirm):

@@ -1641,7 +1641,7 @@ what is now `ace.py` (renamed in build 50).
    `Obj.friend`, not locked or hit), CAPTURE FLAG (rings `RING_Z` 5000 either side of the
    middle, `RING_PASS` 460 to count as through; a ring goes grey while its flag is away;
    `CTF_WIN` 3; a carrier destroyed: the flag goes home; the compass points at the ring to
-   fly to), CONVOY CO-OP (1-4 players guard the new HAULER, `convoy_ship.py` from
+   fly to), CONVOY CO-OP (1-4 players guard the new BULK FREIGHTER, `convoy_ship.py` from
    `tools/make_convoy_ship.py`, on a straight run of `CONVOY_TIME` 150 s to a station; pirate
    waves every `WAVE_EVERY` 25 s) and CONVOY RAID (red defends, blue raids; the pirates are
    blue's friends). Except a duel, destroyed ships come back after `RESPAWN` 5 s at their
@@ -1661,3 +1661,9 @@ what is now `ace.py` (renamed in build 50).
    `tests/test_multiplayer.py` (new, in run_all; four Games on a pretend radio), test_duel and
    test_duel_combat updated. **PC only: not yet on badges** (and nothing yet known of the
    frame time with four ships, the convoy close up (92 lines, 6 parts) or 8 pirates).
+   **Build 149** (Brian, 2026-11-25: "Not sure about the ship design, have to see it in the
+   game ... yes add it to the ship viewer"). The convoy's ship is last in the Ship Viewer
+   (`viewer.with_convoy`), and is called BULK FREIGHTER (the game's own ships already have a
+   HAULER). The viewer now draws a ship made of convex parts as the game does: back to front,
+   a nearer part blacking out what is behind it (`viewer._fill_hull`; the Halo and the freighter
+   gain hidden lines there). `test_app`'s viewer check counts 32. Not yet seen on the badge.

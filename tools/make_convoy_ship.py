@@ -30,7 +30,7 @@ def _box(s, x0, x1, y0, y1, z0, z1):
 
 
 def hauler():
-    s = Ship("CONVOY", "HAULER")
+    s = Ship("CONVOY", "BULK FREIGHTER")
     # the bow: a blunt wedge, the bridge a ridge on its back
     s.part(HIDES_ALWAYS)
     s.hull(_mirror([(36, -28, 430), (36, 18, 420), (120, -56, 290), (120, 56, 290),

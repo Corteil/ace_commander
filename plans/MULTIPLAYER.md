@@ -172,7 +172,7 @@ to be a new large design".
   RED, odd BLUE. Each mode has its least and most players (`MODE_MIN`, `MODE_MAX`).
 - **Modes:** DUEL (unchanged), FREE FOR ALL (10 kills), TEAMS (10 team kills, no friendly
   fire), CAPTURE FLAG (rings 10000 apart; through the other's ring takes its flag, the ring
-  goes grey; back through your own scores; 3 wins), CONVOY CO-OP and CONVOY RAID (the HAULER,
+  goes grey; back through your own scores; 3 wins), CONVOY CO-OP and CONVOY RAID (the BULK FREIGHTER,
   `convoy_ship.py`, flies 12000 units in 150 s to a station; pirates every 25 s; it arriving
   is red's / everyone's win, it destroyed the raiders' / pirates'). Not a duel: back after 5 s
   at your start; a result for 10 s, then the next match (scores, flags and convoy afresh).

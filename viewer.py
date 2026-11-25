@@ -21,6 +21,41 @@ def _rotation(yaw, pitch, roll):
     )
 
 
+def _fill_hull(ctx, pts):
+    """Fill black the outline round pts (the smallest convex shape holding them)."""
+    pts = sorted(pts)
+    hull = []
+    for half in (pts, pts[::-1]):       # Andrew's monotone chain, as cockpit._fill_hull
+        start = len(hull)
+        for p in half:
+            while len(hull) >= start + 2:
+                ax, ay = hull[-2]
+                bx, by = hull[-1]
+                if (bx - ax) * (p[1] - ay) - (by - ay) * (p[0] - ax) > 0:
+                    break
+                hull.pop()
+            hull.append(p)
+        hull.pop()
+    if len(hull) < 3:
+        return
+    ctx.rgb(0, 0, 0)
+    ctx.begin_path()
+    ctx.move_to(*hull[-1])
+    for p in hull:
+        ctx.line_to(*p)
+    ctx.fill()
+
+
+def with_convoy(ships):
+    """The ships to show: the game's, then the convoy's hauler (multiplayer, duel.py),
+    which is the game's own design whichever content is used."""
+    try:
+        from . import convoy_ship
+    except ImportError:
+        return ships
+    return tuple(ships) + (convoy_ship.SHIP,)
+
+
 class Viewer:
     def __init__(self, ships):
         self.ships = ships   # entries from ship_data.SHIPS
@@ -40,6 +75,9 @@ class Viewer:
         self.verts = [(x * s, y * s, z * s) for x, y, z in verts]
         self.edges = edges
         self.normals = normals
+        # convex parts, for a shape that isn't convex (the ring station, the convoy's
+        # hauler): drawn back to front, each nearer one blacking out what is behind
+        self.parts = e[6] if len(e) > 6 else None
 
     def switch(self, step):
         self.idx = (self.idx + step) % len(self.ships)
@@ -71,14 +109,31 @@ class Viewer:
             )
 
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        ctx.rgb(1, 1, 1)
         ctx.line_width = 1.5
-        ctx.begin_path()
-        for a, b, f1, f2 in self.edges:
-            if visible[f1] or visible[f2]:
-                ctx.move_to(screen[a][0], screen[a][1])
-                ctx.line_to(screen[b][0], screen[b][1])
-        ctx.stroke()
+        if self.parts:
+            depth = [m20 * x + m21 * y + m22 * z for x, y, z in self.verts]
+            order = sorted(self.parts, key=lambda p: -sum(depth[v] for v in p[0]) / len(p[0]))
+            side_on = -0.5 < m22 < 0.5      # the nose across the view more than along it
+            for vs, es, hides in order:
+                d = sum(depth[v] for v in vs) / len(vs)
+                if d < 0 and (hides == 1 or (hides == 2 and side_on)):
+                    _fill_hull(ctx, [screen[v] for v in vs])
+                ctx.rgb(1, 1, 1)
+                ctx.begin_path()
+                for i in es:
+                    a, b, f1, f2 = self.edges[i]
+                    if visible[f1] or visible[f2]:
+                        ctx.move_to(screen[a][0], screen[a][1])
+                        ctx.line_to(screen[b][0], screen[b][1])
+                ctx.stroke()
+        else:
+            ctx.rgb(1, 1, 1)
+            ctx.begin_path()
+            for a, b, f1, f2 in self.edges:
+                if visible[f1] or visible[f2]:
+                    ctx.move_to(screen[a][0], screen[a][1])
+                    ctx.line_to(screen[b][0], screen[b][1])
+            ctx.stroke()
 
         ctx.font_size = 13
         ctx.text_align = ctx.CENTER
