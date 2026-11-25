@@ -208,7 +208,7 @@ M.d[1].last_by, M.d[1].last_by_t = 2, 0.0      # CAT got BEN
 M.g[1]._hurt(1000.0)
 M.fly(3)
 check("teams: a kill scores for the team", all(d_.team == [1, 0] for d_ in M.d), str(M.d[3].team))
-check("teams: the HUD line, both teams", [t for t, x, c in M.d[3].hud()] == ["RED 1", "BLUE 0"],
+check("teams: the HUD line, both teams", [h[0] for h in M.d[3].hud()] == ["RED 1", "BLUE 0"],
       str(M.d[3].hud()))
 M.d[3].last_by, M.d[3].last_by_t = 1, 0.0      # BEN got DAN, his own team: nothing
 M.g[3]._hurt(1000.0)
@@ -570,6 +570,118 @@ for _ in range(4):
     r.step_pirates(1)
     seq.append(r.pirates_setting())
 check("skill: a raid goes NORMAL > HARD > OFF > EASY > NORMAL", seq == [2, -1, 0, 1], str(seq))
+
+# ---- station defence (build 153) ------------------------------------------------------------
+check("station: the game's own two to pick from (no Elite data here)", duel.available_stations() == [0, 1]
+      and duel.station_name(0) == "DRUM STATION" and duel.station_name(1) == "HALO STATION")
+air = Air()
+ds = [duel.Duel(Link(air, bytes([2, 0, 0, 0, 10, i + 1])), NAMES[i], 1) for i in range(2)]
+ds[0].host(duel.SCOOP)
+ds[0].step_station(1)
+ds[0].step_time(1)              # 3 min -> 5 min
+ds[0].set_growing(False)
+check("station: host picks the Halo, 5 minutes, steady waves", ds[0].station_i == 1 and ds[0].guard_time() == 300.0
+      and not ds[0].growing)
+ds[0].step_station(1)
+check("station: and round again to the Drum", ds[0].station_i == 0)
+ds[0].step_station(1)
+for _ in range(8):
+    for d_ in ds:
+        d_.lobby_step(DT)
+ds[1].join(ds[1].hosts()[0])
+for _ in range(8):
+    for d_ in ds:
+        d_.lobby_step(DT)
+o = ds[1].host_p.opts
+check("station: the guest's page has them", (o >> 6) & 3 == 1 and (o >> 3) & 3 == 2 and not o & duel.OPT_GROW)
+
+M = Match(duel.SCOOP, 2, seed=20)
+M.fly(5)
+sh = kind(M.g[0], "convoy")
+sg = [o for o in kind(M.g[1], "npc") if o.net_id == 0]
+check("station: the host's station and the guest's copy, the Drum by default",
+      len(sh) == 1 and len(sg) == 1 and sh[0].bp.name == "CORIOLIS" and sh[0].label == "STATION"
+      and sh[0].max_energy == duel.STATION_ENERGY)
+check("station: at the middle of the world for both", math.dist(world_of(M.g[0], sh[0]), (0, 0, 0)) < 5
+      and math.dist(world_of(M.g[1], sg[0]), (0, 0, 0)) < 5)
+check("station: the HUD", M.d[1].hud()[0][0] in ("STATION 100%  3:00", "STATION 100%  2:59")
+      and M.d[1].hud()[1][0] == "DOCKED 0/3", str(M.d[1].hud()))
+check("station: no convoy, no end-station marker", not [o for o in kind(M.g[0], "mark")])
+M.fly(int((duel.WAVE_FIRST + 1) / DT))
+pir = kind(M.g[0], "ship")
+dockers = [o for o in pir if o.net_prey == "dock"]
+check("station: a wave from all round, half making to dock", len(pir) >= 2 and len(dockers) == (len(pir) + 1) // 2
+      and all(o.state == "trade" for o in dockers), "%d %d" % (len(pir), len(dockers)))
+z0 = [math.dist(world_of(M.g[0], o), (0, 0, 0)) for o in dockers]
+M.fly(int(4 / DT))
+z1 = [math.dist(world_of(M.g[0], o), (0, 0, 0)) for o in dockers if not o.dead]
+check("station: the dockers close in", sum(z1) / len(z1) < sum(z0) / len(z0) - 300, "%s -> %s" % (z0, z1))
+# put one at the slot: it docks
+o = dockers[0]
+s_ = sh[0]
+seen = [x for x in kind(M.g[1], "npc") if x.net_id == o.net_id]
+o.x, o.y, o.z = s_.x, s_.y, s_.z + 60.0
+booms = len(M.g[1].booms)
+M.fly(int(0.5 / DT))
+check("station: a pirate docked: gone, counted for both, told", o.dead and o.docked and M.d[0].docked == 1
+      and M.d[1].docked == 1 and M.g[1].msg == "PIRATE DOCKED 1/3", "%d %d %s" % (M.d[0].docked, M.d[1].docked, M.g[1].msg))
+check("station: the guest's copy went without an explosion", seen and seen[0].dead
+      and len(M.g[1].booms) <= booms)
+check("station: no score for a docking", sum(M.d[0].scores) == 0)
+M.d[0].docked = duel.DOCK_LIMIT
+d2 = [x for x in kind(M.g[0], "ship") if x.net_prey == "dock"] or [x for x in kind(M.g[0], "ship")]
+x = d2[0]
+x.state, x.dest, x.net_prey, x.prey = "trade", "station", "dock", None
+x.x, x.y, x.z = s_.x, s_.y, s_.z + 60.0
+M.fly(int(0.5 / DT))
+check("station: more than 3 docked: STATION LOST", M.d[0].result == 2 and M.d[1].result == 2
+      and [l[0] for l in M.d[1].over_lines()][:3] == ["STATION LOST", "YOU LOSE", "PIRATES DOCKED 4"],
+      str(M.d[1].over_lines()))
+M = Match(duel.SCOOP, 1, seed=21)
+M.d[0].mtime = M.d[0].guard_time() - 0.1
+M.fly(5)
+check("station: held to the end: STATION HELD", M.d[0].result == 1
+      and [l[0] for l in M.d[0].over_lines()][:2] == ["STATION HELD", "YOU WIN"])
+M = Match(duel.SCOOP, 1, seed=22)
+st = kind(M.g[0], "convoy")[0]
+st.energy = 0
+st.dead = True
+M.fly(3)
+check("station: destroyed: STATION LOST", M.d[0].result == 2)
+# growing waves
+M = Match(duel.SCOOP, 1, seed=23)
+M.d[0].mtime = 125.0
+M.d[0]._spawn_pirates(M.g[0])
+grown = len(kind(M.g[0], "ship"))
+M = Match(duel.SCOOP, 1, seed=23)
+M.d[0].growing = False
+M.d[0].mtime = 125.0
+M.d[0]._spawn_pirates(M.g[0])
+check("station: growing waves are bigger after 2 minutes (3 against 1)", grown == 3
+      and len(kind(M.g[0], "ship")) == 1, "%d %d" % (grown, len(kind(M.g[0], "ship"))))
+# the raid
+M = Match(duel.SRAID, 2, seed=24)
+M.fly(5)
+sg = [o for o in kind(M.g[1], "npc") if o.net_id == 0][0]
+check("station raid: the raider can shoot the station; DEFEND / RAID",
+      not sg.friend and kind(M.g[0], "convoy")[0].friend and duel.team_label(duel.SRAID, 1) == "RAID")
+check("station raid: the raider starts out from the station", math.dist(wpos(M.g[1]), (0, 0, 0)) > 5000)
+e0 = kind(M.g[0], "convoy")[0].energy
+M.d[1].npc_laser(sg, 100.0)
+M.fly(1)
+check("station raid: the hit counts", kind(M.g[0], "convoy")[0].energy == e0 - 100.0)
+# Elite's stations, when its ship data is here
+import types
+fake = types.ModuleType("ace_commander.ship_data")
+fake.SHIPS = (("CORIOLIS",) + tuple(e[1:5] for e in ace_commander.original_ships.SHIPS if e[0] == "CORIOLIS")[0],
+              ("DODO",) + tuple(e[1:5] for e in ace_commander.original_ships.SHIPS if e[0] == "DODO")[0])
+sys.modules["ace_commander.ship_data"] = fake
+check("station: with Elite's data, all four", duel.available_stations() == [0, 1, 2, 3]
+      and duel.station_name(2) == "CORIOLIS" and duel.station_name(3) == "DODO")
+del sys.modules["ace_commander.ship_data"]
+duel._STATION_BPS.clear()
+check("station: a guest without it sees the game's own instead", duel.station_blueprint(3).name == "DODO"
+      and duel.station_blueprint(3).title == "HALO STATION")
 
 # ---- packet sizes: the NPCS packet fits ESP-NOW's 250 bytes --------------------------------
 import struct

@@ -26,6 +26,10 @@ Modes (MODE_NAMES; Brian, 2026-11-25):
   CONVOY CO-OP   everyone defends a big freighter (convoy_ship.py) on its way
                  to a station from waves of pirates the host's game flies.
   CONVOY RAID    red defends the convoy, blue are raiders (with a few pirates).
+  STATION CO-OP  everyone defends a space station (the host picks which, how long and
+                 whether the waves grow) from pirates: some attack it, some try to dock.
+                 Lost if it is destroyed or more than DOCK_LIMIT pirates dock.
+  STATION RAID   red defends the station, blue raids it.
 Except in a duel, a ship destroyed comes back after RESPAWN seconds at its
 team's start (behind its home ring in Capture Flag); a match won shows who won
 for RESULT_FOR seconds, then the next starts.
@@ -70,7 +74,7 @@ CLAIM_PKT = 11              # through a ring (Capture Flag): TAKE or CAPTURE, th
 CLAIM_FMT = "<2sBBBH"
 TAKE, CAPTURE = 1, 2
 STATE_PKT = 12              # the host's: match, result, time x10, scores, team scores, flags, convoy
-STATE_FMT = "<2sBBBHhhhhhhBBB"
+STATE_FMT = "<2sBBBHhhhhhhBBBB"
 NPCS_PKT = 13               # the host's ships: count, then NPC_FMT each
 NPCS_HEAD = "<2sBB"
 NPC_FMT = "<BBBBhhhhhhhhh"  # id, type (game.PIRATES), flags, speed, x y z / 8, nose, roof x 16384
@@ -90,6 +94,9 @@ OPT_PIRATES = 1             # CONVOY RAID: pirates on the raiders' side (the hos
 # the pirates' skill (the host's choice, build 151): the game's level, EASY / NORMAL / HARD
 # (game.LEVELS: how well they aim, how hard they hit, how tough they are), in options bits 1-2
 LEVEL_NAMES = ("EASY", "NORMAL", "HARD")
+# options bits 3-4: the station modes' time (STATION_TIMES), bit 5: growing waves, bits 6-7:
+# the station (STATIONS)
+OPT_GROW = 32
 LOBBY, HOST, JOIN, FLYING = 0, 1, 2, 3
 NO_ID = b"\x00" * 6
 HELLO_EVERY = 0.25          # seconds between HELLOs on the lobby pages
@@ -105,13 +112,19 @@ NAME_LEN = 16
 MAX_PLAYERS = 4
 
 # ---- modes ---------------------------------------------------------------------------
-DUEL, FFA, TEAMS, CTF, COOP, RAID = range(6)
-MODE_NAMES = ("DUEL", "FREE FOR ALL", "TEAMS", "CAPTURE FLAG", "CONVOY CO-OP", "CONVOY RAID")
+DUEL, FFA, TEAMS, CTF, COOP, RAID, SCOOP, SRAID = range(8)
+MODE_NAMES = ("DUEL", "FREE FOR ALL", "TEAMS", "CAPTURE FLAG", "CONVOY CO-OP", "CONVOY RAID",
+              "STATION CO-OP", "STATION RAID")
 MODE_NOTES = ("two players, rounds", "most kills wins", "red against blue",
-              "take their flag home", "defend it from pirates", "red defends, blue raids")
-MODE_MIN = (2, 2, 2, 2, 1, 2)       # players, the host included
-MODE_MAX = (2, 4, 4, 4, 4, 4)
-TEAMED = (False, False, True, True, False, True)
+              "take their flag home", "defend it from pirates", "red defends, blue raids",
+              "hold it: don't let them dock", "red defends, blue raids")
+MODE_MIN = (2, 2, 2, 2, 1, 2, 1, 2)     # players, the host included
+MODE_MAX = (2, 4, 4, 4, 4, 4, 4, 4)
+TEAMED = (False, False, True, True, False, True, False, True)
+GUARDED = (False, False, False, False, True, True, True, True)  # something to defend
+RAIDED = (False, False, False, False, False, True, False, True)    # red defends, blue raids
+COOPED = (False, False, False, False, True, False, True, False)    # everyone defends
+STATIONED = (False, False, False, False, False, False, True, True)  # it's a station
 TEAM_NAMES = ("RED", "BLUE")
 TEAM_RGB = ((1, 0.25, 0.2), (0.3, 0.55, 1))
 TAKEN_RGB = (0.35, 0.35, 0.4)       # a ring whose flag is away
@@ -149,6 +162,15 @@ CONVOY_Z0 = -6000.0
 CONVOY_SPEED = 80.0         # world units a second
 CONVOY_TIME = 150.0
 CONVOY_ENERGY = 1500.0
+# the station modes (Brian, 2026-11-25): the station at the middle of the world, slot to +z
+STATION_ENERGY = 2500.0
+STATION_TIMES = (120.0, 180.0, 300.0)   # how long to hold it: the host picks (2, 3 or 5 min)
+DOCK_LIMIT = 3              # more than this many pirates docked: the station is lost
+GROW_EVERY = 60.0           # growing waves: one more pirate a wave each this many seconds
+DOCKED = 4                  # NPCS flags: this ship docked (gone, no explosion)
+# the stations to defend: (role, whose): the game's own Drum and Halo, and Elite's Coriolis
+# and Dodo when its ship data is there (on the host; a player without it sees the game's own)
+STATIONS = (("CORIOLIS", "own"), ("DODO", "own"), ("CORIOLIS", "elite"), ("DODO", "elite"))
 WAVE_FIRST = 8.0            # the first pirates come this long after the start
 WAVE_EVERY = 25.0           # and more this often
 MAX_NPCS = 8
@@ -186,7 +208,7 @@ def team_of(mode, slot):
 
 def team_label(mode, t):
     """What a team is called on the pages: RED / BLUE, or in a raid what it does."""
-    if mode == RAID:
+    if RAIDED[mode]:
         return "DEFEND" if t == 0 else "RAID"
     return TEAM_NAMES[t]
 
@@ -216,11 +238,11 @@ def spawn_pose(mode, slot, t=0.0, team=None, mate=None):
         return _pose(mx, 0.0, s * START_Z, 0.0, 0.0, -s)
     if mode == CTF:
         return _pose(mx, 0.0, s * (RING_Z + RING_BEHIND), 0.0, 0.0, -s)
-    cz = convoy_z(t)
-    if mode == RAID and team == 1:      # a raider: ahead of the convoy, off to one side
+    cz = 0.0 if STATIONED[mode] else convoy_z(t)    # the station is at the middle
+    if RAIDED[mode] and team == 1:      # a raider: ahead of the convoy, off to one side
         x = mx * 6.0
         return _pose(x, 0.0, cz + 7000.0, -x, 0.0, -7000.0)
-    if mode == COOP:
+    if COOPED[mode]:
         mate = slot
     side = (-700.0, 700.0, -1100.0, 1100.0)[mate & 3]
     return _pose(side, 250.0, cz - 1800.0, 0.0, 0.0, 1.0)
@@ -244,6 +266,48 @@ def ring_blueprint():
         edges += [(k, n + k, 0, 0) for k in range(0, n, 3)]
         _RING_BP = game.Blueprint(("RING", tuple(verts), tuple(edges), ((0, 0, 0),), None, "RING"))
     return _RING_BP
+
+
+_STATION_BPS = {}
+
+
+def _station_entry(i):
+    """STATIONS[i]'s ship entry, or None if its content isn't here."""
+    role, whose = STATIONS[i]
+    try:
+        if whose == "own":
+            from .original_ships import SHIPS
+        else:
+            from .ship_data import SHIPS
+    except ImportError:
+        return None
+    for e in SHIPS:
+        if e[0] == role:
+            return e
+    return None
+
+
+def available_stations():
+    """The stations this device can show (STATIONS numbers): the game's own two, Elite's
+    two only with its ship data."""
+    out = [i for i in range(len(STATIONS)) if _station_entry(i) is not None]
+    return out or [0]
+
+
+def station_name(i):
+    e = _station_entry(i)
+    if e is None:
+        return STATIONS[i][0]
+    return e[5] if len(e) > 5 else e[0]
+
+
+def station_blueprint(i):
+    """The station to draw for STATIONS[i]: the same role from the other content if this
+    device hasn't that one (a guest without Elite's data sees the game's own)."""
+    if i not in _STATION_BPS:
+        e = _station_entry(i) or _station_entry(i ^ 2) or _station_entry(i & 1)
+        _STATION_BPS[i] = game.Blueprint(e) if e is not None else convoy_blueprint()
+    return _STATION_BPS[i]
 
 
 _CONVOY_BP = None
@@ -301,6 +365,9 @@ class Duel:
         self.team_pref = NO_TEAM    # the team we'd like (team modes)
         self.pirates = True     # hosting CONVOY RAID: pirates on the raiders' side
         self.pirate_level = 1   # their skill: game.LEVELS (0 EASY, 1 NORMAL, 2 HARD)
+        self.time_i = 1         # the station modes: how long (STATION_TIMES), 3 minutes
+        self.growing = True     # and whether the waves grow
+        self.station_i = 0      # and which station (STATIONS)
         self.teams = [0, 1, 0, 1]   # in a game: each slot's team
         self.roster = {}        # in a game: slot -> Player, everyone but us
         self.by_id = {}         # and id -> Player
@@ -340,7 +407,8 @@ class Duel:
         self.scores = [0, 0, 0, 0]      # per slot: kills, captures or pirates destroyed
         self.team = [0, 0]
         self.carrier = [NOBODY, NOBODY]     # who has each team's flag
-        self.hp = 255           # the convoy's energy, 0-255
+        self.hp = 255           # the convoy's (or station's) energy, 0-255
+        self.docked = 0         # the station modes: pirates that have docked
         self.respawn_t = 0.0
         self.last_by = NOBODY   # who last hurt us, and how long ago
         self.last_by_t = 99.0
@@ -469,13 +537,51 @@ class Duel:
         self.pirates = bool(on)
         self.hello_t = 0.0
 
+    def options(self):
+        """The host's options as one byte (HELLO and START)."""
+        return ((OPT_PIRATES if self.pirates else 0) | (self.pirate_level << 1) | (self.time_i << 3)
+                | (OPT_GROW if self.growing else 0) | (self.station_i << 6))
+
+    def _take_options(self, opts):
+        self.pirates = bool(opts & OPT_PIRATES)
+        self.pirate_level = min(2, (opts >> 1) & 3)
+        self.time_i = min(len(STATION_TIMES) - 1, (opts >> 3) & 3)
+        self.growing = bool(opts & OPT_GROW)
+        self.station_i = (opts >> 6) & 3
+
+    def step_time(self, step):
+        self.time_i = (self.time_i + step) % len(STATION_TIMES)
+        self.hello_t = 0.0
+
+    def set_growing(self, on):
+        self.growing = bool(on)
+        self.hello_t = 0.0
+
+    def step_station(self, step):
+        """Left / right on the STATION line: through the stations this device has."""
+        have = available_stations()
+        i = have.index(self.station_i) if self.station_i in have else 0
+        self.station_i = have[(i + step) % len(have)]
+        self.hello_t = 0.0
+
+    def guard_time(self):
+        """How long the defenders must hold out: the convoy's trip, or the station's time."""
+        return STATION_TIMES[self.time_i] if STATIONED[self.mode] else CONVOY_TIME
+
+    def dock_target(self, o):
+        """Game: the station a docking pirate (o.net_prey "dock") is making for, or None."""
+        c = self.convoy
+        if o.net_prey == "dock" and STATIONED[self.mode] and c is not None and not c.dead:
+            return c
+        return None
+
     def pirates_setting(self):
         """The PIRATES line: -1 off, else their level (0-2)."""
-        return self.pirate_level if (self.pirates or self.mode != RAID) else -1
+        return self.pirate_level if (self.pirates or not RAIDED[self.mode]) else -1
 
     def step_pirates(self, step):
         """Left / right on the PIRATES line: through OFF (a raid only), EASY, NORMAL, HARD."""
-        first = -1 if self.mode == RAID else 0
+        first = -1 if RAIDED[self.mode] else 0
         v = self.pirates_setting() + step
         if v > 2:
             v = first
@@ -585,8 +691,7 @@ class Duel:
             teams = (0, 1, 0, 1)
         struct.pack_into(FMT, self.hello, 0, netplay.MAGIC, kind, role, self.colour, self.mode,
                          target, _name_bytes(self.name), self._ids(), self.team_pref,
-                         (OPT_PIRATES if self.pirates else 0) | (self.pirate_level << 1),
-                         bytes(teams[:MAX_PLAYERS]))
+                         self.options(), bytes(teams[:MAX_PLAYERS]))
         self.link.send(self.hello)
 
     def _send_start(self):
@@ -639,8 +744,7 @@ class Duel:
                     self.mode = mode
                     self.start_ids = guests
                     self.teams = [t & 1 for t in bytes(teams)]
-                    self.pirates = bool(opts & OPT_PIRATES)
-                    self.pirate_level = min(2, (opts >> 1) & 3)
+                    self._take_options(opts)
                 continue
             p.role = role
             p.mode = mode
@@ -678,7 +782,7 @@ class Duel:
                 if self.carrier[k] == p.slot:   # its flag goes home
                     self.carrier[k] = NOBODY
                     self.state_t = 0.0
-        if not self.roster and self.mode != COOP:
+        if not self.roster and not COOPED[self.mode]:
             self._end(p.name + " " + word)      # nobody left to play
         elif g is not None:
             g.say(p.name + " " + word, 2.0)
@@ -736,7 +840,7 @@ class Duel:
             self._killed(p.slot, by)
         elif kind == STATE_PKT and p.slot == 0 and len(msg) >= struct.calcsize(STATE_FMT):
             v = struct.unpack_from(STATE_FMT, msg, 0)
-            self._set_state(v[2], v[3], v[4] / 10.0, v[5:9], v[9:11], v[11:13], v[13])
+            self._set_state(v[2], v[3], v[4] / 10.0, v[5:9], v[9:11], v[11:13], v[13], v[14])
         elif kind == NPCS_PKT and p.slot == 0:
             self._hear_npcs(msg)
         elif self.slot == 0 and kind == NPC_HIT_PKT and len(msg) >= struct.calcsize(NPC_HIT_FMT):
@@ -846,7 +950,7 @@ class Duel:
         if g is not None and not g.over and self.team_of(0) == 0:
             choice.append(0)
         for s, p in self.roster.items():
-            if p.ship is not None and not (self.mode == RAID and self.team_of(s) == 1):
+            if p.ship is not None and not (RAIDED[self.mode] and self.team_of(s) == 1):
                 choice.append(s)
         if not choice:
             o.net_prey = 0
@@ -904,14 +1008,15 @@ class Duel:
             v = struct.unpack_from(NPC_FMT, msg, hs + i * NPC_SIZE)
             ident, typ, flags, speed = v[0], v[1], v[2], v[3]
             o = self.npcs.get(ident)
-            if flags & netplay.DEAD:
+            if flags & (netplay.DEAD | DOCKED):
                 if o is not None:
                     del self.npcs[ident]
                     self.npc_seen.pop(ident, None)
                     if o in g.objs:
                         g.objs.remove(o)
-                        g._boom(o.x, o.y, o.z, 8 + 2 * min(o.bp.explosions, 6))
-                        g.sfx("explode")
+                        if not flags & DOCKED:      # docked: just gone (STATE says so)
+                            g._boom(o.x, o.y, o.z, 8 + 2 * min(o.bp.explosions, 6))
+                            g.sfx("explode")
                     o.dead = True
                 continue
             if o is None:
@@ -927,7 +1032,7 @@ class Duel:
                 o.pose = (0.0, 0.0, 0.0)
                 o.pose_age = 0.0
                 o.firing = 0
-                o.friend = self.mode == RAID and self.team_of(self.slot) == 1   # a raider's pirates
+                o.friend = RAIDED[self.mode] and self.team_of(self.slot) == 1   # a raider's pirates
                 self.npcs[ident] = o
                 g.objs.append(o)
             elif o not in g.objs:
@@ -992,18 +1097,24 @@ class Duel:
             g.sfx("explode")
 
     def _spawn_pirates(self, g):
-        """Host: a wave of pirates round the convoy, mostly ahead of it."""
+        """Host: a wave of pirates round the convoy, mostly ahead of it; or from all
+        round the station, every other one making to dock with it."""
         alive = len(self.npcs)
+        station = STATIONED[self.mode]
         if self.mode == COOP:
             n = 1 + len(self.roster) + (1 if self.mtime > CONVOY_TIME * 0.5 else 0)
+        elif self.mode == SCOOP:
+            n = 1 + len(self.roster)
         else:           # a raid: the pirates help the raiders, only while they are fewer
             if not self.pirates:
                 return
             d, r = self._counts()
             n = max(0, 1 + d - r)
+        if station and self.growing and n > 0:
+            n += int(self.mtime / GROW_EVERY)   # one more a wave each minute
         n = min(n, MAX_NPCS - alive)
-        cz = convoy_z(self.mtime)
-        for _ in range(n):
+        cz = 0.0 if station else convoy_z(self.mtime)
+        for i in range(n):
             names = [s for s in game.PIRATES if s in g.types]
             if not names:
                 return
@@ -1011,14 +1122,21 @@ class Duel:
             if name not in g.types:
                 name = random.choice(names)
             bp = g.types[name]
-            dx, dy, dz = game._unit(game._rnd(-1, 1), game._rnd(-0.4, 0.4),
-                                    game._rnd(0.2, 1.0))
+            if station:         # from anywhere round it
+                dx, dy, dz = game._unit(game._rnd(-1, 1), game._rnd(-0.5, 0.5), game._rnd(-1, 1))
+            else:               # mostly ahead of the convoy
+                dx, dy, dz = game._unit(game._rnd(-1, 1), game._rnd(-0.4, 0.4),
+                                        game._rnd(0.2, 1.0))
             d = game._rnd(5000, 7000)
             x, y, z = dx * d, dy * d, cz + dz * d
             o = game.Obj(bp, "ship", 0.0, 0.0, 0.0)
             g.place(o, x, y, z, _pose(0, 0, 0, -dx, -dy, -dz)[3])
             o.role = "pirate"
             o.state = "attack"
+            if station and i % 2 == 0:  # makes to dock (Game._think's trade, Duel.dock_target)
+                o.state = "trade"
+                o.dest = "station"
+                o.net_prey = "dock"
             o.speed = bp.speed * 0.5
             o.leveled = True            # as the game does for its own (Game.step)
             o.energy *= g.energy_k
@@ -1054,7 +1172,7 @@ class Duel:
         for d in self.npc_dead:
             if k >= NPC_SLOTS:
                 break
-            struct.pack_into(NPC_FMT, buf, hs + k * NPC_SIZE, d[0], d[1], netplay.DEAD,
+            struct.pack_into(NPC_FMT, buf, hs + k * NPC_SIZE, d[0], d[1], d[3],
                              0, 0, 0, 0, 0, 0, 16384, 0, 16384, 0)
             k += 1
         if k == 0:
@@ -1137,7 +1255,7 @@ class Duel:
         self._set_state(self.match, self._winner(scores, team), self.mtime, scores, team,
                         carrier, self.hp)
 
-    def _set_state(self, match, result, t, scores, team, carrier, hp):
+    def _set_state(self, match, result, t, scores, team, carrier, hp, docked=None):
         """The host's word (made here if we host, or heard in STATE): say what changed."""
         g = self.g
         if self.slot != 0:
@@ -1176,6 +1294,10 @@ class Duel:
                         g.objs.remove(c)
                         g._boom(c.x, c.y, c.z, 20)
                         g.sfx("explode")
+        if docked is not None and docked != self.docked:
+            if docked > self.docked and not new_match:
+                say = "PIRATE DOCKED %d/%d" % (docked, DOCK_LIMIT)
+            self.docked = docked
         if result and not self.result:
             self.result_t = RESULT_FOR
             say = None          # the result's own screen says it
@@ -1195,7 +1317,8 @@ class Duel:
         struct.pack_into(STATE_FMT, self.state_buf, 0, netplay.MAGIC, STATE_PKT,
                          self.match & 0xFF, self.result, min(65535, int(self.mtime * 10)),
                          self.scores[0], self.scores[1], self.scores[2], self.scores[3],
-                         self.team[0], self.team[1], self.carrier[0], self.carrier[1], self.hp)
+                         self.team[0], self.team[1], self.carrier[0], self.carrier[1], self.hp,
+                         min(255, self.docked))
         self.link.send(self.state_buf)
 
     def _new_match(self, g):
@@ -1262,7 +1385,8 @@ class Duel:
                 g.say("VS " + o.name, 2.0)
         elif TEAMED[self.mode]:
             t = self.team_of(self.slot)
-            what = ("DEFEND THE CONVOY" if t == 0 else "RAID THE CONVOY") if self.mode == RAID else (
+            thing = "STATION" if STATIONED[self.mode] else "CONVOY"
+            what = ("DEFEND THE " if t == 0 else "RAID THE ") + thing if RAIDED[self.mode] else (
                 TEAM_NAMES[t] + " TEAM")
             g.say(what, 2.5)
         else:
@@ -1320,16 +1444,17 @@ class Duel:
                 o.world = (0.0, 0.0, RING_Z if k else -RING_Z)
                 self.rings[k] = o
                 self.marks.append(o)
-        if self.mode == COOP or self.mode == RAID:
+        if GUARDED[self.mode] and not STATIONED[self.mode]:
             st = g.types.get("CORIOLIS") or g.types.get("DODO")
             if st is not None:
                 o = game.Obj(st, "mark", 0.0, 0.0, 0.0)
                 o.world = (0.0, 0.0, convoy_z(CONVOY_TIME) + 1500.0)
                 o.label = "STATION"
                 self.marks.append(o)
+        if GUARDED[self.mode]:
             c = self.convoy
             if c is None:
-                bp = convoy_blueprint()
+                bp = station_blueprint(self.station_i) if STATIONED[self.mode] else convoy_blueprint()
                 if self.slot == 0:
                     c = game.Obj(bp, "convoy", 0.0, 0.0, 0.0)
                     c.energy = c.max_energy = self.convoy_energy()
@@ -1339,8 +1464,8 @@ class Duel:
                 c.role = "trader"
                 c.state = "trade"
                 c.rgb = CONVOY_RGB
-                c.label = "CONVOY"
-                c.friend = not (self.mode == RAID and self.team_of(self.slot) == 1)
+                c.label = "STATION" if STATIONED[self.mode] else "CONVOY"
+                c.friend = not (RAIDED[self.mode] and self.team_of(self.slot) == 1)
                 self.convoy = c
             if not c.dead and self.hp > 0:
                 g.objs.append(c)
@@ -1373,7 +1498,7 @@ class Duel:
     def respawn_time(self):
         """How long we wait to come back: RESPAWN, but in a raid the defenders sooner and
         the raiders longer for each one they have more (so the defenders aren't overwhelmed)."""
-        if self.mode != RAID:
+        if not RAIDED[self.mode]:
             return RESPAWN
         if self.team_of(self.slot) == 0:
             return DEFEND_RESPAWN
@@ -1383,10 +1508,11 @@ class Duel:
     def convoy_energy(self):
         """The convoy's energy: CONVOY_ENERGY, and in a raid a defender's worth more (the
         same again) for each raider more than there are defenders."""
-        if self.mode != RAID:
-            return CONVOY_ENERGY
+        base = STATION_ENERGY if STATIONED[self.mode] else CONVOY_ENERGY
+        if not RAIDED[self.mode]:
+            return base
         d, r = self._counts()
-        return CONVOY_ENERGY * (1 + max(0, r - d) / max(1, d))
+        return base * (1 + max(0, r - d) / max(1, d))
 
     def again_by_c(self):
         """True if C on the end screen starts again (a duel's next round); otherwise
@@ -1425,12 +1551,18 @@ class Duel:
                     ("YOUR KILLS %d" % self.scores[self.slot], 13, ck.WHITE), nxt,
                     ("F: leave game", 12, ck.GREY))
         k = r - 1
-        if self.mode == COOP or self.mode == RAID:
-            head = "CONVOY ARRIVED" if k == 0 else "CONVOY LOST"
+        if GUARDED[self.mode]:
+            if STATIONED[self.mode]:
+                head = "STATION HELD" if k == 0 else "STATION LOST"
+                why = ("PIRATES DOCKED %d" % self.docked) if self.docked > DOCK_LIMIT else (
+                    "PIRATES DESTROYED %d" % sum(self.scores))
+            else:
+                head = "CONVOY ARRIVED" if k == 0 else "CONVOY LOST"
+                why = "PIRATES DESTROYED %d" % sum(self.scores)
             mine = self.team_of(self.slot) == k
             return ((head, 18, CONVOY_RGB), ("YOU WIN" if mine else "YOU LOSE", 16,
                                              ck.GREEN if mine else ck.RED),
-                    ("PIRATES DESTROYED %d" % sum(self.scores), 12, ck.WHITE), nxt)
+                    (why, 12, ck.WHITE), nxt)
         return ((TEAM_NAMES[k] + " TEAM WINS", 18, TEAM_RGB[k]),
                 ("%d - %d" % (self.team[0], self.team[1]), 16, ck.WHITE), nxt,
                 ("F: leave game", 12, ck.GREY))
@@ -1445,8 +1577,9 @@ class Duel:
         return colour_rgb(p.colour if p is not None else 0)
 
     def hud(self):
-        """The line along the top in flight: [(text, x, rgb)], or () (a duel). Made again
-        only when something changes, or each second for the convoy's clock."""
+        """The line along the top in flight: [(text, x, rgb)] (with a fourth, how far below
+        the first line, for a second), or () (a duel). Made again only when something
+        changes, or each second for the clock."""
         if self.mode == DUEL:
             return ()
         c = self.hud_cache
@@ -1461,6 +1594,11 @@ class Duel:
         elif m == TEAMS or m == CTF:
             c = (("%s %d" % (TEAM_NAMES[0], self.team[0]), -30, TEAM_RGB[0]),
                  ("%s %d" % (TEAM_NAMES[1], self.team[1]), 30, TEAM_RGB[1]))
+        elif STATIONED[m]:
+            left = max(0, int(self.guard_time() - self.mtime))
+            c = (("STATION %d%%  %d:%02d" % (self.hp * 100 // 255, left // 60, left % 60), 0, CONVOY_RGB),
+                 ("DOCKED %d/%d" % (self.docked, DOCK_LIMIT), 0,
+                  ck.RED if self.docked >= DOCK_LIMIT else ck.WHITE, 13))
         else:
             left = max(0, int(CONVOY_TIME - self.mtime))
             c = (("CONVOY %d%%  %d:%02d" % (self.hp * 100 // 255, left // 60, left % 60), 0,
@@ -1474,7 +1612,7 @@ class Duel:
             t = self.team_of(self.slot)
             k = t if self.carrier[1 - t] == self.slot else 1 - t   # carrying: home
             return self.rings[k], TEAM_RGB[k]
-        if (self.mode == COOP or self.mode == RAID) and self.convoy is not None and not self.convoy.dead:
+        if GUARDED[self.mode] and self.convoy is not None and not self.convoy.dead:
             return self.convoy, CONVOY_RGB
         return None
 
@@ -1593,13 +1731,16 @@ class Duel:
 
     def _host_step(self, g, dt):
         m = self.mode
-        if m == COOP or m == RAID:
+        if GUARDED[m]:
             c = self.convoy
             if self.result == 0:
                 if c is not None and c.dead:
                     self._set_state(self.match, 2, self.mtime, self.scores, self.team,
                                     self.carrier, 0)
-                elif self.mtime >= CONVOY_TIME:
+                elif self.docked > DOCK_LIMIT:      # too many got in: the station is lost
+                    self._set_state(self.match, 2, self.mtime, self.scores, self.team,
+                                    self.carrier, self.hp)
+                elif self.mtime >= self.guard_time():
                     self._set_state(self.match, 1, self.mtime, self.scores, self.team,
                                     self.carrier, self.hp)
                 elif c is not None:
@@ -1618,7 +1759,14 @@ class Duel:
                     del self.npcs[ident]
                     if not o.dead:
                         continue
-                    self.npc_dead.append([ident, o.net_type, DEAD_FOR])
+                    if o.docked:        # got into the station: gone, no score
+                        self.npc_dead.append([ident, o.net_type, DEAD_FOR, DOCKED])
+                        self.docked += 1
+                        self.hud_cache = None
+                        self.state_t = 0.0
+                        g.say("PIRATE DOCKED %d/%d" % (self.docked, DOCK_LIMIT), 2.0)
+                        continue
+                    self.npc_dead.append([ident, o.net_type, DEAD_FOR, netplay.DEAD])
                     if scores is None:
                         scores = list(self.scores)
                     s = getattr(o, "net_killer", 0)
@@ -1652,7 +1800,7 @@ class Duel:
             self._place_marks(g)
         c = self.convoy
         if c is not None and not c.dead:
-            g.place(c, 0.0, 0.0, convoy_z(self.mtime), _IDENT)
+            g.place(c, 0.0, 0.0, 0.0 if STATIONED[self.mode] else convoy_z(self.mtime), _IDENT)
             if c not in g.objs and self.hp > 0:
                 g.objs.append(c)
         if self.mode != CTF or g.over or self.result:
@@ -1716,7 +1864,7 @@ class Duel:
             s.net_slot = p.slot
             s.rgb = self._rgb(p.slot)
             s.friend = (TEAMED[self.mode] and self.team_of(p.slot) == self.team_of(self.slot)) \
-                or self.mode == COOP
+                or COOPED[self.mode]
         if s not in g.objs:
             g.objs.append(s)
         carrying = self.mode == CTF and p.slot in self.carrier

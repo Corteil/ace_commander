@@ -501,6 +501,7 @@ class Obj:
         self.net_prey = None
         self.net_killer = 0
         self.shot = 0.0     # > 0 just after this ship fired at something not you
+        self.docked = False     # it reached the station it was flying to (and is gone)
         self.role = "pirate"    # ships: "pirate", "trader", "police" or "hunter"
         self.dest = "station"   # a trader's: where it is making for, "station" or "planet"
         self.prey = None        # a pirate's: the trader it is after (None: you)
@@ -1953,6 +1954,8 @@ class Game:
                 want = bp.speed * 0.6
                 sp = self.space
                 st = sp.station if sp is not None else None
+                if st is None and self.net is not None and o.dest == "station":
+                    st = self.net.dock_target(o)    # multiplayer: a pirate docking (duel.py)
                 if o.state == "trade" and st is not None:
                     # on its way to the station (reaching it, it docks) or the planet
                     if o.dest == "station":
@@ -1964,6 +1967,7 @@ class Game:
                     ds = math.sqrt(dx * dx + dy * dy + dz * dz)
                     if ds < reach:
                         o.dead = True
+                        o.docked = True
                         return
                     if ds > 1.0:
                         _turn(m, dx / ds, dy / ds, dz / ds, turn * 0.5)

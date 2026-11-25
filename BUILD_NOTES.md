@@ -1708,3 +1708,24 @@ what is now `ace.py` (renamed in build 50).
    in its middle, which is right (and no piece is nearer than the middle then, so none fills).
    Cost: up to three more fills a frame close to a Halo (about 2 ms each on the badge, from the
    earlier measurements); Elite's Dodo is one convex shape and is unchanged. PC renders only.
+   **Build 153** (Brian, 2026-11-25: "build it, two new modes, 1 and 2 should be selectable
+   all 4 station types depending if elite data loaded, if more than a set number of pirate
+   ships dock or the station is destroyed game over"). STATION CO-OP (1-4, everyone defends)
+   and STATION RAID (red defends, blue raids; the convoy raid's team choice, PIRATES setting
+   and help for outnumbered defenders). The station sits at the world's middle, slot to +z;
+   `STATION_ENERGY` 2500. The host picks on HOSTING: STATION (`duel.STATIONS`: the game's
+   own Drum and Halo, Elite's Coriolis and Dodo only when `ship_data.py` imports;
+   `available_stations`; a guest without Elite's data draws the game's own of the same role,
+   `station_blueprint`), TIME (`STATION_TIMES` 2 / 3 / 5 minutes, 3 by default) and WAVES
+   (STEADY, or GROWING: one more pirate a wave each `GROW_EVERY` 60 s). Options byte: bit 0
+   pirates, 1-2 skill, 3-4 time, 5 growing, 6-7 station. Pirates come from every side; every
+   other one makes to dock (state "trade", `net_prey` "dock": `Game._think`'s trading
+   steering towards `Duel.dock_target`; reaching the station sets `Obj.docked`). The host
+   counts dockings (`Duel.docked`, in STATE, now 23 bytes; NPCS flag `DOCKED`: gone without an
+   explosion), says PIRATE DOCKED n/3. Lost when the station is destroyed or more than
+   `DOCK_LIMIT` (3) have docked (the 4th); held for the time: won (STATION HELD / STATION
+   LOST, and PIRATES DOCKED n when that lost it). A docker shot turns to fight. HUD: STATION
+   energy and time on the top line, DOCKED n/3 under it (red at 3; `Duel.hud` entries can
+   now have a second line), the view label below that. Tests in test_multiplayer (options to
+   the guest, the station for both, dockers closing in and docking, the limit, time up,
+   destroyed, growing waves, the raid, Elite's four with a stand-in ship_data). PC only.

@@ -1094,7 +1094,11 @@ def _world(ctx, g):
         # below the practice score, the multiplayer line and the frame time along the
         # top (build 151: it overlapped them): on the round screen, and on a dashboard
         # layout's shorter view (the Pi's, the Tufty's) as far down from its top
-        text(ctx, VIEW_NAMES[g.view] + " VIEW", 0, -84 if VIEW_HH >= 120 else 26 - VIEW_HH, 11, GREY)
+        y = -84 if VIEW_HH >= 120 else 26 - VIEW_HH
+        net = getattr(g, "net", None)
+        if net is not None and any(len(h) > 3 for h in net.hud()):
+            y += 14             # below multiplayer's second line (the station's DOCKED)
+        text(ctx, VIEW_NAMES[g.view] + " VIEW", 0, y, 11, GREY)
         return
     _draw_world(ctx, g)
 
@@ -1770,8 +1774,11 @@ def draw_net_line(ctx, g, y):
     net = getattr(g, "net", None)
     if net is None:
         return
-    for s, x, rgb in net.hud():
-        text(ctx, s, x, y, 12, rgb)
+    for h in net.hud():
+        if len(h) > 3:          # a second line, below
+            text(ctx, h[0], h[1], y + h[3], 11, h[2])
+        else:
+            text(ctx, h[0], h[1], y, 12, h[2])
 
 
 def _compass(ctx, t):

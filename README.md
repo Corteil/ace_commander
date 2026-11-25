@@ -63,6 +63,14 @@ A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves 
     fewer players).
     So the defenders aren't overwhelmed, they come back after 3 seconds, and for each raider
     more than there are defenders the convoy is tougher and the raiders wait 2 seconds longer.
+  - **STATION CO-OP**: 1 to 4 players defend a space station at the middle of the arena
+    from pirates coming from every side: some attack it, some try to dock. The game is lost
+    if the station is destroyed or more than 3 pirates dock; held for the time, it is won.
+    The host picks the station (the game's Drum or Halo, and Elite's Coriolis or Dodo when
+    Elite's data is loaded), the time (2, 3 or 5 minutes), steady or growing waves, and the
+    pirates' skill.
+  - **STATION RAID**: red defends the station, blue raids it, with the same choices and the
+    same help for outnumbered defenders as the convoy raid.
   Except in a duel, a destroyed ship comes back after 5 seconds at its team's start (behind
   its own ring in Capture Flag); a won match shows the result for 10 seconds, then the next
   starts. The host leaving ends the game; a guest leaving drops out of it.

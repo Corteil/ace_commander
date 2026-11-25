@@ -197,6 +197,15 @@ to be a new large design".
   (they come back in 3 s; extra raiders make the convoy tougher, wait longer and get no
   pirates).
 
+- **Build 153: station defence.** STATION CO-OP and STATION RAID: a station at the
+  world's middle (the host's choice of the game's Drum or Halo, or Elite's Coriolis or Dodo
+  when its ship data is there; a guest without it sees the game's own of the same kind),
+  held for 2, 3 or 5 minutes, steady or growing waves (one more pirate a wave each minute).
+  Pirates come from every side; every other one flies to dock (`Game._think`'s trade
+  steering, with `Duel.dock_target`). More than `DOCK_LIMIT` (3) docked, or the station
+  destroyed: lost. The options byte carries skill, time, waves and station; STATE the
+  docked count. HUD: STATION energy and time, DOCKED n/3 below.
+
 Not yet on badges: the frame time with three other ships, eight pirates and the convoy (92
 lines in 6 parts close up) needs measuring; and how busy the radio is with four (each sends
 15 poses a second; the host also 10 NPCS and 4 STATE).

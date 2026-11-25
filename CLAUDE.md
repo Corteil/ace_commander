@@ -71,8 +71,9 @@ Other devices are in `hosts/`: the Pi, and the Tufty 2350 since build 109 (`host
 - `cockpit.py` - flight view, HUD, radar. Built from rectangles (see Speed).
 - `duel.py`, `netplay.py`, `net_espnow.py` - multiplayer (2026-11-24, `plans/MULTIPLAYER.md`):
   MULTIPLAYER on the title screen when `platform.radio()` exists (it was DUEL until build
-  148); up to four players, modes DUEL, FREE FOR ALL, TEAMS, CAPTURE FLAG, CONVOY CO-OP and
-  CONVOY RAID (build 148: the host decides score, flags, convoy and pirates); `Game.set_anchor`
+  148); up to four players, modes DUEL, FREE FOR ALL, TEAMS, CAPTURE FLAG, CONVOY CO-OP,
+  CONVOY RAID, STATION CO-OP and STATION RAID (builds 148-153: the host decides score,
+  flags, convoy, station and pirates); `Game.set_anchor`
   / `world_pose` / `place` keep a shared world; the 32-byte pose packet; ESP-NOW broadcast on
   the badge (`hosts/pi/net_udp.py` on the Pi with `--duel`). Other players' ships are kind
   "player", the host's pirates on the others' screens "npc", the convoy "convoy" (host) and
