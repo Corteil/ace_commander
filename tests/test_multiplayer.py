@@ -1114,6 +1114,35 @@ check("hosting with a guest: our own name kept too", fz[0].name == "JAMESON")
 check("the newcomer, in no party, numbers by address", fz[2].name == "JAMESON"
       and sorted(p.name for p in fz[2].lobby()) == ["JAMESON 2", "THOMAS"])
 
+# ---- a full game takes no more guests (build 167: a duel took four) ---------------------
+air = Air()
+fl = [duel.Duel(Link(air, bytes([2, 0, 0, 0, 17, i + 1])), NAMES[i], 1) for i in range(3)]
+
+
+def lob_fl(n=8):
+    for _ in range(n):
+        for d_ in fl:
+            d_.lobby_step(DT)
+
+
+fl[0].host(duel.DUEL)
+lob_fl()
+fl[1].join(fl[1].hosts()[0])
+lob_fl()
+check("duel: one guest in", fl[1].accepted() and len(fl[0].guests) == 1)
+check("duel: a full one isn't offered", fl[2].hosts() == [])
+fl[2].join(fl[2].lobby()[0] if fl[2].lobby()[0].role == duel.HOST else fl[2].lobby()[1])
+lob_fl()
+check("duel: asking anyway isn't taken", not fl[2].accepted() and len(fl[0].guests) == 1
+      and fl[0].can_start()[0])
+fl[0].set_mode(duel.FFA)
+lob_fl()
+check("free for all: room for the third", fl[2].accepted() and len(fl[0].guests) == 2)
+fl[0].set_mode(duel.DUEL)
+lob_fl()
+check("back to a duel: the first guest keeps the place", len(fl[0].guests) == 1 and fl[1].accepted()
+      and not fl[2].accepted() and fl[0].can_start()[0])
+
 if fails:
     print("%d FAILED: %s" % (len(fails), ", ".join(fails)))
     sys.exit(1)

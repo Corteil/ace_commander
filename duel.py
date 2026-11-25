@@ -391,6 +391,8 @@ class Player:
         sides = SIDES_CHOICES[self.teamopt & 15] if TEAMED[self.mode] and (self.teamopt & 15) < len(
             SIDES_CHOICES) else None
         most = sides[0] + sides[1] if sides else MAX_PLAYERS
+        if 0 <= self.mode < len(MODE_MAX):  # and no more than the mode takes (a duel: 2; build 167)
+            most = min(most, MODE_MAX[self.mode])
         return most - 1 - len(self.guests)
 
 
@@ -613,7 +615,14 @@ class Duel:
 
     def most_players(self):
         s = self.sides()
-        return s[0] + s[1] if s else MAX_PLAYERS
+        most = s[0] + s[1] if s else MAX_PLAYERS
+        return min(most, MODE_MAX[self.mode])   # (build 167: a duel took four)
+
+    def _trim_guests(self):
+        """Hosting: a mode or sides with fewer places: the first guests keep theirs."""
+        n = self.most_players() - 1
+        if len(self.guests) > n:
+            self.guests = self.guests[:n]
 
     def teamopt(self):
         return (self.sides_i & 15) | (RANDOM_TEAMS if self.random_teams else 0)
@@ -624,6 +633,7 @@ class Duel:
 
     def step_sides(self, step):
         self.sides_i = (self.sides_i + step) % len(SIDES_CHOICES)
+        self._trim_guests()
         self.hello_t = 0.0
 
     def set_random_teams(self, on):
@@ -860,6 +870,7 @@ class Duel:
 
     def set_mode(self, mode):
         self.mode = mode % len(MODE_NAMES)
+        self._trim_guests()
         self.hello_t = 0.0
 
     def join(self, p):

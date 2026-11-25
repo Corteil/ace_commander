@@ -86,8 +86,8 @@ check("lobby: names in capitals, colours passed",
       and next(p for p in da.lobby() if p.name == "BOB").colour == 5)
 check("lobby: no games to join yet", da.hosts() == [] and db.hosts() == [])
 
-# ---- one hosts; the others see the game; one joins, the host sees who
-da.host()
+# ---- one hosts (free for all: room for four); the others see the game; one joins
+da.host(duel.FFA)
 lobby([da, db, dc])
 check("host: B and C see A's game", [p.name for p in db.hosts()] == ["ALICE"]
       and [p.name for p in dc.hosts()] == ["ALICE"])
@@ -104,8 +104,14 @@ lobby([da, db, dc])
 check("join: C is the second guest", [p.name for p in da.guests] == ["BOB", "CAROL"] and dc.accepted())
 check("join: everyone sees who is in it, in order", [e[0] for e in db.party()] == ["ALICE", "BOB", "CAROL"]
       and [e[0] for e in dc.party()] == ["ALICE", "BOB", "CAROL"])
-check("mode: a duel can't start with three", da.can_start() == (False, "2 players only")
-      and not da.start_game())
+da.set_mode(duel.DUEL)              # build 167: a duel keeps the first guest only
+lobby([da, db, dc])
+check("mode: a duel keeps its first guest", [p.name for p in da.guests] == ["BOB"]
+      and db.accepted() and not dc.accepted() and da.can_start()[0])
+da.set_mode(duel.FFA)
+lobby([da, db, dc])
+check("mode: back to four, C is in again", [p.name for p in da.guests] == ["BOB", "CAROL"]
+      and dc.accepted())
 extra = [duel.Duel(Link(air, ID(20 + i)), "X%d" % i, 1) for i in range(2)]
 lobby([da, db, dc] + extra)
 extra[0].join(extra[0].hosts()[0])
@@ -123,6 +129,8 @@ air.links = air.links[:3]
 lobby([da, db, dc])
 check("leave: C and the others back out: B alone is the guest", [p.name for p in da.guests] == ["BOB"]
       and not dc.accepted())
+da.set_mode(duel.DUEL)
+lobby([da, db, dc])
 
 # ---- the host starts; START reaches the guest even when the first ones are lost
 lost = [0]

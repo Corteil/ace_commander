@@ -1889,3 +1889,14 @@ what is now `ace.py` (renamed in build 50).
    party still number by address, so they may see the names the other way round (the
    newcomer calls itself JAMESON); inside the party everyone agrees. Test in
    test_multiplayer.py.
+   Build 166 on the badges (Brian, 2026-11-25): no errors; names agreed on every badge and
+   none changed after joining (the frozen case itself didn't come up: the lower-addressed
+   JAMESON was always there first). It showed a lobby bug from before: BRIAN hosted a DUEL,
+   both JAMESONs joined (the lobby offered it at "DUEL 2/2") and the game couldn't start.
+   **Build 167** (Brian: "yes, fix it"). The guest limit (`Duel.most_players`,
+   `Player.open_slots`) used four for every mode without teams; it is now no more than the
+   mode's MODE_MAX (a duel: 2), so a full game isn't offered and a host takes no more guests
+   than it can start with. Changing the mode or the sides to fewer places keeps the first
+   guests (`Duel._trim_guests`); the others are back to "asking to join" and are taken again
+   if room comes. test_duel's lobby section hosts FREE FOR ALL now (it relied on a duel
+   taking four); new tests in test_multiplayer.py.
