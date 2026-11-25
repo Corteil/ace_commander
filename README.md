@@ -44,20 +44,23 @@ A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves 
   network needed; tested to 10 m through a door). Everyone on the MULTIPLAYER page is listed
   with their commander's name and ship colour. One player picks **HOST A GAME** and a mode
   (left / right), up to three others **JOIN** the host's name, and the host presses C to
-  launch everyone. Lasers, missiles and ramming do damage; the E.C.M. fires only by hand (**B**,
+  launch everyone. In team modes each player picks a team with left / right (the host on
+  its YOU line, up / down picks the line); anyone who hasn't picked joins the smaller team. Lasers, missiles and ramming do damage; the E.C.M. fires only by hand (**B**,
   instead of the energy bomb). The modes:
   - **DUEL**: two players, 8000 apart and facing. Destroyed: C starts the next round, both
     back at their ends with full shields, missiles and E.C.M.; the score is kept.
   - **FREE FOR ALL**: everyone against everyone; 10 kills wins.
-  - **TEAMS**: red against blue (the host's team is red; players join red, blue, red, blue);
-    no friendly fire; 10 team kills wins.
+  - **TEAMS**: red against blue; no friendly fire; 10 team kills wins.
   - **CAPTURE FLAG**: red and blue teams, each with a ring in its colour. Fly through the
     other team's ring to take its flag (the ring goes grey and your name shows *FLAG*), then
     back through your own ring to score. A carrier destroyed drops the flag: it goes home.
     3 captures wins. The compass points at the ring to fly to.
   - **CONVOY CO-OP**: 1 to 4 players guard a big freighter on its way to a station
     (2½ minutes) from waves of pirates; it must arrive. The compass points at the convoy.
-  - **CONVOY RAID**: red guards the convoy, blue raids it, with a few pirates on blue's side.
+  - **CONVOY RAID**: red guards the convoy, blue raids it, player against player. The host
+    picks PIRATES ON (a few pirates on blue's side, only while blue has fewer players) or OFF.
+    So the defenders aren't overwhelmed, they come back after 3 seconds, and for each raider
+    more than there are defenders the convoy is tougher and the raiders wait 2 seconds longer.
   Except in a duel, a destroyed ship comes back after 5 seconds at its team's start (behind
   its own ring in Capture Flag); a won match shows the result for 10 seconds, then the next
   starts. The host leaving ends the game; a guest leaving drops out of it.

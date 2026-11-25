@@ -192,6 +192,11 @@ to be a new large design".
   out ("<NAME> LEFT"), and the game ends when nobody else is left, except CONVOY CO-OP.
 - `tests/test_multiplayer.py`: four players in each mode on a pretend radio.
 
+- **Build 150:** teams are chosen in the lobby (left / right; unpicked players join the
+  smaller team); CONVOY RAID has PIRATES ON / OFF, and is balanced for the defenders
+  (they come back in 3 s; extra raiders make the convoy tougher, wait longer and get no
+  pirates).
+
 Not yet on badges: the frame time with three other ships, eight pirates and the convoy (92
 lines in 6 parts close up) needs measuring; and how busy the radio is with four (each sends
 15 poses a second; the host also 10 NPCS and 4 STATE).

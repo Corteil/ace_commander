@@ -1667,3 +1667,17 @@ what is now `ace.py` (renamed in build 50).
    HAULER). The viewer now draws a ship made of convex parts as the game does: back to front,
    a nearer part blacking out what is behind it (`viewer._fill_hull`; the Halo and the freighter
    gain hidden lines there). `test_app`'s viewer check counts 32. Not yet seen on the badge.
+   **Build 150** (Brian, 2026-11-25: "The convoy game should have a p v p mode as well" (it
+   had: CONVOY RAID) ... "add team choice in the lobby and a no-pirates option. The defenders
+   should not be overwhelmed"). Team modes: each player picks red / blue (in a raid DEFEND /
+   RAID) with left / right, the host on its HOSTING page's YOU line (up / down picks MODE,
+   YOU, PIRATES); anyone who hasn't picked (`NO_TEAM`) joins the smaller team, red if level
+   (`Duel.lobby_teams`). HELLO grew to 52 bytes: the team asked for, the host's options
+   (`OPT_PIRATES`) and each slot's team, which START fixes (`Duel.teams`, `Duel.team_of`).
+   It can start only with a player on each team. Teammates start side by side (`MATE_X`).
+   CONVOY RAID: PIRATES ON / OFF (the host's; off, none come). Balance: defenders come back
+   after `DEFEND_RESPAWN` 3 s; each raider more than there are defenders adds
+   `RAID_EXTRA_RESPAWN` 2 s to the raiders' wait and a defender's worth of energy to the
+   convoy (1 v 3: three times `CONVOY_ENERGY`); a pirate wave is 1 + defenders - raiders
+   ships (none if the raiders are more). Tests in test_multiplayer (team choice, 1 v 3, 2 v 1,
+   pirates off, the app's TEAM line). PC only.

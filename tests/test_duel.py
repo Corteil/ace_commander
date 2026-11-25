@@ -102,8 +102,8 @@ check("join: room for more: C still sees the game, 2 of 4", [p.name for p in dc.
 dc.join(dc.hosts()[0])
 lobby([da, db, dc])
 check("join: C is the second guest", [p.name for p in da.guests] == ["BOB", "CAROL"] and dc.accepted())
-check("join: everyone sees who is in it, in order", [n for n, c, s in db.party()] == ["ALICE", "BOB", "CAROL"]
-      and [n for n, c, s in dc.party()] == ["ALICE", "BOB", "CAROL"])
+check("join: everyone sees who is in it, in order", [e[0] for e in db.party()] == ["ALICE", "BOB", "CAROL"]
+      and [e[0] for e in dc.party()] == ["ALICE", "BOB", "CAROL"])
 check("mode: a duel can't start with three", da.can_start() == (False, "2 players only")
       and not da.start_game())
 extra = [duel.Duel(Link(air, ID(20 + i)), "X%d" % i, 1) for i in range(2)]

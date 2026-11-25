@@ -61,16 +61,20 @@ def flight(seed):
 class Match:
     """n players: the first hosts mode, the rest join in order; all flying."""
 
-    def __init__(self, mode, n, seed=1):
+    def __init__(self, mode, n, seed=1, teams=None, pirates=True):
         self.air = Air()
         self.d = [duel.Duel(Link(self.air, bytes([2, 0, 0, 0, seed, i + 1])), NAMES[i], i + 1)
                   for i in range(n)]
         h = self.d[0]
         h.host(mode)
+        h.set_pirates(pirates)
         self.lobby()
         for j in self.d[1:]:
             j.join(j.hosts()[0])
             self.lobby()
+        for i, t in enumerate(teams or ()):     # each picks a team in the lobby
+            self.d[i].choose_team(t)
+        self.lobby()
         assert h.start_game(), h.can_start()
         self.g = [flight(seed * 10 + i) for i in range(n)]
         h.start(self.g[0])
@@ -408,6 +412,23 @@ a.draw(c)
 texts = [t[0] for t in c.texts]
 check("app: three in the party, with teams", len(a.duel.guests) == 2 and "BEN  BLUE" in texts
       and "CAT  RED" in texts, str(texts))
+bs.tick(a, fresh=["JOYDOWN"])           # down to the TEAM line; right: the host goes blue
+bs.tick(a, fresh=["JOYRIGHT"])
+for _ in range(8):
+    for o in others:
+        o.lobby_step(DT)
+    bs.tick(a)
+c = bs.CountCtx()
+a.draw(c)
+texts = [t[0] for t in c.texts]
+check("app: the host changes team on its TEAM line", a.duel.my_team() == 1 and "< YOU: BLUE >" in texts
+      and others[0].party()[0][3] == 1, str(texts))
+bs.tick(a, fresh=["JOYLEFT"])
+for _ in range(8):
+    for o in others:
+        o.lobby_step(DT)
+    bs.tick(a)
+check("app: and back to red", a.duel.my_team() == 0)
 check("app: the guests see CAPTURE FLAG", others[0].host_p.mode == duel.CTF)
 bs.tick(a, fresh=["CONFIRM"])
 bs.tick(a)
@@ -443,6 +464,78 @@ check("app: back after RESPAWN", not a.game.over and a.dueling)
 a._to_title()
 bs.tick(a)
 check("app: to the title ends it", not a.dueling and a.game.anchor is None and not kind(a.game, "mark"))
+
+# ---- choosing teams in the lobby ------------------------------------------------------
+air = Air()
+ds = [duel.Duel(Link(air, bytes([2, 0, 0, 0, 8, i + 1])), NAMES[i], 1) for i in range(3)]
+
+
+def lob(n=8):
+    for _ in range(n):
+        for d_ in ds:
+            d_.lobby_step(DT)
+
+
+ds[0].host(duel.TEAMS)
+lob()
+for j in ds[1:]:
+    j.join(j.hosts()[0])
+    lob()
+check("teams: unchosen, they alternate: red, blue, red", [e[3] for e in ds[0].party()] == [0, 1, 0])
+check("teams: the guests see the same", [e[3] for e in ds[2].party()] == [0, 1, 0]
+      and ds[1].my_team() == 1 and ds[2].my_team() == 0)
+ds[2].choose_team(1)
+lob()
+check("teams: CAT asks for blue: the host takes it", [e[3] for e in ds[0].party()] == [0, 1, 1]
+      and ds[2].my_team() == 1, str(ds[0].party()))
+ds[1].choose_team(0)
+ds[2].choose_team(0)
+lob()
+check("teams: everyone red: can't start", ds[0].can_start() == (False, "a player on each team"))
+ds[0].choose_team(1)
+lob()
+check("teams: the host goes blue: 1 against 2, can start", [e[3] for e in ds[0].party()] == [1, 0, 0]
+      and ds[0].can_start()[0])
+check("teams: START takes the teams", ds[0].start_game())
+gs = [flight(80 + i) for i in range(3)]
+ds[0].start(gs[0])
+lob(2)
+for d_, g_ in zip(ds[1:], gs[1:]):
+    d_.start(g_)
+check("teams: everyone has the teams", all(d_.teams[:3] == [1, 0, 0] for d_ in ds), str([d_.teams for d_ in ds]))
+check("teams: the host starts on blue's side, the two reds side by side on red's",
+      wpos(gs[0])[2] > 0 and wpos(gs[1])[2] < 0 and wpos(gs[2])[2] < 0
+      and abs(wpos(gs[1])[0] - wpos(gs[2])[0]) > 500)
+seen = {o.label: o for o in kind(gs[1], "player")} if False else None
+for _ in range(5):
+    for d_, g_ in zip(ds, gs):
+        g_.step(DT, 0.0, 0.0, -1.0, False, False)
+        d_.flight_step(g_, DT)
+b_sees = {o.label: o for o in kind(gs[1], "player")}
+check("teams: BEN's teammate CAT is a friend, the host isn't", b_sees["CAT"].friend and not b_sees["ANN"].friend
+      and b_sees["ANN"].rgb == duel.TEAM_RGB[1])
+
+# ---- the raid: no pirates; and the defenders not overwhelmed ------------------------------
+M = Match(duel.RAID, 2, seed=11, pirates=False)
+check("raid: the guest heard PIRATES OFF", not M.d[1].pirates and not M.d[0].pirates)
+M.fly(int((duel.WAVE_FIRST + 2) / DT))
+check("raid, no pirates: none come", kind(M.g[0], "ship") == [] and [o for o in kind(M.g[1], "npc") if o.net_id] == [])
+check("raid 1 v 1: the convoy's energy as usual", kind(M.g[0], "convoy")[0].max_energy == duel.CONVOY_ENERGY)
+check("raid 1 v 1: defender back in 3 s, raider in 5", M.d[0].respawn_time() == duel.DEFEND_RESPAWN
+      and M.d[1].respawn_time() == duel.RESPAWN)
+M = Match(duel.RAID, 4, seed=12, teams=(0, 1, 1, 1))
+check("raid 1 v 3: everyone has the teams", all(d_.teams == [0, 1, 1, 1] for d_ in M.d))
+check("raid 1 v 3: the convoy three times as tough", kind(M.g[0], "convoy")[0].max_energy == duel.CONVOY_ENERGY * 3)
+check("raid 1 v 3: raiders wait 5 + 2 x 2 s", M.d[2].respawn_time() == duel.RESPAWN + 2 * duel.RAID_EXTRA_RESPAWN)
+check("raid 1 v 3: the three raiders start apart, ahead", all(wpos(g_)[2] > duel.convoy_z(0) + 5000 for g_ in M.g[1:])
+      and min(math.dist(wpos(a_), wpos(b_)) for a_, b_ in ((M.g[1], M.g[2]), (M.g[2], M.g[3]), (M.g[1], M.g[3]))) > 1000)
+M.fly(int((duel.WAVE_FIRST + 2) / DT))
+check("raid 1 v 3: no pirates join the raiders", kind(M.g[0], "ship") == [])
+M = Match(duel.RAID, 3, seed=13, teams=(0, 0, 1))
+M.fly(int((duel.WAVE_FIRST + 2) / DT))
+check("raid 2 v 1: a wave of 2 pirates on the raider's side", len(kind(M.g[0], "ship")) == 2,
+      str(len(kind(M.g[0], "ship"))))
+check("raid 2 v 1: both defenders by the convoy", all(wpos(g_)[2] < duel.convoy_z(M.d[0].mtime) for g_ in M.g[:2]))
 
 # ---- packet sizes: the NPCS packet fits ESP-NOW's 250 bytes --------------------------------
 import struct
