@@ -87,6 +87,9 @@ BEAM_CONE = 0.98            # their laser drawn at you when their nose is this c
 FMT = "<2sBBBB6s16s18sBB4s"
 NO_TEAM = 255
 OPT_PIRATES = 1             # CONVOY RAID: pirates on the raiders' side (the host's choice)
+# the pirates' skill (the host's choice, build 151): the game's level, EASY / NORMAL / HARD
+# (game.LEVELS: how well they aim, how hard they hit, how tough they are), in options bits 1-2
+LEVEL_NAMES = ("EASY", "NORMAL", "HARD")
 LOBBY, HOST, JOIN, FLYING = 0, 1, 2, 3
 NO_ID = b"\x00" * 6
 HELLO_EVERY = 0.25          # seconds between HELLOs on the lobby pages
@@ -297,6 +300,7 @@ class Duel:
         self.start_ids = ()     # the guests' ids when the game started
         self.team_pref = NO_TEAM    # the team we'd like (team modes)
         self.pirates = True     # hosting CONVOY RAID: pirates on the raiders' side
+        self.pirate_level = 1   # their skill: game.LEVELS (0 EASY, 1 NORMAL, 2 HARD)
         self.teams = [0, 1, 0, 1]   # in a game: each slot's team
         self.roster = {}        # in a game: slot -> Player, everyone but us
         self.by_id = {}         # and id -> Player
@@ -465,6 +469,23 @@ class Duel:
         self.pirates = bool(on)
         self.hello_t = 0.0
 
+    def pirates_setting(self):
+        """The PIRATES line: -1 off, else their level (0-2)."""
+        return self.pirate_level if (self.pirates or self.mode != RAID) else -1
+
+    def step_pirates(self, step):
+        """Left / right on the PIRATES line: through OFF (a raid only), EASY, NORMAL, HARD."""
+        first = -1 if self.mode == RAID else 0
+        v = self.pirates_setting() + step
+        if v > 2:
+            v = first
+        elif v < first:
+            v = 2
+        self.pirates = v >= 0
+        if v >= 0:
+            self.pirate_level = v
+        self.hello_t = 0.0
+
     def can_start(self):
         """Hosting: (True, "") if the mode can start with these players, else (False, why)."""
         n = 1 + len([p for p in self.guests if p.t < GONE])
@@ -564,7 +585,8 @@ class Duel:
             teams = (0, 1, 0, 1)
         struct.pack_into(FMT, self.hello, 0, netplay.MAGIC, kind, role, self.colour, self.mode,
                          target, _name_bytes(self.name), self._ids(), self.team_pref,
-                         OPT_PIRATES if self.pirates else 0, bytes(teams[:MAX_PLAYERS]))
+                         (OPT_PIRATES if self.pirates else 0) | (self.pirate_level << 1),
+                         bytes(teams[:MAX_PLAYERS]))
         self.link.send(self.hello)
 
     def _send_start(self):
@@ -618,6 +640,7 @@ class Duel:
                     self.start_ids = guests
                     self.teams = [t & 1 for t in bytes(teams)]
                     self.pirates = bool(opts & OPT_PIRATES)
+                    self.pirate_level = min(2, (opts >> 1) & 3)
                 continue
             p.role = role
             p.mode = mode
@@ -1230,6 +1253,7 @@ class Duel:
         g.objs[:] = []
         g.net = self
         g.rules.manual_ecm = True   # the ECM by hand in multiplayer (Brian, 2026-11-25)
+        g.set_level(self.pirate_level)  # how the host's pirates fight (build 151)
         self.g = g
         self._respawn(g, keep_npcs=False)
         o = self.other

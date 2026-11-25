@@ -1681,3 +1681,21 @@ what is now `ace.py` (renamed in build 50).
    convoy (1 v 3: three times `CONVOY_ENERGY`); a pirate wave is 1 + defenders - raiders
    ships (none if the raiders are more). Tests in test_multiplayer (team choice, 1 v 3, 2 v 1,
    pirates off, the app's TEAM line). PC only.
+   **Build 151** (Brian, 2026-11-25: "Remove the none ship items from the view. In combat mode
+   the wave and kills overlap the view labels. The pirates skill level should be selectable.
+   In the loading scene you can see though ships. Also can see lines that should be hidden
+   when the station is in view and on the loading and start screens"). The Ship Viewer leaves
+   out what isn't a ship (`viewer.NOT_SHIPS`: canister, plate, the three rocks, the missile;
+   26 entries with the freighter; stations and the escape pod stay). The view label (REAR
+   VIEW...) moved below the practice score / multiplayer line: y -84 on the round screen, 26
+   below the top of a dashboard layout's view (the Pi's own label went; the Tufty's was off
+   its view). Multiplayer: PIRATES on the HOSTING page is their skill, EASY / NORMAL / HARD
+   (and OFF in a raid; CONVOY CO-OP has the line too), the game's level (`game.LEVELS`) set on
+   the host's game (`Duel.pirate_level`, options bits 1-2). Hidden lines: the loading screen's
+   ship drew every line; the title screen and Ship Viewer judged a face by its normal alone, as
+   if from far off, so close up the far side showed. All three now judge from a point on the
+   face, in perspective, as cockpit.draw_ship does (`letters.face_dots`: n.v + distance x the
+   turned normal's z < 0), and draw ships made of parts back to front (`letters.draw_edges`,
+   `fill_hull`). In flight, ships beyond the station are drawn before it and it is drawn solid
+   over them (`cockpit._draw_space(..., g)`, `_draw_obj`), and it is solid wherever it is over
+   the planet's or sun's filled disc (before: only over the planet's outline). PC renders only.

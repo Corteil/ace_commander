@@ -783,7 +783,7 @@ class AceCommander(PLATFORM.App):
         elif item == "SHIP VIEWER":
             self.zero = None
             if self.viewer is None:
-                self.viewer = viewer.Viewer(viewer.with_convoy(SHIPS))     # and the convoy's
+                self.viewer = viewer.Viewer(viewer.only_ships(SHIPS))     # ships only, and the convoy's
             self.mode = "viewer"
 
     def _update_practice(self, cancel, confirm):
@@ -861,7 +861,7 @@ class AceCommander(PLATFORM.App):
                 elif row == "team":
                     d.choose_team(1 - d.my_team())
                 else:
-                    d.set_pirates(not d.pirates)
+                    d.step_pirates(step)
             elif confirm:
                 d.start_game()      # (nothing until enough have joined)
         elif hit("left") or hit("right"):   # joining: left / right changes our team
@@ -876,7 +876,7 @@ class AceCommander(PLATFORM.App):
         rows = ["mode"]
         if dm.TEAMED[d.mode]:
             rows.append("team")
-        if d.mode == dm.RAID:
+        if d.mode == dm.RAID or d.mode == dm.COOP:
             rows.append("pirates")
         return rows
 
@@ -943,7 +943,8 @@ class AceCommander(PLATFORM.App):
                 elif row == "team":
                     v = "YOU: " + dm.team_label(d.mode, d.my_team())
                 else:
-                    v = "PIRATES: " + ("ON" if d.pirates else "OFF")
+                    v = d.pirates_setting()
+                    v = "PIRATES: " + (dm.LEVEL_NAMES[v] if v >= 0 else "OFF")
                 on = row == sel
                 text(ctx, ("< %s >" if on else "%s") % v, 0, y, 13 if on else 11,
                      cockpit.GREEN if on else cockpit.GREY)
@@ -972,9 +973,10 @@ class AceCommander(PLATFORM.App):
                 if t is not None:       # left / right asks for the other team
                     text(ctx, "< YOU: %s >" % dm.team_label(o.mode, t), 0, y, 13, dm.TEAM_RGB[t])
                     y += 16
-                if o.mode == dm.RAID:
-                    text(ctx, "PIRATES: " + ("ON" if o.opts & dm.OPT_PIRATES else "OFF"), 0, y, 11,
-                         cockpit.GREY)
+                if o.mode == dm.RAID or o.mode == dm.COOP:
+                    on = o.opts & dm.OPT_PIRATES or o.mode == dm.COOP
+                    text(ctx, "PIRATES: " + (dm.LEVEL_NAMES[min(2, (o.opts >> 1) & 3)] if on else "OFF"),
+                         0, y, 11, cockpit.GREY)
                     y += 14
                 self._draw_party(ctx, d, y + 2)
                 text(ctx, "waiting for the host" + dots, 0, 64, 11, cockpit.GREEN)

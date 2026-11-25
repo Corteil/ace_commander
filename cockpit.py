@@ -1091,9 +1091,23 @@ def _world(ctx, g):
         finally:
             g.leave_view()
             g.dust = dust
-        text(ctx, VIEW_NAMES[g.view] + " VIEW", 0, -96, 11, GREY)
+        # below the practice score, the multiplayer line and the frame time along the
+        # top (build 151: it overlapped them): on the round screen, and on a dashboard
+        # layout's shorter view (the Pi's, the Tufty's) as far down from its top
+        text(ctx, VIEW_NAMES[g.view] + " VIEW", 0, -84 if VIEW_HH >= 120 else 26 - VIEW_HH, 11, GREY)
         return
     _draw_world(ctx, g)
+
+
+def _draw_obj(ctx, g, o):
+    """One object, with another player's name under it and its laser if firing."""
+    drawn = draw_ship(ctx, o, UPGRADE_RGB if o.upgrade else o.rgb)
+    if drawn and o.label and o.z > INEAR and not g.over:    # another player: their name
+        z = int(o.z)
+        text(ctx, o.label, int(o.x) * IFOCAL // z,
+             -(int(o.y) * IFOCAL // z) + o.bp.isize * IFOCAL // z + 8, 10, o.rgb or WHITE)
+    if o.beam > 0:
+        _enemy_beam(ctx, o)
 
 
 def _draw_world(ctx, g, station_wire=WIRE_MIN):
@@ -1114,13 +1128,14 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
         ctx.stroke()
 
     sp = g.space
+    st = sp.station if sp is not None else None
     if sp is not None:
         if T_SPACE is not None:     # PERF: how long the sun, planet and station take
             t = _tus()
-            _draw_space(ctx, sp, station_wire)
+            _draw_space(ctx, sp, station_wire, g)
             T_SPACE[0] += _tdiff(_tus(), t)
         else:
-            _draw_space(ctx, sp, station_wire)
+            _draw_space(ctx, sp, station_wire, g)
 
     # stardust, so speed and turning can be seen (close to you, so drawn over the
     # planet and sun); with the jump drive on, each speck is a streak back to
@@ -1153,13 +1168,9 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
 
 
     for o in g.objs:
-        drawn = draw_ship(ctx, o, UPGRADE_RGB if o.upgrade else o.rgb)
-        if drawn and o.label and o.z > INEAR and not g.over:    # another player: their name
-            z = int(o.z)
-            text(ctx, o.label, int(o.x) * IFOCAL // z,
-                 -(int(o.y) * IFOCAL // z) + o.bp.isize * IFOCAL // z + 8, 10, o.rgb or WHITE)
-        if o.beam > 0:
-            _enemy_beam(ctx, o)
+        if st is not None and st.z > NEAR and o.z > st.z:
+            continue            # beyond the station: drawn before it (_draw_space)
+        _draw_obj(ctx, g, o)
 
     for boom in g.booms:
         fade = 1.0 - boom.t / boom.life
@@ -1604,9 +1615,11 @@ def _planet(ctx, sp, planet=None):
     _globe(ctx, sp.px, sp.py, sp.pz, sp.pr, fill, edge)
 
 
-def _draw_space(ctx, sp, wire=WIRE_MIN):
+def _draw_space(ctx, sp, wire=WIRE_MIN, g=None):
     """The sun (filled), the planet (an outline, filled black if it is in
-    front of the sun) and the station, in its government's colour."""
+    front of the sun) and the station, in its government's colour. With g, the
+    ships beyond the station are drawn before it, and it is drawn solid over them
+    (build 151: they showed through it); _draw_world draws the rest after."""
     sun = _sphere(sp.sx, sp.sy, sp.sz, sp.sr)
     planet = _sphere(sp.px, sp.py, sp.pz, sp.pr)
     # whichever is nearer is drawn last, over the other
@@ -1620,17 +1633,23 @@ def _draw_space(ctx, sp, wire=WIRE_MIN):
         _planet(ctx, sp, planet)
     st = sp.station
     if st is not None:
-        # in front of the planet and over its outline: the station hides it
+        # in front of the planet or the sun (filled discs) and over them: the station
+        # hides them (build 151: over its outline only, before; the disc showed through)
         solid = False
-        if (planet is not None and st.z > NEAR
-                and st.x * st.x + st.y * st.y + st.z * st.z
-                < sp.px * sp.px + sp.py * sp.py + sp.pz * sp.pz):
-            k = FOCAL / st.z
-            dx = st.x * k - planet[0]
-            dy = -st.y * k - planet[1]
-            pr = st.bp.size * k
-            d = math.sqrt(dx * dx + dy * dy)
-            solid = abs(d - planet[2]) < pr
+        if st.z > NEAR:
+            sd = st.x * st.x + st.y * st.y + st.z * st.z
+            for disc, cx, cy, cz in ((planet, sp.px, sp.py, sp.pz), (sun, sp.sx, sp.sy, sp.sz)):
+                if disc is not None and sd < cx * cx + cy * cy + cz * cz:
+                    k = FOCAL / st.z
+                    dx = st.x * k - disc[0]
+                    dy = -st.y * k - disc[1]
+                    if math.sqrt(dx * dx + dy * dy) < disc[2] + st.bp.size * k:
+                        solid = True
+        if g is not None and st.z > NEAR:
+            for o in g.objs:
+                if o.z > st.z:
+                    _draw_obj(ctx, g, o)
+                    solid = True    # hide what of it is behind the station
         # wire 0 (the docking computer's view): a wireframe at its true size
         # however far off, never a dot or marker
         draw_ship(ctx, st, station_colour(sp.gov), wire, solid)

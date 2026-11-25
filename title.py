@@ -26,7 +26,7 @@ FIRST = ("COBRA MK III", "MAMBA")   # the original showed these two
 SKIP = ("MISSILE", "CANISTER", "PLATE", "SPLINTER", "BOULDER", "ASTEROID",
         "ESCAPE POD", "THARGON")
 
-from .letters import block_rects, ACE as _ACE, COMMANDER as _COMMANDER, draw_name
+from .letters import block_rects, ACE as _ACE, COMMANDER as _COMMANDER, draw_name, face_dots, draw_edges
 
 
 
@@ -65,6 +65,8 @@ class Title:
         self.verts = [(x * s, y * s, z * s) for x, y, z in verts]
         self.edges = edges
         self.normals = normals
+        self.entry = e
+        self.dots = face_dots(e, s)     # for hidden lines in perspective (letters.face_dots)
         self.t = 0.0
         self.dist = FAR_DIST
 
@@ -93,31 +95,28 @@ class Title:
             self.yaw, self.pitch, self.roll)
         dist = self.dist
         screen = []
+        depth = []
         for x, y, z in self.verts:
-            d = m20 * x + m21 * y + m22 * z + dist
+            dz = m20 * x + m21 * y + m22 * z
+            depth.append(dz)
+            d = dz + dist
             if d < NEAR:
                 screen.append(None)
             else:
                 k = FOCAL / d
                 screen.append(((m00 * x + m01 * y + m02 * z) * k,
                                SHIP_Y - (m10 * x + m11 * y + m12 * z) * k))
-        # a face shows when its normal points back at the camera; a face with
-        # no normal is always drawn
+        # a face shows when its normal points back at the camera from a point on it
+        # (in perspective: letters.face_dots); a face with no normal is always drawn
         visible = []
+        dots = self.dots
+        i = 0
         for nx, ny, nz in self.normals:
             visible.append((nx == 0 and ny == 0 and nz == 0)
-                           or m20 * nx + m21 * ny + m22 * nz < 0)
-        ctx.rgb(1, 1, 1)
+                           or dots[i] + dist * (m20 * nx + m21 * ny + m22 * nz) < 0)
+            i += 1
         ctx.line_width = 1.5
-        ctx.begin_path()
-        for a, b, f1, f2 in self.edges:
-            if visible[f1] or visible[f2]:
-                p = screen[a]
-                q = screen[b]
-                if p is not None and q is not None:
-                    ctx.move_to(p[0], p[1])
-                    ctx.line_to(q[0], q[1])
-        ctx.stroke()
+        draw_edges(ctx, self.entry, screen, visible, depth, (1, 1, 1), -0.5 < m22 < 0.5)
 
         # the name goes on last, so a ship flying past the camera passes behind it
         draw_name(ctx)

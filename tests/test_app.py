@@ -299,12 +299,12 @@ choose(a, "SHIP VIEWER")
 assert a.mode == "viewer"
 v = a.viewer
 seen = set()
-for i in range(32):         # 31 ships and the convoy's hauler
+for i in range(26):         # 31 ships, less the 6 that aren't ships, and the convoy's
     seen.add(v.name)
     c = frame(a); fits(c)
     tick(a, fresh=["C"])
-assert len(seen) == 32 and v.idx == 0 and "BULK FREIGHTER" in seen
-tick(a, fresh=["KEY_P"]); assert v.idx == 31
+assert len(seen) == 26 and v.idx == 0 and "BULK FREIGHTER" in seen
+tick(a, fresh=["KEY_P"]); assert v.idx == 25
 tick(a, fresh=["KEY_N"]); assert v.idx == 0
 r0, p0 = v.roll, v.pitch
 tick(a, held=["JOYRIGHT"]); assert v.roll > r0

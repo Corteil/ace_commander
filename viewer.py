@@ -1,6 +1,11 @@
 """Ship viewer: one ship at a time, spinning, with hidden lines removed."""
 import math
 
+from .letters import face_dots, draw_edges
+
+# not ships (Brian, build 151): cargo, wreckage, rocks and the missile aren't shown
+NOT_SHIPS = ("CANISTER", "PLATE", "ASTEROID", "BOULDER", "SPLINTER", "MISSILE")
+
 CAM_DIST = 380.0
 FOCAL = 300.0
 FIT_RADIUS = 85.0   # every ship is scaled so its furthest vertex is this far out
@@ -21,31 +26,6 @@ def _rotation(yaw, pitch, roll):
     )
 
 
-def _fill_hull(ctx, pts):
-    """Fill black the outline round pts (the smallest convex shape holding them)."""
-    pts = sorted(pts)
-    hull = []
-    for half in (pts, pts[::-1]):       # Andrew's monotone chain, as cockpit._fill_hull
-        start = len(hull)
-        for p in half:
-            while len(hull) >= start + 2:
-                ax, ay = hull[-2]
-                bx, by = hull[-1]
-                if (bx - ax) * (p[1] - ay) - (by - ay) * (p[0] - ax) > 0:
-                    break
-                hull.pop()
-            hull.append(p)
-        hull.pop()
-    if len(hull) < 3:
-        return
-    ctx.rgb(0, 0, 0)
-    ctx.begin_path()
-    ctx.move_to(*hull[-1])
-    for p in hull:
-        ctx.line_to(*p)
-    ctx.fill()
-
-
 def with_convoy(ships):
     """The ships to show: the game's, then the convoy's hauler (multiplayer, duel.py),
     which is the game's own design whichever content is used."""
@@ -54,6 +34,11 @@ def with_convoy(ships):
     except ImportError:
         return ships
     return tuple(ships) + (convoy_ship.SHIP,)
+
+
+def only_ships(ships):
+    """The ships to show: everything but NOT_SHIPS, and the convoy's freighter last."""
+    return tuple(e for e in with_convoy(ships) if e[0] not in NOT_SHIPS)
 
 
 class Viewer:
@@ -78,6 +63,8 @@ class Viewer:
         # convex parts, for a shape that isn't convex (the ring station, the convoy's
         # hauler): drawn back to front, each nearer one blacking out what is behind
         self.parts = e[6] if len(e) > 6 else None
+        self.entry = e
+        self.dots = face_dots(e, s)     # hidden lines in perspective (letters.face_dots)
 
     def switch(self, step):
         self.idx = (self.idx + step) % len(self.ships)
@@ -98,42 +85,20 @@ class Viewer:
             screen.append(((m00 * x + m01 * y + m02 * z) * k,
                            -(m10 * x + m11 * y + m12 * z) * k))
 
-        # Elite's own rule: the ship sits straight ahead, so a face is visible
-        # when its normal points back towards the camera. A face with no
-        # normal (face-less edges, as on the plate) is always drawn.
+        # a face is visible when its normal points back towards the camera from a
+        # point on it (in perspective: letters.face_dots). A face with no normal
+        # (face-less edges, as on the plate) is always drawn.
         visible = []
+        dots = self.dots
+        i = 0
         for nx, ny, nz in self.normals:
-            visible.append(
-                (nx == 0 and ny == 0 and nz == 0)
-                or m20 * nx + m21 * ny + m22 * nz < 0
-            )
-
+            visible.append((nx == 0 and ny == 0 and nz == 0)
+                           or dots[i] + CAM_DIST * (m20 * nx + m21 * ny + m22 * nz) < 0)
+            i += 1
+        depth = [m20 * x + m21 * y + m22 * z for x, y, z in self.verts]
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
         ctx.line_width = 1.5
-        if self.parts:
-            depth = [m20 * x + m21 * y + m22 * z for x, y, z in self.verts]
-            order = sorted(self.parts, key=lambda p: -sum(depth[v] for v in p[0]) / len(p[0]))
-            side_on = -0.5 < m22 < 0.5      # the nose across the view more than along it
-            for vs, es, hides in order:
-                d = sum(depth[v] for v in vs) / len(vs)
-                if d < 0 and (hides == 1 or (hides == 2 and side_on)):
-                    _fill_hull(ctx, [screen[v] for v in vs])
-                ctx.rgb(1, 1, 1)
-                ctx.begin_path()
-                for i in es:
-                    a, b, f1, f2 = self.edges[i]
-                    if visible[f1] or visible[f2]:
-                        ctx.move_to(screen[a][0], screen[a][1])
-                        ctx.line_to(screen[b][0], screen[b][1])
-                ctx.stroke()
-        else:
-            ctx.rgb(1, 1, 1)
-            ctx.begin_path()
-            for a, b, f1, f2 in self.edges:
-                if visible[f1] or visible[f2]:
-                    ctx.move_to(screen[a][0], screen[a][1])
-                    ctx.line_to(screen[b][0], screen[b][1])
-            ctx.stroke()
+        draw_edges(ctx, self.entry, screen, visible, depth, (1, 1, 1), -0.5 < m22 < 0.5)
 
         ctx.font_size = 13
         ctx.text_align = ctx.CENTER

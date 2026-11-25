@@ -537,6 +537,40 @@ check("raid 2 v 1: a wave of 2 pirates on the raider's side", len(kind(M.g[0], "
       str(len(kind(M.g[0], "ship"))))
 check("raid 2 v 1: both defenders by the convoy", all(wpos(g_)[2] < duel.convoy_z(M.d[0].mtime) for g_ in M.g[:2]))
 
+# ---- the pirates' skill (build 151) --------------------------------------------------------
+air = Air()
+ds = [duel.Duel(Link(air, bytes([2, 0, 0, 0, 9, i + 1])), NAMES[i], 1) for i in range(2)]
+ds[0].host(duel.COOP)
+check("skill: co-op starts NORMAL, no OFF", ds[0].pirates_setting() == 1)
+ds[0].step_pirates(1)
+ds[0].step_pirates(1)
+check("skill: co-op goes round HARD, EASY (never off)", ds[0].pirates_setting() == 0)
+ds[0].step_pirates(-1)
+for _ in range(8):
+    for d_ in ds:
+        d_.lobby_step(DT)
+ds[1].join(ds[1].hosts()[0])
+for _ in range(8):
+    for d_ in ds:
+        d_.lobby_step(DT)
+check("skill: the guest sees HARD", (ds[1].host_p.opts >> 1) & 3 == 2)
+ds[0].start_game()
+gs = [flight(90), flight(91)]
+ds[0].start(gs[0])
+for _ in range(2):
+    ds[1].lobby_step(DT)
+ds[1].start(gs[1])
+check("skill: the host's game flies its pirates at HARD", gs[0].level == 2 and ds[1].pirate_level == 2)
+ds[0].stop(gs[0])
+ds[1].stop(gs[1])
+r = duel.Duel(Link(air, bytes([2, 0, 0, 0, 9, 9])), "R", 1)
+r.host(duel.RAID)
+seq = []
+for _ in range(4):
+    r.step_pirates(1)
+    seq.append(r.pirates_setting())
+check("skill: a raid goes NORMAL > HARD > OFF > EASY > NORMAL", seq == [2, -1, 0, 1], str(seq))
+
 # ---- packet sizes: the NPCS packet fits ESP-NOW's 250 bytes --------------------------------
 import struct
 check("sizes: every packet fits ESP-NOW (250 bytes)",

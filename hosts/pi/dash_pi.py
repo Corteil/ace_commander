@@ -244,8 +244,6 @@ def draw_view_overlay(ctx, ck, g, L, ms=None):
         ctx.rectangle(-14, -0.75, 8, 1.5).fill()
         ctx.rectangle(-0.75, 6, 1.5, 8).fill()
         ctx.rectangle(-0.75, -14, 1.5, 8).fill()
-    if g.view and not getattr(g, "autodock", False):
-        ck.text(ctx, ck.VIEW_NAMES[g.view] + " VIEW", 0, -hh + 10, 9, ck.GREY)
     sp = g.space
     if sp is None and getattr(g, "net", None) is None:     # practice: wave and score (not a duel)
         wave, score = str(g.wave), str(g.score)
