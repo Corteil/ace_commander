@@ -326,9 +326,10 @@ while not g.over and steps < 60000:
 assert g.over and g.hull == 0.0, "sitting still gets you killed"
 print("idle player is destroyed after %.0fs: ok" % g.time)
 t0 = g.time
+k0 = g.kills        # (a rock that rammed the idle ship may have counted)
 for _ in range(100):
     g.step(DT, 1, 1, 1, True, True)       # input is ignored once it's over
-assert g.speed < 14 and g.kills == 0
+assert g.speed < 14 and g.kills == k0, (g.speed, g.kills, k0)
 g.reset()
 assert not g.over and g.hull == 100.0 and g.objs == [] and g.score == 0
 print("game over and reset: ok")

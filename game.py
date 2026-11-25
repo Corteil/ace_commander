@@ -404,6 +404,70 @@ def _roll(m, a):
         m[3 + i] = roof * c - side * s
 
 
+def _pos_q(o):
+    """o's position in quarter units (o.q), read again from o.x, o.y, o.z if
+    anything else has moved it since _rotate or _move last did."""
+    q = o.q
+    if q is None:
+        q = o.q = [round(o.x * 4), round(o.y * 4), round(o.z * 4)]
+        o.qf = [32768, 32768, 32768]    # (_move's part-quarters: half to start)
+    elif o.x != (q[0] + 2) >> 2 or o.y != (q[1] + 2) >> 2 or o.z != (q[2] + 2) >> 2:
+        q[0] = round(o.x * 4)
+        q[1] = round(o.y * 4)
+        q[2] = round(o.z * 4)
+    return q
+
+
+def _axes_i(o):
+    """o's axes times 16384 (o.mi), read again from o.m if anything else has
+    turned it (its numbers aren't the very floats last put there) or replaced it."""
+    m = o.m
+    mf = o.mf
+    if (mf is None or m is not o.ml or m[0] is not mf[0] or m[1] is not mf[1]
+            or m[2] is not mf[2] or m[3] is not mf[3] or m[4] is not mf[4] or m[5] is not mf[5]
+            or m[6] is not mf[6] or m[7] is not mf[7] or m[8] is not mf[8]):
+        mi = o.mi
+        if mi is None:
+            mi = o.mi = [0] * 9
+            mf = o.mf = [0.0] * 9
+        for i in range(9):
+            f = m[i]
+            mi[i] = round(f * 16384)
+            mf[i] = f
+        o.ml = m
+    return o.mi
+
+
+def _move(o, v):
+    """Move o v units along its nose: in whole numbers while its masters are up to
+    date (no floats made), else as floats (they are read again at the next turn)."""
+    q = o.q
+    mf = o.mf
+    m = o.m
+    if (q is not None and mf is not None and m is o.ml and m[6] is mf[6] and m[7] is mf[7]
+            and m[8] is mf[8] and o.x == (q[0] + 2) >> 2 and o.y == (q[1] + 2) >> 2
+            and o.z == (q[2] + 2) >> 2):
+        mi = o.mi
+        qf = o.qf               # what is left over below a quarter, kept, so slow drifts add up
+        k = round(v * 16)       # sixteenths of a unit; axes x 16384, q quarters: >> 16
+        t = qf[0] + mi[6] * k
+        q[0] += t >> 16
+        qf[0] = t & 65535
+        t = qf[1] + mi[7] * k
+        q[1] += t >> 16
+        qf[1] = t & 65535
+        t = qf[2] + mi[8] * k
+        q[2] += t >> 16
+        qf[2] = t & 65535
+        o.x = (q[0] + 2) >> 2
+        o.y = (q[1] + 2) >> 2
+        o.z = (q[2] + 2) >> 2
+    else:
+        o.x += m[6] * v
+        o.y += m[7] * v
+        o.z += m[8] * v
+
+
 class Blueprint:
     """One ship type from ship_data.py (or original_ships.py)."""
 
@@ -520,6 +584,15 @@ class Obj:
         Obj.count += 1
         self.slot = Obj.count % THINK_EVERY
         self.think_t = 0.0  # time since this ship last did
+        # build 164: whole-number masters for turning and moving (Game._rotate, _move):
+        # where it is in quarter units, its axes times 16384, the floats last put in m
+        # from them (and the list): anything else that moves or turns it is seen by
+        # those no longer matching, and they are read again from x, y, z and m
+        self.q = None
+        self.qf = None
+        self.mi = None
+        self.mf = None
+        self.ml = None
 
 
 class Boom:
@@ -1687,7 +1760,10 @@ class Game:
                     o.max_energy = o.energy
             self.objs.extend(self.new)
             self.new = []
-        self.objs = [o for o in self.objs if not o.dead]
+        for o in self.objs:     # (a new list only when one has gone)
+            if o.dead:
+                self.objs = [o for o in self.objs if not o.dead]
+                break
         if self.lock is not None and self.lock.dead:
             self.lock = None
             self.locked = False
@@ -1708,8 +1784,14 @@ class Game:
                 sp.sz -= fwd
                 if sp.station is not None:
                     sp.station.z -= fwd
+            fq = round(fwd * 4)
             for o in self.objs:
-                o.z -= fwd
+                q = _pos_q(o)
+                q[2] -= fq
+                o.x = (q[0] + 2) >> 2
+                o.y = (q[1] + 2) >> 2
+                o.z = (q[2] + 2) >> 2
+                _axes_i(o)      # (read again if turned, so _move stays in whole numbers)
             if self.anchor is not None:
                 self.anchor.z -= fwd
             for boom in self.booms:
@@ -1767,23 +1849,38 @@ class Game:
                 m[i], m[i + 1], m[i + 2] = _rot3(m[i], m[i + 1], m[i + 2], fca, fsa, fcb, fsb)
             if self.tick % 32 == 0:
                 _ortho(an.m)
+        fq = round(fwd * 4)
         for o in self.objs:
-            x = int(o.x * 4)
-            y = int(o.y * 4)
-            z = int(o.z * 4)
+            # build 164: on its whole-number masters (_pos_q, _axes_i); x, y, z
+            # stored as whole numbers and m from mi, so the only floats made are m's 9
+            q = _pos_q(o)
+            x = q[0]
+            y = q[1]
+            z = q[2]
             y, z = (y * ca2 - z * sa2 + 4096) >> 13, (y * sa2 + z * ca2 + 4096) >> 13
-            o.x = ((x * cb2 - y * sb2 + 4096) >> 13) * 0.25
-            o.y = ((x * sb2 + y * cb2 + 4096) >> 13) * 0.25
-            o.z = z * 0.25 - fwd
+            x, y = (x * cb2 - y * sb2 + 4096) >> 13, (x * sb2 + y * cb2 + 4096) >> 13
+            z -= fq
+            q[0] = x
+            q[1] = y
+            q[2] = z
+            o.x = (x + 2) >> 2
+            o.y = (y + 2) >> 2
+            o.z = (z + 2) >> 2
+            mi = _axes_i(o)
+            mf = o.mf
             m = o.m
             for i in (0, 3, 6):
-                x = int(m[i] * 16384)
-                y = int(m[i + 1] * 16384)
-                z = int(m[i + 2] * 16384)
+                x = mi[i]
+                y = mi[i + 1]
+                z = mi[i + 2]
                 y, z = (y * ca - z * sa + 8192) >> 14, (y * sa + z * ca + 8192) >> 14
-                m[i] = ((x * cb - y * sb + 8192) >> 14) * _INV14
-                m[i + 1] = ((x * sb + y * cb + 8192) >> 14) * _INV14
-                m[i + 2] = z * _INV14
+                x, y = (x * cb - y * sb + 8192) >> 14, (x * sb + y * cb + 8192) >> 14
+                mi[i] = x
+                mi[i + 1] = y
+                mi[i + 2] = z
+                m[i] = mf[i] = x * _INV14
+                m[i + 1] = mf[i + 1] = y * _INV14
+                m[i + 2] = mf[i + 2] = z * _INV14
             v = o.aim
             if v is not None:
                 x = int(v[0] * 16384)
@@ -1887,10 +1984,7 @@ class Game:
             if o.speed and (kind == "player" or kind == "npc"):
                 # between their poses, along their nose at their speed (build 163: placed
                 # only when a pose comes, not every frame); your own flight moves it as all
-                v = o.speed * SPEED_K * dt
-                o.x += m[6] * v
-                o.y += m[7] * v
-                o.z += m[8] * v
+                _move(o, o.speed * SPEED_K * dt)
             return
         if kind == "ship":
             # Steering is the costly part, and makes a lot of work for the
@@ -1898,10 +1992,7 @@ class Game:
             # for all the time since it last did. It still moves every frame.
             o.think_t += dt
             if (self.frame + o.slot) % THINK_EVERY:
-                v = o.speed * SPEED_K * dt
-                o.x += m[6] * v
-                o.y += m[7] * v
-                o.z += m[8] * v
+                _move(o, o.speed * SPEED_K * dt)
                 return
             dt = o.think_t
             o.think_t = 0.0
@@ -1915,10 +2006,7 @@ class Game:
             bp = o.bp
             if o.state == "drift":      # a Thargon with no mothership: adrift
                 o.speed = bp.speed * 0.25
-                v = o.speed * SPEED_K * dt / THINK_EVERY
-                o.x += m[6] * v
-                o.y += m[7] * v
-                o.z += m[8] * v
+                _move(o, o.speed * SPEED_K * dt / THINK_EVERY)
                 return
             if bp.name == "THARGON" and not self._any_thargoid():
                 o.state = "drift"       # half speed, aimless (TACTICS part 1)
@@ -2096,9 +2184,7 @@ class Game:
             if o.spin:
                 _roll(m, o.spin * dt)
             v = o.speed * SPEED_K * dt
-        o.x += m[6] * v
-        o.y += m[7] * v
-        o.z += m[8] * v
+        _move(o, v)
 
     def _launch(self, ship):
         o = Obj(self.missile_bp, "missile", ship.x, ship.y, ship.z)

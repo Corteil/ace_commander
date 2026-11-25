@@ -1838,3 +1838,28 @@ what is now `ace.py` (renamed in build 50).
    same script on both builds: build 162 averaged 83-90 ms a frame (draw 63-65, update 20-27),
    a collection every 20-21 frames; build 163 56-64 ms (draw 39-42, update 16-21), every
    33-43 frames. Not yet played by hand.
+   **Build 164** (Brian, 2026-11-25: "can shared game rules use integer maths?", then
+   "measure first then do step 1"). Measured first (three games on one badge, build 163):
+   `Game.step` made 6.8 KB (host) / 5.1 KB (guest) a frame, of it `_rotate` 3.5 / 3.4 KB
+   (each object's position and axes turned in whole numbers but stored back as floats,
+   ~26 floats an object), `_think` 2.2 / 0.6 KB (the AI's planning, and moving along the
+   nose every frame), collisions and weapons ~0.6 KB. Step 1: every object turns and moves
+   on whole-number masters, `Obj.q` (position in quarter units), `Obj.qf` (what `_move` has
+   left over below a quarter, so slow drifts add up) and `Obj.mi` (axes x 16384);
+   `o.x / y / z` are stored as whole numbers (rounded from q) and `o.m` as floats made from
+   mi (its nine, no temporaries); `game._move` moves along the nose in whole numbers. The
+   230-odd readers of o.x / o.m are unchanged: anything else that moves or turns an object
+   (spawns, the AI's `_turn` / `_look`, duel's `place_i`, view flips, `_shift`, a new o.m
+   list) is seen by x, y, z no longer matching q (by value) or o.m's numbers no longer
+   being the very floats last put there (`Obj.mf`, by identity), and the masters are read
+   again (`_pos_q`, `_axes_i`). `Game.step` makes a new objs list only when one has gone.
+   Turning error against exact floats over 200 frames is as before (18 units at 2500: the
+   rounded sines). Tests: `tests/test_int_masters.py`; test_game's game-over check compares
+   kills before and after (an idle ship rammed by a rock now counts one, the random fight
+   being a hair different). Measured the same way: `Game.step` 3.7 KB (host) / 3.3 KB
+   (guest), `_rotate` 2.2 / 2.3 KB (o.m's nine floats an object, and the multiplayer anchor,
+   kept in exact floats on purpose), `_think` 0.8 / 0.3 KB. The four-badge bot game
+   (STATION CO-OP, as build 163): a collection every 44-57 frames (33-43 before), average
+   frame 56-61 ms (56-64), update 15-19 ms (16-21); slow frames about the same or a few
+   more (53-103 against 53-92: one run each, not enough to tell). Not yet played by hand,
+   and the main game (docking, the sun, practice) only by the PC tests.

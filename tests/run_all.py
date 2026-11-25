@@ -15,7 +15,8 @@ for name in ("test_game.py", "test_app.py", "test_commander.py", "test_galaxy.py
              "test_leds.py", "test_hardcore.py", "test_views.py", "test_keys.py", "test_analog.py",
              "test_bench.py", "test_run.py", "test_pi_controls.py", "test_build_mpy.py",
              "test_sound.py", "test_espnow_link.py", "test_net_pose.py", "test_duel.py", "test_duel_combat.py",
-             "test_multiplayer.py", "test_net_espnow.py"):
+             "test_multiplayer.py", "test_net_espnow.py",
+             "test_int_masters.py"):
     r = subprocess.run([sys.executable, os.path.join(HERE, name)], capture_output=True, text=True)
     lines = [l for l in r.stdout.strip().split("\n") if not l.startswith(("PERF", "BENCH"))]
     print("%-14s %s" % (name, "ok" if r.returncode == 0 else "FAILED"), "-", lines[-1] if lines else "")
