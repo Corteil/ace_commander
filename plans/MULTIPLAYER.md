@@ -225,6 +225,13 @@ to be a new large design".
 - **Builds 157-158: the defenders' colour.** The raids' HOSTING page has DEFENDERS: RED or
   BLUE (HELLO's last byte); the raiders are the other.
 
+- **Build 159: team sizes and random teams.** SIDES (ANY or red v blue sizes; the game is
+  capped at their sum: hosts() and the host's join check) and PICK (CHOOSE / RANDOM) on
+  HOSTING (HELLO's last byte: the SIDES number, bit 4 RANDOM). Chosen teams are kept while
+  the team has room. RANDOM: the lobby shows "?", the host draws the teams at START (within
+  the sizes, someone on each side) and START carries them. The HOSTING page shows six lines
+  at a time and scrolls.
+
 Not yet on badges: the frame time with three other ships, eight pirates and the convoy (92
 lines in 6 parts close up) needs measuring; and how busy the radio is with four (each sends
 15 poses a second; the host also 10 NPCS and 4 STATE).

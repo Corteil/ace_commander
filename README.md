@@ -44,8 +44,12 @@ A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves 
   network needed; tested to 10 m through a door). Everyone on the MULTIPLAYER page is listed
   with their commander's name and ship colour. One player picks **HOST A GAME** and a mode
   (left / right), up to three others **JOIN** the host's name, and the host presses C to
-  launch everyone. In team modes each player picks a team with left / right (the host on
-  its YOU line, up / down picks the line); anyone who hasn't picked joins the smaller team. Lasers, missiles and ramming do damage; the E.C.M. fires only by hand (**B**,
+  launch everyone. In team modes the host sets SIDES (ANY, or the team sizes: 1 v 1, 1 v 2,
+  2 v 1, 2 v 2, 1 v 3 or 3 v 1, which also caps how many can join) and PICK: CHOOSE (each
+  player picks a team with left / right, the host on its YOU line; up / down picks the line;
+  anyone who hasn't picked, or whose team is full, joins the one with more room) or RANDOM
+  (the teams are drawn when the host starts). The hosting page scrolls when it has more
+  lines than fit. Lasers, missiles and ramming do damage; the E.C.M. fires only by hand (**B**,
   instead of the energy bomb). The modes:
   - **DUEL**: two players, 8000 apart and facing. Destroyed: C starts the next round, both
     back at their ends with full shields, missiles and E.C.M.; the score is kept.

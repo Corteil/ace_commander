@@ -88,7 +88,8 @@ BEAM_CONE = 0.98            # their laser drawn at you when their nose is this c
 # name (16 bytes, ASCII, padded with spaces), guests (the host's: 3 ids, NO_ID if none),
 # the team we'd like (NO_TEAM: any), options (the host's: OPT_PIRATES), each slot's team
 # (the host's: 4 bytes, slot 0 first)
-FMT = "<2sBBBB6s16s18sBB4sBB"    # ... the host's LIVES (0: unlimited), the defenders' colour
+FMT = "<2sBBBB6s16s18sBB4sBBB"   # ... the host's LIVES (0: unlimited), the defenders' colour,
+# its team set-up (SIDES_CHOICES number, bit 4: RANDOM)
 NO_TEAM = 255
 OPT_PIRATES = 1             # CONVOY RAID: pirates on the raiders' side (the host's choice)
 # the pirates' skill (the host's choice, build 151): the game's level, EASY / NORMAL / HARD
@@ -134,6 +135,13 @@ TEAM_RGB = ((1, 0.25, 0.2), (0.3, 0.55, 1))
 # build 158: "Just between red and blue is ok"): 0 red (the raiders blue) or 1 blue (the
 # raiders red)
 DEFEND_COLOUR = 0
+# team sizes (Brian, build 159: "Team size to be defined by the host"): ANY (players pick
+# freely, at most MAX_PLAYERS) or red / defenders v blue / raiders, which caps the game at
+# their sum; and "random player colour selection": PICK RANDOM puts the players on the
+# teams at random when the host starts (within the sizes), CHOOSE lets each pick
+SIDES_CHOICES = (None, (1, 1), (1, 2), (2, 1), (2, 2), (1, 3), (3, 1))
+RANDOM_TEAMS = 16           # in the team set-up byte
+UNKNOWN = 2                 # a team not known yet (RANDOM, before the start)
 
 
 def raid_rgb(defend_colour, t):
@@ -363,6 +371,7 @@ class Player:
         self.opts = OPT_PIRATES     # a host's options
         self.opts2 = 0
         self.defend_colour = DEFEND_COLOUR
+        self.teamopt = 0        # a host's team set-up (SIDES_CHOICES number, RANDOM_TEAMS)
         self.t = 0.0            # seconds since last heard
         self.slot = 0
         self.ship = None        # their ship in our game (an Obj, kind "player")
@@ -374,7 +383,10 @@ class Player:
         self.lost = False
 
     def open_slots(self):
-        return MAX_PLAYERS - 1 - len(self.guests)
+        sides = SIDES_CHOICES[self.teamopt & 15] if TEAMED[self.mode] and (self.teamopt & 15) < len(
+            SIDES_CHOICES) else None
+        most = sides[0] + sides[1] if sides else MAX_PLAYERS
+        return most - 1 - len(self.guests)
 
 
 class Duel:
@@ -397,6 +409,8 @@ class Duel:
         self.station_i = 0      # and which station (STATIONS)
         self.lives = 0          # and LIVES (LIVES_CHOICES; 0: unlimited)
         self.defend_colour = DEFEND_COLOUR  # a raid's defenders' colour: 0 red, 1 blue (raid_rgb)
+        self.sides_i = 0        # team modes: team sizes (SIDES_CHOICES), 0 ANY
+        self.random_teams = False   # and PICK: RANDOM
         self.wants_launch = False   # destroyed, penalty served: ace shows the launch tunnel
         self.teams = [0, 1, 0, 1]   # in a game: each slot's team
         self.roster = {}        # in a game: slot -> Player, everyone but us
@@ -548,23 +562,67 @@ class Duel:
                             i + 1, h.teams[i + 1]))
         return out
 
-    def lobby_teams(self):
-        """Hosting: each slot's team: as its player chose, or else the smaller team then
-        (red if they are level). Four, slot 0 (us) first."""
-        teams = []
-        n = [0, 0]
+    def sides(self):
+        """The team sizes the host set: (red / defenders, blue / raiders), or None (ANY)."""
+        return SIDES_CHOICES[self.sides_i] if TEAMED[self.mode] else None
+
+    def most_players(self):
+        s = self.sides()
+        return s[0] + s[1] if s else MAX_PLAYERS
+
+    def teamopt(self):
+        return (self.sides_i & 15) | (RANDOM_TEAMS if self.random_teams else 0)
+
+    def _take_teamopt(self, b):
+        self.sides_i = (b & 15) if (b & 15) < len(SIDES_CHOICES) else 0
+        self.random_teams = bool(b & RANDOM_TEAMS)
+
+    def step_sides(self, step):
+        self.sides_i = (self.sides_i + step) % len(SIDES_CHOICES)
+        self.hello_t = 0.0
+
+    def set_random_teams(self, on):
+        self.random_teams = bool(on)
+        self.hello_t = 0.0
+
+    def lobby_teams(self, final=False):
+        """Hosting: each slot's team, four, slot 0 (us) first: as its player chose if that
+        team has room (SIDES), or else the team with more room (red if level). With PICK
+        RANDOM: UNKNOWN until final (the start), then at random within the sizes."""
         prefs = [self.team_pref] + [p.team_pref for p in self.guests]
+        sides = self.sides()
+        room = list(sides) if sides else [MAX_PLAYERS, MAX_PLAYERS]
+        if self.random_teams and TEAMED[self.mode]:
+            n = len(prefs)
+            if not final:
+                return [UNKNOWN] * MAX_PLAYERS
+            # how many red: as near the sizes' share as fits, at least one on each side
+            k0 = int(n * room[0] / float(room[0] + room[1]) + 0.5) if sides else (n + 1) // 2
+            k0 = max(max(1, n - room[1]), min(k0, room[0], n - 1)) if n > 1 else 1
+            order = list(range(n))
+            for i in range(n - 1, 0, -1):       # shuffle (MicroPython has no random.shuffle)
+                j = random.randint(0, i)
+                order[i], order[j] = order[j], order[i]
+            teams = [1] * n
+            for s_ in order[:k0]:
+                teams[s_] = 0
+            return teams + [0] * (MAX_PLAYERS - n)
+        teams = []
         for pref in prefs:
-            t = pref if pref == 0 or pref == 1 else (0 if n[0] <= n[1] else 1)
-            n[t] += 1
+            if (pref == 0 or pref == 1) and room[pref] > 0:
+                t = pref
+            else:
+                t = 0 if room[0] >= room[1] else 1
+            room[t] -= 1
             teams.append(t)
         while len(teams) < MAX_PLAYERS:
-            teams.append(0 if n[0] <= n[1] else 1)
-            n[teams[-1]] += 1
+            teams.append(0 if room[0] >= room[1] else 1)
+            room[teams[-1]] -= 1
         return teams
 
     def my_team(self):
-        """The team we are on in the lobby (as the host has it), or None (no teams)."""
+        """The team we are on in the lobby (as the host has it), None (no teams), or
+        UNKNOWN (PICK RANDOM: till the start)."""
         if self.role == HOST:
             return self.lobby_teams()[0] if TEAMED[self.mode] else None
         h = self.host_p
@@ -727,8 +785,12 @@ class Duel:
         if n > MODE_MAX[self.mode]:
             return False, "%d players only" % MODE_MAX[self.mode]
         if TEAMED[self.mode]:
+            if n > self.most_players():
+                return False, "%d players only" % self.most_players()
+            if n < 2:
+                return False, "a player on each team"
             teams = self.lobby_teams()[:n]
-            if 0 not in teams or 1 not in teams:
+            if not self.random_teams and (0 not in teams or 1 not in teams):
                 return False, "a player on each team"
         return True, ""
 
@@ -770,7 +832,7 @@ class Duel:
             return False
         self.guests = [p for p in self.guests if p.t < GONE]
         self.start_ids = tuple(p.id for p in self.guests)
-        self.teams = self.lobby_teams()
+        self.teams = self.lobby_teams(final=True)     # (RANDOM: drawn now)
         self.start_t = START_FOR
         self.start_gap = START_EVERY
         self._send_start()
@@ -813,13 +875,13 @@ class Duel:
             target = NO_ID
         hosting = role == HOST or (role == FLYING and self.slot == 0)
         if hosting:
-            teams = self.teams if self.flying else self.lobby_teams()
+            teams = self.teams if (self.flying or kind == START_PKT) else self.lobby_teams()
         else:
             teams = (0, 1, 0, 1)
         struct.pack_into(FMT, self.hello, 0, netplay.MAGIC, kind, role, self.colour, self.mode,
                          target, _name_bytes(self.name), self._ids(), self.team_pref,
                          self.options(), bytes(teams[:MAX_PLAYERS]),
-                         self.lives & 0xFF, self.defend_colour & 0xFF)
+                         self.lives & 0xFF, self.defend_colour & 0xFF, self.teamopt())
         self.link.send(self.hello)
 
     def _send_start(self):
@@ -852,7 +914,7 @@ class Duel:
             if (kind != HELLO and kind != START_PKT and kind != END_PKT) or len(msg) < size:
                 continue
             (_, _, role, colour, mode, target, name, ids, pref, opts,
-             teams, opts2, dcol) = struct.unpack_from(FMT, msg, 0)
+             teams, opts2, dcol, topt) = struct.unpack_from(FMT, msg, 0)
             hid = bytes(host)
             p = self.players.get(hid)
             if p is None:
@@ -871,24 +933,26 @@ class Duel:
                     self.go = True          # our host started: fly
                     self.mode = mode
                     self.start_ids = guests
-                    self.teams = [t & 1 for t in bytes(teams)]
+                    self.teams = [t & 1 for t in bytes(teams)]   # (at the start, all known)
                     self._take_options(opts)
                     self.lives = opts2
                     self.defend_colour = dcol & 1
+                    self._take_teamopt(topt)
                 continue
             p.role = role
             p.mode = mode
             p.team_pref = pref
             if role == HOST or role == FLYING:
-                p.teams = tuple(t & 1 for t in bytes(teams))
+                p.teams = tuple(t if t <= UNKNOWN else 0 for t in bytes(teams))
                 p.opts = opts
                 p.opts2 = opts2
                 p.defend_colour = dcol & 1
+                p.teamopt = topt
             p.target = bytes(target)
             p.guests = guests if role == HOST or role == FLYING else ()
             if self.role == HOST and not self.flying:
                 if role == JOIN and p.target == me:
-                    if p not in self.guests and len(self.guests) < MAX_PLAYERS - 1:
+                    if p not in self.guests and len(self.guests) < self.most_players() - 1:
                         self.guests.append(p)       # a guest (the first three to ask)
                 elif p in self.guests:
                     self.guests.remove(p)           # gone back to the lobby, or elsewhere

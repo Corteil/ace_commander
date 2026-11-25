@@ -412,7 +412,7 @@ a.draw(c)
 texts = [t[0] for t in c.texts]
 check("app: three in the party, with teams", len(a.duel.guests) == 2 and "BEN  BLUE" in texts
       and "CAT  RED" in texts, str(texts))
-bs.tick(a, fresh=["JOYDOWN"])           # down to the TEAM line; right: the host goes blue
+a.d_row = 3                             # the TEAM line (after MODE, SIDES, PICK); right: blue
 bs.tick(a, fresh=["JOYRIGHT"])
 for _ in range(8):
     for o in others:
@@ -871,6 +871,73 @@ seen = {o.label: o.rgb for o in kind(gs[1], "player")}
 check("colour: in flight the defenders are blue, the raider red", seen["ANN"] == duel.TEAM_RGB[1]
       and seen["CAT"] == duel.TEAM_RGB[1] and {o.label: o.rgb for o in kind(gs[0], "player")}["BEN"] == duel.TEAM_RGB[0],
       str(seen))
+
+# ---- team sizes and random teams (build 159) -----------------------------------------------
+air = Air()
+ds = [duel.Duel(Link(air, bytes([2, 0, 0, 0, 14, i + 1])), NAMES[i], 1) for i in range(4)]
+
+
+def lob(n=8):
+    for _ in range(n):
+        for d_ in ds:
+            d_.lobby_step(DT)
+
+
+ds[0].host(duel.TEAMS)
+while ds[0].sides() != (2, 1):
+    ds[0].step_sides(1)
+lob()
+ds[1].choose_team(1)
+ds[2].choose_team(1)            # blue has room for one only
+for j in ds[1:3]:
+    j.join(j.hosts()[0])
+    lob()
+check("sides 2 v 1: the second to ask for blue goes red", [e[3] for e in ds[0].party()] == [0, 1, 0],
+      str(ds[0].party()))
+check("sides 2 v 1: full at three: the fourth doesn't see the game", ds[3].hosts() == [])
+ds[3].join(next(p for p in ds[3].lobby() if p.name == "ANN"))
+lob()
+check("sides 2 v 1: and isn't taken if it asks", len(ds[0].guests) == 2 and not ds[3].accepted())
+ds[0].set_random_teams(True)
+lob()
+check("random: the lobby shows the teams as not known yet", [e[3] for e in ds[1].party()] == [duel.UNKNOWN] * 3
+      and ds[1].my_team() == duel.UNKNOWN)
+check("random: it can start", ds[0].can_start()[0])
+random.seed(5)
+ds[0].start_game()
+lob(2)
+check("random: drawn at the start, 2 v 1, the same for all", sorted(ds[0].teams[:3]) == [0, 0, 1]
+      and ds[1].teams[:3] == ds[0].teams[:3] and ds[2].teams[:3] == ds[0].teams[:3], str([d_.teams for d_ in ds]))
+draws = set()
+for seed in range(12):
+    random.seed(seed)
+    draws.add(tuple(ds[0].lobby_teams(final=True)[:3]))
+check("random: different draws put different players together", len(draws) >= 2, str(draws))
+ds[0].sides_i = 0
+draws = [tuple(ds[0].lobby_teams(final=True)[:3]) for _ in range(20)]
+check("random, ANY sizes: always someone on each side", all(0 in d and 1 in d for d in draws))
+c = bs.CountCtx()
+
+# the app's HOSTING page scrolls (STATION RAID: ten lines)
+air = Air()
+mine = Link(air, bytes([2, 0, 0, 0, 15, 1]))
+a = ace_commander.AceCommander()
+a.platform.radio = lambda: mine
+bs.choose(a, "MULTIPLAYER")
+bs.tick(a, fresh=["CONFIRM"])
+a.duel.set_mode(duel.SRAID)
+check("app: station raid has ten lines", len(a._host_rows(a.duel)) == 10, str(a._host_rows(a.duel)))
+c = bs.CountCtx()
+a.draw(c)
+texts = [t[0] for t in c.texts]
+check("app: six shown, more below", "..." in texts and "LIVES: UNLIMITED" not in texts, str(texts))
+a.d_row = 9
+c = bs.CountCtx()
+a.draw(c)
+texts = [t[0] for t in c.texts]
+check("app: down at LIVES, the list has scrolled", "< LIVES: UNLIMITED >" in texts and "STATION RAID" not in texts,
+      str(texts))
+a._to_title()
 
 # ---- packet sizes: the NPCS packet fits ESP-NOW's 250 bytes --------------------------------
 import struct

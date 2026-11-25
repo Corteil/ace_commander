@@ -875,6 +875,10 @@ class AceCommander(PLATFORM.App):
                     self.d_mode = d.mode        # the next game starts on it too
                 elif row == "team":
                     d.choose_team(1 - d.my_team())
+                elif row == "sides":
+                    d.step_sides(step)
+                elif row == "pick":
+                    d.set_random_teams(not d.random_teams)
                 elif row == "pirates":
                     d.step_pirates(step)
                 elif row == "colour":
@@ -891,16 +895,20 @@ class AceCommander(PLATFORM.App):
                 d.start_game()      # (nothing until enough have joined)
         elif hit("left") or hit("right"):   # joining: left / right changes our team
             t = d.my_team()
-            if t is not None:
+            if t is not None and t != dm.UNKNOWN:
                 d.choose_team(1 - t)
+
+    SHOWN = 6           # the HOSTING page's lines shown at once (it scrolls)
 
     @staticmethod
     def _host_rows(d):
         """The HOSTING page's lines that left / right change."""
         from . import duel as dm
         rows = ["mode"]
-        if dm.TEAMED[d.mode]:
-            rows.append("team")
+        if dm.TEAMED[d.mode]:           # team sizes, chosen or random teams, ours
+            rows += ["sides", "pick"]
+            if not d.random_teams:
+                rows.append("team")
         if dm.GUARDED[d.mode]:
             rows.append("pirates")
         if dm.RAIDED[d.mode]:           # the defenders' colour
@@ -918,7 +926,10 @@ class AceCommander(PLATFORM.App):
         dcol = d.defend_colour if d.role == dm.HOST else (
             d.host_p.defend_colour if d.host_p is not None else dm.DEFEND_COLOUR)
         for i, (name, colour, slot, t) in enumerate(d.party()):
-            if dm.TEAMED[mode]:
+            if dm.TEAMED[mode] and t == dm.UNKNOWN:    # PICK RANDOM: drawn at the start
+                rgb = cockpit.GREY
+                name = "%s  ?" % name[:12]
+            elif dm.TEAMED[mode]:
                 rgb = dm.raid_rgb(dcol, t) if dm.RAIDED[mode] else dm.TEAM_RGB[t]
                 name = "%s  %s" % (name[:12], dm.team_label(mode, t))
             else:
@@ -967,12 +978,23 @@ class AceCommander(PLATFORM.App):
             text(ctx, "HOSTING", 0, -86, 14, cockpit.WHITE)
             rows = self._host_rows(d)
             sel = rows[self.d_row] if self.d_row < len(rows) else "mode"
-            many = len(rows) > 3            # the station modes: closer together
-            step = 12 if len(rows) >= 8 else (13 if many else 15)
+            many = len(rows) > 3            # closer together
+            step = 13 if many else 15
+            # at most SHOWN lines, scrolling with the one picked ("..." where there are more)
+            first = max(0, min(self.d_row - 2, len(rows) - self.SHOWN))
+            last = min(len(rows), first + self.SHOWN)
             y = -68
-            for row in rows:
+            if first > 0:               # more above: under the title, the lines a little lower
+                text(ctx, "...", 0, -76, 10, cockpit.GREY)
+                y = -64
+            for row in rows[first:last]:
                 if row == "mode":
                     v = dm.MODE_NAMES[d.mode]
+                elif row == "sides":
+                    sz = d.sides()
+                    v = "SIDES: " + ("ANY" if sz is None else "%d v %d" % sz)
+                elif row == "pick":
+                    v = "PICK: " + ("RANDOM" if d.random_teams else "CHOOSE")
                 elif row == "team":
                     v = "YOU: " + dm.team_label(d.mode, d.my_team())
                 elif row == "pirates":
@@ -994,10 +1016,13 @@ class AceCommander(PLATFORM.App):
                     rgb = dm.TEAM_RGB[d.defend_colour]
                 text(ctx, ("< %s >" if on else "%s") % v, 0, y, (12 if many else 13) if on else 11, rgb)
                 y += step
-                if row == "mode" and len(rows) < 6:     # (no room with the station's lines)
+                if row == "mode" and len(rows) < 5:     # (no room with more lines)
                     text(ctx, dm.MODE_NOTES[d.mode], 0, y - 2, 10, cockpit.YELLOW)
                     y += 11 if many else 12
-            self._draw_party(ctx, d, y + 4, 11 if len(rows) >= 8 else (12 if many else 14))
+            if last < len(rows):
+                text(ctx, "...", 0, y - 5, 10, cockpit.GREY)
+                y += 5
+            self._draw_party(ctx, d, y + 4, 12 if many else 14)
             ok, why = d.can_start()
             if ok:
                 text(ctx, "C: start   F: stop", 0, 80, 12, cockpit.GREY)
@@ -1015,7 +1040,16 @@ class AceCommander(PLATFORM.App):
                 text(ctx, dm.MODE_NAMES[o.mode], 0, -64, 14, cockpit.GREEN)
                 y = -46
                 t = d.my_team()
-                if t is not None:       # left / right asks for the other team
+                if t is not None and dm.TEAMED[o.mode]:     # sizes, and how teams are picked
+                    sz = dm.SIDES_CHOICES[o.teamopt & 15] if (o.teamopt & 15) < len(dm.SIDES_CHOICES) else None
+                    text(ctx, "SIDES: %s  %s" % ("ANY" if sz is None else "%d v %d" % sz,
+                                                 "RANDOM" if o.teamopt & dm.RANDOM_TEAMS else "CHOOSE"),
+                         0, y, 10, cockpit.GREY)
+                    y += 13
+                if t == dm.UNKNOWN:
+                    text(ctx, "TEAMS DRAWN AT THE START", 0, y, 11, cockpit.YELLOW)
+                    y += 16
+                elif t is not None:     # left / right asks for the other team
                     text(ctx, "< YOU: %s >" % dm.team_label(o.mode, t), 0, y, 13,
                          dm.raid_rgb(o.defend_colour, t) if dm.RAIDED[o.mode] else dm.TEAM_RGB[t])
                     y += 16

@@ -1772,3 +1772,17 @@ what is now `ace.py` (renamed in build 50).
    BLUE only (`Duel.defend_colour` 0 / 1, left or right switches); the raiders are the other
    (`duel.raid_rgb`: `TEAM_RGB[team ^ defend_colour]`). Build 157's eight paints and the
    cyan rule are gone. Tests in test_multiplayer. PC only.
+   **Build 159** (Brian, 2026-11-25: "Add a random player colour selection. Team size to be
+   defined by the host"). Team modes (TEAMS, CAPTURE FLAG, both raids) have two more HOSTING
+   lines: SIDES (`duel.SIDES_CHOICES`: ANY, or red / defenders v blue / raiders 1v1, 1v2,
+   2v1, 2v2, 1v3, 3v1; `Duel.sides`, `most_players`: the game is capped at their sum, so a
+   full game drops out of the others' lobby and further joins are refused) and PICK: CHOOSE /
+   RANDOM (taken to mean the team colour drawn at random). CHOOSE: a player's pick is kept
+   while that team has room, else the one with more room (`lobby_teams`). RANDOM: the YOU line
+   goes, the party shows "?" (`UNKNOWN`), and START carries teams drawn then
+   (`lobby_teams(final=True)`: red's share of the sizes, at least one each side, a shuffle by
+   hand as MicroPython has no `random.shuffle`). HELLO 55 bytes (the last byte: SIDES number,
+   bit 4 `RANDOM_TEAMS`). JOINING shows SIDES and CHOOSE / RANDOM, and "TEAMS DRAWN AT THE
+   START". The HOSTING page shows `AceCommander.SHOWN` (6) lines at a time, scrolling with the
+   one picked, "..." above / below; the mode's note only with fewer than 5 lines. Tests in
+   test_multiplayer. PC only.
