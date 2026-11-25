@@ -720,24 +720,27 @@ class Duel:
         return None
 
     def _shield_step(self, g, c, dt):
-        """Host: the station's shield takes its hits first (the game takes them from its
-        energy; given back here), recharges when it has been left alone, and sends the
-        would-be dockers in only while it is down."""
+        """Host: the station's shield takes its hits first, recharges when it has been
+        left alone, and sends the would-be dockers in only while it is down. The shield
+        is part of the station's energy (c.energy = its own + the shield): whatever hits
+        it, in any part of the game, takes the shield first, and it is destroyed only
+        with both gone (a hit bigger than its own energy left can't destroy it while the
+        shield holds)."""
         if self.last_energy is None:
             self.last_energy = c.energy
         lost = self.last_energy - c.energy
         if lost > 0:
             self.shield_quiet = 0.0
             if self.shield > 0:
-                take = lost if lost < self.shield else self.shield
-                self.shield -= take
-                c.energy += take
+                self.shield -= lost if lost < self.shield else self.shield
         else:
             self.shield_quiet += dt
             if self.shield_quiet >= SHIELD_WAIT and self.shield < self.shield_max:
-                self.shield += SHIELD_RECHARGE * dt
-                if self.shield > self.shield_max:
-                    self.shield = self.shield_max
+                add = SHIELD_RECHARGE * dt
+                if add > self.shield_max - self.shield:
+                    add = self.shield_max - self.shield
+                self.shield += add
+                c.energy += add
         self.last_energy = c.energy
         sb = 0 if self.shield <= 0 else max(1, int(self.shield * 255 / self.shield_max))
         if sb != self.shield_b:
@@ -759,6 +762,10 @@ class Duel:
                 o.state = "attack"      # shields up again: back to battering it
                 o.net_prey = "c"
                 o.prey = None
+
+    def hull(self, c):
+        """The convoy's or station's own energy: a station's without its shield (the host's)."""
+        return c.energy - self.shield if STATIONED[self.mode] and self.shield > 0 else c.energy
 
     def pirates_setting(self):
         """The PIRATES line: -1 off, else their level (0-2)."""
@@ -1672,6 +1679,7 @@ class Duel:
                     c.energy = c.max_energy = self.convoy_energy()
                     if STATIONED[self.mode]:    # its shield, as much tougher in a raid
                         self.shield = self.shield_max = STATION_SHIELD * c.max_energy / STATION_ENERGY
+                        c.energy += self.shield     # the shield is part of its energy (_shield_step)
                         self.last_energy = c.energy
                 else:
                     c = game.Obj(bp, "npc", 0.0, 0.0, 0.0)
@@ -1982,7 +1990,8 @@ class Duel:
                 elif c is not None:
                     if STATIONED[m]:
                         self._shield_step(g, c, dt)
-                    hp = max(1, int(c.energy * 255 / c.max_energy)) if c.energy > 0 else 0
+                    e = self.hull(c)
+                    hp = max(1, int(e * 255 / c.max_energy)) if e > 0 else 0
                     if hp != self.hp:
                         self.hp = hp
                         self.hud_cache = None

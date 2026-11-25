@@ -1786,3 +1786,10 @@ what is now `ace.py` (renamed in build 50).
    START". The HOSTING page shows `AceCommander.SHOWN` (6) lines at a time, scrolling with the
    one picked, "..." above / below; the mode's note only with fewer than 5 lines. Tests in
    test_multiplayer. PC only.
+   **Build 160** (review of PR #61, 2026-11-25). The station's shield is part of its energy
+   (`c.energy` = its own + the shield; `Duel.hull` its own, for the HUD's STATION %): before,
+   the game took a hit from its energy and `_shield_step` gave it back on the host's next frame,
+   so a hit bigger than the energy left destroyed it at once with the shield up (a guest's
+   laser, pirate fire, the host's laser in a raid, a missile). Recharging adds to both.
+   test_multiplayer's station section runs as without Elite's ship data even where it is on
+   disc (`sys.modules["ace_commander.ship_data"] = None`), so it passes on both. PC only.

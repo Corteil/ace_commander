@@ -572,6 +572,11 @@ for _ in range(4):
 check("skill: a raid goes NORMAL > HARD > OFF > EASY > NORMAL", seq == [2, -1, 0, 1], str(seq))
 
 # ---- station defence (build 153) ------------------------------------------------------------
+# as on a device without Elite's ship data, even where it is on disc: None in sys.modules
+# makes the import fail (ImportError), as a missing file does
+_had_ship_data = sys.modules.get("ace_commander.ship_data")
+sys.modules["ace_commander.ship_data"] = None
+duel._STATION_BPS.clear()
 check("station: the game's own two to pick from (no Elite data here)", duel.available_stations() == [0, 1]
       and duel.station_name(0) == "DRUM STATION" and duel.station_name(1) == "HALO STATION")
 air = Air()
@@ -616,6 +621,8 @@ check("station: shield up: the dockers attack it first", all(o.state != "trade" 
                                                              for o in dockers))
 s_ = sh[0]
 e0 = s_.energy
+check("station: its energy holds the shield too", e0 == duel.STATION_ENERGY + duel.STATION_SHIELD
+      and M.d[0].hull(s_) == duel.STATION_ENERGY, "%.0f" % e0)
 o = dockers[0]
 o.x, o.y, o.z = s_.x, s_.y, s_.z + 60.0     # right at the slot: shield up, no docking
 o.state = "trade"
@@ -626,11 +633,13 @@ check("station: with the shield up a pirate at the slot can't dock", not o.dead 
 # hits take the shield first, not the station's energy
 s_.energy -= 300.0
 M.fly(int(0.4 / DT))
-check("station: hits take the shield first", s_.energy == e0 and M.d[0].shield == duel.STATION_SHIELD - 300.0
+check("station: hits take the shield first", M.d[0].hull(s_) == duel.STATION_ENERGY
+      and M.d[0].shield == duel.STATION_SHIELD - 300.0
       and M.d[1].shield_b < 255, "%.0f %.0f %d" % (s_.energy, M.d[0].shield, M.d[1].shield_b))
 s_.energy -= 800.0              # more than the shield has left: the rest hurts it
 M.fly(3)
-check("station: shield down, the rest hurts the station", M.d[0].shield == 0 and s_.energy == e0 - 100.0
+check("station: shield down, the rest hurts the station", M.d[0].shield == 0
+      and M.d[0].hull(s_) == duel.STATION_ENERGY - 100.0
       and M.d[1].shield_b == 0, "%.0f %.0f" % (M.d[0].shield, s_.energy))
 check("station: SHIELDS DOWN told to both", M.g[0].msg == "STATION SHIELDS DOWN" and M.g[1].msg == "STATION SHIELDS DOWN",
       "%s / %s" % (M.g[0].msg, M.g[1].msg))
@@ -708,8 +717,19 @@ check("station raid: the raider starts out from the station", math.dist(wpos(M.g
 e0 = kind(M.g[0], "convoy")[0].energy
 M.d[1].npc_laser(sg, 100.0)
 M.fly(1)
-check("station raid: the hit counts (on the shield first)", kind(M.g[0], "convoy")[0].energy == e0
-      and M.d[0].shield == M.d[0].shield_max - 100.0)
+check("station raid: the hit counts (on the shield first)", kind(M.g[0], "convoy")[0].energy == e0 - 100.0
+      and M.d[0].shield == M.d[0].shield_max - 100.0
+      and M.d[0].hull(kind(M.g[0], "convoy")[0]) == e0 - M.d[0].shield_max)
+# a hit bigger than the station's own energy left, with the shield up: the shield takes it
+# (it used to be destroyed at once, the shield given back only on the host's next frame)
+c_ = kind(M.g[0], "convoy")[0]
+M.d[0].shield = M.d[0].shield_max
+c_.energy = 40.0 + M.d[0].shield
+M.d[0].last_energy = c_.energy
+M.d[1].npc_laser(sg, 50.0)
+M.fly(1)
+check("station raid: low on energy, shield up: a big hit doesn't destroy it", not c_.dead
+      and M.d[0].result == 0 and M.d[0].hull(c_) == 40.0, "%s %.0f %.0f" % (c_.dead, c_.energy, M.d[0].shield))
 # Elite's stations, when its ship data is here
 import types
 fake = types.ModuleType("ace_commander.ship_data")
@@ -718,10 +738,15 @@ fake.SHIPS = (("CORIOLIS",) + tuple(e[1:5] for e in ace_commander.original_ships
 sys.modules["ace_commander.ship_data"] = fake
 check("station: with Elite's data, all four", duel.available_stations() == [0, 1, 2, 3]
       and duel.station_name(2) == "CORIOLIS" and duel.station_name(3) == "DODO")
-del sys.modules["ace_commander.ship_data"]
+sys.modules["ace_commander.ship_data"] = None
 duel._STATION_BPS.clear()
 check("station: a guest without it sees the game's own instead", duel.station_blueprint(3).name == "DODO"
       and duel.station_blueprint(3).title == "HALO STATION")
+if _had_ship_data is not None:
+    sys.modules["ace_commander.ship_data"] = _had_ship_data
+else:
+    del sys.modules["ace_commander.ship_data"]
+duel._STATION_BPS.clear()
 
 # ---- station modes: defenders launch from the station; one life (build 155) ---------------------
 M = Match(duel.SCOOP, 2, seed=30)
