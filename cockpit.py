@@ -1153,7 +1153,7 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
 
     for o in g.objs:
         drawn = draw_ship(ctx, o, UPGRADE_RGB if o.upgrade else o.rgb)
-        if drawn and o.label and o.z > INEAR:     # another player: their name under the ship
+        if drawn and o.label and o.z > INEAR and not g.over:    # another player: their name
             z = int(o.z)
             text(ctx, o.label, int(o.x) * IFOCAL // z,
                  -(int(o.y) * IFOCAL // z) + o.bp.isize * IFOCAL // z + 8, 10, o.rgb or WHITE)
@@ -1850,8 +1850,8 @@ def _hud(ctx, g, ms=None, ring=True):
             _planet_gauge(ctx, sp)
 
     # combat practice: wave (yellow) and score (white), as one centred row of
-    # digits; a commander's flight has neither
-    if sp is None:
+    # digits; a commander's flight has neither, nor a duel (its score is on its end screen)
+    if sp is None and getattr(g, "net", None) is None:
         wave = str(g.wave)
         score = str(g.score)
         width = (len(wave) + len(score)) * 10 - 6 + 9

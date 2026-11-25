@@ -200,7 +200,7 @@ def draw_view_overlay(ctx, g, ms=None):
         ctx.rectangle(-0.75, 6, 1.5, 8).fill()
         ctx.rectangle(-0.75, -14, 1.5, 8).fill()
     sp = g.space
-    if sp is None:                   # combat practice: wave (yellow) and score (white)
+    if sp is None and getattr(g, "net", None) is None:     # practice: wave and score (not a duel)
         wave, score = str(g.wave), str(g.score)
         width = (len(wave) + len(score)) * 10 - 6 + 9
         x = -width / 2.0
