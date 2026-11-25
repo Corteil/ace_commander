@@ -1623,3 +1623,8 @@ what is now `ace.py` (renamed in build 50).
    second while noise plays (each ~0.25 ms). Tests in test_buzzer_tufty.
    **Release 0.4.4** (2026-11-23): builds 145-147 (I2S sound on the badge with VOLUME 1-11 and
    MUTED, the Pi's sounds made as the badge's, the Tufty's SparkFun or Modulino buzzer).
+   **Release 0.5.0** (2026-11-25): DUEL, two badges over ESP-NOW (plans/MULTIPLAYER.md): a
+   lobby with commander names and ship colours, one player hosts and starts; lasers, missiles
+   and ramming do damage, the E.C.M. by hand (B); rounds with a fresh loadout and the score;
+   either leaving ends it. The Pi duels over UDP with --duel. Key guides for the Pi and Tufty
+   in their zips.
