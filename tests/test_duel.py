@@ -167,6 +167,49 @@ check("reset: back at the start", math.dist(ga.world_pose()[:3], (0, 0, -1000)) 
 da.stop(ga)
 check("stop: no anchor, not quiet, no other ship", ga.anchor is None and not ga.quiet and player(ga) == [])
 
+# ---- one flies first, alone; the other joins later (Brian, 2026-11-25: both took slot 0,
+# back to back). The first is the larger id, so it must move to slot 1 when the other joins
+air2 = Air()
+big, small = Link(air2, b"\x02\x00\x00\x00\x00\x0f"), Link(air2, b"\x02\x00\x00\x00\x00\x01")
+d_big, d_small = duel.Duel(big), duel.Duel(small)
+g_big, g_small = flight(4), flight(5)
+d_big.start(g_big)                  # nobody heard yet: slot 0 for now
+check("alone: slot 0 for now", d_big.slot == 0)
+for _ in range(20):                 # flies about alone; the other opens DUEL meanwhile
+    g_big.step(DT, 0.5, 0.2, 1.0, False, False)
+    d_big.flight_step(g_big, DT)
+    d_small.lobby_step(DT)
+check("joiner hears the one flying", d_small.found and d_small.peer_flying)
+d_small.start(g_small)
+check("joiner takes slot 0 (smaller id)", d_small.slot == 0)
+for _ in range(3):
+    for g_, d_ in ((g_big, d_big), (g_small, d_small)):
+        g_.step(DT, 0.0, 0.0, 0.0, False, False)
+        d_.flight_step(g_, DT)
+check("first one moved to slot 1, PLAYER JOINED", d_big.slot == 1 and g_big.msg == "PLAYER JOINED",
+      "slot %d, %s" % (d_big.slot, g_big.msg))
+for _ in range(3):
+    for g_, d_ in ((g_big, d_big), (g_small, d_small)):
+        g_.step(DT, 0.0, 0.0, 0.0, False, False)
+        d_.flight_step(g_, DT)
+seen = [player(g_big), player(g_small)]
+check("now they face each other: each sees the other ahead",
+      all(len(p_) == 1 and p_[0].z > 1500 and abs(p_[0].x) < 5 and p_[0].m[8] < -0.99 for p_ in seen),
+      str([(round(p_[0].x), round(p_[0].z)) for p_ in seen if p_]))
+# the same player coming back after LINK LOST doesn't start you again
+d_big.joined = False
+air2.drop = lambda msg: True
+for _ in range(int(duel.GONE / DT) + 5):
+    g_big.step(DT, 0.0, 0.0, 1.0, False, False)
+    d_big.flight_step(g_big, DT)
+air2.drop = lambda msg: False
+for _ in range(3):
+    for g_, d_ in ((g_big, d_big), (g_small, d_small)):
+        g_.step(DT, 0.0, 0.0, 1.0, False, False)
+        d_.flight_step(g_, DT)
+check("same player back: no new start", g_big.msg == "LINK BACK"
+      and math.dist(g_big.world_pose()[:3], (0, 0, 1000)) > 200, g_big.msg)
+
 # ---- through the app: DUEL on the title screen, its page, flying, back to the title
 a = ace_commander.AceCommander()
 check("app: no DUEL without a radio", True)     # (the badge stubs' platform has one)

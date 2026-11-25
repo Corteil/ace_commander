@@ -27,6 +27,7 @@ LOST = 3.0                  # seconds without a packet: the other player is gone
 GONE = 3.0                  # on the page: seconds without a HELLO before "searching" again
 # where each side starts in the shared world: (x, y, z, nose x, y, z)
 START = ((0.0, 0.0, -1000.0, 0.0, 0.0, 1.0), (0.0, 0.0, 1000.0, 0.0, 0.0, -1.0))
+START_SPEED = 14.0          # as a new flight (Game.reset)
 
 
 def start_pose(slot):
@@ -55,6 +56,7 @@ class Duel:
         self.last_seq = None
         self.lost = False
         self.slot = 0
+        self.joined = False     # the other player just started flying: both go back to the start
 
     # ---- both pages ------------------------------------------------------------------
 
@@ -75,6 +77,8 @@ class Duel:
             if host == self.link.id:
                 continue        # our own (a UDP broadcast comes back)
             if self.peer is None or not self.found:
+                if self.peer != host:
+                    self.peer_flying = False    # someone new: not flying until a pose says so
                 self.peer = bytes(host)     # the first (or a new) player heard (a copy:
                                             # the radio reuses its buffer)
                 self.last_seq = None
@@ -91,6 +95,8 @@ class Duel:
                 if self.last_seq is not None and not netplay.newer(seq, self.last_seq):
                     continue    # late: an older pose than the one we have
                 self.last_seq = seq
+                if not self.peer_flying:    # they have just started flying: both start
+                    self.joined = True      # again, facing (flight_step; start clears it)
                 self.peer_flying = True
                 self.pose = (r[2], r[3], r[4], r[6])
                 self.pose_age = 0.0
@@ -112,10 +118,15 @@ class Duel:
     # ---- flying ----------------------------------------------------------------------
 
     def start(self, g):
-        """Into the arena: an empty one, you at your starting place."""
+        """Into the arena: an empty one, you at your starting place. Flying alone,
+        you take START[0] for now; when someone joins, both start again (flight_step),
+        so you can't both be in the same slot (Brian, 2026-11-25: the first one
+        flying took slot 0 alone, the second took it too, back to back)."""
         self.slot = 0 if self.peer is None or self.link.id < self.peer else 1
+        self.joined = False
         g.quiet = True
         g.objs[:] = []
+        g.speed = START_SPEED
         g.set_anchor(*start_pose(self.slot))
         self.send_t = 0.0
         self.lost = False
@@ -138,6 +149,10 @@ class Duel:
         self.peer_t += dt
         self.pose_age += dt
         self._hear()
+        if self.joined:                 # someone new: both back to the start, facing
+            self.start(g)
+            self.pose = None            # their pose from before they started again
+            g.say("PLAYER JOINED", 2.0)
         # send our pose SEND_HZ times a second
         self.send_t -= dt
         if self.send_t <= 0:
