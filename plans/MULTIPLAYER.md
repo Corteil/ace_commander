@@ -101,6 +101,16 @@ can change underneath.
 
 ## Built: DUEL (same branch)
 
+- **Lobby, host and join (Brian, 2026-11-25):** everyone on the DUEL page says HELLO
+  4 times a second with their commander's name (`cmdr_name`) and ship paint
+  (`cmdr.colour`, `cockpit.SHIP_COLOURS`) and what they are doing (LOBBY / HOST / JOIN /
+  FLYING, and for whom). The lobby page lists HOST A GAME, a JOIN line for each open
+  game, and who is there; a host takes the first guest to ask (the game then shows as
+  full); the host sees the guest's name in their colour and C starts: START to the guest
+  (repeated for 1 s) and both fly at once, host from START[0], guest from START[1]. The
+  other ship is drawn in its owner's paint with their name under it (`Obj.rgb`,
+  `Obj.label`; the radar and both dashboards use the colour). This replaced slots by id
+  and the "start again when the other starts flying" fix.
 - Title screen DUEL (only when the platform has `radio()`: the badge always; the Pi with
   `run.py --duel [PORT]`; not the Tufty yet). Its page says HELLO 4 times a second and
   shows SEARCHING / PLAYER FOUND; C flies (alone until the other comes), F back.

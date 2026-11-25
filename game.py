@@ -482,6 +482,8 @@ class Obj:
         self.target = None  # what a player missile is chasing
         self.good = None    # a splinter: the good it holds (a canister: None, any of several)
         self.upgrade = False    # a practice upgrade canister (Game.practice_upgrades)
+        self.rgb = None         # another player's ship: its paint (duel.py), else None
+        self.label = None       # and their name, drawn under it
         self.role = "pirate"    # ships: "pirate", "trader", "police" or "hunter"
         self.dest = "station"   # a trader's: where it is making for, "station" or "planet"
         self.prey = None        # a pirate's: the trader it is after (None: you)

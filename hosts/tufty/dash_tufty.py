@@ -73,7 +73,7 @@ def _blip_colour(o):
         if o.role == "police":
             return ck.POLICE_BLUE
         return ck.WHITE
-    return ck.COLOUR[o.kind]
+    return o.rgb or ck.COLOUR[o.kind]
 
 
 def _stalk(ctx, bx, by, h, size):

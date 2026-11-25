@@ -1142,7 +1142,11 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
 
 
     for o in g.objs:
-        draw_ship(ctx, o, UPGRADE_RGB if o.upgrade else None)
+        drawn = draw_ship(ctx, o, UPGRADE_RGB if o.upgrade else o.rgb)
+        if drawn and o.label and o.z > INEAR:     # another player: their name under the ship
+            z = int(o.z)
+            text(ctx, o.label, int(o.x) * IFOCAL // z,
+                 -(int(o.y) * IFOCAL // z) + o.bp.isize * IFOCAL // z + 8, 10, o.rgb or WHITE)
         if o.beam > 0:
             _enemy_beam(ctx, o)
 
@@ -1806,7 +1810,7 @@ def _hud(ctx, g, ms=None, ring=True):
             else:
                 ctx.rgb(*WHITE)
         else:
-            ctx.rgb(*(UPGRADE_RGB if o.upgrade else COLOUR[o.kind]))
+            ctx.rgb(*(UPGRADE_RGB if o.upgrade else o.rgb or COLOUR[o.kind]))
         if h >= 0:
             ctx.rectangle(bx, by - h, 1, h).fill()
         else:
