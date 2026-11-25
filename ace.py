@@ -979,7 +979,7 @@ class AceCommander(PLATFORM.App):
                     v = d.pirates_setting()
                     v = "PIRATES: " + (dm.LEVEL_NAMES[v] if v >= 0 else "OFF")
                 elif row == "colour":
-                    v = "DEFENDERS: " + cockpit.SHIP_COLOURS[d.defend_colour][0]
+                    v = "DEFENDERS: " + dm.TEAM_NAMES[d.defend_colour]
                 elif row == "station":
                     v = dm.station_name(d.station_i)
                 elif row == "time":
@@ -991,7 +991,7 @@ class AceCommander(PLATFORM.App):
                 on = row == sel
                 rgb = cockpit.GREEN if on else cockpit.GREY
                 if row == "colour":     # in the colour itself
-                    rgb = cockpit.ship_rgb(d.defend_colour)
+                    rgb = dm.TEAM_RGB[d.defend_colour]
                 text(ctx, ("< %s >" if on else "%s") % v, 0, y, (12 if many else 13) if on else 11, rgb)
                 y += step
                 if row == "mode" and len(rows) < 6:     # (no room with the station's lines)

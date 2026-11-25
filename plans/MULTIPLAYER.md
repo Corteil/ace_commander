@@ -222,8 +222,8 @@ to be a new large design".
   number); each device counts every player's deaths from KILLED (`Duel.lives_lost`), out at
   the number; the end screen says how many are left.
 
-- **Build 157: the defenders' colour.** The raids' HOSTING page has DEFENDERS (a ship
-  paint, RED by default; HELLO's last byte); raiders blue, or red against blue or cyan.
+- **Builds 157-158: the defenders' colour.** The raids' HOSTING page has DEFENDERS: RED or
+  BLUE (HELLO's last byte); the raiders are the other.
 
 Not yet on badges: the frame time with three other ships, eight pirates and the convoy (92
 lines in 6 parts close up) needs measuring; and how busy the radio is with four (each sends

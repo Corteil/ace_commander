@@ -1768,3 +1768,7 @@ what is now `ace.py` (renamed in build 50).
    the ships in flight, the radar and the party lists on HOSTING and JOINING use it
    (`Duel.team_rgb`). Other team modes keep red and blue. With eight lines (STATION RAID)
    the HOSTING page is closer packed. Tests in test_multiplayer. PC only.
+   **Build 158** (Brian, 2026-11-25: "Just between red and blue is ok"). DEFENDERS is RED or
+   BLUE only (`Duel.defend_colour` 0 / 1, left or right switches); the raiders are the other
+   (`duel.raid_rgb`: `TEAM_RGB[team ^ defend_colour]`). Build 157's eight paints and the
+   cyan rule are gone. Tests in test_multiplayer. PC only.

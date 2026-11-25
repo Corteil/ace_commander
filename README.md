@@ -76,8 +76,8 @@ A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves 
     the station (in the raid, every raider out holds it).
   - **STATION RAID**: red defends the station, blue raids it, with the same choices and the
     same help for outnumbered defenders as the convoy raid.
-  In both raids the host picks the defenders' colour (DEFENDERS: any of the ship paints);
-  the raiders are blue, or red when the defenders are blue or cyan.
+  In both raids the host picks the defenders' colour (DEFENDERS: RED or BLUE); the raiders
+  are the other.
   Except in a duel, a destroyed ship comes back after 5 seconds at its team's start (behind
   its own ring in Capture Flag); a won match shows the result for 10 seconds, then the next
   starts. The host leaving ends the game; a guest leaving drops out of it.

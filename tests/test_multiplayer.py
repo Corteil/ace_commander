@@ -834,20 +834,18 @@ check("app launch: out of the slot, flying", a.mode == "flight" and not a.game.o
 a._to_title()
 bs.tick(a)
 
-# ---- the raids' defenders' colour (build 157) ---------------------------------------------
-check("colour: defenders red, raiders blue by default", duel.raid_rgb(duel.DEFEND_COLOUR, 0) == cockpit.ship_rgb(2)
+# ---- the raids' defenders' colour (builds 157-158: red or blue) ---------------------------
+check("colour: defenders red, raiders blue by default", duel.raid_rgb(duel.DEFEND_COLOUR, 0) == duel.TEAM_RGB[0]
       and duel.raid_rgb(duel.DEFEND_COLOUR, 1) == duel.TEAM_RGB[1])
-check("colour: defenders blue (or cyan): raiders red", duel.raid_rgb(6, 1) == duel.TEAM_RGB[0]
-      and duel.raid_rgb(0, 1) == duel.TEAM_RGB[0] and duel.raid_rgb(6, 0) == cockpit.ship_rgb(6))
-M = Match(duel.SRAID, 3, seed=40, teams=(0, 1, 0))
-M.d[0].step_defend_colour(3)            # RED -> GREEN
-for _ in range(8):
-    M.d[0].flight_step(M.g[0], DT)
-check("colour: the host picks GREEN", cockpit.SHIP_COLOURS[M.d[0].defend_colour][0] == "GREEN")
+check("colour: defenders blue, raiders red", duel.raid_rgb(1, 0) == duel.TEAM_RGB[1]
+      and duel.raid_rgb(1, 1) == duel.TEAM_RGB[0])
 air = Air()
 ds = [duel.Duel(Link(air, bytes([2, 0, 0, 0, 13, i + 1])), NAMES[i], 1) for i in range(3)]
 ds[0].host(duel.RAID)
-ds[0].step_defend_colour(3)
+ds[0].step_defend_colour(1)
+check("colour: right switches to BLUE, again back to RED", ds[0].defend_colour == 1)
+ds[0].step_defend_colour(-1)
+ds[0].step_defend_colour(1)
 for _ in range(8):
     for d_ in ds:
         d_.lobby_step(DT)
@@ -856,7 +854,7 @@ for j in ds[1:]:
     for _ in range(8):
         for d_ in ds:
             d_.lobby_step(DT)
-check("colour: the guests' pages have it", all(j.host_p.defend_colour == 5 for j in ds[1:]))
+check("colour: the guests' pages have it", all(j.host_p.defend_colour == 1 for j in ds[1:]))
 ds[0].start_game()
 gs = [flight(95 + i) for i in range(3)]
 ds[0].start(gs[0])
@@ -870,8 +868,8 @@ for _ in range(5):
         g_.step(DT, 0.0, 0.0, -1.0, False, False)
         d_.flight_step(g_, DT)
 seen = {o.label: o.rgb for o in kind(gs[1], "player")}
-check("colour: in flight the defenders are green, the raider blue", seen["ANN"] == cockpit.ship_rgb(5)
-      and seen["CAT"] == cockpit.ship_rgb(5) and {o.label: o.rgb for o in kind(gs[0], "player")}["BEN"] == duel.TEAM_RGB[1],
+check("colour: in flight the defenders are blue, the raider red", seen["ANN"] == duel.TEAM_RGB[1]
+      and seen["CAT"] == duel.TEAM_RGB[1] and {o.label: o.rgb for o in kind(gs[0], "player")}["BEN"] == duel.TEAM_RGB[0],
       str(seen))
 
 # ---- packet sizes: the NPCS packet fits ESP-NOW's 250 bytes --------------------------------

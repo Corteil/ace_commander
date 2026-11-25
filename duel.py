@@ -130,18 +130,15 @@ COOPED = (False, False, False, False, True, False, True, False)    # everyone de
 STATIONED = (False, False, False, False, False, False, True, True)  # it's a station
 TEAM_NAMES = ("RED", "BLUE")
 TEAM_RGB = ((1, 0.25, 0.2), (0.3, 0.55, 1))
-# the raids' defenders' colour (Brian, build 157: "defenders colour should be configurable"):
-# one of the ship paints (cockpit.SHIP_COLOURS), RED by default; the raiders are blue, or
-# red if the defenders are blue (or cyan, too like it)
-DEFEND_COLOUR = 2           # RED in cockpit.SHIP_COLOURS
-BLUES = (0, 6)              # CYAN, BLUE
+# the raids' defenders' colour (Brian, build 157: "defenders colour should be configurable",
+# build 158: "Just between red and blue is ok"): 0 red (the raiders blue) or 1 blue (the
+# raiders red)
+DEFEND_COLOUR = 0
 
 
 def raid_rgb(defend_colour, t):
-    """A raid team's colour: the defenders' (team 0) as chosen, the raiders' against it."""
-    if t == 0:
-        return colour_rgb(defend_colour)
-    return TEAM_RGB[0] if defend_colour in BLUES else TEAM_RGB[1]
+    """A raid team's colour: the defenders' (team 0) as chosen, the raiders' the other."""
+    return TEAM_RGB[(t ^ defend_colour) & 1]
 TAKEN_RGB = (0.35, 0.35, 0.4)       # a ring whose flag is away
 CONVOY_RGB = (1, 0.85, 0.2)
 FFA_WIN = 10
@@ -399,7 +396,7 @@ class Duel:
         self.growing = True     # and whether the waves grow
         self.station_i = 0      # and which station (STATIONS)
         self.lives = 0          # and LIVES (LIVES_CHOICES; 0: unlimited)
-        self.defend_colour = DEFEND_COLOUR  # a raid's defenders' colour (raid_rgb)
+        self.defend_colour = DEFEND_COLOUR  # a raid's defenders' colour: 0 red, 1 blue (raid_rgb)
         self.wants_launch = False   # destroyed, penalty served: ace shows the launch tunnel
         self.teams = [0, 1, 0, 1]   # in a game: each slot's team
         self.roster = {}        # in a game: slot -> Player, everyone but us
@@ -596,10 +593,9 @@ class Duel:
         self.growing = bool(opts & OPT_GROW)
         self.station_i = (opts >> 6) & 3
 
-    def step_defend_colour(self, step):
-        """Left / right on the DEFENDERS line: through the ship paints."""
-        from . import cockpit
-        self.defend_colour = (self.defend_colour + step) % len(cockpit.SHIP_COLOURS)
+    def step_defend_colour(self, step=1):
+        """Left / right on the DEFENDERS line: red or blue."""
+        self.defend_colour ^= 1
         self.hello_t = 0.0
 
     def team_rgb(self, t):
@@ -878,7 +874,7 @@ class Duel:
                     self.teams = [t & 1 for t in bytes(teams)]
                     self._take_options(opts)
                     self.lives = opts2
-                    self.defend_colour = dcol
+                    self.defend_colour = dcol & 1
                 continue
             p.role = role
             p.mode = mode
@@ -887,7 +883,7 @@ class Duel:
                 p.teams = tuple(t & 1 for t in bytes(teams))
                 p.opts = opts
                 p.opts2 = opts2
-                p.defend_colour = dcol
+                p.defend_colour = dcol & 1
             p.target = bytes(target)
             p.guests = guests if role == HOST or role == FLYING else ()
             if self.role == HOST and not self.flying:
