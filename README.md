@@ -40,6 +40,14 @@ A ship tumbles under the name. Joystick left / right picks, C chooses, F leaves 
 - **Combat practice**: endless waves of ships, with nothing kept. Pick the level
   (EASY, NORMAL, HARD) and HARDCORE on its page before you fly; practice's HARDCORE is
   its own, apart from your commander's. The practice ship has an E.C.M.
+- **Duel**: two badges fight each other over the badge's own radio (ESP-NOW: no Wi-Fi
+  network needed; tested to 10 m through a door). Everyone on the DUEL page is listed with
+  their commander's name and ship colour. One player picks **HOST A GAME**, the other
+  **JOIN** and the host's name; the host presses C and both launch, 8000 apart and facing
+  each other, in an arena with no other ships. Lasers, missiles and ramming do damage; the
+  E.C.M. fires only by hand (**B** in a duel, instead of the energy bomb). Destroyed: C
+  starts the next round, both back at their ends with full shields, missiles and E.C.M.;
+  the score is kept. Either player leaving ends the duel for both.
 - **Ship viewer**: every ship in the game, turning.
 - **Options**: steering (joystick or tilt), CONTROLS (flip the flight controls up / down,
   left / right or both), your commander's name, the docking style, how soon mission 1's
@@ -194,6 +202,8 @@ the rest of the keyboard works as the Keyboard Hexpansion. A game pad (Xbox, Pla
 8BitDo...) flies with analogue sticks: left stick power and yaw, right stick pitch and roll,
 triggers missile and fire, bumpers E.C.M. and energy bomb, D-pad views; docked it works as the
 badge, and the screens name its buttons. Saves go in `~/.local/share/ace_commander/`.
+With `--duel`, DUEL is on the title screen: two windows on one Pi, or two computers on one
+network, duel over UDP (a Pi can't yet duel a badge).
 Work in progress: see `hosts/pi/PLAN.md`.
 
 ## For developers
