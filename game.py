@@ -86,6 +86,8 @@ RADAR_RANGE = 10000.0
 # game, the convoy (the host's), a ring or marker; the first three can be shot at
 NET_KINDS = ("player", "npc", "convoy", "mark")
 NET_TARGETS = ("player", "npc", "convoy")
+_NINE = (0, 1, 2, 3, 4, 5, 6, 7, 8)
+_K28 = 1.0 / (1 << 28)     # axes x 16384 times axes x 16384, back to 1
 MAX_OBJECTS = 14
 
 # A commander's flight is in a star system: a planet, a sun and a space station
@@ -739,6 +741,45 @@ class Game:
         return (x * m[0] + y * m[1] + z * m[2], x * m[3] + y * m[4] + z * m[5],
                 x * m[6] + y * m[7] + z * m[8])
 
+    def anchor_ints(self):
+        """The anchor in whole numbers, made at most once a frame (build 163: whole numbers
+        up to 2^30 make no garbage on the badge, every float does): [anchor, frame, x, y,
+        z, its axes x 16384, its axes x 4096 (for positions: within ~150000 no product
+        passes 2^30, and the error is under 1 in 4000)]."""
+        a = self.anchor
+        c = self._ai
+        if c[0] is not a or c[1] != self.frame:
+            m = a.m
+            w = c[5]
+            p = c[6]
+            for i in _NINE:
+                v = int(m[i] * 16384)
+                w[i] = v
+                p[i] = v >> 2
+            c[0] = a
+            c[1] = self.frame
+            c[2] = int(a.x)
+            c[3] = int(a.y)
+            c[4] = int(a.z)
+        return c
+
+    def place_i(self, o, x, y, z, m):
+        """place() in whole numbers: (x, y, z) in world units and axes m x 16384, all ints;
+        only o.m's nine numbers come out as floats (build 163: place() made ~65 floats a
+        call). Products stay under 2^30 (no big ints) for positions within ~150000."""
+        c = self.anchor_ints()
+        w = c[5]
+        p = c[6]
+        o.x = c[2] + ((x * p[0] + y * p[3] + z * p[6]) >> 12)
+        o.y = c[3] + ((x * p[1] + y * p[4] + z * p[7]) >> 12)
+        o.z = c[4] + ((x * p[2] + y * p[5] + z * p[8]) >> 12)
+        om = o.m
+        for i in (0, 3, 6):
+            a, b, d = m[i], m[i + 1], m[i + 2]
+            om[i] = (a * w[0] + b * w[3] + d * w[6]) * _K28
+            om[i + 1] = (a * w[1] + b * w[4] + d * w[7]) * _K28
+            om[i + 2] = (a * w[2] + b * w[5] + d * w[8]) * _K28
+
     def place(self, o, x, y, z, m):
         """Put o (an Obj) where a pose in the shared world puts it in yours:
         (x, y, z) and axes m (rows, the world's coordinates)."""
@@ -801,6 +842,9 @@ class Game:
         self.new = []      # objects created during a step, added at its end
         self.booms = []
         self.anchor = None  # multiplayer: the shared world's origin and axes (set_anchor)
+        # and in whole numbers, made once a frame (anchor_ints): [anchor, frame, x, y, z,
+        # axes x 16384, axes x 4096]
+        self._ai = [None, -1, 0, 0, 0, [0] * 9, [0] * 9]
         self.tick = 0
         self.frame = 0
         # dust and explosion dots are whole numbers: see _rotate
@@ -1840,6 +1884,13 @@ class Game:
         if kind in NET_KINDS:   # multiplayer's (duel.py): moved from packets, or fixed
             if o.ram_t > 0:
                 o.ram_t -= dt
+            if o.speed and (kind == "player" or kind == "npc"):
+                # between their poses, along their nose at their speed (build 163: placed
+                # only when a pose comes, not every frame); your own flight moves it as all
+                v = o.speed * SPEED_K * dt
+                o.x += m[6] * v
+                o.y += m[7] * v
+                o.z += m[8] * v
             return
         if kind == "ship":
             # Steering is the costly part, and makes a lot of work for the

@@ -44,6 +44,22 @@ def pack_pose(buf, player, seq, pose, speed=0, flags=0):
     return buf
 
 
+def read_pose_i(msg, m):
+    """read_pose in whole numbers (build 163: no floats, which are garbage on the badge):
+    (player, seq, x, y, z, speed, flags), x y z in world units; m (9 ints) is filled with
+    the side, roof and nose x 16384. None if it isn't a POSE packet."""
+    if msg is None or len(msg) < SIZE or msg[0] != MAGIC[0] or msg[1] != MAGIC[1] or msg[2] != POSE:
+        return None
+    (_, _, player, seq, x, y, z, nx, ny, nz, rx, ry, rz,
+     speed, flags) = struct.unpack_from(FMT, msg, 0)
+    m[0] = (ry * nz - rz * ny) >> 14    # side = roof x nose
+    m[1] = (rz * nx - rx * nz) >> 14
+    m[2] = (rx * ny - ry * nx) >> 14
+    m[3], m[4], m[5] = rx, ry, rz
+    m[6], m[7], m[8] = nx, ny, nz
+    return player, seq, x >> 2, y >> 2, z >> 2, speed, flags
+
+
 def read_pose(msg, m=None):
     """(player, seq, x, y, z, m, speed, flags) from a POSE packet, or None if it
     isn't one. m (9 floats: side, roof, nose rows) is filled if given."""

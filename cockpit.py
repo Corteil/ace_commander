@@ -1096,8 +1096,8 @@ def _world(ctx, g):
         # layout's shorter view (the Pi's, the Tufty's) as far down from its top
         y = -84 if VIEW_HH >= 120 else 26 - VIEW_HH
         net = getattr(g, "net", None)
-        if net is not None and any(len(h) > 3 for h in net.hud()):
-            y += 14             # below multiplayer's second line (the station's DOCKED)
+        if net is not None and any(r[2] > 10 for r in net.hud_rows()):
+            y += 14             # below multiplayer's second line (the station's shield)
         text(ctx, VIEW_NAMES[g.view] + " VIEW", 0, y, 11, GREY)
         return
     _draw_world(ctx, g)
@@ -1769,16 +1769,39 @@ def compass_target(g):
     return o.x, o.y, o.z, rgb
 
 
+NET_DIM = (0.25, 0.25, 0.3)     # a gauge's empty part
+
+
 def draw_net_line(ctx, g, y):
-    """Multiplayer's line along the top (duel.Duel.hud): the score, or the convoy's."""
+    """Multiplayer's line along the top (duel.Duel.hud_rows), y its middle: the score, or
+    the convoy's or station's energy, time left, shield and pirates docked. Rectangles
+    only (build 163: the text it was cost 20-30 ms a frame on the badge)."""
     net = getattr(g, "net", None)
     if net is None:
         return
-    for h in net.hud():
-        if len(h) > 3:          # a second line, below
-            text(ctx, h[0], h[1], y + h[3], 11, h[2])
-        else:
-            text(ctx, h[0], h[1], y, 12, h[2])
+    top = y - 6
+    for kind, x, dy, a, b, rgb in net.hud_rows():
+        yy = top + dy
+        if kind == "bar":
+            w = int(a * b + 0.5) if b > 0 else 0
+            if w < a:
+                ctx.rgb(*NET_DIM).rectangle(x + w, yy, a - w, 5).fill()
+            if w > 0:
+                ctx.rgb(*rgb).rectangle(x, yy, w, 5).fill()
+        elif kind == "num":
+            ctx.rgb(*rgb)
+            number(ctx, a, x, yy, _BIG, b)
+        elif kind == "clock":   # m:ss
+            ctx.rgb(*rgb)
+            x += number(ctx, a // 60, x, yy, _BIG, -1) + 2
+            ctx.rectangle(x, yy + 2, 2, 2).fill()
+            ctx.rectangle(x, yy + 7, 2, 2).fill()
+            x += 4
+            x += number(ctx, (a % 60) // 10, x, yy, _BIG, -1) + 3
+            number(ctx, a % 10, x, yy, _BIG, -1)
+        else:                   # pips: b marks, a of them lit
+            for i in range(b):
+                ctx.rgb(*(rgb if i < a else NET_DIM)).rectangle(x + i * 9, yy, 6, 6).fill()
 
 
 def _compass(ctx, t):

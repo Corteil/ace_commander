@@ -448,7 +448,24 @@ check("app: rings and two other ships", len(kind(a.game, "mark")) == 2 and len(k
 c = bs.CountCtx()
 a.draw(c)
 texts = [t[0] for t in c.texts]
-check("app: the score line drawn", "RED 0" in texts and "BLUE 0" in texts, str(texts))
+rows = a.duel.hud_rows()
+check("app: the score line drawn, in digits, not text (build 163)", "RED 0" not in texts and "BLUE 0" not in texts
+      and [(r[0], r[3]) for r in rows] == [("num", 0), ("num", 0)] and rows[0][5] == duel.TEAM_RGB[0]
+      and c.calls.get("rectangle", 0) > 0, str(rows))
+# the gauges for every mode, drawn with rectangles only
+for mode_ in (duel.FFA, duel.COOP, duel.SCOOP):
+    M = Match(mode_, 2, seed=60 + mode_)
+    M.fly(3)
+    c = bs.CountCtx()
+    texts0 = len(c.texts)
+    cockpit.draw_net_line(c, M.g[1], -98)
+    kinds = [r[0] for r in M.d[1].hud_rows()]
+    check("gauges: %s drawn without text" % duel.MODE_NAMES[mode_], len(c.texts) == texts0
+          and c.calls.get("rectangle", 0) >= 3, "%s %s" % (kinds, c.calls))
+check("gauges: the station's energy, clock, shield and docked marks", kinds == ["bar", "clock", "bar", "pips"])
+r = M.d[1].hud_rows()
+check("gauges: full energy and shield, none docked", r[0][4] == 1.0 and r[2][4] == 1.0 and r[3][3] == 0
+      and r[3][4] == duel.DOCK_LIMIT and 170 <= r[1][3] <= 180, str(r))
 a.game._hurt(1000.0)
 bs.tick(a)
 for _ in range(20):
@@ -982,6 +999,45 @@ check("sizes: every packet fits ESP-NOW (250 bytes)",
       and struct.calcsize(duel.FMT) <= 250 and struct.calcsize(duel.STATE_FMT) <= 250)
 
 print()
+# ---- whole-number maths (build 163) ---------------------------------------------------------
+from ace_commander import netplay
+g_ = flight(90)
+g_.set_anchor(*duel._pose(1234.0, -567.0, 8901.0, 0.3, 0.2, 0.9))
+for _ in range(30):         # turned about a bit, as flying does
+    g_.step(DT, 0.4, 0.2, 0.1, False, False)
+o1 = game.Obj(g_.types["CORIOLIS"], "mark", 0.0, 0.0, 0.0)
+o2 = game.Obj(g_.types["CORIOLIS"], "mark", 0.0, 0.0, 0.0)
+mf = duel._pose(0, 0, 0, -0.5, 0.4, 0.7)[3]
+mi = [int(round(v * 16384)) for v in mf]
+g_.place(o1, 4000.0, -2500.0, 7000.0, mf)
+g_.place_i(o2, 4000, -2500, 7000, mi)
+check("ints: place_i puts it where place does (within a few units)",
+      math.dist((o1.x, o1.y, o1.z), (o2.x, o2.y, o2.z)) < 5, "%s %s" % ((o1.x, o1.y, o1.z), (o2.x, o2.y, o2.z)))
+check("ints: and turns it the same", max(abs(a - b) for a, b in zip(o1.m, o2.m)) < 0.002)
+check("ints: its position whole numbers", all(isinstance(v, int) for v in (o2.x, o2.y, o2.z)))
+buf = bytearray(netplay.SIZE)
+netplay.pack_pose(buf, 2, 77, g_.world_pose(), 23.0, netplay.FIRING)
+mf9, mi9 = [0.0] * 9, [0] * 9
+rf = netplay.read_pose(buf, mf9)
+ri = netplay.read_pose_i(buf, mi9)
+check("ints: read_pose_i agrees with read_pose", ri[:2] == rf[:2] and ri[5:] == rf[6:]
+      and all(abs(a - b) <= 1 for a, b in zip(ri[2:5], rf[2:5]))
+      and max(abs(a / 16384.0 - b) for a, b in zip(mi9, mf9)) < 0.001, "%s %s" % (ri, rf[:5]))
+check("ints: read_pose_i only whole numbers", all(isinstance(v, int) for v in ri[2:5] + tuple(mi9)))
+# a remote ship coasts along its nose between poses, as its pose would put it
+M = Match(duel.FFA, 2, seed=91)
+M.fly(10)
+s_ = kind(M.g[0], "player")[0]
+for g in M.g:
+    g.speed = 0.0
+M.g[1].speed = 20.0
+M.fly(int(0.3 / DT))
+a_ = world_of(M.g[0], s_)
+M.fly(int(1.0 / DT))
+b_ = world_of(M.g[0], s_)
+check("ints: the other player's ship moves on between poses and with them", 18 < math.dist(a_, b_) * 1.0
+      and math.dist(b_, wpos(M.g[1])) < 30, "%.0f %.0f" % (math.dist(a_, b_), math.dist(b_, wpos(M.g[1]))))
+
 if fails:
     print("%d FAILED: %s" % (len(fails), ", ".join(fails)))
     sys.exit(1)

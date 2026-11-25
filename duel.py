@@ -79,6 +79,7 @@ NPCS_PKT = 13               # the host's ships: count, then NPC_FMT each
 NPCS_HEAD = "<2sBB"
 NPC_FMT = "<BBBBhhhhhhhhh"  # id, type (game.PIRATES), flags, speed, x y z / 8, nose, roof x 16384
 NPC_SIZE = struct.calcsize(NPC_FMT)
+NPCS_HEAD_SIZE = struct.calcsize(NPCS_HEAD)
 NPC_BIT = 0x80              # a missile's target: one of the host's ships
 NPC_SRC = 254               # a hit or a kill by the host's pirates
 NOBODY = 255                # killed by nobody (the sun, a crash...); no flag carrier
@@ -164,6 +165,8 @@ STATE_EVERY = 0.25
 NPC_EVERY = 0.1             # the host's ships' poses, ten times a second
 NPC_GONE = 1.5              # a ship of the host's not heard of this long has gone
 DEAD_FOR = 0.5              # a destroyed ship of the host's is sent this long (to explode)
+MARK_FRAMES = 12            # rings and the station put back every this many frames (~0.5 s)
+CONVOY_FRAMES = 3           # the convoy placed every this many frames (it moves slowly)
 
 # where each side starts in the shared world: (x, y, z, nose x, y, z). A duel: host 0,
 # guest 1, 8000 apart (Brian, 2026-11-25: 2000 started too close), as far as practice's
@@ -375,9 +378,10 @@ class Player:
         self.t = 0.0            # seconds since last heard
         self.slot = 0
         self.ship = None        # their ship in our game (an Obj, kind "player")
-        self.pose = None        # (x, y, z, speed) of their last pose
-        self.pose_m = [0.0] * 9     # its axes (filled by read_pose)
-        self.pose_age = 0.0
+        self.pose = None        # (x, y, z, speed) of their last pose, whole numbers
+        self.pose_m = [0] * 9   # its axes x 16384 (filled by netplay.read_pose_i)
+        self.fresh = False      # a pose not yet placed (build 163: placed only then)
+        self.flag_label = None  # (carrying a flag, label) as last set
         self.last_seq = None
         self.flags = 0          # their last pose's flags (netplay.FIRING, DEAD)
         self.lost = False
@@ -478,9 +482,9 @@ class Duel:
         self.rings = [None, None]
         self.convoy = None
         self.ring_rel = None    # how far we were through each ring's plane last frame
-        self.mark_t = 0.0
         self.hud_t = 0.0
         self.hud_cache = None
+        self.rows = ()
 
     def team_of(self, slot):
         """A slot's team in this game (as chosen in the lobby); 0 for all with no teams."""
@@ -1185,16 +1189,16 @@ class Duel:
         if p is None:
             return              # not someone in our game
         p.t = 0.0
-        r = netplay.read_pose(msg, p.pose_m)
+        r = netplay.read_pose_i(msg, p.pose_m)
         if r is None:
             return
         seq = r[1]
         if p.last_seq is not None and not netplay.newer(seq, p.last_seq):
-            return              # late: an older pose than the one we have
+            return              # late (its axes were read over ours: the next pose puts them right)
         p.last_seq = seq
-        p.pose = (r[2], r[3], r[4], r[6])
-        p.flags = r[7]
-        p.pose_age = 0.0
+        p.pose = (r[2], r[3], r[4], r[5])
+        p.flags = r[6]
+        p.fresh = True
 
     # ---- the host's ships, as the others see them -----------------------------------------
 
@@ -1206,7 +1210,6 @@ class Duel:
         n = msg[3]
         if len(msg) < hs + n * NPC_SIZE:
             return
-        k = 1.0 / 16384
         for i in range(n):
             v = struct.unpack_from(NPC_FMT, msg, hs + i * NPC_SIZE)
             ident, typ, flags, speed = v[0], v[1], v[2], v[3]
@@ -1231,48 +1234,56 @@ class Duel:
                     continue
                 o = game.Obj(bp, "npc", 0.0, 0.0, 0.0)
                 o.net_id = ident
-                o.pose_m = [0.0] * 9
-                o.pose = (0.0, 0.0, 0.0)
-                o.pose_age = 0.0
+                o.pose_m = [0] * 9      # axes x 16384
+                o.pose = (0, 0, 0)
+                o.fresh = False
                 o.firing = 0
                 o.friend = RAIDED[self.mode] and self.team_of(self.slot) == 1   # a raider's pirates
                 self.npcs[ident] = o
                 g.objs.append(o)
             elif o not in g.objs:
                 g.objs.append(o)
-            m = o.pose_m
-            m[6], m[7], m[8] = v[7] * k, v[8] * k, v[9] * k
-            m[3], m[4], m[5] = v[10] * k, v[11] * k, v[12] * k
-            m[0] = m[4] * m[8] - m[5] * m[7]
-            m[1] = m[5] * m[6] - m[3] * m[8]
-            m[2] = m[3] * m[7] - m[4] * m[6]
-            o.pose = (v[4] * 8.0, v[5] * 8.0, v[6] * 8.0)
+            m = o.pose_m        # whole numbers (build 163)
+            m[6], m[7], m[8] = v[7], v[8], v[9]
+            m[3], m[4], m[5] = v[10], v[11], v[12]
+            m[0] = (m[4] * m[8] - m[5] * m[7]) >> 14
+            m[1] = (m[5] * m[6] - m[3] * m[8]) >> 14
+            m[2] = (m[3] * m[7] - m[4] * m[6]) >> 14
+            o.pose = (v[4] * 8, v[5] * 8, v[6] * 8)
             o.speed = speed
-            o.pose_age = 0.0
+            o.fresh = True
             o.firing = flags & netplay.FIRING
             self.npc_seen[ident] = 0.0
 
     def _show_npcs(self, g, dt):
-        for ident in list(self.npc_seen):
-            t = self.npc_seen[ident] + dt
-            self.npc_seen[ident] = t
+        """The host's ships: placed when a pose comes (whole numbers, Game.place_i), moved
+        by the game between; gone if not heard of for NPC_GONE."""
+        gone = None
+        seen = self.npc_seen
+        for ident in seen:
+            t = seen[ident] + dt
+            seen[ident] = t
             o = self.npcs.get(ident)
             if o is None:
                 continue
             if t > NPC_GONE:            # heard of no more: gone without a word
-                del self.npc_seen[ident]
-                del self.npcs[ident]
+                if gone is None:
+                    gone = []
+                gone.append(ident)
+                continue
+            if o.fresh:
+                o.fresh = False
+                x, y, z = o.pose
+                g.place_i(o, x, y, z, o.pose_m)
+            if o.firing:
+                self._beam_at_me(o)
+        if gone is not None:
+            for ident in gone:
+                del seen[ident]
+                o = self.npcs.pop(ident)
                 o.dead = True
                 if o in g.objs:
                     g.objs.remove(o)
-                continue
-            o.pose_age += dt
-            x, y, z = o.pose
-            m = o.pose_m
-            v = o.speed * game.SPEED_K * o.pose_age
-            g.place(o, x + m[6] * v, y + m[7] * v, z + m[8] * v, m)
-            if o.firing:
-                self._beam_at_me(o)
 
     def _beam_at_me(self, s):
         d = (s.x * s.x + s.y * s.y + s.z * s.z) ** 0.5
@@ -1357,20 +1368,30 @@ class Duel:
     def _send_npcs(self, g):
         """Host: our ships' poses (and those just destroyed, to explode) to the others."""
         k = 0
-        hs = struct.calcsize(NPCS_HEAD)
+        hs = NPCS_HEAD_SIZE
         buf = self.npc_buf
-        a = g.anchor
+        c = g.anchor_ints()     # whole numbers (build 163): only o.m's six reads are floats
+        ax, ay, az, w, p = c[2], c[3], c[4], c[5], c[6]
         for ident, o in self.npcs.items():
             if k >= NPC_SLOTS:
                 break
-            x, y, z = g.world_point(o.x, o.y, o.z)
-            nx, ny, nz = self._world_axis(a, o.m, 6)
-            rx, ry, rz = self._world_axis(a, o.m, 3)
+            x, y, z = int(o.x) - ax, int(o.y) - ay, int(o.z) - az
+            om = o.m
+            n0, n1, n2 = int(om[6] * 16384), int(om[7] * 16384), int(om[8] * 16384)
+            r0, r1, r2 = int(om[3] * 16384), int(om[4] * 16384), int(om[5] * 16384)
             flags = netplay.FIRING if (o.beam > 0 or o.shot > 0) else 0
+            sp = int(o.speed)
             struct.pack_into(NPC_FMT, buf, hs + k * NPC_SIZE, ident, o.net_type, flags,
-                             min(255, int(o.speed)), _c16(x / 8), _c16(y / 8), _c16(z / 8),
-                             netplay._s(nx), netplay._s(ny), netplay._s(nz),
-                             netplay._s(rx), netplay._s(ry), netplay._s(rz))
+                             sp if sp < 255 else 255,
+                             _c16((x * p[0] + y * p[1] + z * p[2]) >> 15),     # world, / 8
+                             _c16((x * p[3] + y * p[4] + z * p[5]) >> 15),
+                             _c16((x * p[6] + y * p[7] + z * p[8]) >> 15),
+                             _c16((n0 * w[0] + n1 * w[1] + n2 * w[2]) >> 14),
+                             _c16((n0 * w[3] + n1 * w[4] + n2 * w[5]) >> 14),
+                             _c16((n0 * w[6] + n1 * w[7] + n2 * w[8]) >> 14),
+                             _c16((r0 * w[0] + r1 * w[1] + r2 * w[2]) >> 14),
+                             _c16((r0 * w[3] + r1 * w[4] + r2 * w[5]) >> 14),
+                             _c16((r0 * w[6] + r1 * w[7] + r2 * w[8]) >> 14))
             k += 1
         for d in self.npc_dead:
             if k >= NPC_SLOTS:
@@ -1575,6 +1596,8 @@ class Duel:
                 self.by_id[p.id] = p
                 p.ship = None
                 p.pose = None
+                p.fresh = False
+                p.flag_label = None
                 p.last_seq = None
                 p.lost = False
                 p.flags = 0
@@ -1645,8 +1668,9 @@ class Duel:
             g.place(o, x, y, z, m)
             g.objs.append(o)
         for ident in list(self.npcs):
-            if self.slot != 0:          # the others' copies come back with the next poses
+            if self.slot != 0:          # the others' copies: placed again in the new anchor
                 o = self.npcs[ident]
+                o.fresh = True
                 g.objs.append(o)
         self._make_marks(g)
 
@@ -1660,14 +1684,14 @@ class Duel:
                 o = game.Obj(bp, "mark", 0.0, 0.0, 0.0)
                 o.rgb = TEAM_RGB[k]
                 o.label = TEAM_NAMES[k] + " FLAG"
-                o.world = (0.0, 0.0, RING_Z if k else -RING_Z)
+                o.world = (0, 0, int(RING_Z) if k else -int(RING_Z))
                 self.rings[k] = o
                 self.marks.append(o)
         if GUARDED[self.mode] and not STATIONED[self.mode]:
             st = g.types.get("CORIOLIS") or g.types.get("DODO")
             if st is not None:
                 o = game.Obj(st, "mark", 0.0, 0.0, 0.0)
-                o.world = (0.0, 0.0, convoy_z(CONVOY_TIME) + 1500.0)   # (no name: Brian, build 162)
+                o.world = (0, 0, int(convoy_z(CONVOY_TIME)) + 1500)   # (no name: Brian, build 162)
                 self.marks.append(o)
         if GUARDED[self.mode]:
             c = self.convoy
@@ -1686,7 +1710,7 @@ class Duel:
                 c.role = "trader"
                 c.state = "trade"
                 c.rgb = CONVOY_RGB
-                c.label = None if STATIONED[self.mode] else "CONVOY"   # a station isn't named (build 162)
+                c.label = None          # neither the station nor the convoy is named (builds 162-163)
                 c.friend = not (RAIDED[self.mode] and self.team_of(self.slot) == 1)
                 self.convoy = c
             if not c.dead and self.hp > 0:
@@ -1694,14 +1718,20 @@ class Duel:
         for o in self.marks:
             g.objs.append(o)
         self._place_marks(g)
+        self._place_convoy(g)
 
     def _place_marks(self, g):
         for o in self.marks:
             x, y, z = o.world
-            g.place(o, x, y, z, _IDENT)
+            g.place_i(o, x, y, z, _IDENT_I)
         if self.rings[0] is not None:
             for k in (0, 1):
                 self.rings[k].rgb = TEAM_RGB[k] if self.carrier[k] == NOBODY else TAKEN_RGB
+
+    def _place_convoy(self, g):
+        c = self.convoy
+        if c is not None and not c.dead:
+            g.place_i(c, 0, 0, 0 if STATIONED[self.mode] else int(convoy_z(self.mtime)), _IDENT_I)
 
     def loadout(self, g):
         """Every life starts the same for everyone (Brian): shields and energy full, an
@@ -1838,7 +1868,36 @@ class Duel:
             c = (("CONVOY %d%%  %d:%02d" % (self.hp * 100 // 255, left // 60, left % 60), 0,
                   CONVOY_RGB),)
         self.hud_cache = c
+        self.rows = self._rows(ck)
         return c
+
+    def hud_rows(self):
+        """The line along the top as cockpit.draw_net_line draws it (build 163: gauges and
+        rectangle digits, no text, which costs ~4-12 ms a call on the badge): a tuple of
+        (kind, x, dy, a, b, rgb), dy below the line's top. kind "bar": a bar a wide, b full
+        (0-1); "num": the number a, aligned by b (-1 left, 0 centre, 1 right); "clock": a
+        seconds as m:ss from x; "pips": b marks, the first a lit. Made with hud()."""
+        self.hud()
+        return self.rows
+
+    def _rows(self, ck):
+        m = self.mode
+        if m == DUEL:
+            return ()
+        if m == FFA:            # your kills, a bar, the best (of FFA_WIN to win)
+            return (("num", -8, 0, self.scores[self.slot], 1, self._rgb(self.slot)),
+                    ("bar", -1, 2, 2, 1.0, ck.GREY),
+                    ("num", 8, 0, max(self.scores), -1, ck.GREY))
+        if m == TEAMS or m == CTF:
+            return (("num", -30, 0, self.team[0], 0, TEAM_RGB[0]),
+                    ("num", 30, 0, self.team[1], 0, TEAM_RGB[1]))
+        left = max(0, int(self.guard_time() - self.mtime))
+        rows = (("bar", -58, 3, 52, self.hp / 255.0, CONVOY_RGB),   # the station's or convoy's energy
+                ("clock", 4, 0, left, 0, ck.WHITE))
+        if STATIONED[m]:        # its shield, and the pirates docked (DOCK_LIMIT marks)
+            rows += (("bar", -58, 16, 52, self.shield_b / 255.0, ck.CYAN),
+                     ("pips", 6, 15, self.docked, DOCK_LIMIT, ck.RED))
+        return rows
 
     def compass(self):
         """What the compass points at: an Obj in our game, and its colour; or None."""
@@ -1920,7 +1979,7 @@ class Duel:
             flags = (netplay.DEAD if g.over else 0) | (netplay.FIRING if g.beam > 0 else 0)
             netplay.pack_pose(self.buf, self.slot, self.seq, g.world_pose(), g.speed, flags)
             self.link.send(self.buf)
-        for key in list(self.incoming):     # their missiles here: hit us, or our ECM got them
+        for key in (list(self.incoming) if self.incoming else ()):  # their missiles here: hit us, or our ECM got them
             mo = self.incoming[key]
             if mo.dead:
                 del self.incoming[key]
@@ -1928,7 +1987,7 @@ class Duel:
                     self.last_by = key[0]
                     self.last_by_t = 0.0
                 self._gone(key[1], GONE_ECM if mo.ecmed else GONE_HIT, key[0])
-        for n in list(self.ghosts):     # our copies that reached them, or ran out
+        for n in (list(self.ghosts) if self.ghosts else ()):    # our copies that reached them, or ran out
             if self.ghosts[n].dead:
                 del self.ghosts[n]
         if g.over and not self.dead_here:
@@ -2001,7 +2060,14 @@ class Duel:
                     self.wave_t = WAVE_EVERY
                     self._spawn_pirates(g)
             scores = None
-            for ident in list(self.npcs):   # ours destroyed: send them (to explode), score them
+            gone = None                 # (no copy of the list each frame: build 163)
+            objs = g.objs
+            for ident, o in self.npcs.items():
+                if o.dead or o not in objs:
+                    if gone is None:
+                        gone = []
+                    gone.append(ident)
+            for ident in (gone or ()):  # ours destroyed: send them (to explode), score them
                 o = self.npcs[ident]
                 if o.dead or o not in g.objs:
                     del self.npcs[ident]
@@ -2023,14 +2089,20 @@ class Duel:
             if scores is not None:
                 self._set_state(self.match, self.result, self.mtime, scores, self.team,
                                 self.carrier, self.hp)
-            for d in self.npc_dead:
-                d[2] -= dt
-            self.npc_dead = [d for d in self.npc_dead if d[2] > 0]
-            for key in list(self.npc_missiles):
-                mo = self.npc_missiles[key]
-                if mo.dead:
-                    del self.npc_missiles[key]
-                    self._gone(key[1], GONE_HIT, key[0])
+            if self.npc_dead:
+                old = False
+                for d in self.npc_dead:
+                    d[2] -= dt
+                    if d[2] <= 0:
+                        old = True
+                if old:
+                    self.npc_dead = [d for d in self.npc_dead if d[2] > 0]
+            if self.npc_missiles:
+                for key in list(self.npc_missiles):
+                    mo = self.npc_missiles[key]
+                    if mo.dead:
+                        del self.npc_missiles[key]
+                        self._gone(key[1], GONE_HIT, key[0])
             self.npc_t -= dt
             if self.npc_t <= 0:
                 self.npc_t = NPC_EVERY
@@ -2042,15 +2114,17 @@ class Duel:
 
     def _mode_step(self, g, dt):
         """The rings (and passing through them) and the convoy, each frame."""
-        self.mark_t -= dt
-        if self.mark_t <= 0:            # the world's turning drifts them a little: put back
-            self.mark_t = 0.5
+        f = g.frame             # (whole numbers: a float a frame is garbage on the badge)
+        if f % MARK_FRAMES == 0:        # the world's turning drifts them a little: put back
             self._place_marks(g)
         c = self.convoy
         if c is not None and not c.dead:
-            g.place(c, 0.0, 0.0, 0.0 if STATIONED[self.mode] else convoy_z(self.mtime), _IDENT)
-            if c not in g.objs and self.hp > 0:
+            back = c not in g.objs and self.hp > 0
+            if back:
                 g.objs.append(c)
+            # the station stays put: with the marks; the convoy moves: every few frames
+            if back or f % (MARK_FRAMES if STATIONED[self.mode] else CONVOY_FRAMES) == 0:
+                self._place_convoy(g)
         if self.mode != CTF or g.over or self.result:
             return
         x, y, z = g.world_pose()[:3]
@@ -2077,8 +2151,8 @@ class Duel:
             self.link.send(memoryview(self.pkt)[:struct.calcsize(CLAIM_FMT)])
 
     def _show_player(self, g, p, dt):
-        """Another player's ship, where their last pose and speed put it now."""
-        p.pose_age += dt
+        """Another player's ship: placed when a pose comes (in whole numbers, Game.place_i);
+        between poses the game moves it along its nose (Game._think) and with your flight."""
         if p.t >= GONE_END:
             self._drop(p, "LOST")       # not heard for a long while: gone without a word
             return
@@ -2104,6 +2178,7 @@ class Duel:
                     g.say("%s DESTROYED  %d-%d" % (p.name, self.kills, self.deaths), 3.0)
             return
         s = p.ship
+        new = s is None
         if s is None:
             bp = g.types.get(g.ship_name)     # practice flies a Cobra Mk III: so do they
             if bp is None:
@@ -2115,19 +2190,22 @@ class Duel:
                 or COOPED[self.mode]
         if s not in g.objs:
             g.objs.append(s)
+            new = True
         carrying = self.mode == CTF and p.slot in self.carrier
-        s.label = p.name + " *FLAG*" if carrying else p.name
-        x, y, z, speed = p.pose
-        m = p.pose_m
-        # where it is now: its last pose, moved on along its nose at its speed
-        v = speed * game.SPEED_K * p.pose_age
-        g.place(s, x + m[6] * v, y + m[7] * v, z + m[8] * v, m)
-        s.speed = speed
+        if new or p.flag_label is not carrying:     # (a new string only when it changes)
+            p.flag_label = carrying
+            s.label = p.name + " *FLAG*" if carrying else p.name
+        if new or p.fresh:
+            p.fresh = False
+            x, y, z, speed = p.pose
+            g.place_i(s, x, y, z, p.pose_m)
+            s.speed = speed
         if p.flags & netplay.FIRING:    # their laser: drawn at you if they are aiming at you
             self._beam_at_me(s)
 
 
 _IDENT = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+_IDENT_I = (16384, 0, 0, 0, 16384, 0, 0, 0, 16384)     # the same x 16384 (Game.place_i)
 _NET_KINDS = ("player", "npc", "convoy", "mark")
 
 
