@@ -1918,3 +1918,20 @@ what is now `ace.py` (renamed in build 50).
    game's order), and in the game the kill messages matched on every badge ("JAMESON
    DESTROYED BY JAMESON 2" on the host, "YOU DESTROYED JAMESON" on JAMESON 2, "YOU
    DESTROYED JAMESON 2" on JAMESON). No errors; frames 44-88 ms.
+   **Build 169** (Brian, 2026-11-26: "reduce the remaining garbage in Game.step").
+   `Obj.m` is a property: `_rotate` turns only the whole-number axes (`Obj.mi`) and sets
+   `Obj.mstale`; the nine floats are made again (`game._fresh_m`) only when something
+   reads o.m (the AI's steering, a laser drawn, a view flip). `draw_ship`, `_move16` and
+   duel's `_send_npcs` read mi; `Game.place_i` writes mi (no floats at all now). The
+   anchor's exact turn is written out (no tuples) and, like `_rot3` (the planet, sun and
+   station), skips the axis not turned (a digital joystick turns one at a time); the
+   sines once a frame; `Blueprint.crash_r` (the crash radius, once per type; `_collide`
+   made two floats an object a frame); no arithmetic on zero throttle, pitch or roll;
+   coasting ships move by `round(speed * Game.k16)` (one float, was three). Measured
+   (three games on one badge, as builds 164-168): `Game.step` 2.2 KB (host) / 1.5 KB (guest)
+   a frame steering on both axes at once, 1.8 / 1.1 KB on one (build 164: 3.7 / 3.3; 163:
+   6.8 / 5.1); `_collide` 0. Left: the anchor (0.5-0.9 KB, exact floats on purpose) and
+   the host's pirate AI planning (~0.75 KB). The four-badge bot game (STATION CO-OP, as
+   before): a collection every 61-94 frames (164: 44-57), frames 56-61 ms as before (the
+   drawing, ~40 ms, is most of a frame now). The main game's (planet, sun, station) not
+   measured on the badge.
