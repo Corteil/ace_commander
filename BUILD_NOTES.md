@@ -1912,3 +1912,9 @@ what is now `ace.py` (renamed in build 50).
    agree, and a newcomer, last, renames nobody. Outside a game, by radio address, round
    the game's names. So on joining, a name may change once (address order to the game's).
    Test in test_multiplayer.py (fails on build 167: the late JAMESON called itself JAMESON).
+   Build 168 on the badges (Brian, 2026-11-26; BRIAN hosting FREE FOR ALL, two JAMESONs):
+   every badge agreed. The first to join was JAMESON and the second JAMESON 2 on all
+   three; when the first left and joined again it came second, so the two swapped (the
+   game's order), and in the game the kill messages matched on every badge ("JAMESON
+   DESTROYED BY JAMESON 2" on the host, "YOU DESTROYED JAMESON" on JAMESON 2, "YOU
+   DESTROYED JAMESON 2" on JAMESON). No errors; frames 44-88 ms.
