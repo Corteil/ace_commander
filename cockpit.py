@@ -217,16 +217,28 @@ def draw_ship(ctx, o, rgb=None, wire_min=WIRE_MIN, solid=False):
         ctx.rectangle(sx - 1, sy - h, 1.5, 2 * h).fill()
         return True
 
-    m = o.m
-    m0 = int(m[0] * 4096)
-    m1 = int(m[1] * 4096)
-    m2 = int(m[2] * 4096)
-    m3 = int(m[3] * 4096)
-    m4 = int(m[4] * 4096)
-    m5 = int(m[5] * 4096)
-    m6 = int(m[6] * 4096)
-    m7 = int(m[7] * 4096)
-    m8 = int(m[8] * 4096)
+    if getattr(o, "mstale", False):     # turned in whole numbers since (game.Obj.m): no floats
+        m = o.mi
+        m0 = m[0] >> 2
+        m1 = m[1] >> 2
+        m2 = m[2] >> 2
+        m3 = m[3] >> 2
+        m4 = m[4] >> 2
+        m5 = m[5] >> 2
+        m6 = m[6] >> 2
+        m7 = m[7] >> 2
+        m8 = m[8] >> 2
+    else:
+        m = o.m
+        m0 = int(m[0] * 4096)
+        m1 = int(m[1] * 4096)
+        m2 = int(m[2] * 4096)
+        m3 = int(m[3] * 4096)
+        m4 = int(m[4] * 4096)
+        m5 = int(m[5] * 4096)
+        m6 = int(m[6] * 4096)
+        m7 = int(m[7] * 4096)
+        m8 = int(m[8] * 4096)
     px = _PX
     py = _PY
     ok = _OK

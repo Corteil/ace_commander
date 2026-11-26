@@ -1433,15 +1433,15 @@ class Duel:
         k = 0
         hs = NPCS_HEAD_SIZE
         buf = self.npc_buf
-        c = g.anchor_ints()     # whole numbers (build 163): only o.m's six reads are floats
+        c = g.anchor_ints()     # whole numbers (build 163; the axes too since 169)
         ax, ay, az, w, p = c[2], c[3], c[4], c[5], c[6]
         for ident, o in self.npcs.items():
             if k >= NPC_SLOTS:
                 break
             x, y, z = int(o.x) - ax, int(o.y) - ay, int(o.z) - az
-            om = o.m
-            n0, n1, n2 = int(om[6] * 16384), int(om[7] * 16384), int(om[8] * 16384)
-            r0, r1, r2 = int(om[3] * 16384), int(om[4] * 16384), int(om[5] * 16384)
+            om = game._axes_i(o)    # its axes x 16384 (build 169: not o.m's floats)
+            n0, n1, n2 = om[6], om[7], om[8]
+            r0, r1, r2 = om[3], om[4], om[5]
             flags = netplay.FIRING if (o.beam > 0 or o.shot > 0) else 0
             sp = int(o.speed)
             struct.pack_into(NPC_FMT, buf, hs + k * NPC_SIZE, ident, o.net_type, flags,

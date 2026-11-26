@@ -87,7 +87,6 @@ RADAR_RANGE = 10000.0
 NET_KINDS = ("player", "npc", "convoy", "mark")
 NET_TARGETS = ("player", "npc", "convoy")
 _NINE = (0, 1, 2, 3, 4, 5, 6, 7, 8)
-_K28 = 1.0 / (1 << 28)     # axes x 16384 times axes x 16384, back to 1
 MAX_OBJECTS = 14
 
 # A commander's flight is in a star system: a planet, a sun and a space station
@@ -420,8 +419,12 @@ def _pos_q(o):
 
 def _axes_i(o):
     """o's axes times 16384 (o.mi), read again from o.m if anything else has
-    turned it (its numbers aren't the very floats last put there) or replaced it."""
-    m = o.m
+    turned it (its numbers aren't the very floats last put there) or replaced it.
+    While o.mstale (turned by _rotate since o.m was last read: build 169) mi is newer
+    than o.m and nothing else can have changed o.m, so it is mi as it is."""
+    if o.mstale:
+        return o.mi
+    m = o._m
     mf = o.mf
     if (mf is None or m is not o.ml or m[0] is not mf[0] or m[1] is not mf[1]
             or m[2] is not mf[2] or m[3] is not mf[3] or m[4] is not mf[4] or m[5] is not mf[5]
@@ -438,18 +441,33 @@ def _axes_i(o):
     return o.mi
 
 
+def _fresh_m(o):
+    """o.m's floats made again from o.mi (Obj.m, when read after a turn)."""
+    m = o._m
+    mi = o.mi
+    mf = o.mf
+    for i in range(9):
+        m[i] = mf[i] = mi[i] * _INV14
+    o.mstale = False
+
+
 def _move(o, v):
-    """Move o v units along its nose: in whole numbers while its masters are up to
-    date (no floats made), else as floats (they are read again at the next turn)."""
+    """Move o v units along its nose (see _move16)."""
+    _move16(o, round(v * 16))
+
+
+def _move16(o, k):
+    """Move o k sixteenths of a unit along its nose: in whole numbers while its masters
+    are up to date (no floats made), else as floats (read again at the next turn)."""
     q = o.q
     mf = o.mf
-    m = o.m
-    if (q is not None and mf is not None and m is o.ml and m[6] is mf[6] and m[7] is mf[7]
-            and m[8] is mf[8] and o.x == (q[0] + 2) >> 2 and o.y == (q[1] + 2) >> 2
-            and o.z == (q[2] + 2) >> 2):
+    m = o._m
+    if (q is not None and mf is not None and (o.mstale or (m is o.ml and m[6] is mf[6]
+            and m[7] is mf[7] and m[8] is mf[8])) and o.x == (q[0] + 2) >> 2
+            and o.y == (q[1] + 2) >> 2 and o.z == (q[2] + 2) >> 2):
         mi = o.mi
         qf = o.qf               # what is left over below a quarter, kept, so slow drifts add up
-        k = round(v * 16)       # sixteenths of a unit; axes x 16384, q quarters: >> 16
+        # k: sixteenths of a unit; axes x 16384, q quarters: >> 16
         t = qf[0] + mi[6] * k
         q[0] += t >> 16
         qf[0] = t & 65535
@@ -463,6 +481,8 @@ def _move(o, v):
         o.y = (q[1] + 2) >> 2
         o.z = (q[2] + 2) >> 2
     else:
+        m = o.m
+        v = k * 0.0625
         o.x += m[6] * v
         o.y += m[7] * v
         o.z += m[8] * v
@@ -512,6 +532,7 @@ class Blueprint:
             area = size2 * 0.4
         self.area = float(max(area, 400))   # hit area: radius squared
         self.radius = math.sqrt(self.area)
+        self.crash_r = int(self.radius * 0.7 + 60.0)    # Game._collide's, once (build 169)
 
 
 def _view_xz(view, x, z):
@@ -533,6 +554,19 @@ def _view_obj(o, view):
 class Obj:
     """A ship, missile, rock or cargo canister."""
     count = 0
+
+    # its axes as floats (side, roof, nose): made from the whole-number mi only when read
+    # after a turn (build 169: _rotate turns mi alone and sets mstale)
+    @property
+    def m(self):
+        if self.mstale:
+            _fresh_m(self)
+        return self._m
+
+    @m.setter
+    def m(self, v):
+        self._m = v
+        self.mstale = False
 
     def __init__(self, bp, kind, x, y, z):
         self.bp = bp
@@ -615,9 +649,13 @@ class Boom:
 
 def _rot3(x, y, z, ca, sa, cb, sb):
     """Pitch a point by the angle with cosine ca and sine sa, then roll it by
-    cb, sb: the same turn as Game._rotate does in whole numbers."""
-    y, z = y * ca - z * sa, y * sa + z * ca
-    return x * cb - y * sb, x * sb + y * cb, z
+    cb, sb: the same turn as Game._rotate does in whole numbers. A turn about one
+    axis only (most, with a digital joystick) does only that one (build 169)."""
+    if sa:
+        y, z = y * ca - z * sa, y * sa + z * ca
+    if sb:
+        x, y = x * cb - y * sb, x * sb + y * cb
+    return x, y, z
 
 
 class Anchor:
@@ -659,6 +697,7 @@ class Space:
 
 class Game:
     def __init__(self, ships, level=1):
+        self.k16 = SPEED_K * 16 * 0.04     # (Game.step sets it each frame)
         self.set_level(level)
         self.god = False    # a cheat: hits flash but do no damage
         self.sounds = []    # sounds asked for this frame (sfx.py's names), which ace.py plays
@@ -838,20 +877,24 @@ class Game:
 
     def place_i(self, o, x, y, z, m):
         """place() in whole numbers: (x, y, z) in world units and axes m x 16384, all ints;
-        only o.m's nine numbers come out as floats (build 163: place() made ~65 floats a
-        call). Products stay under 2^30 (no big ints) for positions within ~150000."""
+        no floats (build 169; 163: o.m's nine; place() made ~65 floats a call). Products stay under 2^30 (no big ints) for positions within ~150000."""
         c = self.anchor_ints()
         w = c[5]
         p = c[6]
         o.x = c[2] + ((x * p[0] + y * p[3] + z * p[6]) >> 12)
         o.y = c[3] + ((x * p[1] + y * p[4] + z * p[7]) >> 12)
         o.z = c[4] + ((x * p[2] + y * p[5] + z * p[8]) >> 12)
-        om = o.m
+        # the axes into its whole-number mi, o.m's floats made only if read (build 169)
+        om = o.mi
+        if om is None:
+            _axes_i(o)
+            om = o.mi
         for i in (0, 3, 6):
             a, b, d = m[i], m[i + 1], m[i + 2]
-            om[i] = (a * w[0] + b * w[3] + d * w[6]) * _K28
-            om[i + 1] = (a * w[1] + b * w[4] + d * w[7]) * _K28
-            om[i + 2] = (a * w[2] + b * w[5] + d * w[8]) * _K28
+            om[i] = (a * w[0] + b * w[3] + d * w[6] + 8192) >> 14
+            om[i + 1] = (a * w[1] + b * w[4] + d * w[7] + 8192) >> 14
+            om[i + 2] = (a * w[2] + b * w[5] + d * w[8] + 8192) >> 14
+        o.mstale = True
 
     def place(self, o, x, y, z, m):
         """Put o (an Obj) where a pose in the shared world puts it in yours:
@@ -1698,13 +1741,15 @@ class Game:
             throttle = -1.0
             fire = missile = False
 
-        self.speed += throttle * THROTTLE_RATE * dt
+        if throttle:            # (no floats made for none: build 169)
+            self.speed += throttle * THROTTLE_RATE * dt
         if self.speed < 0.0:
             self.speed = 0.0
         elif self.speed > self.max_speed:
             self.speed = self.max_speed
 
         self.frame += 1
+        self.k16 = SPEED_K * 16 * dt    # (a speed times this: sixteenths of a unit this frame)
         fwd = self.speed * SPEED_K * dt
         sp = self.space
         # the jump drive: speed up held at full speed, with no ships about
@@ -1734,7 +1779,8 @@ class Game:
         if self.jumping or (self.autodock and self.speed >= self.max_speed and self.auto_far):
             fwd *= JUMP_K
         self.fwd = int(fwd)
-        self._rotate(pitch * PITCH_RATE * self.turn_k * dt, roll * ROLL_RATE * self.turn_k * dt, fwd)
+        self._rotate(pitch * PITCH_RATE * self.turn_k * dt if pitch else 0.0,
+                     roll * ROLL_RATE * self.turn_k * dt if roll else 0.0, fwd)
         if yaw:
             self._yaw(yaw * YAW_RATE * self.turn_k * dt)
         for o in self.objs:
@@ -1806,12 +1852,26 @@ class Game:
                     p[2] = random.randint(900, 1500)
             return
         # sines and cosines times 8192 (for positions) and 16384 (for directions)
-        ca = round(math.cos(a) * 16384)
+        # exact (the anchor's, below); a turn about one axis only (the joystick is digital,
+        # so most are) leaves the other's as 1 and 0, made by nobody (build 169)
+        if a != 0.0:
+            eca = math.cos(a)
+            esa = math.sin(a)
+        else:
+            eca = 1.0
+            esa = 0.0
+        if b != 0.0:
+            ecb = math.cos(b)
+            esb = math.sin(b)
+        else:
+            ecb = 1.0
+            esb = 0.0
+        ca = round(eca * 16384)
         dx = self.dust_x
         dx_far = dx * 7 // 5
-        sa = round(math.sin(a) * 16384)
-        cb = round(math.cos(b) * 16384)
-        sb = round(math.sin(b) * 16384)
+        sa = round(esa * 16384)
+        cb = round(ecb * 16384)
+        sb = round(esb * 16384)
         ca2 = ca >> 1
         sa2 = sa >> 1
         cb2 = cb >> 1
@@ -1838,15 +1898,29 @@ class Game:
             # exact sines, not the rounded whole-number ones: those don't quite square
             # to 1, so what they turn slowly grows or shrinks (unseen alone, but two
             # badges' worlds would drift apart)
-            fca = math.cos(a)
-            fsa = math.sin(a)
-            fcb = math.cos(b)
-            fsb = math.sin(b)
-            an.x, an.y, an.z = _rot3(an.x, an.y, an.z, fca, fsa, fcb, fsb)
-            an.z -= fwd
+            # (as _rot3, written out: no tuples, and only the turns there are; build 169)
+            x = an.x
+            y = an.y
+            z = an.z
+            if a != 0.0:
+                y, z = y * eca - z * esa, y * esa + z * eca
+            if b != 0.0:
+                x, y = x * ecb - y * esb, x * esb + y * ecb
+            an.x = x
+            an.y = y
+            an.z = z - fwd
             m = an.m
             for i in (0, 3, 6):
-                m[i], m[i + 1], m[i + 2] = _rot3(m[i], m[i + 1], m[i + 2], fca, fsa, fcb, fsb)
+                x = m[i]
+                y = m[i + 1]
+                z = m[i + 2]
+                if a != 0.0:
+                    y, z = y * eca - z * esa, y * esa + z * eca
+                if b != 0.0:
+                    x, y = x * ecb - y * esb, x * esb + y * ecb
+                m[i] = x
+                m[i + 1] = y
+                m[i + 2] = z
             if self.tick % 32 == 0:
                 _ortho(an.m)
         fq = round(fwd * 4)
@@ -1867,8 +1941,6 @@ class Game:
             o.y = (y + 2) >> 2
             o.z = (z + 2) >> 2
             mi = _axes_i(o)
-            mf = o.mf
-            m = o.m
             for i in (0, 3, 6):
                 x = mi[i]
                 y = mi[i + 1]
@@ -1878,9 +1950,7 @@ class Game:
                 mi[i] = x
                 mi[i + 1] = y
                 mi[i + 2] = z
-                m[i] = mf[i] = x * _INV14
-                m[i + 1] = mf[i + 1] = y * _INV14
-                m[i + 2] = mf[i + 2] = z * _INV14
+            o.mstale = True     # (o.m's floats made only if something reads them)
             v = o.aim
             if v is not None:
                 x = int(v[0] * 16384)
@@ -1976,7 +2046,6 @@ class Game:
             o.beam -= dt
         if o.shot > 0:
             o.shot -= dt
-        m = o.m
         kind = o.kind
         if kind in NET_KINDS:   # multiplayer's (duel.py): moved from packets, or fixed
             if o.ram_t > 0:
@@ -1984,7 +2053,7 @@ class Game:
             if o.speed and (kind == "player" or kind == "npc"):
                 # between their poses, along their nose at their speed (build 163: placed
                 # only when a pose comes, not every frame); your own flight moves it as all
-                _move(o, o.speed * SPEED_K * dt)
+                _move16(o, round(o.speed * self.k16))
             return
         if kind == "ship":
             # Steering is the costly part, and makes a lot of work for the
@@ -1992,7 +2061,7 @@ class Game:
             # for all the time since it last did. It still moves every frame.
             o.think_t += dt
             if (self.frame + o.slot) % THINK_EVERY:
-                _move(o, o.speed * SPEED_K * dt)
+                _move16(o, round(o.speed * self.k16))
                 return
             dt = o.think_t
             o.think_t = 0.0
@@ -2003,6 +2072,7 @@ class Game:
         if d < 1.0:
             d = 1.0
         if kind == "ship":
+            m = o.m             # (read only where it is turned: o.m's floats are made on reading)
             bp = o.bp
             if o.state == "drift":      # a Thargon with no mothership: adrift
                 o.speed = bp.speed * 0.25
@@ -2147,7 +2217,7 @@ class Game:
                 self.sfx("crash")       # a missile exploding: Elite's EXNO3 (TA34)
                 o.dead = True
                 return
-            _turn(m, -o.x / d, -o.y / d, -o.z / d, 2.2 * dt)
+            _turn(o.m, -o.x / d, -o.y / d, -o.z / d, 2.2 * dt)
             v = MISSILE_SPEED * dt
         elif kind == "pmissile":
             o.t -= dt
@@ -2178,11 +2248,11 @@ class Game:
                     if t.energy <= 0:
                         self._kill(t)
                     return
-                _turn(m, dx / dd, dy / dd, dz / dd, 3.0 * dt)
+                _turn(o.m, dx / dd, dy / dd, dz / dd, 3.0 * dt)
             v = PMISSILE_SPEED * dt
         else:   # rocks and canisters drift and tumble
             if o.spin:
-                _roll(m, o.spin * dt)
+                _roll(o.m, o.spin * dt)
             v = o.speed * SPEED_K * dt
         _move(o, v)
 
@@ -2223,7 +2293,7 @@ class Game:
                 continue        # a ring or a marker (duel.py): flown through
             if o.ram_t > 0 and o.kind in NET_KINDS:
                 continue        # just rammed: not again every frame
-            r = o.bp.radius * 0.7 + 60.0
+            r = o.bp.crash_r    # (a whole number: no floats a frame)
             if abs(o.z) > r:
                 continue
             d2 = o.x * o.x + o.y * o.y + o.z * o.z
