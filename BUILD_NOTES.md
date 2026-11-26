@@ -1900,3 +1900,15 @@ what is now `ace.py` (renamed in build 50).
    guests (`Duel._trim_guests`); the others are back to "asking to join" and are taken again
    if room comes. test_duel's lobby section hosts FREE FOR ALL now (it relied on a duel
    taking four); new tests in test_multiplayer.py.
+   Build 167 on the badges (Brian, 2026-11-26): a full duel wasn't offered, FREE FOR ALL
+   took a third, back to DUEL kept the first guest. Then four-player FREE FOR ALL games
+   (45-92 ms a frame) and a docking flight with the docking computer, no errors. But the
+   names: one badge listed "BRIAN, JAMESON, JAMESON", and both JAMESON badges called
+   themselves JAMESON. Build 166's freeze kept what each badge had, and a player heard
+   afresh was kept with its plain name.
+   **Build 168**. `Duel._number_names`, run each `lobby_step`: in a game (joined and
+   accepted, or hosting with guests) repeated names are numbered by the game's order, the
+   host then its guests as they joined; every member has that order from the host, so all
+   agree, and a newcomer, last, renames nobody. Outside a game, by radio address, round
+   the game's names. So on joining, a name may change once (address order to the game's).
+   Test in test_multiplayer.py (fails on build 167: the late JAMESON called itself JAMESON).

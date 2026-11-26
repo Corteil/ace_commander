@@ -522,32 +522,39 @@ class Duel:
             self._number_names()
 
     def _number_names(self):
-        """Two or more players with one name (two JAMESONs): the one with the lowest
-        radio address keeps it, the others are NAME 2, NAME 3... (Brian, 2026-11-25).
-        Names in our party are kept as they are (build 166).
-        Every badge hears the same names and addresses, so all number them alike;
-        not while flying, so nobody is renamed in a game."""
+        """Two or more players with one name (two JAMESONs, the default) are told apart
+        as NAME 2, NAME 3... (Brian, 2026-11-25). In a game (joined and accepted, or
+        hosting with guests), by its order: the host, then the guests as they joined,
+        which every one of them has from the host, so all agree, and a newcomer, coming
+        last, renames nobody (build 168; build 166 kept what each badge had, so two
+        could both be JAMESON). Everyone else by radio address, numbered round the game's
+        names. Not while flying."""
         if self.flying:
             return
-        # once joined (or hosting with guests), the party's names stay as they were
-        # (Brian, 2026-11-25): anyone heard after is numbered round them
-        party = []
+        me = self.link.id
+        game_order = []         # (base, Player or None for us), in the game's order
         if self.role == HOST and self.guests:
-            party = list(self.guests)
+            game_order.append((self.my_name, None))
+            for p in self.guests:
+                game_order.append((p.base, p))
         elif self.role == JOIN and self.accepted():
             h = self.host_p
-            party = [h] + [self.players[g] for g in h.guests if g in self.players]
-        taken = set(p.name for p in party)
-        everyone = []
-        if party:
-            taken.add(self.name)
-        else:
-            everyone.append((self.link.id, self.my_name, None))
+            game_order.append((h.base, h))
+            for g in h.guests:
+                if g == me:
+                    game_order.append((self.my_name, None))
+                elif g in self.players:
+                    p = self.players[g]
+                    game_order.append((p.base, p))
+        rest = []
+        if not game_order:
+            rest.append((me, self.my_name, None))
         for p in self.players.values():
-            if p.t < GONE and p not in party:
-                everyone.append((p.id, p.base, p))
-        everyone.sort(key=lambda e: e[0])
-        for ident, base, p in everyone:
+            if p.t < GONE and not any(q is p for _, q in game_order):
+                rest.append((p.id, p.base, p))
+        rest.sort(key=lambda e: e[0])
+        taken = set()
+        for base, p in game_order + [(b, p) for _, b, p in rest]:
             n = 1
             shown = base
             while shown in taken:
@@ -555,8 +562,9 @@ class Duel:
                 shown = base[:NAME_LEN - 2] + " " + str(n)
             taken.add(shown)
             if p is None:
-                self.name = shown
-            else:
+                if self.name != shown:
+                    self.name = shown
+            elif p.name != shown:
                 p.name = shown
 
     @property
@@ -916,6 +924,7 @@ class Duel:
         self._hear()
         if self.role == HOST:
             self.guests = [p for p in self.guests if p.t < GONE]    # gone away: room again
+        self._number_names()    # (who is about, and in which game, may have changed)
 
     def _age(self, dt):
         for p in self.players.values():
@@ -985,9 +994,8 @@ class Duel:
                 self.players[hid] = p
             p.t = 0.0
             nm = name.decode().strip() or "?"
-            if nm != p.base:    # a new player or a new name: number any repeats again
+            if nm != p.base:    # a new player or a new name (numbered in lobby_step)
                 p.base = p.name = nm
-                self._number_names()
             p.colour = colour
             if kind == END_PKT:
                 if self.flying and self.by_id.get(hid) is p:

@@ -1143,6 +1143,40 @@ lob_fl()
 check("back to a duel: the first guest keeps the place", len(fl[0].guests) == 1 and fl[1].accepted()
       and not fl[2].accepted() and fl[0].can_start()[0])
 
+# ---- two JAMESONs in one game: numbered by the game's order, alike on every badge -------
+# (build 166 let each badge keep what it had: in a four-badge game one listed
+# "BRIAN, JAMESON, JAMESON", and both JAMESON badges called themselves JAMESON)
+air = Air()
+gm = [duel.Duel(Link(air, bytes([2, 0, 0, 0, 18, 5])), "BRIAN", 1),
+      duel.Duel(Link(air, bytes([2, 0, 0, 0, 18, 7])), "JAMESON", 1),     # joins first
+      duel.Duel(Link(air, bytes([2, 0, 0, 0, 18, 6])), "THOMAS", 1)]
+
+
+def lob_gm(n=8):
+    for _ in range(n):
+        for d_ in gm:
+            d_.lobby_step(DT)
+
+
+gm[0].host(duel.FFA)
+lob_gm()
+for d_ in gm[1:]:
+    d_.join(d_.hosts()[0])
+    lob_gm()
+gm.append(duel.Duel(Link(air, bytes([2, 0, 0, 0, 18, 1])), "JAMESON", 1))  # lower address, later
+lob_gm()
+gm[3].join(gm[3].hosts()[0])
+lob_gm()
+parties = [[e[0] for e in d_.party()] for d_ in gm]
+check("one game, two JAMESONs: every badge alike", all(p == parties[0] for p in parties), str(parties))
+check("by the game's order: the first to join keeps the name",
+      parties[0] == ["BRIAN", "JAMESON", "THOMAS", "JAMESON 2"], str(parties[0]))
+check("each badge's own name agrees", [d_.name for d_ in gm] == ["BRIAN", "JAMESON", "THOMAS", "JAMESON 2"])
+del gm[2].players[gm[1].link.id]            # a player heard afresh (it had gone quiet)
+lob_gm()
+check("heard afresh: still numbered", [e[0] for e in gm[2].party()] == parties[0],
+      str([e[0] for e in gm[2].party()]))
+
 if fails:
     print("%d FAILED: %s" % (len(fails), ", ".join(fails)))
     sys.exit(1)
