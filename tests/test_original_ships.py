@@ -94,10 +94,11 @@ for e in SHIPS:
         o.m = [ca, sa * sb, -sa * cb, 0.0, cb, sb, sa, -ca * sb, ca * cb]
         o.x, o.y, o.z = 0.0, 0.0, o.bp.size * 3
         cockpit.draw_ship(CountCtx(), o, None, 0, True)
-# the ring station is drawn in convex parts, back to front: the hub always
-# blacks out what is behind it, the ring's pieces only side-on, the spokes never
+# the ring station is drawn in convex parts, back to front: the hub and the ring's
+# pieces always black out what is behind them (the ring's only side-on until build
+# 152, when the spokes showed through it), the spokes never
 halo = game.Blueprint([e for e in SHIPS if e[0] == "DODO"][0])
-assert halo.parts and sorted(p[2] for p in halo.parts) == [0, 0, 0, 1, 2, 2, 2, 2, 2, 2]
+assert halo.parts and sorted(p[2] for p in halo.parts) == [0, 0, 0, 1, 1, 1, 1, 1, 1, 1]
 assert sorted(e for p in halo.parts for e in p[1]) == list(range(len(halo.edges))), \
     "every edge in exactly one part"
 o = O(); o.bp = halo; o.x = o.y = 0.0; o.z = 1500.0

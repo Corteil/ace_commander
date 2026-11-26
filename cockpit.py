@@ -78,7 +78,8 @@ LASER_COLOURS = {
 # enemy missiles are orange like enemy lasers (all enemy fire), yours light purple
 UPGRADE_RGB = GREEN     # a practice upgrade canister (game.UPGRADES), on screen and radar
 COLOUR = {"ship": WHITE, "rock": GREY, "can": YELLOW, "missile": ORANGE, "pmissile": LIGHT_PURPLE,
-          "station": WHITE, "player": (0.3, 0.9, 1)}     # player: another player's ship (duel.py)
+          "station": WHITE, "player": (0.3, 0.9, 1),     # player: another player's ship (duel.py)
+          "npc": WHITE, "convoy": YELLOW, "mark": GREY}   # the host's ships, the convoy, rings
 PLANET = (0.35, 0.6, 1)
 # each system's planet is one of these, picked from its number (Space.planet):
 # (the disc's colour, its outline's)
@@ -216,16 +217,28 @@ def draw_ship(ctx, o, rgb=None, wire_min=WIRE_MIN, solid=False):
         ctx.rectangle(sx - 1, sy - h, 1.5, 2 * h).fill()
         return True
 
-    m = o.m
-    m0 = int(m[0] * 4096)
-    m1 = int(m[1] * 4096)
-    m2 = int(m[2] * 4096)
-    m3 = int(m[3] * 4096)
-    m4 = int(m[4] * 4096)
-    m5 = int(m[5] * 4096)
-    m6 = int(m[6] * 4096)
-    m7 = int(m[7] * 4096)
-    m8 = int(m[8] * 4096)
+    if getattr(o, "mstale", False):     # turned in whole numbers since (game.Obj.m): no floats
+        m = o.mi
+        m0 = m[0] >> 2
+        m1 = m[1] >> 2
+        m2 = m[2] >> 2
+        m3 = m[3] >> 2
+        m4 = m[4] >> 2
+        m5 = m[5] >> 2
+        m6 = m[6] >> 2
+        m7 = m[7] >> 2
+        m8 = m[8] >> 2
+    else:
+        m = o.m
+        m0 = int(m[0] * 4096)
+        m1 = int(m[1] * 4096)
+        m2 = int(m[2] * 4096)
+        m3 = int(m[3] * 4096)
+        m4 = int(m[4] * 4096)
+        m5 = int(m[5] * 4096)
+        m6 = int(m[6] * 4096)
+        m7 = int(m[7] * 4096)
+        m8 = int(m[8] * 4096)
     px = _PX
     py = _PY
     ok = _OK
@@ -1090,9 +1103,33 @@ def _world(ctx, g):
         finally:
             g.leave_view()
             g.dust = dust
-        text(ctx, VIEW_NAMES[g.view] + " VIEW", 0, -96, 11, GREY)
+        # below the practice score, the multiplayer line and the frame time along the
+        # top (build 151: it overlapped them): on the round screen, and on a dashboard
+        # layout's shorter view (the Pi's, the Tufty's) as far down from its top
+        y = -84 if VIEW_HH >= 120 else 26 - VIEW_HH
+        net = getattr(g, "net", None)
+        if net is not None and any(r[2] > 10 for r in net.hud_rows()):
+            y += 14             # below multiplayer's second line (the station's shield)
+        text(ctx, VIEW_NAMES[g.view] + " VIEW", 0, y, 11, GREY)
         return
     _draw_world(ctx, g)
+
+
+SHOW_NAMES = True   # Options > NAMES (build 164): HIDDEN leaves only a flag carrier's *FLAG*
+
+
+def _draw_obj(ctx, g, o):
+    """One object, with another player's name under it and its laser if firing."""
+    drawn = draw_ship(ctx, o, UPGRADE_RGB if o.upgrade else o.rgb)
+    label = o.label
+    if label and not SHOW_NAMES:    # names hidden: only who has a flag
+        label = "*FLAG*" if label.endswith("*FLAG*") else None
+    if drawn and label and o.z > INEAR and not g.over:      # another player: their name
+        z = int(o.z)
+        text(ctx, label, int(o.x) * IFOCAL // z,
+             -(int(o.y) * IFOCAL // z) + o.bp.isize * IFOCAL // z + 8, 10, o.rgb or WHITE)
+    if o.beam > 0:
+        _enemy_beam(ctx, o)
 
 
 def _draw_world(ctx, g, station_wire=WIRE_MIN):
@@ -1113,13 +1150,14 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
         ctx.stroke()
 
     sp = g.space
+    st = sp.station if sp is not None else None
     if sp is not None:
         if T_SPACE is not None:     # PERF: how long the sun, planet and station take
             t = _tus()
-            _draw_space(ctx, sp, station_wire)
+            _draw_space(ctx, sp, station_wire, g)
             T_SPACE[0] += _tdiff(_tus(), t)
         else:
-            _draw_space(ctx, sp, station_wire)
+            _draw_space(ctx, sp, station_wire, g)
 
     # stardust, so speed and turning can be seen (close to you, so drawn over the
     # planet and sun); with the jump drive on, each speck is a streak back to
@@ -1152,13 +1190,9 @@ def _draw_world(ctx, g, station_wire=WIRE_MIN):
 
 
     for o in g.objs:
-        drawn = draw_ship(ctx, o, UPGRADE_RGB if o.upgrade else o.rgb)
-        if drawn and o.label and o.z > INEAR and not g.over:    # another player: their name
-            z = int(o.z)
-            text(ctx, o.label, int(o.x) * IFOCAL // z,
-                 -(int(o.y) * IFOCAL // z) + o.bp.isize * IFOCAL // z + 8, 10, o.rgb or WHITE)
-        if o.beam > 0:
-            _enemy_beam(ctx, o)
+        if st is not None and st.z > NEAR and o.z > st.z:
+            continue            # beyond the station: drawn before it (_draw_space)
+        _draw_obj(ctx, g, o)
 
     for boom in g.booms:
         fade = 1.0 - boom.t / boom.life
@@ -1603,9 +1637,11 @@ def _planet(ctx, sp, planet=None):
     _globe(ctx, sp.px, sp.py, sp.pz, sp.pr, fill, edge)
 
 
-def _draw_space(ctx, sp, wire=WIRE_MIN):
+def _draw_space(ctx, sp, wire=WIRE_MIN, g=None):
     """The sun (filled), the planet (an outline, filled black if it is in
-    front of the sun) and the station, in its government's colour."""
+    front of the sun) and the station, in its government's colour. With g, the
+    ships beyond the station are drawn before it, and it is drawn solid over them
+    (build 151: they showed through it); _draw_world draws the rest after."""
     sun = _sphere(sp.sx, sp.sy, sp.sz, sp.sr)
     planet = _sphere(sp.px, sp.py, sp.pz, sp.pr)
     # whichever is nearer is drawn last, over the other
@@ -1619,17 +1655,23 @@ def _draw_space(ctx, sp, wire=WIRE_MIN):
         _planet(ctx, sp, planet)
     st = sp.station
     if st is not None:
-        # in front of the planet and over its outline: the station hides it
+        # in front of the planet or the sun (filled discs) and over them: the station
+        # hides them (build 151: over its outline only, before; the disc showed through)
         solid = False
-        if (planet is not None and st.z > NEAR
-                and st.x * st.x + st.y * st.y + st.z * st.z
-                < sp.px * sp.px + sp.py * sp.py + sp.pz * sp.pz):
-            k = FOCAL / st.z
-            dx = st.x * k - planet[0]
-            dy = -st.y * k - planet[1]
-            pr = st.bp.size * k
-            d = math.sqrt(dx * dx + dy * dy)
-            solid = abs(d - planet[2]) < pr
+        if st.z > NEAR:
+            sd = st.x * st.x + st.y * st.y + st.z * st.z
+            for disc, cx, cy, cz in ((planet, sp.px, sp.py, sp.pz), (sun, sp.sx, sp.sy, sp.sz)):
+                if disc is not None and sd < cx * cx + cy * cy + cz * cz:
+                    k = FOCAL / st.z
+                    dx = st.x * k - disc[0]
+                    dy = -st.y * k - disc[1]
+                    if math.sqrt(dx * dx + dy * dy) < disc[2] + st.bp.size * k:
+                        solid = True
+        if g is not None and st.z > NEAR:
+            for o in g.objs:
+                if o.z > st.z:
+                    _draw_obj(ctx, g, o)
+                    solid = True    # hide what of it is behind the station
         # wire 0 (the docking computer's view): a wireframe at its true size
         # however far off, never a dot or marker
         draw_ship(ctx, st, station_colour(sp.gov), wire, solid)
@@ -1726,17 +1768,65 @@ def _planet_gauge(ctx, sp):
     ctx.rgb(*(RED if a < 5 else CYAN)).rectangle(-25, -94, a, 4).fill()
 
 
-def _compass(ctx, sp):
+def compass_target(g):
+    """(x, y, z, rgb) the compass points at: the planet, the station in its safe zone,
+    or in multiplayer what the mode wants (duel.Duel.compass); None for nothing."""
+    sp = g.space
+    if sp is not None:
+        if sp.witch:
+            return None
+        st = sp.station
+        if sp.safe and st is not None:
+            return st.x, st.y, st.z, station_colour(sp.gov)
+        return sp.px, sp.py, sp.pz, PLANET
+    net = getattr(g, "net", None)
+    t = net.compass() if net is not None else None
+    if t is None:
+        return None
+    o, rgb = t
+    return o.x, o.y, o.z, rgb
+
+
+NET_DIM = (0.25, 0.25, 0.3)     # a gauge's empty part
+
+
+def draw_net_line(ctx, g, y):
+    """Multiplayer's line along the top (duel.Duel.hud_rows), y its middle: the score, or
+    the convoy's or station's energy, time left, shield and pirates docked. Rectangles
+    only (build 163: the text it was cost 20-30 ms a frame on the badge)."""
+    net = getattr(g, "net", None)
+    if net is None:
+        return
+    top = y - 6
+    for kind, x, dy, a, b, rgb in net.hud_rows():
+        yy = top + dy
+        if kind == "bar":
+            w = int(a * b + 0.5) if b > 0 else 0
+            if w < a:
+                ctx.rgb(*NET_DIM).rectangle(x + w, yy, a - w, 5).fill()
+            if w > 0:
+                ctx.rgb(*rgb).rectangle(x, yy, w, 5).fill()
+        elif kind == "num":
+            ctx.rgb(*rgb)
+            number(ctx, a, x, yy, _BIG, b)
+        elif kind == "clock":   # m:ss
+            ctx.rgb(*rgb)
+            x += number(ctx, a // 60, x, yy, _BIG, -1) + 2
+            ctx.rectangle(x, yy + 2, 2, 2).fill()
+            ctx.rectangle(x, yy + 7, 2, 2).fill()
+            x += 4
+            x += number(ctx, (a % 60) // 10, x, yy, _BIG, -1) + 3
+            number(ctx, a % 10, x, yy, _BIG, -1)
+        else:                   # pips: b marks, a of them lit
+            for i in range(b):
+                ctx.rgb(*(rgb if i < a else NET_DIM)).rectangle(x + i * 9, yy, 6, 6).fill()
+
+
+def _compass(ctx, t):
     ctx.rgb(*RADAR_GRID)        # its ring as bright as the radar's (build 139)
     for px, py in _COMPASS:
         ctx.rectangle(px, py, 1.5, 1.5).fill()
-    st = sp.station
-    if sp.safe and st is not None:
-        x, y, z = st.x, st.y, st.z
-        rgb = station_colour(sp.gov)
-    else:
-        x, y, z = sp.px, sp.py, sp.pz
-        rgb = PLANET
+    x, y, z, rgb = t
     d = math.sqrt(x * x + y * y + z * z)
     if d < 1:
         return
@@ -1812,7 +1902,9 @@ def _hud(ctx, g, ms=None, ring=True):
             h = 22
         elif h < -6:
             h = -6
-        if o.kind == "ship":    # hostile ships red, the police blue, traders white
+        if o.rgb is not None and not o.upgrade:     # another player's, the convoy, a ring
+            ctx.rgb(*o.rgb)
+        elif o.kind == "ship" or o.kind == "npc":   # hostile ships red, the police blue, traders white
             if hostile(o):
                 ctx.rgb(*RED)
             elif o.role == "police":
@@ -1826,6 +1918,9 @@ def _hud(ctx, g, ms=None, ring=True):
         else:
             ctx.rectangle(bx, by, 1, -h).fill()
         ctx.rectangle(bx - 1, by - h - 1, 3, 3).fill()
+    t = compass_target(g)       # nothing to point at in witchspace
+    if t is not None:
+        _compass(ctx, t)
     sp = g.space
     if sp is not None:
         st = sp.station     # far off it is beyond cheap whole numbers, so check first
@@ -1842,8 +1937,6 @@ def _hud(ctx, g, ms=None, ring=True):
                 else:
                     ctx.rectangle(bx, by, 1, -h).fill()
                 ctx.rectangle(bx - 2, by - h - 2, 5, 5).fill()
-        if not sp.witch:        # nothing to point at in witchspace
-            _compass(ctx, sp)
         if g.cabin > COOL_CABIN:
             _sun_gauges(ctx, g, sp)
         elif not sp.witch:
@@ -1860,6 +1953,8 @@ def _hud(ctx, g, ms=None, ring=True):
         x += number(ctx, g.wave, x, -102, _BIG, -1) + 9
         ctx.rgb(*WHITE)
         number(ctx, g.score, x, -102, _BIG, -1)
+    elif sp is None:        # multiplayer: its score along the top
+        draw_net_line(ctx, g, -98)
     if ms is not None:      # frame time in ms, small, just above
         ctx.rgb(*GREY)
         number(ctx, ms, 0, -114, _SMALL)
@@ -1873,7 +1968,7 @@ def _hud(ctx, g, ms=None, ring=True):
         text(ctx, "C: to the station" if g.again.endswith("station") else g.again,
              0, 30, 12, GREY)
         text(ctx, "F: title screen", 0, 46, 12, GREY)
-    elif g.over and getattr(g, "net", None) is not None:     # a duel's own end screen
+    elif getattr(g, "net", None) is not None and g.net.showing(g):   # multiplayer's end screen
         draw_duel_over(ctx, g, -52)
     elif g.over:
         ctx.rgba(0, 0, 0, 0.8).rectangle(-100, -42, 200, 100).fill()

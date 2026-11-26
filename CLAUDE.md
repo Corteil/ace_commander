@@ -70,9 +70,15 @@ Other devices are in `hosts/`: the Pi, and the Tufty 2350 since build 109 (`host
   imports, so it runs on a PC.
 - `cockpit.py` - flight view, HUD, radar. Built from rectangles (see Speed).
 - `duel.py`, `netplay.py`, `net_espnow.py` - multiplayer (2026-11-24, `plans/MULTIPLAYER.md`):
-  DUEL on the title screen when `platform.radio()` exists; `Game.set_anchor` / `world_pose`
-  / `place` keep a shared world; the 32-byte pose packet; ESP-NOW broadcast on the badge
-  (`hosts/pi/net_udp.py` on the Pi with `--duel`). The other player is kind "player".
+  MULTIPLAYER on the title screen when `platform.radio()` exists (it was DUEL until build
+  148); up to four players, modes DUEL, FREE FOR ALL, TEAMS, CAPTURE FLAG, CONVOY CO-OP,
+  CONVOY RAID, STATION CO-OP and STATION RAID (builds 148-153: the host decides score,
+  flags, convoy, station and pirates); `Game.set_anchor`
+  / `world_pose` / `place` keep a shared world; the 32-byte pose packet; ESP-NOW broadcast on
+  the badge (`hosts/pi/net_udp.py` on the Pi with `--duel`). Other players' ships are kind
+  "player", the host's pirates on the others' screens "npc", the convoy "convoy" (host) and
+  rings and the station "mark" (`game.NET_KINDS`). `convoy_ship.py` (committed, original) is
+  the convoy's BULK FREIGHTER, made by `tools/make_convoy_ship.py`.
 - `viewer.py` - ship viewer. `bench.py` - the speed test (DEBUG > DISPLAY > SPEED TEST since build 72;
   imported only when it is opened, since 2026-11-20).
 - `title.py` - title screen: block-letter name from rectangles, tumbling ship, one menu line.

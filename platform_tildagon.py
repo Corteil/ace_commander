@@ -473,14 +473,19 @@ class Platform:
             await render_update()
 
     def radio(self):
-        """ESP-NOW broadcast (net_espnow.py), opened the first time a duel is."""
+        """ESP-NOW broadcast (net_espnow.py), opened the first time a duel is; it holds
+        the radio (the firmware's ESP-NOW service paused) till minimise."""
         from . import net_espnow
-        return net_espnow.Link()
+        self.link = net_espnow.Link()
+        return self.link
 
     def minimise(self):
         """Leave the game: the host (the loading screen) is the app the
         scheduler knows; the game is its own host only on a PC (the tests)."""
         self.close_sound()
+        link = getattr(self, "link", None)
+        if link is not None:        # the radio back to the firmware (it reopens on use)
+            link.close()
         if self.host is not self.app:
             self.host.minimise()
         else:

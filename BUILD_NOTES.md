@@ -1628,3 +1628,310 @@ what is now `ace.py` (renamed in build 50).
    and ramming do damage, the E.C.M. by hand (B); rounds with a fresh loadout and the score;
    either leaving ends it. The Pi duels over UDP with --duel. Key guides for the Pi and Tufty
    in their zips.
+   **Build 148** (Brian, 2026-11-25: "make it support up to four players. Modes Free for all,
+   teams and capture the flag. Protect the convoy ship from pirates"; capture the flag: "Two
+   rings in teams colours set distance apart ... fly through the ring then changes colour and
+   you must fly back to your ring and pass though to score. Destroyed ship spawn close/behind
+   to their home ring after a set time"; the convoy "could be coop or p v p. Convoy ship will
+   need to be a new large design"). DUEL on the title screen is now **MULTIPLAYER**; the host
+   picks the mode (left / right on HOSTING) and takes up to three guests (`duel.MAX_PLAYERS`);
+   slot 0 is the host, then the guests in the order they joined; in team modes even slots are
+   RED and odd BLUE. Modes (`duel.MODE_NAMES`): DUEL (as before: two, rounds by C), FREE FOR
+   ALL (`FFA_WIN` 10 kills), TEAMS (`TEAM_WIN` 10, no friendly fire: a teammate is
+   `Obj.friend`, not locked or hit), CAPTURE FLAG (rings `RING_Z` 5000 either side of the
+   middle, `RING_PASS` 460 to count as through; a ring goes grey while its flag is away;
+   `CTF_WIN` 3; a carrier destroyed: the flag goes home; the compass points at the ring to
+   fly to), CONVOY CO-OP (1-4 players guard the new BULK FREIGHTER, `convoy_ship.py` from
+   `tools/make_convoy_ship.py`, on a straight run of `CONVOY_TIME` 150 s to a station; pirate
+   waves every `WAVE_EVERY` 25 s) and CONVOY RAID (red defends, blue raids; the pirates are
+   blue's friends). Except a duel, destroyed ships come back after `RESPAWN` 5 s at their
+   start (`spawn_pose`; behind the home ring in Capture Flag, by the convoy for defenders); a
+   result shows `RESULT_FOR` 10 s, then the next match. **The host decides** the score, the
+   flags, the convoy and the pirates (`STATE` 4 a second and on a change; `CLAIM` for a ring
+   passed, `KILLED` with who did it, the last hit within 10 s); the pirates are ordinary ships
+   in the host's game (`Game._pick_prey` asks `Duel.prey_for`: the convoy, the host or another
+   player), sent as `NPCS` 10 a second (22 bytes each, up to 10 in a packet: 224 bytes, inside
+   ESP-NOW's 250); the others draw them as kind "npc" and send hits (`NPC_HIT`) and missiles
+   (`MISSILE` with `NPC_BIT`) to the host. A pirate hitting another player sends that player a
+   `HIT` (who: `NPC_SRC`). HIT and MISSILE now name their target's slot. The host respawning
+   keeps its pirates where they were in the shared world. Leaving: the host ends it for all; a
+   guest drops out, and it ends when nobody else is left (CONVOY CO-OP goes on alone). HUD: the
+   score (or the convoy's energy and time left) along the top (`cockpit.draw_net_line`, the Pi
+   and Tufty dashboards too); the compass (`cockpit.compass_target`) on all three. Tests:
+   `tests/test_multiplayer.py` (new, in run_all; four Games on a pretend radio), test_duel and
+   test_duel_combat updated. **PC only: not yet on badges** (and nothing yet known of the
+   frame time with four ships, the convoy close up (92 lines, 6 parts) or 8 pirates).
+   **Build 149** (Brian, 2026-11-25: "Not sure about the ship design, have to see it in the
+   game ... yes add it to the ship viewer"). The convoy's ship is last in the Ship Viewer
+   (`viewer.with_convoy`), and is called BULK FREIGHTER (the game's own ships already have a
+   HAULER). The viewer now draws a ship made of convex parts as the game does: back to front,
+   a nearer part blacking out what is behind it (`viewer._fill_hull`; the Halo and the freighter
+   gain hidden lines there). `test_app`'s viewer check counts 32. Not yet seen on the badge.
+   **Build 150** (Brian, 2026-11-25: "The convoy game should have a p v p mode as well" (it
+   had: CONVOY RAID) ... "add team choice in the lobby and a no-pirates option. The defenders
+   should not be overwhelmed"). Team modes: each player picks red / blue (in a raid DEFEND /
+   RAID) with left / right, the host on its HOSTING page's YOU line (up / down picks MODE,
+   YOU, PIRATES); anyone who hasn't picked (`NO_TEAM`) joins the smaller team, red if level
+   (`Duel.lobby_teams`). HELLO grew to 52 bytes: the team asked for, the host's options
+   (`OPT_PIRATES`) and each slot's team, which START fixes (`Duel.teams`, `Duel.team_of`).
+   It can start only with a player on each team. Teammates start side by side (`MATE_X`).
+   CONVOY RAID: PIRATES ON / OFF (the host's; off, none come). Balance: defenders come back
+   after `DEFEND_RESPAWN` 3 s; each raider more than there are defenders adds
+   `RAID_EXTRA_RESPAWN` 2 s to the raiders' wait and a defender's worth of energy to the
+   convoy (1 v 3: three times `CONVOY_ENERGY`); a pirate wave is 1 + defenders - raiders
+   ships (none if the raiders are more). Tests in test_multiplayer (team choice, 1 v 3, 2 v 1,
+   pirates off, the app's TEAM line). PC only.
+   **Build 151** (Brian, 2026-11-25: "Remove the none ship items from the view. In combat mode
+   the wave and kills overlap the view labels. The pirates skill level should be selectable.
+   In the loading scene you can see though ships. Also can see lines that should be hidden
+   when the station is in view and on the loading and start screens"). The Ship Viewer leaves
+   out what isn't a ship (`viewer.NOT_SHIPS`: canister, plate, the three rocks, the missile;
+   26 entries with the freighter; stations and the escape pod stay). The view label (REAR
+   VIEW...) moved below the practice score / multiplayer line: y -84 on the round screen, 26
+   below the top of a dashboard layout's view (the Pi's own label went; the Tufty's was off
+   its view). Multiplayer: PIRATES on the HOSTING page is their skill, EASY / NORMAL / HARD
+   (and OFF in a raid; CONVOY CO-OP has the line too), the game's level (`game.LEVELS`) set on
+   the host's game (`Duel.pirate_level`, options bits 1-2). Hidden lines: the loading screen's
+   ship drew every line; the title screen and Ship Viewer judged a face by its normal alone, as
+   if from far off, so close up the far side showed. All three now judge from a point on the
+   face, in perspective, as cockpit.draw_ship does (`letters.face_dots`: n.v + distance x the
+   turned normal's z < 0), and draw ships made of parts back to front (`letters.draw_edges`,
+   `fill_hull`). In flight, ships beyond the station are drawn before it and it is drawn solid
+   over them (`cockpit._draw_space(..., g)`, `_draw_obj`), and it is solid wherever it is over
+   the planet's or sun's filled disc (before: only over the planet's outline). PC renders only.
+   **Build 152** (Brian, 2026-11-25: "Can see the spokes line entering the wheel on the halo
+   render"). The Halo (the game's own DODO) had its ring's six pieces black out what is behind
+   them only side-on (`HIDES_SIDE_ON`), so seen at a slant a spoke's end was drawn across a
+   nearer piece of the ring. Now `HIDES_ALWAYS` (tools/make_original_ships.py, original_ships.py
+   remade): a piece nearer than the middle hides what is behind it, in flight, on the title
+   screen and in the Ship Viewer. Seen dead face-on the spokes still meet the ring's inner wall
+   in its middle, which is right (and no piece is nearer than the middle then, so none fills).
+   Cost: up to three more fills a frame close to a Halo (about 2 ms each on the badge, from the
+   earlier measurements); Elite's Dodo is one convex shape and is unchanged. PC renders only.
+   **Build 153** (Brian, 2026-11-25: "build it, two new modes, 1 and 2 should be selectable
+   all 4 station types depending if elite data loaded, if more than a set number of pirate
+   ships dock or the station is destroyed game over"). STATION CO-OP (1-4, everyone defends)
+   and STATION RAID (red defends, blue raids; the convoy raid's team choice, PIRATES setting
+   and help for outnumbered defenders). The station sits at the world's middle, slot to +z;
+   `STATION_ENERGY` 2500. The host picks on HOSTING: STATION (`duel.STATIONS`: the game's
+   own Drum and Halo, Elite's Coriolis and Dodo only when `ship_data.py` imports;
+   `available_stations`; a guest without Elite's data draws the game's own of the same role,
+   `station_blueprint`), TIME (`STATION_TIMES` 2 / 3 / 5 minutes, 3 by default) and WAVES
+   (STEADY, or GROWING: one more pirate a wave each `GROW_EVERY` 60 s). Options byte: bit 0
+   pirates, 1-2 skill, 3-4 time, 5 growing, 6-7 station. Pirates come from every side; every
+   other one makes to dock (state "trade", `net_prey` "dock": `Game._think`'s trading
+   steering towards `Duel.dock_target`; reaching the station sets `Obj.docked`). The host
+   counts dockings (`Duel.docked`, in STATE, now 23 bytes; NPCS flag `DOCKED`: gone without an
+   explosion), says PIRATE DOCKED n/3. Lost when the station is destroyed or more than
+   `DOCK_LIMIT` (3) have docked (the 4th); held for the time: won (STATION HELD / STATION
+   LOST, and PIRATES DOCKED n when that lost it). A docker shot turns to fight. HUD: STATION
+   energy and time on the top line, DOCKED n/3 under it (red at 3; `Duel.hud` entries can
+   now have a second line), the view label below that. Tests in test_multiplayer (options to
+   the guest, the station for both, dockers closing in and docking, the limit, time up,
+   destroyed, growing waves, the raid, Elite's four with a stand-in ship_data). PC only.
+   **Build 154** (Brian, 2026-11-25: "the shield must be destroyed before a pirate ship can
+   dock"). The station modes' station has a shield (`STATION_SHIELD` 1000; in a raid scaled as
+   its energy is). The host's `Duel._shield_step` sees each frame's hits as the station's lost
+   energy (whoever made them: the host's pirates, lasers, missiles, the guests' NPC_HIT) and
+   gives back what the shield takes. Pirates that mean to dock (`Obj.net_docker`, every other
+   one) attack the station (`net_prey` "c") while the shield is up, and only with it down turn
+   to dock (state "trade", "dock"); `dock_target` gives no station while the shield is up, so
+   even one at the slot can't dock. Unhit for `SHIELD_WAIT` 5 s it recharges `SHIELD_RECHARGE`
+   20 a second; back up, the dockers still outside go back to attacking. STATE 24 bytes (the
+   shield, 0-255); STATION SHIELDS DOWN / UP said to everyone; HUD's second line SHIELD n%
+   DOCKED n/3 (red with the shield down). Tests in test_multiplayer. PC only.
+   **Build 155** (Brian, 2026-11-25: "Defending Player respawn launch from the station, just
+   the tunnel screen, there should be time penalty and one life option"). Station modes: a
+   destroyed defender waits `STATION_PENALTY` 10 s (the end screen says LAUNCH IN n), then
+   `Duel.wants_launch`; ace shows the launch tunnel (new mode "mlaunch", `_mp_launch`: a
+   `cockpit.Tunnel` for the station being defended, your ship in your colours, LAUNCH_TIME, C
+   skips; `flight_step` and, while destroyed, `Game.step` keep running so the radio stays up
+   and the host's pirates fly on), then `Duel.launched` puts you `LAUNCH_OUT` 300 in front of
+   the slot, facing out (teammates 250 further each). Raiders (station raid) come back as
+   before. HOSTING has a LIVES line in the station modes (UNLIMITED / ONE; HELLO 53 bytes, the
+   new last byte `OPT2_ONE_LIFE`); the mode's note line is left out when there are 6 or more
+   lines. One life: destroyed, you are out till the next match (OUT: ONE LIFE; every device
+   keeps `Duel.out` from KILLED); every defender out: STATION LOST (DEFENDERS ALL OUT); in the
+   raid every raider out: STATION HELD (RAIDERS ALL OUT). Tests in test_multiplayer, one
+   through the app. PC only.
+   **Build 156** (Brian, 2026-11-25: "Or fixed lifes"). LIVES in the station modes is now
+   UNLIMITED, 1, 2, 3 or 5 (`duel.LIVES_CHOICES`, `Duel.lives`, `step_lives`; HELLO's last byte
+   is the number, `OPT2_ONE_LIFE` gone). Every device counts each slot's deaths from KILLED
+   (`Duel.lives_lost`); at the number the player is out till the next match (OUT: NO LIVES
+   LEFT). Before that the end screen's last line says "n LIVES LEFT   F: leave". A whole side
+   out ends it as before. Tests in test_multiplayer. PC only.
+   **Build 157** (Brian, 2026-11-25: "defenders colour should be configurable"). CONVOY RAID
+   and STATION RAID have a DEFENDERS line on HOSTING: any of the ship paints
+   (`cockpit.SHIP_COLOURS`, RED by default, `duel.DEFEND_COLOUR`), drawn in that colour;
+   `Duel.step_defend_colour`. The raiders stay blue, or are red when the defenders are blue or
+   cyan (`duel.raid_rgb`, `BLUES`). HELLO and START carry it (54 bytes, the last byte);
+   the ships in flight, the radar and the party lists on HOSTING and JOINING use it
+   (`Duel.team_rgb`). Other team modes keep red and blue. With eight lines (STATION RAID)
+   the HOSTING page is closer packed. Tests in test_multiplayer. PC only.
+   **Build 158** (Brian, 2026-11-25: "Just between red and blue is ok"). DEFENDERS is RED or
+   BLUE only (`Duel.defend_colour` 0 / 1, left or right switches); the raiders are the other
+   (`duel.raid_rgb`: `TEAM_RGB[team ^ defend_colour]`). Build 157's eight paints and the
+   cyan rule are gone. Tests in test_multiplayer. PC only.
+   **Build 159** (Brian, 2026-11-25: "Add a random player colour selection. Team size to be
+   defined by the host"). Team modes (TEAMS, CAPTURE FLAG, both raids) have two more HOSTING
+   lines: SIDES (`duel.SIDES_CHOICES`: ANY, or red / defenders v blue / raiders 1v1, 1v2,
+   2v1, 2v2, 1v3, 3v1; `Duel.sides`, `most_players`: the game is capped at their sum, so a
+   full game drops out of the others' lobby and further joins are refused) and PICK: CHOOSE /
+   RANDOM (taken to mean the team colour drawn at random). CHOOSE: a player's pick is kept
+   while that team has room, else the one with more room (`lobby_teams`). RANDOM: the YOU line
+   goes, the party shows "?" (`UNKNOWN`), and START carries teams drawn then
+   (`lobby_teams(final=True)`: red's share of the sizes, at least one each side, a shuffle by
+   hand as MicroPython has no `random.shuffle`). HELLO 55 bytes (the last byte: SIDES number,
+   bit 4 `RANDOM_TEAMS`). JOINING shows SIDES and CHOOSE / RANDOM, and "TEAMS DRAWN AT THE
+   START". The HOSTING page shows `AceCommander.SHOWN` (6) lines at a time, scrolling with the
+   one picked, "..." above / below; the mode's note only with fewer than 5 lines. Tests in
+   test_multiplayer. PC only.
+   **Build 160** (review of PR #61, 2026-11-25). The station's shield is part of its energy
+   (`c.energy` = its own + the shield; `Duel.hull` its own, for the HUD's STATION %): before,
+   the game took a hit from its energy and `_shield_step` gave it back on the host's next frame,
+   so a hit bigger than the energy left destroyed it at once with the shield up (a guest's
+   laser, pirate fire, the host's laser in a raid, a missile). Recharging adds to both.
+   test_multiplayer's station section runs as without Elite's ship data even where it is on
+   disc (`sys.modules["ace_commander.ship_data"] = None`), so it passes on both. PC only.
+   **Build 161** (a STATION CO-OP host crashed on the badge with four playing, 2026-11-25:
+   `ValueError: ESPNow.recv(): buffer error` in `net_espnow.Link.recv`, and the firmware's
+   own ESP-NOW service crashed with it). Read from the firmware (`system/espnow/service.py`,
+   started at boot) and MicroPython 1.28's `modespnow.c`: the service's background task reads
+   every packet too, from the one radio into the one class buffer, so it took some of ours;
+   the radio writes a packet in three pieces from the Wi-Fi task, and a read between them
+   raises "buffer error" and leaves the buffer out of step; `rxbuf` applies only when ESP-NOW
+   starts, which the service had done (so RXBUF never applied); the service turns Wi-Fi power
+   saving on (dropping packets) every 10 s unless someone listens. `net_espnow.Link` now pauses
+   the service's reader (cancels its task; started again by `close()`, from
+   `Platform.minimise`; opened again on use), listens for its event so the radio stays awake,
+   restarts ESP-NOW so RXBUF applies, reads only as many packets as `stats()[3]` (rx_packets,
+   counted once a packet is all written) says, and restarts the radio on a buffer error
+   instead of crashing. Test: `tests/test_net_espnow.py` (pretend radio and service). On four
+   badges over the REPL (the service not running there): 4096 bytes, no errors, every counted
+   packet read. Not yet in a real game.
+   **Build 162** (Brian, 2026-11-25: "the station does not need to be named"). The station
+   modes' station and the convoy's end station have no label (the convoy keeps CONVOY). The
+   HUD's STATION % is rounded: on the badge (32-bit floats) its own energy, the total less
+   the shield, came out a hair under full unhurt, showing 99% (seen in the four-badge test).
+   That test (four badges, STATION CO-OP, build 161): no crash, no radio restarts; the
+   firmware's service kept the radio awake for our listener. Frames averaged 90-108 ms (about
+   10 a second) on all four, HUD 32-35 ms of it (its text lines), and 5-7 frames in 100 were
+   collections of 140-340 ms. Not yet improved.
+   **Build 163** (Brian, 2026-11-25: "do both and remove convoy label", "use integer maths").
+   The convoy has no label either. Multiplayer's HUD line is gauges and rectangle digits, no
+   text (`Duel.hud_rows`, drawn by `cockpit.draw_net_line`; `hud()` keeps the text for the
+   tests): the station modes a yellow energy bar, the time left as m:ss, a cyan shield bar
+   and DOCK_LIMIT marks lit red per pirate docked; the convoy modes its bar and the clock;
+   TEAMS / CAPTURE FLAG the two team scores in their colours; FREE FOR ALL your kills, a bar,
+   the best. (The screen reader no longer reads it.) Whole-number placement: `Game.anchor_ints`
+   (the anchor as ints once a frame: axes x 16384 and x 4096), `Game.place_i` (ints in, only
+   o.m's nine values floats; ~65 floats a call before), `netplay.read_pose_i`; remote ships
+   and the host's pirates are placed only when a pose comes and coast along their nose in
+   `Game._think` between (your own flight already moves every object); the rings and station
+   every MARK_FRAMES (12) frames, the convoy every CONVOY_FRAMES (3); the host packs its
+   pirates' poses in ints and stops copying lists each frame. Measured on the badge (three
+   games on one badge, MicroPython's gc.mem_alloc): multiplayer's own garbage 6.6 KB (host)
+   / 9.3 KB (guest) a frame -> 2.0 KB; `Game.step` (the shared rules, mostly the pirates'
+   AI) is now the largest, 4.9-6.6 KB. A scripted game on all four badges (`bot.py` over the
+   REPL: the real Duel, Game and ESP-NOW link, a bot pilot, every frame drawn; no LEDs, sound
+   or input, the app not running), STATION CO-OP, four players, eight pirates, 60 s, the
+   same script on both builds: build 162 averaged 83-90 ms a frame (draw 63-65, update 20-27),
+   a collection every 20-21 frames; build 163 56-64 ms (draw 39-42, update 16-21), every
+   33-43 frames. Not yet played by hand.
+   **Build 164** (Brian, 2026-11-25: "can shared game rules use integer maths?", then
+   "measure first then do step 1"). Measured first (three games on one badge, build 163):
+   `Game.step` made 6.8 KB (host) / 5.1 KB (guest) a frame, of it `_rotate` 3.5 / 3.4 KB
+   (each object's position and axes turned in whole numbers but stored back as floats,
+   ~26 floats an object), `_think` 2.2 / 0.6 KB (the AI's planning, and moving along the
+   nose every frame), collisions and weapons ~0.6 KB. Step 1: every object turns and moves
+   on whole-number masters, `Obj.q` (position in quarter units), `Obj.qf` (what `_move` has
+   left over below a quarter, so slow drifts add up) and `Obj.mi` (axes x 16384);
+   `o.x / y / z` are stored as whole numbers (rounded from q) and `o.m` as floats made from
+   mi (its nine, no temporaries); `game._move` moves along the nose in whole numbers. The
+   230-odd readers of o.x / o.m are unchanged: anything else that moves or turns an object
+   (spawns, the AI's `_turn` / `_look`, duel's `place_i`, view flips, `_shift`, a new o.m
+   list) is seen by x, y, z no longer matching q (by value) or o.m's numbers no longer
+   being the very floats last put there (`Obj.mf`, by identity), and the masters are read
+   again (`_pos_q`, `_axes_i`). `Game.step` makes a new objs list only when one has gone.
+   Turning error against exact floats over 200 frames is as before (18 units at 2500: the
+   rounded sines). Tests: `tests/test_int_masters.py`; test_game's game-over check compares
+   kills before and after (an idle ship rammed by a rock now counts one, the random fight
+   being a hair different). Measured the same way: `Game.step` 3.7 KB (host) / 3.3 KB
+   (guest), `_rotate` 2.2 / 2.3 KB (o.m's nine floats an object, and the multiplayer anchor,
+   kept in exact floats on purpose), `_think` 0.8 / 0.3 KB. The four-badge bot game
+   (STATION CO-OP, as build 163): a collection every 44-57 frames (33-43 before), average
+   frame 56-61 ms (56-64), update 15-19 ms (16-21); slow frames about the same or a few
+   more (53-103 against 53-92: one run each, not enough to tell). Not yet played by hand,
+   and the main game (docking, the sun, practice) only by the PC tests.
+   Brian played build 164 by hand (four badges, Capture Flag): "game play seems ok"; the
+   logs had no tracebacks or radio errors, frames 52-95 ms (about 75; build 161's station
+   game ~100), still 2-3 collections a minute of 200-330 ms.
+   **Build 165** (Brian, 2026-11-25: "the flags do not need to be labeled", "add a number
+   to repeated names", "have an option to drop player names"). The flags (CTF's rings) have
+   no label; a carrier still has NAME *FLAG*. Two players with one name (two JAMESONs, the
+   default, seen in that game): `Duel._number_names` gives the one with the lowest radio
+   address the name and the others NAME 2, NAME 3 (`Player.base` as sent, `Player.name` /
+   `Duel.name` as shown, `Duel.my_name` sent); every badge hears the same names and
+   addresses, so all number them alike; not while flying. Options and in-flight Settings,
+   where there is a radio: NAMES: SHOWN / HIDDEN (`AceCommander.use_names`, options.json
+   "names", `cockpit.SHOW_NAMES`); hidden leaves only a carrier's *FLAG*. Tests in
+   test_multiplayer.py; test_find's "no NAME line in flight" now looks for "NAME:".
+   Build 165 played by hand (four badges, duels; two named JAMESON): confirmed by Brian,
+   NAMES: HIDDEN hides the names. The logs: no tracebacks or radio errors; the lobby showed
+   "BRIAN, JAMESON 2, THOMAS" and each badge agreed who was JAMESON 2 (a badge that had
+   joined before hearing the other JAMESON renamed its host while waiting, as designed:
+   not once flying); duel frames 41-75 ms.
+   **Build 166** (Brian, 2026-11-25: "freeze the names once joined"). `Duel._number_names`
+   keeps the names of our party (joined and accepted: the host and its guests; hosting:
+   ourselves and our guests) as they are; anyone heard after is numbered round them (the
+   lowest number not taken). So a badge that joined JAMESON before hearing a second one
+   keeps calling its host JAMESON, and the newcomer is JAMESON 2 to it. Badges outside the
+   party still number by address, so they may see the names the other way round (the
+   newcomer calls itself JAMESON); inside the party everyone agrees. Test in
+   test_multiplayer.py.
+   Build 166 on the badges (Brian, 2026-11-25): no errors; names agreed on every badge and
+   none changed after joining (the frozen case itself didn't come up: the lower-addressed
+   JAMESON was always there first). It showed a lobby bug from before: BRIAN hosted a DUEL,
+   both JAMESONs joined (the lobby offered it at "DUEL 2/2") and the game couldn't start.
+   **Build 167** (Brian: "yes, fix it"). The guest limit (`Duel.most_players`,
+   `Player.open_slots`) used four for every mode without teams; it is now no more than the
+   mode's MODE_MAX (a duel: 2), so a full game isn't offered and a host takes no more guests
+   than it can start with. Changing the mode or the sides to fewer places keeps the first
+   guests (`Duel._trim_guests`); the others are back to "asking to join" and are taken again
+   if room comes. test_duel's lobby section hosts FREE FOR ALL now (it relied on a duel
+   taking four); new tests in test_multiplayer.py.
+   Build 167 on the badges (Brian, 2026-11-26): a full duel wasn't offered, FREE FOR ALL
+   took a third, back to DUEL kept the first guest. Then four-player FREE FOR ALL games
+   (45-92 ms a frame) and a docking flight with the docking computer, no errors. But the
+   names: one badge listed "BRIAN, JAMESON, JAMESON", and both JAMESON badges called
+   themselves JAMESON. Build 166's freeze kept what each badge had, and a player heard
+   afresh was kept with its plain name.
+   **Build 168**. `Duel._number_names`, run each `lobby_step`: in a game (joined and
+   accepted, or hosting with guests) repeated names are numbered by the game's order, the
+   host then its guests as they joined; every member has that order from the host, so all
+   agree, and a newcomer, last, renames nobody. Outside a game, by radio address, round
+   the game's names. So on joining, a name may change once (address order to the game's).
+   Test in test_multiplayer.py (fails on build 167: the late JAMESON called itself JAMESON).
+   Build 168 on the badges (Brian, 2026-11-26; BRIAN hosting FREE FOR ALL, two JAMESONs):
+   every badge agreed. The first to join was JAMESON and the second JAMESON 2 on all
+   three; when the first left and joined again it came second, so the two swapped (the
+   game's order), and in the game the kill messages matched on every badge ("JAMESON
+   DESTROYED BY JAMESON 2" on the host, "YOU DESTROYED JAMESON" on JAMESON 2, "YOU
+   DESTROYED JAMESON 2" on JAMESON). No errors; frames 44-88 ms.
+   **Build 169** (Brian, 2026-11-26: "reduce the remaining garbage in Game.step").
+   `Obj.m` is a property: `_rotate` turns only the whole-number axes (`Obj.mi`) and sets
+   `Obj.mstale`; the nine floats are made again (`game._fresh_m`) only when something
+   reads o.m (the AI's steering, a laser drawn, a view flip). `draw_ship`, `_move16` and
+   duel's `_send_npcs` read mi; `Game.place_i` writes mi (no floats at all now). The
+   anchor's exact turn is written out (no tuples) and, like `_rot3` (the planet, sun and
+   station), skips the axis not turned (a digital joystick turns one at a time); the
+   sines once a frame; `Blueprint.crash_r` (the crash radius, once per type; `_collide`
+   made two floats an object a frame); no arithmetic on zero throttle, pitch or roll;
+   coasting ships move by `round(speed * Game.k16)` (one float, was three). Measured
+   (three games on one badge, as builds 164-168): `Game.step` 2.2 KB (host) / 1.5 KB (guest)
+   a frame steering on both axes at once, 1.8 / 1.1 KB on one (build 164: 3.7 / 3.3; 163:
+   6.8 / 5.1); `_collide` 0. Left: the anchor (0.5-0.9 KB, exact floats on purpose) and
+   the host's pirate AI planning (~0.75 KB). The four-badge bot game (STATION CO-OP, as
+   before): a collection every 61-94 frames (164: 44-57), frames 56-61 ms as before (the
+   drawing, ~40 ms, is most of a frame now). The main game's (planet, sun, station) not
+   measured on the badge.

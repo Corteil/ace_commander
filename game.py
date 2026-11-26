@@ -82,6 +82,11 @@ BREAK_DIST = 900.0         # enemies peel away when this close
 DESPAWN = 14000.0
 RAM_AGAIN = 1.0         # seconds before ramming another player's ship hurts again (duel.py)
 RADAR_RANGE = 10000.0
+# multiplayer's kinds of object (duel.py): another player's ship, a ship of the host's
+# game, the convoy (the host's), a ring or marker; the first three can be shot at
+NET_KINDS = ("player", "npc", "convoy", "mark")
+NET_TARGETS = ("player", "npc", "convoy")
+_NINE = (0, 1, 2, 3, 4, 5, 6, 7, 8)
 MAX_OBJECTS = 14
 
 # A commander's flight is in a star system: a planet, a sun and a space station
@@ -398,6 +403,91 @@ def _roll(m, a):
         m[3 + i] = roof * c - side * s
 
 
+def _pos_q(o):
+    """o's position in quarter units (o.q), read again from o.x, o.y, o.z if
+    anything else has moved it since _rotate or _move last did."""
+    q = o.q
+    if q is None:
+        q = o.q = [round(o.x * 4), round(o.y * 4), round(o.z * 4)]
+        o.qf = [32768, 32768, 32768]    # (_move's part-quarters: half to start)
+    elif o.x != (q[0] + 2) >> 2 or o.y != (q[1] + 2) >> 2 or o.z != (q[2] + 2) >> 2:
+        q[0] = round(o.x * 4)
+        q[1] = round(o.y * 4)
+        q[2] = round(o.z * 4)
+    return q
+
+
+def _axes_i(o):
+    """o's axes times 16384 (o.mi), read again from o.m if anything else has
+    turned it (its numbers aren't the very floats last put there) or replaced it.
+    While o.mstale (turned by _rotate since o.m was last read: build 169) mi is newer
+    than o.m and nothing else can have changed o.m, so it is mi as it is."""
+    if o.mstale:
+        return o.mi
+    m = o._m
+    mf = o.mf
+    if (mf is None or m is not o.ml or m[0] is not mf[0] or m[1] is not mf[1]
+            or m[2] is not mf[2] or m[3] is not mf[3] or m[4] is not mf[4] or m[5] is not mf[5]
+            or m[6] is not mf[6] or m[7] is not mf[7] or m[8] is not mf[8]):
+        mi = o.mi
+        if mi is None:
+            mi = o.mi = [0] * 9
+            mf = o.mf = [0.0] * 9
+        for i in range(9):
+            f = m[i]
+            mi[i] = round(f * 16384)
+            mf[i] = f
+        o.ml = m
+    return o.mi
+
+
+def _fresh_m(o):
+    """o.m's floats made again from o.mi (Obj.m, when read after a turn)."""
+    m = o._m
+    mi = o.mi
+    mf = o.mf
+    for i in range(9):
+        m[i] = mf[i] = mi[i] * _INV14
+    o.mstale = False
+
+
+def _move(o, v):
+    """Move o v units along its nose (see _move16)."""
+    _move16(o, round(v * 16))
+
+
+def _move16(o, k):
+    """Move o k sixteenths of a unit along its nose: in whole numbers while its masters
+    are up to date (no floats made), else as floats (read again at the next turn)."""
+    q = o.q
+    mf = o.mf
+    m = o._m
+    if (q is not None and mf is not None and (o.mstale or (m is o.ml and m[6] is mf[6]
+            and m[7] is mf[7] and m[8] is mf[8])) and o.x == (q[0] + 2) >> 2
+            and o.y == (q[1] + 2) >> 2 and o.z == (q[2] + 2) >> 2):
+        mi = o.mi
+        qf = o.qf               # what is left over below a quarter, kept, so slow drifts add up
+        # k: sixteenths of a unit; axes x 16384, q quarters: >> 16
+        t = qf[0] + mi[6] * k
+        q[0] += t >> 16
+        qf[0] = t & 65535
+        t = qf[1] + mi[7] * k
+        q[1] += t >> 16
+        qf[1] = t & 65535
+        t = qf[2] + mi[8] * k
+        q[2] += t >> 16
+        qf[2] = t & 65535
+        o.x = (q[0] + 2) >> 2
+        o.y = (q[1] + 2) >> 2
+        o.z = (q[2] + 2) >> 2
+    else:
+        m = o.m
+        v = k * 0.0625
+        o.x += m[6] * v
+        o.y += m[7] * v
+        o.z += m[8] * v
+
+
 class Blueprint:
     """One ship type from ship_data.py (or original_ships.py)."""
 
@@ -442,6 +532,7 @@ class Blueprint:
             area = size2 * 0.4
         self.area = float(max(area, 400))   # hit area: radius squared
         self.radius = math.sqrt(self.area)
+        self.crash_r = int(self.radius * 0.7 + 60.0)    # Game._collide's, once (build 169)
 
 
 def _view_xz(view, x, z):
@@ -463,6 +554,19 @@ def _view_obj(o, view):
 class Obj:
     """A ship, missile, rock or cargo canister."""
     count = 0
+
+    # its axes as floats (side, roof, nose): made from the whole-number mi only when read
+    # after a turn (build 169: _rotate turns mi alone and sets mstale)
+    @property
+    def m(self):
+        if self.mstale:
+            _fresh_m(self)
+        return self._m
+
+    @m.setter
+    def m(self, v):
+        self._m = v
+        self.mstale = False
 
     def __init__(self, bp, kind, x, y, z):
         self.bp = bp
@@ -489,6 +593,16 @@ class Obj:
         self.ghost = False      # a missile at another player: shown only, their game decides
         self.net_id = 0         # a missile to or from another player: its number (duel.py)
         self.ecmed = False      # an enemy missile destroyed by your ECM
+        # multiplayer (duel.py): on your side (no lock, your lasers pass by it), the
+        # player slot a ship is, a host's pirate's type and its target, who hit it last
+        self.friend = False
+        self.net_slot = 0
+        self.net_type = 0
+        self.net_prey = None
+        self.net_killer = 0
+        self.shot = 0.0     # > 0 just after this ship fired at something not you
+        self.docked = False     # it reached the station it was flying to (and is gone)
+        self.net_docker = False     # a pirate that means to dock (duel.py's station modes)
         self.role = "pirate"    # ships: "pirate", "trader", "police" or "hunter"
         self.dest = "station"   # a trader's: where it is making for, "station" or "planet"
         self.prey = None        # a pirate's: the trader it is after (None: you)
@@ -504,6 +618,15 @@ class Obj:
         Obj.count += 1
         self.slot = Obj.count % THINK_EVERY
         self.think_t = 0.0  # time since this ship last did
+        # build 164: whole-number masters for turning and moving (Game._rotate, _move):
+        # where it is in quarter units, its axes times 16384, the floats last put in m
+        # from them (and the list): anything else that moves or turns it is seen by
+        # those no longer matching, and they are read again from x, y, z and m
+        self.q = None
+        self.qf = None
+        self.mi = None
+        self.mf = None
+        self.ml = None
 
 
 class Boom:
@@ -526,9 +649,13 @@ class Boom:
 
 def _rot3(x, y, z, ca, sa, cb, sb):
     """Pitch a point by the angle with cosine ca and sine sa, then roll it by
-    cb, sb: the same turn as Game._rotate does in whole numbers."""
-    y, z = y * ca - z * sa, y * sa + z * ca
-    return x * cb - y * sb, x * sb + y * cb, z
+    cb, sb: the same turn as Game._rotate does in whole numbers. A turn about one
+    axis only (most, with a digital joystick) does only that one (build 169)."""
+    if sa:
+        y, z = y * ca - z * sa, y * sa + z * ca
+    if sb:
+        x, y = x * cb - y * sb, x * sb + y * cb
+    return x, y, z
 
 
 class Anchor:
@@ -570,6 +697,7 @@ class Space:
 
 class Game:
     def __init__(self, ships, level=1):
+        self.k16 = SPEED_K * 16 * 0.04     # (Game.step sets it each frame)
         self.set_level(level)
         self.god = False    # a cheat: hits flash but do no damage
         self.sounds = []    # sounds asked for this frame (sfx.py's names), which ace.py plays
@@ -725,6 +853,49 @@ class Game:
         return (x * m[0] + y * m[1] + z * m[2], x * m[3] + y * m[4] + z * m[5],
                 x * m[6] + y * m[7] + z * m[8])
 
+    def anchor_ints(self):
+        """The anchor in whole numbers, made at most once a frame (build 163: whole numbers
+        up to 2^30 make no garbage on the badge, every float does): [anchor, frame, x, y,
+        z, its axes x 16384, its axes x 4096 (for positions: within ~150000 no product
+        passes 2^30, and the error is under 1 in 4000)]."""
+        a = self.anchor
+        c = self._ai
+        if c[0] is not a or c[1] != self.frame:
+            m = a.m
+            w = c[5]
+            p = c[6]
+            for i in _NINE:
+                v = int(m[i] * 16384)
+                w[i] = v
+                p[i] = v >> 2
+            c[0] = a
+            c[1] = self.frame
+            c[2] = int(a.x)
+            c[3] = int(a.y)
+            c[4] = int(a.z)
+        return c
+
+    def place_i(self, o, x, y, z, m):
+        """place() in whole numbers: (x, y, z) in world units and axes m x 16384, all ints;
+        no floats (build 169; 163: o.m's nine; place() made ~65 floats a call). Products stay under 2^30 (no big ints) for positions within ~150000."""
+        c = self.anchor_ints()
+        w = c[5]
+        p = c[6]
+        o.x = c[2] + ((x * p[0] + y * p[3] + z * p[6]) >> 12)
+        o.y = c[3] + ((x * p[1] + y * p[4] + z * p[7]) >> 12)
+        o.z = c[4] + ((x * p[2] + y * p[5] + z * p[8]) >> 12)
+        # the axes into its whole-number mi, o.m's floats made only if read (build 169)
+        om = o.mi
+        if om is None:
+            _axes_i(o)
+            om = o.mi
+        for i in (0, 3, 6):
+            a, b, d = m[i], m[i + 1], m[i + 2]
+            om[i] = (a * w[0] + b * w[3] + d * w[6] + 8192) >> 14
+            om[i + 1] = (a * w[1] + b * w[4] + d * w[7] + 8192) >> 14
+            om[i + 2] = (a * w[2] + b * w[5] + d * w[8] + 8192) >> 14
+        o.mstale = True
+
     def place(self, o, x, y, z, m):
         """Put o (an Obj) where a pose in the shared world puts it in yours:
         (x, y, z) and axes m (rows, the world's coordinates)."""
@@ -787,6 +958,9 @@ class Game:
         self.new = []      # objects created during a step, added at its end
         self.booms = []
         self.anchor = None  # multiplayer: the shared world's origin and axes (set_anchor)
+        # and in whole numbers, made once a frame (anchor_ints): [anchor, frame, x, y, z,
+        # axes x 16384, axes x 4096]
+        self._ai = [None, -1, 0, 0, 0, [0] * 9, [0] * 9]
         self.tick = 0
         self.frame = 0
         # dust and explosion dots are whole numbers: see _rotate
@@ -1567,13 +1741,15 @@ class Game:
             throttle = -1.0
             fire = missile = False
 
-        self.speed += throttle * THROTTLE_RATE * dt
+        if throttle:            # (no floats made for none: build 169)
+            self.speed += throttle * THROTTLE_RATE * dt
         if self.speed < 0.0:
             self.speed = 0.0
         elif self.speed > self.max_speed:
             self.speed = self.max_speed
 
         self.frame += 1
+        self.k16 = SPEED_K * 16 * dt    # (a speed times this: sixteenths of a unit this frame)
         fwd = self.speed * SPEED_K * dt
         sp = self.space
         # the jump drive: speed up held at full speed, with no ships about
@@ -1603,7 +1779,8 @@ class Game:
         if self.jumping or (self.autodock and self.speed >= self.max_speed and self.auto_far):
             fwd *= JUMP_K
         self.fwd = int(fwd)
-        self._rotate(pitch * PITCH_RATE * self.turn_k * dt, roll * ROLL_RATE * self.turn_k * dt, fwd)
+        self._rotate(pitch * PITCH_RATE * self.turn_k * dt if pitch else 0.0,
+                     roll * ROLL_RATE * self.turn_k * dt if roll else 0.0, fwd)
         if yaw:
             self._yaw(yaw * YAW_RATE * self.turn_k * dt)
         for o in self.objs:
@@ -1629,7 +1806,10 @@ class Game:
                     o.max_energy = o.energy
             self.objs.extend(self.new)
             self.new = []
-        self.objs = [o for o in self.objs if not o.dead]
+        for o in self.objs:     # (a new list only when one has gone)
+            if o.dead:
+                self.objs = [o for o in self.objs if not o.dead]
+                break
         if self.lock is not None and self.lock.dead:
             self.lock = None
             self.locked = False
@@ -1650,8 +1830,14 @@ class Game:
                 sp.sz -= fwd
                 if sp.station is not None:
                     sp.station.z -= fwd
+            fq = round(fwd * 4)
             for o in self.objs:
-                o.z -= fwd
+                q = _pos_q(o)
+                q[2] -= fq
+                o.x = (q[0] + 2) >> 2
+                o.y = (q[1] + 2) >> 2
+                o.z = (q[2] + 2) >> 2
+                _axes_i(o)      # (read again if turned, so _move stays in whole numbers)
             if self.anchor is not None:
                 self.anchor.z -= fwd
             for boom in self.booms:
@@ -1666,12 +1852,26 @@ class Game:
                     p[2] = random.randint(900, 1500)
             return
         # sines and cosines times 8192 (for positions) and 16384 (for directions)
-        ca = round(math.cos(a) * 16384)
+        # exact (the anchor's, below); a turn about one axis only (the joystick is digital,
+        # so most are) leaves the other's as 1 and 0, made by nobody (build 169)
+        if a != 0.0:
+            eca = math.cos(a)
+            esa = math.sin(a)
+        else:
+            eca = 1.0
+            esa = 0.0
+        if b != 0.0:
+            ecb = math.cos(b)
+            esb = math.sin(b)
+        else:
+            ecb = 1.0
+            esb = 0.0
+        ca = round(eca * 16384)
         dx = self.dust_x
         dx_far = dx * 7 // 5
-        sa = round(math.sin(a) * 16384)
-        cb = round(math.cos(b) * 16384)
-        sb = round(math.sin(b) * 16384)
+        sa = round(esa * 16384)
+        cb = round(ecb * 16384)
+        sb = round(esb * 16384)
         ca2 = ca >> 1
         sa2 = sa >> 1
         cb2 = cb >> 1
@@ -1698,34 +1898,59 @@ class Game:
             # exact sines, not the rounded whole-number ones: those don't quite square
             # to 1, so what they turn slowly grows or shrinks (unseen alone, but two
             # badges' worlds would drift apart)
-            fca = math.cos(a)
-            fsa = math.sin(a)
-            fcb = math.cos(b)
-            fsb = math.sin(b)
-            an.x, an.y, an.z = _rot3(an.x, an.y, an.z, fca, fsa, fcb, fsb)
-            an.z -= fwd
+            # (as _rot3, written out: no tuples, and only the turns there are; build 169)
+            x = an.x
+            y = an.y
+            z = an.z
+            if a != 0.0:
+                y, z = y * eca - z * esa, y * esa + z * eca
+            if b != 0.0:
+                x, y = x * ecb - y * esb, x * esb + y * ecb
+            an.x = x
+            an.y = y
+            an.z = z - fwd
             m = an.m
             for i in (0, 3, 6):
-                m[i], m[i + 1], m[i + 2] = _rot3(m[i], m[i + 1], m[i + 2], fca, fsa, fcb, fsb)
+                x = m[i]
+                y = m[i + 1]
+                z = m[i + 2]
+                if a != 0.0:
+                    y, z = y * eca - z * esa, y * esa + z * eca
+                if b != 0.0:
+                    x, y = x * ecb - y * esb, x * esb + y * ecb
+                m[i] = x
+                m[i + 1] = y
+                m[i + 2] = z
             if self.tick % 32 == 0:
                 _ortho(an.m)
+        fq = round(fwd * 4)
         for o in self.objs:
-            x = int(o.x * 4)
-            y = int(o.y * 4)
-            z = int(o.z * 4)
+            # build 164: on its whole-number masters (_pos_q, _axes_i); x, y, z
+            # stored as whole numbers and m from mi, so the only floats made are m's 9
+            q = _pos_q(o)
+            x = q[0]
+            y = q[1]
+            z = q[2]
             y, z = (y * ca2 - z * sa2 + 4096) >> 13, (y * sa2 + z * ca2 + 4096) >> 13
-            o.x = ((x * cb2 - y * sb2 + 4096) >> 13) * 0.25
-            o.y = ((x * sb2 + y * cb2 + 4096) >> 13) * 0.25
-            o.z = z * 0.25 - fwd
-            m = o.m
+            x, y = (x * cb2 - y * sb2 + 4096) >> 13, (x * sb2 + y * cb2 + 4096) >> 13
+            z -= fq
+            q[0] = x
+            q[1] = y
+            q[2] = z
+            o.x = (x + 2) >> 2
+            o.y = (y + 2) >> 2
+            o.z = (z + 2) >> 2
+            mi = _axes_i(o)
             for i in (0, 3, 6):
-                x = int(m[i] * 16384)
-                y = int(m[i + 1] * 16384)
-                z = int(m[i + 2] * 16384)
+                x = mi[i]
+                y = mi[i + 1]
+                z = mi[i + 2]
                 y, z = (y * ca - z * sa + 8192) >> 14, (y * sa + z * ca + 8192) >> 14
-                m[i] = ((x * cb - y * sb + 8192) >> 14) * _INV14
-                m[i + 1] = ((x * sb + y * cb + 8192) >> 14) * _INV14
-                m[i + 2] = z * _INV14
+                x, y = (x * cb - y * sb + 8192) >> 14, (x * sb + y * cb + 8192) >> 14
+                mi[i] = x
+                mi[i + 1] = y
+                mi[i + 2] = z
+            o.mstale = True     # (o.m's floats made only if something reads them)
             v = o.aim
             if v is not None:
                 x = int(v[0] * 16384)
@@ -1819,11 +2044,16 @@ class Game:
             o.hit -= dt
         if o.beam > 0:
             o.beam -= dt
-        m = o.m
+        if o.shot > 0:
+            o.shot -= dt
         kind = o.kind
-        if kind == "player":    # another player's ship: duel.py moves it, from their packets
+        if kind in NET_KINDS:   # multiplayer's (duel.py): moved from packets, or fixed
             if o.ram_t > 0:
                 o.ram_t -= dt
+            if o.speed and (kind == "player" or kind == "npc"):
+                # between their poses, along their nose at their speed (build 163: placed
+                # only when a pose comes, not every frame); your own flight moves it as all
+                _move16(o, round(o.speed * self.k16))
             return
         if kind == "ship":
             # Steering is the costly part, and makes a lot of work for the
@@ -1831,27 +2061,22 @@ class Game:
             # for all the time since it last did. It still moves every frame.
             o.think_t += dt
             if (self.frame + o.slot) % THINK_EVERY:
-                v = o.speed * SPEED_K * dt
-                o.x += m[6] * v
-                o.y += m[7] * v
-                o.z += m[8] * v
+                _move16(o, round(o.speed * self.k16))
                 return
             dt = o.think_t
             o.think_t = 0.0
         d = math.sqrt(o.x * o.x + o.y * o.y + o.z * o.z)
-        if d > DESPAWN:
+        if d > DESPAWN and self.net is None:    # (multiplayer: the host's pirates are for all)
             o.dead = True
             return
         if d < 1.0:
             d = 1.0
         if kind == "ship":
+            m = o.m             # (read only where it is turned: o.m's floats are made on reading)
             bp = o.bp
             if o.state == "drift":      # a Thargon with no mothership: adrift
                 o.speed = bp.speed * 0.25
-                v = o.speed * SPEED_K * dt / THINK_EVERY
-                o.x += m[6] * v
-                o.y += m[7] * v
-                o.z += m[8] * v
+                _move(o, o.speed * SPEED_K * dt / THINK_EVERY)
                 return
             if bp.name == "THARGON" and not self._any_thargoid():
                 o.state = "drift"       # half speed, aimless (TACTICS part 1)
@@ -1868,7 +2093,8 @@ class Game:
             prey = o.prey
             if prey is not None and (prey.dead or (o.state != "attack" and o.state != "break")):
                 o.prey = prey = None
-            if prey is None and o.role == "pirate" and o.state == "attack" and self.space is not None:
+            if prey is None and o.role == "pirate" and o.state == "attack" and (
+                    self.space is not None or self.net is not None):
                 prey = o.prey = self._pick_prey(o, d)
             if prey is not None:    # after a trader
                 px, py, pz = prey.x - o.x, prey.y - o.y, prey.z - o.z
@@ -1897,7 +2123,11 @@ class Game:
                         if (abs(px) < ENEMY_REACH and abs(py) < ENEMY_REACH and abs(pz) < ENEMY_REACH
                                 and bp.laser and aim > 0.96 and o.cool <= 0):
                             o.cool = _rnd(0.5, 1.1)
-                            if random.random() < 0.5:
+                            o.shot = 0.2
+                            if prey.kind == "player":   # another player's: their game is hurt
+                                if random.random() < min(0.7, 0.3 + 0.05 * self.wave) * self.aim_k:
+                                    self.net.npc_hits(prey, (3.0 + bp.laser * 2.5) * self.damage_k)
+                            elif random.random() < 0.5:
                                 prey.energy -= 3.0 + bp.laser * 2.5
                                 prey.hit = 0.12
                                 if prey.state == "trade":
@@ -1934,6 +2164,8 @@ class Game:
                 want = bp.speed * 0.6
                 sp = self.space
                 st = sp.station if sp is not None else None
+                if st is None and self.net is not None and o.dest == "station":
+                    st = self.net.dock_target(o)    # multiplayer: a pirate docking (duel.py)
                 if o.state == "trade" and st is not None:
                     # on its way to the station (reaching it, it docks) or the planet
                     if o.dest == "station":
@@ -1945,6 +2177,7 @@ class Game:
                     ds = math.sqrt(dx * dx + dy * dy + dz * dz)
                     if ds < reach:
                         o.dead = True
+                        o.docked = True
                         return
                     if ds > 1.0:
                         _turn(m, dx / ds, dy / ds, dz / ds, turn * 0.5)
@@ -1984,7 +2217,7 @@ class Game:
                 self.sfx("crash")       # a missile exploding: Elite's EXNO3 (TA34)
                 o.dead = True
                 return
-            _turn(m, -o.x / d, -o.y / d, -o.z / d, 2.2 * dt)
+            _turn(o.m, -o.x / d, -o.y / d, -o.z / d, 2.2 * dt)
             v = MISSILE_SPEED * dt
         elif kind == "pmissile":
             o.t -= dt
@@ -2015,15 +2248,13 @@ class Game:
                     if t.energy <= 0:
                         self._kill(t)
                     return
-                _turn(m, dx / dd, dy / dd, dz / dd, 3.0 * dt)
+                _turn(o.m, dx / dd, dy / dd, dz / dd, 3.0 * dt)
             v = PMISSILE_SPEED * dt
         else:   # rocks and canisters drift and tumble
             if o.spin:
-                _roll(m, o.spin * dt)
+                _roll(o.m, o.spin * dt)
             v = o.speed * SPEED_K * dt
-        o.x += m[6] * v
-        o.y += m[7] * v
-        o.z += m[8] * v
+        _move(o, v)
 
     def _launch(self, ship):
         o = Obj(self.missile_bp, "missile", ship.x, ship.y, ship.z)
@@ -2058,9 +2289,11 @@ class Game:
         for o in self.objs:
             if o.dead or o.kind == "missile" or o.kind == "pmissile":
                 continue
-            if o.kind == "player" and o.ram_t > 0:
+            if o.kind == "mark":
+                continue        # a ring or a marker (duel.py): flown through
+            if o.ram_t > 0 and o.kind in NET_KINDS:
                 continue        # just rammed: not again every frame
-            r = o.bp.radius * 0.7 + 60.0
+            r = o.bp.crash_r    # (a whole number: no floats a frame)
             if abs(o.z) > r:
                 continue
             d2 = o.x * o.x + o.y * o.y + o.z * o.z
@@ -2099,8 +2332,8 @@ class Game:
             self.sfx("crash")
             self._hurt(10.0 + self.speed * 0.5)
             self.speed *= 0.4
-            if o.kind == "player":  # another player: each game hurts its own ship (they see
-                o.ram_t = RAM_AGAIN     # the crash too); not again for a moment
+            if o.kind in NET_KINDS:     # another player's, or the host's: each game hurts its
+                o.ram_t = RAM_AGAIN     # own ship (they see the crash too); not again for a moment
                 continue
             o.energy -= 60.0
             if o.energy <= 0:
@@ -2157,7 +2390,7 @@ class Game:
         best = None
         best_r = cone * cone
         for o in self.objs:
-            if (o.kind != "ship" and o.kind != "player") or o.dead or o.z < 100:
+            if (o.kind != "ship" and o.kind not in NET_TARGETS) or o.dead or o.z < 100 or o.friend:
                 continue
             r = (o.x * o.x + o.y * o.y) / (o.z * o.z)
             if r < best_r:
@@ -2179,10 +2412,12 @@ class Game:
             o.target = launch
             o.t = 8.0
             self.new.append(o)
-            if launch.kind == "player":     # at another player: theirs flies it at them (duel.py)
+            if launch.kind == "player" or launch.kind == "npc":     # theirs flies it (duel.py)
                 o.ghost = True
                 if self.net is not None:
-                    self.net.missile_fired(o)
+                    self.net.missile_fired(o, launch)
+            elif self.net is not None:
+                launch.net_killer = 0       # the host's own, at its own ship
             self.say("MISSILE AWAY", 1.0)
             self.sfx("missile")
 
@@ -2224,8 +2459,9 @@ class Game:
             best = None
             best_z = LASER_RANGE
             for o in (self.objs if self.looking else ()):   # off a space view: no hits
-                if o.dead or o.kind == "pmissile" or o.z <= 30 or o.z >= best_z or o.upgrade:
-                    continue    # (a practice upgrade canister can't be shot)
+                if (o.dead or o.kind == "pmissile" or o.z <= 30 or o.z >= best_z or o.upgrade
+                        or o.friend or o.kind == "mark"):
+                    continue    # (a practice upgrade canister can't be shot, nor a friend)
                 lim = o.z * AIM_ASSIST
                 lim *= lim
                 if lim < o.bp.area:
@@ -2235,12 +2471,17 @@ class Game:
                     best_z = o.z
             if best is None and self.space is not None and self.looking:
                 self._hit_station()
-            if best is not None and best.kind == "player":
-                best.hit = 0.12     # another player: their game takes the damage (duel.py)
+            if best is not None and (best.kind == "player" or best.kind == "npc"):
+                best.hit = 0.12     # another player's, or the host's: their game takes it (duel.py)
                 self.sfx("hit")
                 if self.net is not None:
-                    self.net.laser_hit(self.laser_damage)
+                    if best.kind == "player":
+                        self.net.laser_hit(best, self.laser_damage)
+                    else:
+                        self.net.npc_laser(best, self.laser_damage)
                 best = None
+            if best is not None and self.net is not None:
+                best.net_killer = 0         # the host's own hit
             if best is not None and best.role == "constrictor" and self.laser != "military":
                 self._provoke(best)     # its shields shrug off anything but a military laser
                 best = None
@@ -2514,7 +2755,10 @@ class Game:
 
     def _pick_prey(self, o, d):
         """The trader pirate o should go for instead of you: the nearest one
-        to it, if nearer than you and within PREY_RANGE; else None."""
+        to it, if nearer than you and within PREY_RANGE; else None. In multiplayer
+        (duel.py) the host's pirates go for the convoy or any player."""
+        if self.net is not None:
+            return self.net.prey_for(o)
         best = None
         best_d2 = min(d, PREY_RANGE)
         best_d2 *= best_d2

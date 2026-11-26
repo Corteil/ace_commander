@@ -156,6 +156,86 @@ can change underneath.
 Not yet on a badge. Next: shots and hits (the shooter decides, sends a HIT with damage;
 the target takes it and sends DEAD), then the Tufty (UDP on its Wi-Fi) and the Pi bridge.
 
+## Built: up to four players and modes (build 148, 2026-11-25)
+
+Brian: "make it support up to four players. Modes Free for all, teams and capture the flag.
+Protect the convoy ship from pirates." Capture the flag: "Two rings in teams colours set
+distance apart. To capture the flag you must fly through the ring the changes colour and you
+must fly back to your ring and pass though to score. Destroyed ship spawn close/behind to
+their home ring after a set time." The convoy: "could be coop or p v p. Convoy ship will need
+to be a new large design".
+
+- **Lobby:** DUEL on the title screen is MULTIPLAYER. The host picks the mode (left / right)
+  and takes the first three to join; HELLO carries the mode and the host's guests (46 bytes),
+  so the lobby shows each game's mode and how full it is, and the guests see who else is in.
+  START carries the guests in order: slot 0 the host, 1-3 the guests. Team modes: even slots
+  RED, odd BLUE. Each mode has its least and most players (`MODE_MIN`, `MODE_MAX`).
+- **Modes:** DUEL (unchanged), FREE FOR ALL (10 kills), TEAMS (10 team kills, no friendly
+  fire), CAPTURE FLAG (rings 10000 apart; through the other's ring takes its flag, the ring
+  goes grey; back through your own scores; 3 wins), CONVOY CO-OP and CONVOY RAID (the BULK FREIGHTER,
+  `convoy_ship.py`, flies 12000 units in 150 s to a station; pirates every 25 s; it arriving
+  is red's / everyone's win, it destroyed the raiders' / pirates'). Not a duel: back after 5 s
+  at your start; a result for 10 s, then the next match (scores, flags and convoy afresh).
+- **Who decides:** your game what hits you (as the duel); the host everything shared, said
+  in STATE (22 bytes, 4 a second and at once on a change): match, result, time, per-slot
+  scores, team scores, the flag carriers, the convoy's energy. Others ask: CLAIM (through a
+  ring), KILLED (by whom: the last hit within 10 s). The convoy's place is worked out from
+  the match time on every device; only its energy is sent.
+- **The pirates** are ordinary ships in the host's game, so they fight as practice's do.
+  `Game._pick_prey` asks `Duel.prey_for`: the convoy (twice as likely), the host or another
+  player (not raiders in a raid); a pirate shot by a guest turns on that guest. Their poses go
+  out in NPCS (ten a second; 22 bytes each, at most 10 a packet, 224 bytes); a destroyed one
+  is sent with DEAD for half a second so the others see it explode. The others' copies are
+  kind "npc": hits go to the host (NPC_HIT), missiles too (MISSILE with `NPC_BIT`: the host
+  flies it and says GONE). A pirate's hit on another player is a HIT from `NPC_SRC`.
+- **Leaving:** the host leaving ends the game for everyone (as before); a guest leaving drops
+  out ("<NAME> LEFT"), and the game ends when nobody else is left, except CONVOY CO-OP.
+- `tests/test_multiplayer.py`: four players in each mode on a pretend radio.
+
+- **Build 150:** teams are chosen in the lobby (left / right; unpicked players join the
+  smaller team); CONVOY RAID has PIRATES ON / OFF, and is balanced for the defenders
+  (they come back in 3 s; extra raiders make the convoy tougher, wait longer and get no
+  pirates).
+
+- **Build 153: station defence.** STATION CO-OP and STATION RAID: a station at the
+  world's middle (the host's choice of the game's Drum or Halo, or Elite's Coriolis or Dodo
+  when its ship data is there; a guest without it sees the game's own of the same kind),
+  held for 2, 3 or 5 minutes, steady or growing waves (one more pirate a wave each minute).
+  Pirates come from every side; every other one flies to dock (`Game._think`'s trade
+  steering, with `Duel.dock_target`). More than `DOCK_LIMIT` (3) docked, or the station
+  destroyed: lost. The options byte carries skill, time, waves and station; STATE the
+  docked count. HUD: STATION energy and time, DOCKED n/3 below.
+
+- **Build 154: the station's shield.** Hits take the shield first (1000, as much more as
+  the energy in a raid); the would-be dockers batter it while it is up and fly in only once
+  it is down; unhit for 5 s it recharges 20 a second, and those still outside turn back.
+  STATE carries it; HUD: SHIELD n%  DOCKED n/3.
+
+- **Build 155: launching, the time penalty, one life.** In the station modes a destroyed
+  defender waits `STATION_PENALTY` (10 s), then ace shows the launch tunnel (mode "mlaunch",
+  the radio and the host's game still running) and it comes out of the slot, facing out.
+  Raiders come back as before. LIVES: ONE (HELLO's new last byte, `OPT2_ONE_LIFE`): destroyed,
+  out till the next match (`Duel.out`, kept by everyone from KILLED); the host ends it when a
+  whole side is out (defenders: lost; raiders: held).
+
+- **Build 156: fixed lives.** LIVES is UNLIMITED, 1, 2, 3 or 5 (HELLO's last byte is the
+  number); each device counts every player's deaths from KILLED (`Duel.lives_lost`), out at
+  the number; the end screen says how many are left.
+
+- **Builds 157-158: the defenders' colour.** The raids' HOSTING page has DEFENDERS: RED or
+  BLUE (HELLO's last byte); the raiders are the other.
+
+- **Build 159: team sizes and random teams.** SIDES (ANY or red v blue sizes; the game is
+  capped at their sum: hosts() and the host's join check) and PICK (CHOOSE / RANDOM) on
+  HOSTING (HELLO's last byte: the SIDES number, bit 4 RANDOM). Chosen teams are kept while
+  the team has room. RANDOM: the lobby shows "?", the host draws the teams at START (within
+  the sizes, someone on each side) and START carries them. The HOSTING page shows six lines
+  at a time and scrolls.
+
+Not yet on badges: the frame time with three other ships, eight pirates and the convoy (92
+lines in 6 parts close up) needs measuring; and how busy the radio is with four (each sends
+15 poses a second; the host also 10 NPCS and 4 STATE).
+
 ## The game (suggestion)
 
 1. A duel in the combat practice arena, no NPCs: each device flies its own ship and

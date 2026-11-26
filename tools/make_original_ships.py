@@ -14,7 +14,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from shipmaker import HIDES_NEVER, HIDES_SIDE_ON, Ship
+from shipmaker import HIDES_ALWAYS, HIDES_NEVER, HIDES_SIDE_ON, Ship
 
 
 def ring_station():
@@ -30,7 +30,8 @@ def ring_station():
         rings.append([s.vertex((rr * c, rr * sn, z))
                       for rr, z in ((r + w, d), (r + w, -d), (r - w, -d), (r - w, d))])
     for k in range(n):
-        s.part(HIDES_SIDE_ON)   # each piece of the ring is convex: drawn on its own
+        s.part(HIDES_ALWAYS)    # each piece of the ring is convex: drawn on its own, hiding
+        # what is behind it from any side (build 152: the spokes showed through it)
         p, q = rings[k], rings[(k + 1) % n]
         corners = [s.verts[i] for i in p + q]
         mid = tuple(sum(v[j] for v in corners) / 8.0 for j in range(3))   # inside the tube

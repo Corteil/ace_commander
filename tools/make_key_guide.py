@@ -121,9 +121,9 @@ def badge():
                   "In Hardcore " + k("E") + " is the E.C.M., so use " + k("+") + " to speed up; "
                   "missiles lock only while armed; docking is by hand only, unless you have "
                   "bought a docking computer.", note),
-        Paragraph("<b>DUEL</b> (two badges): the E.C.M. is by hand: " + k("B") + " on the badge, "
-                  + k("E") + " on a keyboard. Destroyed: " + k("C") + " next round, " + k("F")
-                  + " leave the duel.", note),
+        Paragraph("<b>MULTIPLAYER</b> (2-4 badges): the E.C.M. is by hand: " + k("B") + " on the badge, "
+                  + k("E") + " on a keyboard. Duel destroyed: " + k("C") + " next round; other modes "
+                  "come back by themselves. " + k("F") + " leaves the game.", note),
     ]
 
     right = [
@@ -231,9 +231,9 @@ def pi():
                   "or on the Combat practice page. In Hardcore " + k("E") + " is the E.C.M., so use "
                   + k("+") + " to speed up; missiles lock only while armed; docking is by hand "
                   "only, unless you have bought a docking computer.", note),
-        Paragraph("<b>DUEL</b> (start with " + k("--duel") + "): the E.C.M. is by hand: " + k("E")
-                  + ", " + k("F2") + " or the pad's " + k("LB") + ". Destroyed: " + k("Enter")
-                  + " next round, " + k("Esc") + " leave the duel.", note),
+        Paragraph("<b>MULTIPLAYER</b> (start with " + k("--duel") + "): the E.C.M. is by hand: " + k("E")
+                  + ", " + k("F2") + " or the pad's " + k("LB") + ". Duel destroyed: " + k("Enter")
+                  + " next round; other modes come back by themselves. " + k("Esc") + " leaves the game.", note),
 
         section("SCREENS IN FLIGHT  (Elite's f4–f9)", table([
             [k("5"), "Galactic chart"], [k("6"), "Local chart"],

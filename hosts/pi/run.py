@@ -442,7 +442,7 @@ def main(argv=None):
     ap.add_argument("--log-keys", action="store_true", help="print every key and the button it becomes")
     ap.add_argument("--frames", type=int, default=None, help="stop after this many frames")
     ap.add_argument("--duel", type=int, nargs="?", const=47001, default=None, metavar="PORT",
-                    help="DUEL on the title screen: two players over UDP broadcast (two windows "
+                    help="MULTIPLAYER on the title screen: up to four players over UDP broadcast (two windows "
                          "on one Pi, or two computers on one network); PORT default 47001")
     args = ap.parse_args(argv)
     Host(args.scale, args.full, debug=args.debug, log_keys=args.log_keys,

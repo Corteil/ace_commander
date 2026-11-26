@@ -238,7 +238,7 @@ a = ace_commander.AceCommander()
 air2 = Air()
 mine, theirs = Link(air2, bytes([2, 0, 0, 0, 0, 3])), Link(air2, bytes([2, 0, 0, 0, 0, 4]))
 a.platform.radio = lambda: mine
-bs.choose(a, "DUEL")
+bs.choose(a, "MULTIPLAYER")
 hd = duel.Duel(theirs, "HAL", 1)
 hd.host()
 for _ in range(10):

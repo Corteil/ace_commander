@@ -48,7 +48,7 @@ pkg, mod = load()
 a = pkg.AceCommander()
 assert a.overlays == [] and len(mod.SHIPS) == 31
 assert not a.use_tilt, "joystick steering is the default"
-assert a.cmdr is None and a.choices() == ["NEW COMMANDER", "COMBAT PRACTICE", "DUEL", "SHIP VIEWER", "OPTIONS"]
+assert a.cmdr is None and a.choices() == ["NEW COMMANDER", "COMBAT PRACTICE", "MULTIPLAYER", "SHIP VIEWER", "OPTIONS"]
 c = frame(a); fits(c)
 assert [t[0] for t in c.texts] == ["< NEW COMMANDER >"], "one piece of text on the title screen"
 assert c.calls.get("line_to", 0) > 5, "and a ship"
@@ -299,12 +299,12 @@ choose(a, "SHIP VIEWER")
 assert a.mode == "viewer"
 v = a.viewer
 seen = set()
-for i in range(31):
+for i in range(26):         # 31 ships, less the 6 that aren't ships, and the convoy's
     seen.add(v.name)
     c = frame(a); fits(c)
     tick(a, fresh=["C"])
-assert len(seen) == 31 and v.idx == 0
-tick(a, fresh=["KEY_P"]); assert v.idx == 30
+assert len(seen) == 26 and v.idx == 0 and "BULK FREIGHTER" in seen
+tick(a, fresh=["KEY_P"]); assert v.idx == 25
 tick(a, fresh=["KEY_N"]); assert v.idx == 0
 r0, p0 = v.roll, v.pitch
 tick(a, held=["JOYRIGHT"]); assert v.roll > r0

@@ -1,19 +1,64 @@
-"""The badge's radio link for a duel (duel.py): ESP-NOW broadcast, no router.
+"""The badge's radio link for multiplayer (duel.py): ESP-NOW broadcast, no router.
 Measured with tools/espnow_link.py (plans/MULTIPLAYER.md): ~5 ms each way, no
-loss side by side, ~1% at 10 m through a door. Both badges must be on one
+loss side by side, ~1% at 10 m through a door. All badges must be on one
 Wi-Fi channel: one on a network uses that network's; one that isn't is set to
 CHANNEL (and disconnected first, so it stops hunting for its network).
 
 recv() is read every frame by the game, so the bigger receive buffer (RXBUF)
 holds a few frames' packets; the default ~500 bytes dropped packets.
+
+Build 161 (a host crashed with "ESPNow.recv(): buffer error", 2026-11-25, four
+badges), read from the firmware and MicroPython 1.28's source:
+- The firmware has an ESP-NOW service (system.espnow.espnow_service, started at
+  boot) whose background task reads every packet too, into the same buffer (all
+  ESPNow objects share one radio, and espnow.ESPNow._data is one class buffer):
+  it took some of our packets, and the two readers broke together. While we have
+  the radio, its reader is paused (its task cancelled) and started again on
+  close() (Platform.minimise).
+- The radio writes a packet into the receive buffer in three pieces (header, sender,
+  message: modespnow.c recv_cb, on the Wi-Fi task); a read between them finds the
+  header but not the rest and raises "buffer error", and the buffer is then out of
+  step for good. rx_packets (stats()[3]) counts a packet only once it is all
+  written, so recv() reads no more than it has counted: never half a packet. If a
+  read fails anyway, the radio is restarted (an empty buffer).
+- rxbuf takes effect only when ESP-NOW starts (espnow_init), and the service had
+  already started it: RXBUF never applied. We restart it (active False, True).
+- The service sets Wi-Fi power saving (which drops ESP-NOW packets) every 10 s
+  unless someone listens for its EspNowReceiveEvent: we listen (never called, its
+  reader being paused) and switch power saving off.
+On a firmware without the service, only the counting and the restart apply.
 """
 CHANNEL = 1
 RXBUF = 4096
 BROADCAST = b"\xff" * 6
+_NONE = (None, None)
+
+
+async def _never(event):
+    pass                        # (the service's reader is paused: nothing comes)
+
+
+def _service():
+    """The firmware's ESP-NOW service, the scheduler and the event bus, or None."""
+    try:
+        from system.espnow import espnow_service, EspNowReceiveEvent
+        from system.scheduler import scheduler
+        from system.eventbus import eventbus
+    except Exception:
+        return None
+    return espnow_service, EspNowReceiveEvent, scheduler, eventbus
 
 
 class Link:
     def __init__(self, channel=CHANNEL):
+        self.channel_wanted = channel
+        self.e = None
+        self.paused = None      # the service's reader task we cancelled (to restart)
+        self.listening = None
+        self.restarts = 0       # radio restarts after a bad read (for the log)
+        self._open()
+
+    def _open(self):
         import network
         import espnow
         sta = network.WLAN(network.STA_IF)
@@ -23,22 +68,73 @@ class Link:
                 sta.disconnect()
             except Exception:
                 pass
-            sta.config(channel=channel)
-        e = espnow.ESPNow()
-        e.active(True)
+            sta.config(channel=self.channel_wanted)
+        self._pause_service()
+        try:
+            sta.config(pm=sta.PM_NONE)  # power saving drops ESP-NOW packets
+        except Exception:
+            pass
+        self.e = espnow.ESPNow()
+        self._restart()
+        self.id = bytes(sta.config("mac"))
+        self.channel = sta.config("channel")
+
+    def _restart(self):
+        """ESP-NOW off and on: an empty receive buffer of RXBUF, the broadcast peer."""
+        e = self.e
+        try:
+            e.active(False)
+        except Exception:
+            pass
         try:
             e.config(rxbuf=RXBUF)
         except Exception:
             pass
+        e.active(True)
         try:
             e.add_peer(BROADCAST)
         except OSError:
-            pass                # already a peer (opened before)
-        self.e = e
-        self.id = bytes(sta.config("mac"))
-        self.channel = sta.config("channel")
+            pass                # already a peer
+        self.seen = e.stats()[3]    # packets written so far (the count never resets)
+        self.ready = 0          # counted but not yet read
+
+    def _pause_service(self):
+        s = _service()
+        if s is None or self.paused is not None:
+            return
+        svc, event, scheduler, eventbus = s
+        task = scheduler.background_tasks.get(svc)
+        if task is not None:
+            task.cancel()
+            del scheduler.background_tasks[svc]
+            self.paused = svc
+        if self.listening is None:  # so the service keeps the radio awake
+            eventbus.on_async(event, _never, self)
+            self.listening = (eventbus, event)
+
+    def close(self):
+        """Give the radio back: the firmware's ESP-NOW service reads it again."""
+        if self.e is None:
+            return
+        self.e = None
+        if self.listening is not None:
+            eventbus, event = self.listening
+            self.listening = None
+            try:
+                eventbus.remove(event, _never, self)
+            except Exception:
+                pass
+        svc = self.paused
+        self.paused = None
+        if svc is not None:
+            s = _service()
+            if s is not None:
+                import asyncio
+                s[2].background_tasks[svc] = asyncio.create_task(svc.background_task())
 
     def send(self, msg):
+        if self.e is None:
+            self._open()        # back after minimise
         try:
             self.e.send(BROADCAST, msg, False)
         except OSError:
@@ -46,5 +142,26 @@ class Link:
 
     def recv(self):
         """(sender, packet) or (None, None). Both are buffers the radio reuses:
-        copy what you keep."""
-        return self.e.irecv(0)
+        copy what you keep. Only packets the radio has finished writing."""
+        e = self.e
+        if e is None:
+            self._open()
+            e = self.e
+        if self.ready <= 0:
+            n = e.stats()[3]
+            self.ready = n - self.seen
+            self.seen = n
+            if self.ready <= 0:
+                self.ready = 0
+                return _NONE
+        self.ready -= 1
+        try:
+            r = e.irecv(0)
+        except ValueError:      # "buffer error": out of step; start the buffer afresh
+            self.restarts += 1
+            print("net_espnow: receive buffer error, radio restarted (%d)" % self.restarts)
+            self._restart()
+            return _NONE
+        if r[0] is None:
+            self.ready = 0      # (dropped as the buffer was full: none left)
+        return r

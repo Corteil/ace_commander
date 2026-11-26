@@ -310,7 +310,9 @@ class AceCommander(PLATFORM.App):
         self.p_hardcore = False # combat practice's own HARDCORE, apart from the commander's
         self.p_sel = 0          # the combat practice page's line: 0 LEVEL, 1 HARDCORE
         self.duel = None        # a duel (duel.py), made the first time DUEL is chosen
-        self.dueling = False    # the flight is a duel's
+        self.dueling = False    # the flight is a multiplayer game's
+        self.d_mode = 0         # the mode the next game hosted starts on (duel.MODE_NAMES)
+        self.d_row = 0          # the HOSTING page's line: mode, team, pirates
         self.duel_err = None    # the radio wouldn't open: why
         self.d_sel = 0          # the duel lobby's line: 0 HOST A GAME, then a JOIN for each host
         self.n_hardcore = False # the new-commander page's HARDCORE
@@ -376,6 +378,7 @@ class AceCommander(PLATFORM.App):
         self.jump_rgb = DUST_RGB         # their colour at full brightness
         self.use_leds = USE_LEDS         # the Options page's LEDS: ON / OFF
         self.use_sound = True            # SOUND: ON / MUTED (builds 140, 145), where there is sound
+        self.use_names = True            # NAMES: SHOWN / HIDDEN, multiplayer's name labels (build 164)
         self.volume = VOLUME_DEFAULT     # VOLUME: 1-11 (build 145), where the device has it
         self.use_picker = False          # TEXT ENTRY: the letter picker (picker.py) rather than
                                          # the badge's own dialog (build 124, an option)
@@ -684,6 +687,19 @@ class AceCommander(PLATFORM.App):
                     self.game.over = True   # every launch is a new flight
                 self.docked = False
                 self._start_flight(True)
+        elif self.mode == "mlaunch":   # multiplayer: a defender launching from the station
+            self.launch_t += dt
+            g = self.game
+            self._leds_station(cockpit.tunnel_glow(min(1.0, self.launch_t / LAUNCH_TIME),
+                                                   self.tunnel))
+            if g is not None and g.over:
+                g.step(dt, 0.0, 0.0, 0.0, False, False)     # the host's pirates fly on
+            if g is None or not g.over or not self.duel.wants_launch:
+                self.mode = "flight"    # a new match put us back already
+            elif confirm or self.launch_t >= LAUNCH_TIME:
+                self._leds_release()
+                self.duel.launched(g)
+                self.mode = "flight"
         elif self.mode == "docking":
             self.dock_t += dt
             self._leds_station(cockpit.dock_glow(min(1.0, self.dock_t / DOCK_TIME), self.tunnel))
@@ -707,8 +723,10 @@ class AceCommander(PLATFORM.App):
             if flying and PERF_LOG:
                 self._perf(delta, _diff(_us(), t0) / 1000.0)
         if self.dueling:            # paused too: the other player keeps hearing us
-            if self.mode == "flight" and self.game is not None:
+            if (self.mode == "flight" or self.mode == "mlaunch") and self.game is not None:
                 self.duel.flight_step(self.game, dt)
+                if self.duel.wants_launch and self.mode == "flight":
+                    self._mp_launch()   # a station's defender: back by the launch tunnel
             if self.duel.ended is not None:     # the other player left (Brian): the game ends,
                 self.duel.stop(self.game)       # back to the lobby, which says why
                 self.dueling = False
@@ -716,7 +734,7 @@ class AceCommander(PLATFORM.App):
                 self.fsub = None
                 self.d_sel = 0
                 self.mode = "duel"
-            elif self.mode != "flight":         # we left the flight: practice's game again
+            elif self.mode != "flight" and self.mode != "mlaunch":  # we left the flight: practice's again
                 self.duel.stop(self.game)
                 self.dueling = False
         self._sounds()
@@ -736,7 +754,7 @@ class AceCommander(PLATFORM.App):
             return items
         items = ["NEW COMMANDER", "COMBAT PRACTICE", "SHIP VIEWER", "OPTIONS"]
         if getattr(self.platform, "radio", None) is not None:
-            items.insert(2, "DUEL")     # two players (duel.py): only with a radio
+            items.insert(2, "MULTIPLAYER")     # up to four players (duel.py): only with a radio
         if self.cmdr is not None:
             items.insert(0, "CONTINUE")
         if TITLE_QUIT:
@@ -759,7 +777,7 @@ class AceCommander(PLATFORM.App):
         elif item == "COMBAT PRACTICE":
             self.p_sel = 0
             self.mode = "practice"      # its level and HARDCORE first
-        elif item == "DUEL":
+        elif item == "MULTIPLAYER":
             if self.duel is None and self.duel_err is None:
                 try:
                     from . import duel
@@ -781,7 +799,7 @@ class AceCommander(PLATFORM.App):
         elif item == "SHIP VIEWER":
             self.zero = None
             if self.viewer is None:
-                self.viewer = viewer.Viewer(SHIPS)
+                self.viewer = viewer.Viewer(viewer.only_ships(SHIPS))     # ships only, and the convoy's
             self.mode = "viewer"
 
     def _update_practice(self, cancel, confirm):
@@ -804,10 +822,11 @@ class AceCommander(PLATFORM.App):
             self._start_flight(False)
 
     def _update_duel(self, dt, cancel, confirm):
-        """The DUEL pages (Brian, 2026-11-25: a lobby, one player hosts). In the
-        lobby up / down picks HOST A GAME or a host to join and C chooses; hosting,
-        C starts once someone has joined; joining, the host starts it. F goes back:
-        to the lobby, then the title screen."""
+        """The MULTIPLAYER pages (duel.py; Brian, 2026-11-25: a lobby, one player
+        hosts, up to four play). In the lobby up / down picks HOST A GAME or a game to
+        join and C chooses; hosting, left / right picks the mode and C starts once
+        enough have joined; joining, the host starts it. F goes back: to the lobby,
+        then the title screen."""
         from . import duel as dm
         d = self.duel
         if d is None:
@@ -835,13 +854,88 @@ class AceCommander(PLATFORM.App):
                 self.d_sel = (self.d_sel + 1) % n
             elif confirm:
                 if self.d_sel == 0:
-                    d.host()
+                    d.host(self.d_mode)
+                    self.d_row = 0
                 else:
                     d.join(hosts[self.d_sel - 1])
         elif cancel:
             d.leave()
-        elif confirm and d.role == dm.HOST:
-            d.start_game()          # (nothing until someone has joined)
+        elif d.role == dm.HOST:     # up / down picks MODE, TEAM or PIRATES; left / right changes it
+            rows = self._host_rows(d)
+            if self.d_row >= len(rows):
+                self.d_row = 0
+            if hit("up"):
+                self.d_row = (self.d_row - 1) % len(rows)
+            elif hit("down"):
+                self.d_row = (self.d_row + 1) % len(rows)
+            elif hit("left") or hit("right"):
+                step = -1 if hit("left") else 1
+                row = rows[self.d_row]
+                if row == "mode":
+                    d.set_mode(d.mode + step)
+                    self.d_mode = d.mode        # the next game starts on it too
+                elif row == "team":
+                    d.choose_team(1 - d.my_team())
+                elif row == "sides":
+                    d.step_sides(step)
+                elif row == "pick":
+                    d.set_random_teams(not d.random_teams)
+                elif row == "pirates":
+                    d.step_pirates(step)
+                elif row == "colour":
+                    d.step_defend_colour(step)
+                elif row == "station":
+                    d.step_station(step)
+                elif row == "time":
+                    d.step_time(step)
+                elif row == "waves":
+                    d.set_growing(not d.growing)
+                else:
+                    d.step_lives(step)
+            elif confirm:
+                d.start_game()      # (nothing until enough have joined)
+        elif hit("left") or hit("right"):   # joining: left / right changes our team
+            t = d.my_team()
+            if t is not None and t != dm.UNKNOWN:
+                d.choose_team(1 - t)
+
+    SHOWN = 6           # the HOSTING page's lines shown at once (it scrolls)
+
+    @staticmethod
+    def _host_rows(d):
+        """The HOSTING page's lines that left / right change."""
+        from . import duel as dm
+        rows = ["mode"]
+        if dm.TEAMED[d.mode]:           # team sizes, chosen or random teams, ours
+            rows += ["sides", "pick"]
+            if not d.random_teams:
+                rows.append("team")
+        if dm.GUARDED[d.mode]:
+            rows.append("pirates")
+        if dm.RAIDED[d.mode]:           # the defenders' colour
+            rows.append("colour")
+        if dm.STATIONED[d.mode]:        # which station, how long, growing waves, lives
+            rows += ["station", "time", "waves", "lives"]
+        return rows
+
+    def _draw_party(self, ctx, d, top, step=14):
+        """Who is in the game hosted or joined: a line each, in their colour (their
+        team's in a team mode)."""
+        from . import duel as dm
+        text = cockpit.text
+        mode = d.mode if d.role == dm.HOST else (d.host_p.mode if d.host_p is not None else 0)
+        dcol = d.defend_colour if d.role == dm.HOST else (
+            d.host_p.defend_colour if d.host_p is not None else dm.DEFEND_COLOUR)
+        for i, (name, colour, slot, t) in enumerate(d.party()):
+            if dm.TEAMED[mode] and t == dm.UNKNOWN:    # PICK RANDOM: drawn at the start
+                rgb = cockpit.GREY
+                name = "%s  ?" % name[:12]
+            elif dm.TEAMED[mode]:
+                rgb = dm.raid_rgb(dcol, t) if dm.RAIDED[mode] else dm.TEAM_RGB[t]
+                name = "%s  %s" % (name[:12], dm.team_label(mode, t))
+            else:
+                rgb = cockpit.ship_rgb(colour)
+            text(ctx, name[:18], 0, top + i * step, 11 if step >= 14 else 10, rgb)
 
     def _draw_duel(self, ctx):
         from . import duel as dm
@@ -849,59 +943,137 @@ class AceCommander(PLATFORM.App):
         text = cockpit.text
         d = self.duel
         if d is None:
-            text(ctx, "DUEL", 0, -70, 18, cockpit.WHITE)
+            text(ctx, "MULTIPLAYER", 0, -70, 18, cockpit.WHITE)
             text(ctx, "NO RADIO", 0, -20, 17, cockpit.RED)
             text(ctx, (self.duel_err or "")[:28], 0, 5, 11, cockpit.GREY)
             text(ctx, "F: back", 0, 80, 12, cockpit.GREY)
             return
         me = cockpit.ship_rgb(d.colour)
+        dots = "." * (1 + (_ms() // 500) % 3)
         if d.role == dm.LOBBY:
-            text(ctx, "DUEL LOBBY", 0, -78, 17, cockpit.WHITE)
-            text(ctx, d.name, 0, -58, 12, me)
+            text(ctx, "MULTIPLAYER", 0, -80, 17, cockpit.WHITE)
+            text(ctx, d.name, 0, -62, 12, me)
             hosts = d.hosts()
             rows = ["HOST A GAME"] + ["JOIN " + p.name for p in hosts]
             top = max(0, min(self.d_sel - 2, len(rows) - 4))
             for i in range(top, min(len(rows), top + 4)):
-                y = -30 + (i - top) * 22
+                y = -38 + (i - top) * 20
                 on = i == self.d_sel
                 rgb = cockpit.ship_rgb(hosts[i - 1].colour) if i and not on else (
                     cockpit.GREEN if on else cockpit.GREY)
                 text(ctx, ("< %s >" if on else "%s") % rows[i][:18], 0, y, 14 if on else 12, rgb)
+            if self.d_sel:          # the game picked: its mode and how full it is
+                p = hosts[self.d_sel - 1]
+                text(ctx, "%s  %d/%d" % (dm.MODE_NAMES[p.mode], 1 + len(p.guests), dm.MODE_MAX[p.mode]),
+                     0, 44, 11, cockpit.YELLOW)
             others = d.lobby()
-            if d.notice:                # why the last duel ended
+            if d.notice:                # why the last game ended
                 text(ctx, d.notice, 0, 62, 12, cockpit.RED)
             elif others:
                 names = ", ".join(p.name for p in others[:3]) + ("..." if len(others) > 3 else "")
                 text(ctx, "HERE: " + names[:26], 0, 62, 10, cockpit.GREY)
             else:
-                dots = "." * (1 + (_ms() // 500) % 3)
                 text(ctx, "nobody else yet" + dots, 0, 62, 10, cockpit.YELLOW)
             text(ctx, "C: choose   F: back", 0, 82, 12, cockpit.GREY)
         elif d.role == dm.HOST:
-            text(ctx, "HOSTING", 0, -70, 18, cockpit.WHITE)
-            text(ctx, d.name, 0, -48, 12, me)
-            o = d.other
-            if o is not None:
-                text(ctx, o.name, 0, -10, 17, cockpit.ship_rgb(o.colour))
-                text(ctx, "has joined", 0, 12, 12, cockpit.GREY)
+            text(ctx, "HOSTING", 0, -86, 14, cockpit.WHITE)
+            rows = self._host_rows(d)
+            sel = rows[self.d_row] if self.d_row < len(rows) else "mode"
+            many = len(rows) > 3            # closer together
+            step = 13 if many else 15
+            # at most SHOWN lines, scrolling with the one picked ("..." where there are more)
+            first = max(0, min(self.d_row - 2, len(rows) - self.SHOWN))
+            last = min(len(rows), first + self.SHOWN)
+            y = -68
+            if first > 0:               # more above: under the title, the lines a little lower
+                text(ctx, "...", 0, -76, 10, cockpit.GREY)
+                y = -64
+            for row in rows[first:last]:
+                if row == "mode":
+                    v = dm.MODE_NAMES[d.mode]
+                elif row == "sides":
+                    sz = d.sides()
+                    v = "SIDES: " + ("ANY" if sz is None else "%d v %d" % sz)
+                elif row == "pick":
+                    v = "PICK: " + ("RANDOM" if d.random_teams else "CHOOSE")
+                elif row == "team":
+                    v = "YOU: " + dm.team_label(d.mode, d.my_team())
+                elif row == "pirates":
+                    v = d.pirates_setting()
+                    v = "PIRATES: " + (dm.LEVEL_NAMES[v] if v >= 0 else "OFF")
+                elif row == "colour":
+                    v = "DEFENDERS: " + dm.TEAM_NAMES[d.defend_colour]
+                elif row == "station":
+                    v = dm.station_name(d.station_i)
+                elif row == "time":
+                    v = "TIME: %d MIN" % (dm.STATION_TIMES[d.time_i] // 60)
+                elif row == "waves":
+                    v = "WAVES: " + ("GROWING" if d.growing else "STEADY")
+                else:
+                    v = "LIVES: " + (str(d.lives) if d.lives else "UNLIMITED")
+                on = row == sel
+                rgb = cockpit.GREEN if on else cockpit.GREY
+                if row == "colour":     # in the colour itself
+                    rgb = dm.TEAM_RGB[d.defend_colour]
+                text(ctx, ("< %s >" if on else "%s") % v, 0, y, (12 if many else 13) if on else 11, rgb)
+                y += step
+                if row == "mode" and len(rows) < 5:     # (no room with more lines)
+                    text(ctx, dm.MODE_NOTES[d.mode], 0, y - 2, 10, cockpit.YELLOW)
+                    y += 11 if many else 12
+            if last < len(rows):
+                text(ctx, "...", 0, y - 5, 10, cockpit.GREY)
+                y += 5
+            self._draw_party(ctx, d, y + 4, 12 if many else 14)
+            ok, why = d.can_start()
+            if ok:
                 text(ctx, "C: start   F: stop", 0, 80, 12, cockpit.GREY)
             else:
-                dots = "." * (1 + (_ms() // 500) % 3)
-                text(ctx, "waiting for a player" + dots, 0, 0, 12, cockpit.YELLOW)
+                text(ctx, ("waiting: " + why + dots) if not d.guests else why, 0, 66, 11,
+                     cockpit.YELLOW)
                 text(ctx, "F: stop", 0, 80, 12, cockpit.GREY)
         else:
-            text(ctx, "JOINING", 0, -70, 18, cockpit.WHITE)
-            o = d.other
-            text(ctx, o.name if o is not None else "?", 0, -40, 17,
-                 cockpit.ship_rgb(o.colour) if o is not None else cockpit.GREY)
+            text(ctx, "JOINING", 0, -82, 16, cockpit.WHITE)
+            o = d.host_p
             if o is None or o.t >= dm.GONE:
+                text(ctx, o.name if o is not None else "?", 0, -40, 17, cockpit.GREY)
                 text(ctx, "HOST GONE", 0, 0, 14, cockpit.RED)
             elif d.accepted():
-                text(ctx, "waiting for the host", 0, -5, 12, cockpit.GREEN)
-                text(ctx, "to start", 0, 12, 12, cockpit.GREEN)
+                text(ctx, dm.MODE_NAMES[o.mode], 0, -64, 14, cockpit.GREEN)
+                y = -46
+                t = d.my_team()
+                if t is not None and dm.TEAMED[o.mode]:     # sizes, and how teams are picked
+                    sz = dm.SIDES_CHOICES[o.teamopt & 15] if (o.teamopt & 15) < len(dm.SIDES_CHOICES) else None
+                    text(ctx, "SIDES: %s  %s" % ("ANY" if sz is None else "%d v %d" % sz,
+                                                 "RANDOM" if o.teamopt & dm.RANDOM_TEAMS else "CHOOSE"),
+                         0, y, 10, cockpit.GREY)
+                    y += 13
+                if t == dm.UNKNOWN:
+                    text(ctx, "TEAMS DRAWN AT THE START", 0, y, 11, cockpit.YELLOW)
+                    y += 16
+                elif t is not None:     # left / right asks for the other team
+                    text(ctx, "< YOU: %s >" % dm.team_label(o.mode, t), 0, y, 13,
+                         dm.raid_rgb(o.defend_colour, t) if dm.RAIDED[o.mode] else dm.TEAM_RGB[t])
+                    y += 16
+                if dm.GUARDED[o.mode]:
+                    on = o.opts & dm.OPT_PIRATES or dm.COOPED[o.mode]
+                    text(ctx, "PIRATES: " + (dm.LEVEL_NAMES[min(2, (o.opts >> 1) & 3)] if on else "OFF"),
+                         0, y, 11, cockpit.GREY)
+                    y += 14
+                if dm.STATIONED[o.mode]:    # the host's station, time and waves
+                    text(ctx, "%s  %d MIN  %s" % (dm.station_name((o.opts >> 6) & 3),
+                                                  dm.STATION_TIMES[min(2, (o.opts >> 3) & 3)] // 60,
+                                                  "GROWING" if o.opts & dm.OPT_GROW else "STEADY"),
+                         0, y, 10, cockpit.GREY)
+                    y += 12
+                    text(ctx, "LIVES: " + (str(o.opts2) if o.opts2 else "UNLIMITED"),
+                         0, y, 10, cockpit.GREY)
+                    y += 14
+                self._draw_party(ctx, d, y + 2)
+                text(ctx, "waiting for the host" + dots, 0, 64, 11, cockpit.GREEN)
             else:
+                text(ctx, o.name, 0, -40, 17, cockpit.ship_rgb(o.colour))
                 text(ctx, "asking to join...", 0, 0, 12, cockpit.YELLOW)
-            text(ctx, "F: leave", 0, 80, 12, cockpit.GREY)
+            text(ctx, "F: leave", 0, 82, 12, cockpit.GREY)
 
     def _draw_practice(self, ctx):
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
@@ -1494,6 +1666,21 @@ class AceCommander(PLATFORM.App):
             self.tunnel.park([types[n] for n in game.parked_ships(gov, tech) if n in types],
                              random)
 
+    def _mp_launch(self):
+        """Multiplayer (duel.py's station modes): a destroyed defender's time penalty is
+        over: the launch tunnel of the station being defended, then out of its slot."""
+        from . import duel as dm
+        d = self.duel
+        self.tunnel = cockpit.Tunnel(d.station_i, dm.STATIONS[d.station_i][0])
+        g = self.game
+        bp = g.types.get(g.ship_name) if g is not None else None
+        if bp is not None:
+            self.tunnel.fly(bp, d._rgb(d.slot))
+        self.launch_t = 0.0
+        self.paused = False
+        self.fsub = None
+        self.mode = "mlaunch"
+
     def _launch(self):
         self._play("launch")
         self._save_docked()
@@ -1703,8 +1890,8 @@ class AceCommander(PLATFORM.App):
                     self._restore()     # back to the last save, as in the original
             if confirm and self.career:
                 self._dock()
-            elif confirm:
-                g.reset()
+            elif confirm and not (self.dueling and not self.duel.again_by_c()):
+                g.reset()       # (multiplayer but a duel: you come back by yourself)
                 self.jump_to = None
                 self.banked = 0
                 self.banked_cash = 0
@@ -1932,6 +2119,8 @@ class AceCommander(PLATFORM.App):
             port = getattr(self.platform, "sound_port", None)
             if port is not None and self.use_sound:     # where the I2S amp is (build 145)
                 items.append("SOUND PORT: %d" % port)
+        if getattr(self.platform, "radio", None) is not None:   # multiplayer's (build 164)
+            items.append("NAMES: " + ("SHOWN" if self.use_names else "HIDDEN"))
         if getattr(self.platform, "picker_choice", False):    # the badge: its own or the picker
             items.append("TEXT ENTRY: " + ("PICKER" if self.use_picker else "BADGE"))
         if HAVE_ELITE_SHIPS and self.mode != "flight":     # whose data, from the next start
@@ -1961,6 +2150,9 @@ class AceCommander(PLATFORM.App):
         elif item in ("SAVE COMMANDER", "COMMANDER SAVED"):
             if not left:
                 self._save_now()
+        elif item.startswith("NAMES"):     # the other players' names over their ships
+            self.use_names = cockpit.SHOW_NAMES = not self.use_names
+            self._save_options()
         elif item.startswith("NAME"):
             if not left:
                 self._open_name(self.cmdr.name, self._set_name)
@@ -2036,6 +2228,8 @@ class AceCommander(PLATFORM.App):
                 self.use_picker = d["picker"]
             if isinstance(d.get("sound"), bool):
                 self.use_sound = d["sound"]
+            if isinstance(d.get("names"), bool):
+                self.use_names = cockpit.SHOW_NAMES = d["names"]
             v = d.get("volume")
             if isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= VOLUME_MAX:
                 self.volume = v
@@ -2065,7 +2259,7 @@ class AceCommander(PLATFORM.App):
             with open(options_path(), "w") as f:
                 f.write(json.dumps({"tilt": self.use_tilt, "tilt_flip": self.tilt_flip,
                                     "leds": self.use_leds, "picker": self.use_picker,
-                                    "sound": self.use_sound,
+                                    "sound": self.use_sound, "names": self.use_names,
                                     "volume": self.volume,
                                     "sound_port": getattr(self.platform, "sound_port", None),
                                     "practice_level": self.p_level,
@@ -3219,6 +3413,9 @@ class AceCommander(PLATFORM.App):
         elif self.mode == "launch":
             cockpit.draw_tunnel(ctx, min(1.0, self.launch_t / LAUNCH_TIME), self.launch_t,
                                 cockpit.station_colour(self._government()), False, self.tunnel)
+        elif self.mode == "mlaunch":
+            cockpit.draw_tunnel(ctx, min(1.0, self.launch_t / LAUNCH_TIME), self.launch_t,
+                                cockpit.station_colour(None), False, self.tunnel)
         elif self.mode == "docking":
             cockpit.draw_tunnel(ctx, min(1.0, self.dock_t / DOCK_TIME), self.dock_t,
                                 cockpit.station_colour(self._government()), True, self.tunnel)
