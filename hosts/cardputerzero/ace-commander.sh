@@ -7,7 +7,9 @@ LOG="$HOME/.cache/ace_commander"
 mkdir -p "$LOG"
 ls -1t "$LOG"/play-*.log 2>/dev/null | tail -n +10 | xargs -r rm -f
 T=$(date +%Y%m%d-%H%M%S)
-PYTHONUNBUFFERED=1 python3 "$HERE/run_cz.py" --perf "$@" > "$LOG/play-$T.log" 2>&1
+EXTRA=""
+[ -e "$LOG/log-keys" ] && EXTRA="--log-keys"     # touch it to log every key
+PYTHONUNBUFFERED=1 python3 "$HERE/run_cz.py" --perf $EXTRA "$@" > "$LOG/play-$T.log" 2>&1
 RC=$?
 echo "exit $RC" >> "$LOG/play-$T.log"
 sync
