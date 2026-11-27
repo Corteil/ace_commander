@@ -28,6 +28,7 @@ class Ctx:
     def __init__(self, surface, scale=2):
         self.surf = surface
         self.s = scale
+        self.sx = scale         # across: a small screen's host may stretch its menus wider
         self.ox = surface.get_width() / 2.0
         self.oy = surface.get_height() / 2.0
         self.col = (255, 255, 255)
@@ -45,6 +46,7 @@ class Ctx:
         self.a11y = None        # the firmware's screen-reader hook: none here
         self.labels = None      # {"C": "A", ...}: the hints name a pad's buttons (relabel)
         self.line_k = scale     # line widths: times this (the Elite layout draws thinner lines)
+        self.text_k = 1.0       # text sizes: times this too (a small screen's host makes it bigger)
 
     # ---- state ------------------------------------------------------------
     def save(self):
@@ -69,7 +71,7 @@ class Ctx:
         return self
 
     def _p(self, x, y):
-        return (self.ox + x * self.s, self.oy + y * self.s)
+        return (self.ox + x * self.sx, self.oy + y * self.s)
 
     # ---- paths and shapes ---------------------------------------------------
     def begin_path(self):
@@ -109,6 +111,12 @@ class Ctx:
         self.cur = (x + r * math.cos(a1), y + r * math.sin(a1))
         return self
 
+    def _oval(self, x, y, r):
+        """A circle's box when stretched across (sx is not s)."""
+        cx, cy = self._p(x, y)
+        rx, ry = max(1, r * self.sx), max(1, r * self.s)
+        return pygame.Rect(round(cx - rx), round(cy - ry), round(2 * rx), round(2 * ry))
+
     def _target(self):
         """Where to draw: the surface, or a see-through layer for a colour
         with alpha (blended on in _done)."""
@@ -137,7 +145,10 @@ class Ctx:
             t.fill(col, r)
         elif sh and sh[0] == "circle":
             _, x, y, r = sh
-            pygame.draw.circle(t, col, self._p(x, y), max(1, r * self.s))
+            if self.sx != self.s:
+                pygame.draw.ellipse(t, col, self._oval(x, y, r))
+            else:
+                pygame.draw.circle(t, col, self._p(x, y), max(1, r * self.s))
         for pts in self.paths:
             if len(pts) > 2:
                 pygame.draw.polygon(t, col, pts)
@@ -155,7 +166,10 @@ class Ctx:
                                                  round(abs(bx - ax)), round(abs(by - ay))), w)
         elif sh and sh[0] == "circle":
             _, x, y, r = sh
-            pygame.draw.circle(t, col, self._p(x, y), max(1, r * self.s), w)
+            if self.sx != self.s:
+                pygame.draw.ellipse(t, col, self._oval(x, y, r), w)
+            else:
+                pygame.draw.circle(t, col, self._p(x, y), max(1, r * self.s), w)
         for pts in self.paths:
             if len(pts) > 1:
                 pygame.draw.lines(t, col, False, pts, w)
@@ -173,7 +187,7 @@ class Ctx:
         s = str(s)
         if self.labels:
             s = relabel(s, self.labels)
-        size = max(6, int(self.font_size * self.s))
+        size = max(6, int(self.font_size * self.s * self.text_k))
         key = (s, size, self.col)
         img = self._texts.get(key)
         if img is None:
