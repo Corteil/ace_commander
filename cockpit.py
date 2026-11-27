@@ -38,6 +38,7 @@ NEAR = 30.0      # nothing closer than this is drawn
 VIEW_HW = 120
 VIEW_HH = 120
 TAU = 2 * math.pi
+MENU_K = config.menu_k      # list menus' spacing (1 on the badge; see menu_rows)
 WIRE_MIN = config.wire_min   # ships that look smaller than this (pixels) are drawn as a marker
 STREAK_MIN = 300  # world units: the shortest stardust streak with the jump drive on
 
@@ -145,11 +146,21 @@ def number(ctx, value, x, y, font=_BIG, align=0):
     return width
 
 
+def menu_rows(rows, step):
+    """A list menu's lines shown at once and their spacing: as given on the badge;
+    with MENU_K (a host with bigger text) fewer lines, further apart, in about
+    the same height."""
+    if MENU_K == 1:
+        return rows, step
+    return max(2, int(rows / MENU_K)), step * MENU_K
+
+
 def menu_lines(ctx, items, sel, y, step, rows):
     """A list of setting lines from y down, sel highlighted, at most rows of
     them: a longer list scrolls with sel, a small bar above or below saying
     there is more (Options with TEXT ENTRY has nine lines, the hints sit
     below eight: build 131)."""
+    rows, step = menu_rows(rows, step)
     n = len(items)
     top = 0
     if n > rows:
@@ -160,6 +171,14 @@ def menu_lines(ctx, items, sel, y, step, rows):
         text(ctx, items[i], 0, y, 13, GREEN if i == sel else GREY)
         y += step
     ctx.rgb(*GREY)
+    if MENU_K != 1:     # lines close for their size: a small arrow at the right instead
+        if top > 0:
+            y0 = y - rows * step
+            ctx.begin_path().move_to(88, y0 + 3).line_to(96, y0 + 3).line_to(92, y0 - 3).close_path().fill()
+        if top + rows < n:
+            y1 = y - step
+            ctx.begin_path().move_to(88, y1 - 3).line_to(96, y1 - 3).line_to(92, y1 + 3).close_path().fill()
+        return y
     if top > 0:
         ctx.rectangle(-8, y - (rows + 1) * step + 2, 16, 2).fill()
     if top + rows < n:

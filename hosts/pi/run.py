@@ -53,6 +53,8 @@ LOAD_HOLD = 3000                    # ms the loading screen shows (as the Tufty'
 # names"): C is Enter, F is Esc, A (the pause menu) is P
 KEY_LABELS_FLIGHT = {"A": "P", "C": "ENTER", "F": "ESC"}
 WIRE_MIN = 3                        # ships are wireframes down to this size (badge units; the badge: 8)
+CONFIG = {}                         # more config.py switches, set before the game loads (a host
+                                    # built on this one: the CardputerZero's menu_k)
 
 
 def data_dir():
@@ -92,6 +94,8 @@ def load_game(d, debug=False):
         config.debug_menu = want
         config.perf_log = 60 if want else 0     # the badge's timing lines, a line a second in flight
         config.wire_min = WIRE_MIN
+        for k, v in CONFIG.items():
+            setattr(config, k, v)
         spec.loader.exec_module(pkg)
         return sys.modules[full]
     # loaded already (a second Host in one process, the tests): point it at d

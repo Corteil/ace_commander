@@ -8,11 +8,14 @@ The Pi host (hosts/pi/run.py) unchanged underneath, set up for this device
 
 - The screen: KMSDRM on card1 when there is no desktop to draw on (labwc's only
   output is headless), the Elite layout full screen, text TEXT_K times bigger
-  (the 240 canvas is drawn at 170 / 240 = 0.71).
-- Fonts by fixed path: pygame's font lookup runs fc-list, which times out here
-  and holds up the first frame by seconds.
-- Keys: no arrow key reaches SDL, so on menus and screens (not flying, not
-  typing) W / A / S / D are the arrows; the badge buttons they hide move to
+  (the 240 canvas is drawn at 170 / 240 = 0.71) and, off the flight, the
+  badge's screens stretched across by as much so their columns keep room.
+- List menus (pause, Settings, Options, DEBUG, the lobby) show fewer lines,
+  MENU_K times further apart, and scroll (config.menu_k).
+- Fonts by fixed path (DejaVu Sans Condensed Bold): pygame's font lookup runs
+  fc-list, which times out here and holds up the first frame by seconds.
+- Keys: Fn + ; . , / are the arrows. On menus and screens (not flying, not
+  typing) W / A / S / D are the arrows too; the badge buttons they hide move to
   Q (A: launch, done), Z (C, as C and Enter are) and X (D: sell, data). The hints
   name those keys.
 - Stopping from a shell: `touch ~/.cache/ace_commander/stop`, or SIGTERM; both
@@ -32,11 +35,13 @@ if PI not in sys.path:
     sys.path.insert(0, PI)
 
 SIZE = (320, 170)
-TEXT_K = 1.4            # text 1.4 times the Pi's size for the canvas's scale
+TEXT_K = 1.6            # text 1.6 times the Pi's size for the canvas's scale (Brian: "C")
+MENU_K = 1.6            # list menus' lines that much further apart, fewer shown (config.menu_k)
 CARD = "1"              # /dev/dri/card1: the LCD (card0 is HDMI)
 STOP = os.path.join(os.path.expanduser("~"), ".cache", "ace_commander", "stop")
 FONT_DIR = "/usr/share/fonts/truetype/dejavu"
-FONTS = {"dejavusans": "DejaVuSans.ttf", "dejavusansbold": "DejaVuSans-Bold.ttf"}
+# the game's text in DejaVu Sans Condensed Bold: sharper at these sizes, and narrower
+FONTS = {"dejavusans": "DejaVuSansCondensed-Bold.ttf", "dejavusansbold": "DejaVuSansCondensed-Bold.ttf"}
 
 
 def _video_env():
@@ -70,6 +75,8 @@ def match_font(name, bold=False, italic=False):
 pygame.font.match_font = match_font
 
 import run as pi_run        # noqa: E402  (the Pi's host)
+
+pi_run.CONFIG["menu_k"] = MENU_K
 
 # W/A/S/D as the arrows on menus and screens; the badge buttons they hide (A, D)
 # and C on the keys beside them

@@ -31,7 +31,7 @@ def key(h, k, ch="", frames=2):
 # fonts by path, never fc-list
 assert pygame.font.match_font is run_cz.match_font
 p = run_cz.match_font("DejaVuSans")
-assert p is None or p.endswith("DejaVuSans.ttf"), p
+assert p is None or p.endswith("DejaVuSansCondensed-Bold.ttf"), p
 assert run_cz.match_font("nosuchfont") is None
 print("fonts: DejaVu by path, no fc-list: ok")
 
@@ -44,6 +44,12 @@ for _ in range(3):
     h.step(40)
 assert abs(h.ctx.sx - h.scale * run_cz.TEXT_K) < 1e-9, "the title is stretched across"
 print("320 x 170, Elite layout, text x%.1f, menus stretched across: ok" % run_cz.TEXT_K)
+
+# list menus: fewer lines, further apart (config.menu_k, 1 on the badge)
+ck = h.ck
+assert ck.MENU_K == run_cz.MENU_K
+assert ck.menu_rows(8, 16) == (int(8 / run_cz.MENU_K), 16 * run_cz.MENU_K)
+print("menus: %d of 8 lines shown, %.1f apart: ok" % ck.menu_rows(8, 16))
 
 # the title: D is right (the next line), A left; Z picks (the badge's C)
 first = a.choices()[a.menu]
