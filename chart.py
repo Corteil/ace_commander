@@ -154,21 +154,27 @@ class _Cursor:
         arrows round it, "< LAVE >"."""
         text = cockpit.text
         s = self.sel
+        lx, la = 0, 0               # the line under the name: centred, RANGE below it
+        if config.wide:             # a wide screen: that line ending left of the middle,
+            lx, la = -6, 1          # RANGE starting right of it (Brian)
         if s is not None:
             name = self.info.name if self.active else "< %s >" % self.info.name
             text(ctx, name, 0, name_y, 15, cockpit.WHITE)
             mark = "TARGET  " if s[2] == self.marked and s[2] != self.here else ""
             if s[2] == self.here:
-                text(ctx, "YOU ARE HERE", 0, line_y, 12, cockpit.GREEN)
+                text(ctx, "YOU ARE HERE", lx, line_y, 12, cockpit.GREEN, la)
             elif self.target() is not None:
-                text(ctx, mark + _ly(s[3]), 0, line_y, 12, cockpit.GREEN)
+                text(ctx, mark + _ly(s[3]), lx, line_y, 12, cockpit.GREEN, la)
             elif s[3] == 0:
-                text(ctx, "TOO CLOSE TO JUMP", 0, line_y, 12, cockpit.RED)
+                text(ctx, "TOO CLOSE TO JUMP", lx, line_y, 12, cockpit.RED, la)
             elif mark:          # the longest line: smaller, to fit low on the local chart
-                text(ctx, "TARGET %s TOO FAR" % _ly(s[3]), 0, line_y, 10, cockpit.RED)
+                text(ctx, "TARGET %s TOO FAR" % _ly(s[3]), lx, line_y, 10, cockpit.RED, la)
             else:
-                text(ctx, "%s  TOO FAR" % _ly(s[3]), 0, line_y, 12, cockpit.RED)
-        text(ctx, "RANGE %s" % _ly(self.fuel), 0, fuel_y, 10, cockpit.YELLOW)
+                text(ctx, "%s  TOO FAR" % _ly(s[3]), lx, line_y, 12, cockpit.RED, la)
+        if config.wide and s is not None:
+            text(ctx, "RANGE %s" % _ly(self.fuel), 6, line_y, 10, cockpit.YELLOW, -1)
+        else:
+            text(ctx, "RANGE %s" % _ly(self.fuel), 0, fuel_y, 10, cockpit.YELLOW)
 
     def _hint(self, ctx, y):
         """A hint line, only where the screen's corners show (config.more_hints:

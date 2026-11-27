@@ -33,6 +33,8 @@ more_hints = False      # the screen is square, so its corners show (the Tufty, 
                         # room, the charts and the title screen (Brian, build 129)
 laser_leds = True       # your laser lights the LEDs in its colour (off on the Tufty and the
                         # Pi, whose "LEDs" are drawn on the screen; build 113)
+wide = False            # a screen wider than tall (the CardputerZero): the charts' line under
+                        # the system's name and RANGE side by side, not one above the other
 menu_k = 1             # list menus' lines this many times further apart, fewer of them shown
                         # (they scroll): a small screen with bigger text (the CardputerZero)
 wire_min = 8.0          # ships that look smaller than this (pixels) are drawn as a marker
