@@ -8,8 +8,9 @@ The Pi host (hosts/pi/run.py) unchanged underneath, set up for this device
 
 - The screen: KMSDRM on card1 when there is no desktop to draw on (labwc's only
   output is headless), the Elite layout full screen, text TEXT_K times bigger
-  (the 240 canvas is drawn at 170 / 240 = 0.71) and, off the flight, the
-  badge's screens stretched across by as much so their columns keep room.
+  (the 240 canvas is drawn at 170 / 240 = 0.71). Whole-frame screens (off the
+  flight, and the in-flight screens) are fitted to the LCD (fit_cz.py): their
+  hints in one row along the bottom, the rest spread over the width and height.
 - List menus (pause, Settings, Options, DEBUG, the lobby) show fewer lines,
   MENU_K times further apart, and scroll (config.menu_k).
 - Fonts by fixed path (DejaVu Sans Condensed Bold): pygame's font lookup runs
@@ -75,6 +76,7 @@ def match_font(name, bold=False, italic=False):
 pygame.font.match_font = match_font
 
 import run as pi_run        # noqa: E402  (the Pi's host)
+import fit_cz               # noqa: E402
 
 pi_run.CONFIG["menu_k"] = MENU_K
 
@@ -87,6 +89,7 @@ SCREEN_LABELS = {"A": "Q", "D": "X"}
 FLIGHT_SCREEN_LABELS = dict(SCREEN_LABELS, **pi_run.KEY_LABELS_FLIGHT)
 TYPING = ("namer", "finder", "tdialog", "ndialog")
 FLIGHT_MODES = ("flight", "launch", "docking", "mlaunch")
+SCREENS = ("status", "inventory", "market", "chart", "data")   # ace.SCREENS: whole-frame in flight
 
 
 class Host(pi_run.Host):
@@ -96,6 +99,7 @@ class Host(pi_run.Host):
         self.perf = perf
         self._held = {}         # physical key -> the key sent at its key-down
         self._perf = None
+        self.fitter = fit_cz.Fitter()
         super().__init__(**kw)
         self.stop_file = STOP
         try:
@@ -117,7 +121,11 @@ class Host(pi_run.Host):
 
     def _fit(self):
         super()._fit()
+        old = self.ctx
+        self.ctx = fit_cz.FitCtx(self.window, self.scale)   # records whole-frame screens
+        self.ctx.line_k = old.line_k
         self.ctx.text_k = TEXT_K
+        self.ctx.base = self.scale
 
     def toggle_full(self):
         pass                    # always the whole LCD
@@ -151,12 +159,26 @@ class Host(pi_run.Host):
         # hints also name Q and X (the paused flight keeps P for A)
         if not self.pad_last and self.on_screen():
             self.ctx.labels = FLIGHT_SCREEN_LABELS if self.app.mode == "flight" else SCREEN_LABELS
-        # off the flight the badge's 240 screens are stretched across by TEXT_K, as
-        # their text is, so columns keep their room (the LCD is wider than tall);
-        # flight (its 3D view, dashboard and screens) stays square
-        flat = getattr(self.app, "mode", "") not in FLIGHT_MODES
-        self.ctx.sx = self.scale * (TEXT_K if flat else 1.0)
+        key = self.screen_key()
+        if key is not None:         # a whole-frame screen: fitted to the LCD (fit_cz)
+            self.fitter.draw(self.ctx, self.window, draw, key, self.ctx.labels, self.scale)
+            return
+        self.ctx.sx = self.ctx.s = self.scale
         super()._paint(draw)
+
+    def screen_key(self):
+        """Which whole-frame screen is up (for fit_cz), or None: flight's own frames
+        (the 3D view and dashboard, the pause menu over them, the tunnels)."""
+        app = self.app
+        mode = getattr(app, "mode", "")
+        if mode == "flight":
+            if app.fsub in SCREENS and not app.paused:
+                return (mode, app.fsub)
+            return None
+        if mode in FLIGHT_MODES or mode == "bench":
+            return None
+        dock = getattr(app, "dock", None)
+        return (mode, dock.name() if mode == "docked" and dock is not None else None)
 
     # ---- a frame on the screen, the stop file and --perf -----------------------------
     def show(self, ms=0):
