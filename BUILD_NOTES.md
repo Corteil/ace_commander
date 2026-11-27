@@ -1935,3 +1935,9 @@ what is now `ace.py` (renamed in build 50).
    before): a collection every 61-94 frames (164: 44-57), frames 56-61 ms as before (the
    drawing, ~40 ms, is most of a frame now). The main game's (planet, sun, station) not
    measured on the badge.
+   **Release 0.6.0** (2026-11-27): builds 148-169. Multiplayer for up to four: FREE FOR ALL,
+   TEAMS, CAPTURE FLAG, CONVOY (and CONVOY RAID), STATION CO-OP and STATION RAID; teams picked
+   in the lobby or drawn at random, SIDES set by the host, pirates on / off and their skill,
+   LIVES, the defenders' colour; repeated names numbered, Options > NAMES. The ESP-NOW buffer
+   error crash fixed (the firmware's service paused). HUD in gauges and digits, whole-number
+   placement and turning (frames 83-90 -> 56-61 ms in a four-badge station game).
