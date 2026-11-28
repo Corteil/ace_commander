@@ -39,6 +39,18 @@ assert all(abs(p - q) < 1e-6 for p, q in zip(e1, (1, 0, 0))) and \
     all(abs(p - q) < 1e-6 for p, q in zip(e2, (0, 1, 0))), (e1, e2)
 print("flat: across gravity are x and y (the badge as before): ok")
 
+# a first read of all zeros (the badge's IMU right after start) isn't taken as level
+keep = list(A)
+A[:] = [0.0, 0.0, 0.0]
+a.zero = None
+a.platform.tilt()
+assert a._tilt_xy() == (0.0, 0.0) and a.zero is None, a.zero
+A[:] = keep
+a.platform.tilt()
+a._tilt_xy()
+assert a.zero is not None and abs(a.zero[0] + 1.0) < 1e-9, a.zero
+print("an all-zero first read isn't level; the next real one is: ok")
+
 # TILT SETUP: level where it is held, then tilt each way and see the dot move one axis
 a._change("TILT SETUP", False)
 assert a.mode == "tiltset"

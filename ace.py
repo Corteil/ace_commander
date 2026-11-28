@@ -617,6 +617,8 @@ class AceCommander(PLATFORM.App):
         ax, ay = pl.tx, pl.ty
         az = getattr(pl, "tz", None)
         if self.zero is None:
+            if az is not None and ax * ax + ay * ay + az * az < 0.09:
+                return 0.0, 0.0     # no gravity in it: the sensor's first read is all zeros
             self.zero = (ax, ay, az if az is not None else 0.0)
         z = self.zero
         if self.zaxes is None or self.zaxes[2] is not z:    # worked out once per level pose
