@@ -29,7 +29,7 @@ os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 try:
     import pygame  # noqa: F401
     for host, pi_name, label in (("pi", "test_pi_host.py", "pi host"), ("pi", "test_pi_trip.py", "pi trip"),
-                                  ("pi", "test_pi_pad.py", "pi pad"), ("pi", "test_pi_elite.py", "pi elite"), ("pi", "test_pi_wide.py", "pi wide"),
+                                  ("pi", "test_pi_pad.py", "pi pad"), ("pi", "test_pi_elite.py", "pi elite"), ("pi", "test_pi_wide.py", "pi wide"), ("pi", "test_pi_micro.py", "pi micro"),
                                   ("cardputerzero", "test_cz_host.py", "cardputerzero")):
         pi_test = os.path.join(os.path.dirname(HERE), "hosts", host, "tests", pi_name)
         r = subprocess.run([sys.executable, pi_test], capture_output=True, text=True)

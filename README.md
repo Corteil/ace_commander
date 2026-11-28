@@ -241,7 +241,11 @@ Arrows are the joystick, Enter confirms, Esc goes back, F1-F6 are the badge's bu
 the rest of the keyboard works as the Keyboard Hexpansion. A game pad (Xbox, PlayStation,
 8BitDo...) flies with analogue sticks: left stick power and yaw, right stick pitch and roll,
 triggers missile and fire, bumpers E.C.M. and energy bomb, D-pad views; docked it works as the
-badge, and the screens name its buttons. Saves go in `~/.local/share/ace_commander/`.
+badge, and the screens name its buttons. The 8BitDo Micro (no sticks) has its own layout: D-pad
+pitch and roll, A fire, B missile, X held the jump drive, Y the docking computer, L / R slower /
+faster, L2 E.C.M., R2 energy bomb, - the next view, + the pause menu, Home held a second the
+escape pod; off the flight A chooses, B goes back, Y sells, L / R change tabs, + launches.
+Saves go in `~/.local/share/ace_commander/`.
 With `--duel`, MULTIPLAYER is on the title screen: windows on one Pi, or computers on one
 network, play over UDP (a Pi can't yet play a badge).
 Work in progress: see `hosts/pi/PLAN.md`.
