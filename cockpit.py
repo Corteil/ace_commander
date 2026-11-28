@@ -157,32 +157,24 @@ def menu_rows(rows, step):
 
 def menu_lines(ctx, items, sel, y, step, rows):
     """A list of setting lines from y down, sel highlighted, at most rows of
-    them: a longer list scrolls with sel, a small bar above or below saying
-    there is more (Options with TEXT ENTRY has nine lines, the hints sit
-    below eight: build 131)."""
+    them (Options with TEXT ENTRY has nine lines, the hints sit below eight:
+    build 131). A longer list loops (Brian: "make the menu items loop"): the
+    chosen line stays in the middle and the list goes on round past its ends,
+    a short dim rule where the last line meets the first."""
     rows, step = menu_rows(rows, step)
     n = len(items)
-    top = 0
-    if n > rows:
-        top = sel - rows + 1 if sel >= rows else 0
-        if top > n - rows:
-            top = n - rows
-    for i in range(top, min(n, top + rows)):     # the chosen line green, no box (build 136)
+    if n <= rows:
+        for i in range(n):          # the chosen line green, no box (build 136)
+            text(ctx, items[i], 0, y, 13, GREEN if i == sel else GREY)
+            y += step
+        return y
+    first = sel - rows // 2
+    for k in range(rows):
+        i = (first + k) % n
+        if i == 0 and k > 0:        # the end of the list: back to its start
+            ctx.rgb(*DIM).rectangle(-20, y - step // 2, 40, 1).fill()
         text(ctx, items[i], 0, y, 13, GREEN if i == sel else GREY)
         y += step
-    ctx.rgb(*GREY)
-    if MENU_K != 1:     # lines close for their size: a small arrow at the right instead
-        if top > 0:
-            y0 = y - rows * step
-            ctx.begin_path().move_to(88, y0 + 3).line_to(96, y0 + 3).line_to(92, y0 - 3).close_path().fill()
-        if top + rows < n:
-            y1 = y - step
-            ctx.begin_path().move_to(88, y1 - 3).line_to(96, y1 - 3).line_to(92, y1 + 3).close_path().fill()
-        return y
-    if top > 0:
-        ctx.rectangle(-8, y - (rows + 1) * step + 2, 16, 2).fill()
-    if top + rows < n:
-        ctx.rectangle(-8, y - step + 10, 16, 2).fill()
     return y
 
 
