@@ -2003,3 +2003,8 @@ what is now `ace.py` (renamed in build 50).
    CardputerZero's (1, -1.0) set from Brian's "tilt up is left"; its roll direction not yet
    confirmed. FULL TILT / DEAD ZONE a degree at a time (17-44 / 3-12); an all-zero first IMU
    read (seen on the badge right after start) isn't taken as level.
+   **Release 0.7.1** (2026-11-28): build 172 and the hosts since 0.7.0. TILT SETUP (a live test,
+   FULL TILT / DEAD ZONE a degree at a time, SWAP AXES, TILT PITCH / ROLL, LEVEL), tilt at any
+   holding angle, the badge's tilt axes corrected and each device's in device.json; the
+   CardputerZero's accelerometer and its key guide; the game pad guide (PAD_GUIDE.pdf) and
+   --pad; the fitted title screen steady; README and README_PI for Windows and --duel.
