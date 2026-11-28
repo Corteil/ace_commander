@@ -122,7 +122,7 @@ class Host:
     screen. The window can be any size: everything scales to fit."""
 
     def __init__(self, scale=2, full=None, save_dir=None, debug=False, log_keys=False, layout=None,
-                 sound=False, duel=None, wide=False, pad="auto"):
+                 sound=False, duel=None, wide=False, pad="auto", bridge=None):
         pygame.init()
         # --wide: in the Elite layout the badge's whole-frame screens (docked, the title,
         # the in-flight screens) are fitted to the window (fit_pygame): its width used,
@@ -173,7 +173,10 @@ class Host:
             p.set_volume = self.player.set_volume       # Options > VOLUME (build 145)
             p.sound_stop = self.player.stop
             self.app._apply_volume()        # options.json's, read before the player was there
-        if duel:                            # --duel: DUEL on the title screen, over UDP
+        if bridge:                          # --bridge DEVICE: with badges, through a dongle
+            import net_bridge
+            self.app.platform.radio = lambda: net_bridge.Link(bridge)
+        elif duel:                          # --duel: DUEL on the title screen, over UDP
             import net_udp
             self.app.platform.radio = lambda: net_udp.Link(duel)
         self.clock = pygame.time.Clock()
@@ -473,6 +476,9 @@ def main(argv=None):
     ap.add_argument("--sound", action="store_true", help="the game's sounds (Options > SOUND too)")
     ap.add_argument("--log-keys", action="store_true", help="print every key and the button it becomes")
     ap.add_argument("--frames", type=int, default=None, help="stop after this many frames")
+    ap.add_argument("--bridge", metavar="DEVICE", default=None,
+                    help="MULTIPLAYER with badges, over ESP-NOW through a USB dongle running "
+                         "tools/bridge/main.py (e.g. /dev/ttyACM0; Windows COM3)")
     ap.add_argument("--wide", dest="wide", action="store_true", default=True,
                     help="in the Elite layout, the badge's screens use the window's width, hints in one row "
                          "(the default, Brian)")
@@ -487,7 +493,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
     Host(args.scale, args.full, debug=args.debug, log_keys=args.log_keys,
          layout=args.layout, sound=args.sound, duel=args.duel, wide=args.wide,
-         pad=args.pad).run(args.frames)
+         pad=args.pad, bridge=args.bridge).run(args.frames)
 
 
 if __name__ == "__main__":

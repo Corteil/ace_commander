@@ -248,6 +248,8 @@ def main(argv=None):
     ap.add_argument("--log-keys", action="store_true", help="print every key and the button it becomes")
     ap.add_argument("--pad", choices=("auto", "micro", "standard"), default="auto",
                     help="the game pad layout (as the Pi's run.py): auto, micro or standard")
+    ap.add_argument("--bridge", metavar="DEVICE", default=None,
+                    help="MULTIPLAYER with badges through a USB ESP-NOW dongle (tools/bridge)")
     ap.add_argument("--no-tilt", dest="tilt", action="store_false", default=True,
                     help="don't use its accelerometer for tilt steering")
     ap.add_argument("--perf", action="store_true", help="a FPS / RSS / CPU line a second on stderr")
@@ -257,7 +259,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
     try:
         Host(perf=args.perf, tilt=args.tilt, full=args.full, debug=args.debug, log_keys=args.log_keys,
-             sound=args.sound, duel=args.duel, pad=args.pad).run(args.frames)
+             sound=args.sound, duel=args.duel, pad=args.pad, bridge=args.bridge).run(args.frames)
     finally:
         if args.perf:
             sys.stderr.write("CZ exit maxrss_mb %.1f\n" % (
