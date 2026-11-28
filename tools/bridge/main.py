@@ -10,7 +10,10 @@ On the 2022 badge its screen shows the channel, its own address, packets each wa
 whether the Pi is talking, and the badges heard (Brian: "the 22 badge's screen should
 display info"). Without that screen it runs the same, blind.
 
-The badges all use one Wi-Fi channel (net_espnow.CHANNEL): CHANNEL below must match.
+ESP-NOW only reaches radios on the same Wi-Fi channel. A badge off any network is on
+net_espnow.CHANNEL (1); one on a network is on that network's (Brian's: 6). So the
+dongle hunts: while it hears no badge it moves on every HOP_MS through HUNT, and it
+stays on a channel while badges are heard there.
 Ctrl-C is switched off while it runs (a packet may hold 0x03). To get the REPL back:
 - connect within GRACE_MS of it starting (plugging in): Ctrl-C still works then;
 - or hold any button (A, B, front, joystick centre) while it starts;
@@ -25,7 +28,9 @@ import network
 import espnow
 from machine import Pin
 
-CHANNEL = 1
+HUNT = (6, 1, 11, 2, 3, 4, 5, 7, 8, 9, 10, 12, 13)   # channels tried, in this order
+HOP_MS = 1500           # listened this long on a channel before trying the next
+STAY_MS = 8000          # stays this long after the last badge heard
 SYNC = 0xA5
 BROADCAST = b"\xff" * 6
 SHOW_MS = 1000          # the screen redrawn this often
@@ -58,6 +63,8 @@ try:
     sta.disconnect()
 except OSError:
     pass
+hunt_i = 0
+CHANNEL = HUNT[0]
 sta.config(channel=CHANNEL)
 try:
     sta.config(pm=sta.PM_NONE)  # power saving drops ESP-NOW packets
@@ -79,6 +86,8 @@ to_pi = from_pi = 0     # packets passed each way
 pi_t = None             # when the Pi last sent something
 start = time.ticks_ms()
 shown = start - SHOW_MS
+on_ch = start           # when this channel was picked
+last_badge = None       # when a badge was last heard (on this channel)
 
 
 def hexmac(m):
@@ -92,7 +101,9 @@ def draw(now):
     T = tidal_screen
     s.clear()
     s.text("ACE BRIDGE", 4, 4, T.YELLOW, 2)
-    s.text("ch %d  %s" % (CHANNEL, hexmac(MAC)[6:]), 4, 24, T.GREY)
+    found = last_badge is not None and time.ticks_diff(now, last_badge) < STAY_MS
+    s.text("ch %d %s  %s" % (CHANNEL, "found" if found else "hunting", hexmac(MAC)[9:]),
+           4, 24, T.GREEN if found else T.GREY)
     pi_ok = pi_t is not None and time.ticks_diff(now, pi_t) < 3000
     s.text("PI " + ("TALKING" if pi_ok else "quiet"), 4, 38, T.GREEN if pi_ok else T.RED)
     s.text("to Pi %d" % to_pi, 4, 52, T.CYAN)
@@ -117,6 +128,7 @@ while True:
         if msg:
             out.write(bytes((SYNC, 6 + len(msg))) + mac + msg)
             heard[bytes(mac)] = now
+            last_badge = now
             to_pi += 1
     # USB to the radio: a byte at a time while there are any (packets are small)
     while poll.poll(0):
@@ -139,6 +151,17 @@ while True:
             except OSError:
                 pass
         buf = buf[2 + n:]
+    # no badge here lately: try the next channel
+    quiet = last_badge is None or time.ticks_diff(now, last_badge) >= STAY_MS
+    if quiet and time.ticks_diff(now, on_ch) >= HOP_MS:
+        hunt_i = (hunt_i + 1) % len(HUNT)
+        CHANNEL = HUNT[hunt_i]
+        try:
+            sta.config(channel=CHANNEL)
+        except Exception:
+            pass
+        on_ch = now
+        last_badge = None
     if time.ticks_diff(now, shown) >= SHOW_MS:
         shown = now
         for m in [m for m, t in heard.items() if time.ticks_diff(now, t) > 60000]:
