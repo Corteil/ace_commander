@@ -275,7 +275,8 @@ assert "more with a commander" in tx, "no commander: no docking or Constrictor"
 for s_, (x, y), size in c.texts:
     assert (x * x + y * y) ** 0.5 + size / 2 <= 120.5, (s_, y)
 tick(a, fresh=["JOYRIGHT"]); assert a.use_tilt, "right changes the steering"
-tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["JOYDOWN"]); assert a.omenu == 2   # past CONTROLS
+tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["JOYDOWN"]); tick(a, fresh=["JOYDOWN"])
+assert a.omenu == 3, a.omenu    # past CONTROLS and TILT SETUP (tilt's test and setup page)
 tick(a, fresh=["C"]); assert not a.use_leds
 tick(a, fresh=["F"]); assert a.mode == "menu"
 # kept for next time
@@ -291,11 +292,12 @@ b.dock.go(0); tick(b, fresh=["F"])
 bs.choose(b, "OPTIONS")
 items = b._settings(True)
 assert items[1] == "CONTROLS: NORMAL", items      # (build 85)
-assert items[2] == "NAME: JAMESON", items       # (build 89)
-assert items[3].startswith("DOCKING") and items[4] == "CONSTRICTOR: 2 MIN", items
-b.omenu = 3; tick(b, fresh=["JOYLEFT"])
+assert items[2] == "TILT SETUP", items          # tilt's test and setup page
+assert items[3] == "NAME: JAMESON", items       # (build 89)
+assert items[4].startswith("DOCKING") and items[5] == "CONSTRICTOR: 2 MIN", items
+b.omenu = 4; tick(b, fresh=["JOYLEFT"])
 assert b.cmdr.docking == "A"
-b.omenu = 4; tick(b, fresh=["C"])
+b.omenu = 5; tick(b, fresh=["C"])
 assert not b.cmdr.quick_con
 from ace_commander import commander as cm
 d = cm.load(save); assert d.docking == "A" and d.quick_con is False

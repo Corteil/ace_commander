@@ -78,6 +78,47 @@ def match_font(name, bold=False, italic=False):
 pygame.font.match_font = match_font
 
 import run as pi_run        # noqa: E402  (the Pi's host)
+import platform_pi          # noqa: E402
+
+IIO = "/sys/bus/iio/devices"
+G = 9.80665
+
+
+class Accel:
+    """The CardputerZero's accelerometer (a BMI270, which the kernel's iio driver
+    shows in /sys/bus/iio/devices), read as (x, y, z) in g: the game's tilt steering
+    and TILT SETUP. Its files stay open; each read goes back to their start."""
+
+    def __init__(self, folder):
+        with open(os.path.join(folder, "in_accel_scale")) as f:
+            self.k = float(f.read().strip()) / G       # raw counts to g
+        self.files = [open(os.path.join(folder, "in_accel_%s_raw" % a), "rb", buffering=0)
+                      for a in "xyz"]
+
+    def __call__(self):
+        out = []
+        for f in self.files:
+            f.seek(0)
+            out.append(int(f.read().strip()) * self.k)
+        return tuple(out)
+
+
+def find_accel():
+    """The first iio device with an accelerometer, as an Accel, or None."""
+    try:
+        names = sorted(os.listdir(IIO))
+    except OSError:
+        return None
+    for n in names:
+        d = os.path.join(IIO, n)
+        if os.path.exists(os.path.join(d, "in_accel_x_raw")):
+            try:
+                a = Accel(d)
+                a()
+                return a
+            except (OSError, ValueError):
+                continue
+    return None
 
 pi_run.CONFIG["menu_k"] = MENU_K
 
@@ -92,13 +133,15 @@ TYPING = ("namer", "finder", "tdialog", "ndialog")
 
 
 class Host(pi_run.Host):
-    def __init__(self, perf=False, **kw):
+    def __init__(self, perf=False, tilt=True, **kw):
         kw.setdefault("full", True)
         kw.setdefault("layout", "elite")
         kw.setdefault("wide", True)     # screens fitted to the LCD (the Pi's --wide, fit_pygame)
         self.perf = perf
         self._held = {}         # physical key -> the key sent at its key-down
         self._perf = None
+        # its accelerometer: STEER: TILT and TILT SETUP in Options (set before the game starts)
+        platform_pi.TILT = find_accel() if tilt else None
         super().__init__(**kw)
         self.stop_file = STOP
         try:
@@ -204,13 +247,15 @@ def main(argv=None):
     ap.add_argument("--log-keys", action="store_true", help="print every key and the button it becomes")
     ap.add_argument("--pad", choices=("auto", "micro", "standard"), default="auto",
                     help="the game pad layout (as the Pi's run.py): auto, micro or standard")
+    ap.add_argument("--no-tilt", dest="tilt", action="store_false", default=True,
+                    help="don't use its accelerometer for tilt steering")
     ap.add_argument("--perf", action="store_true", help="a FPS / RSS / CPU line a second on stderr")
     ap.add_argument("--frames", type=int, default=None, help="stop after this many frames")
     ap.add_argument("--duel", type=int, nargs="?", const=47001, default=None, metavar="PORT",
                     help="MULTIPLAYER on the title screen, over UDP; PORT default 47001")
     args = ap.parse_args(argv)
     try:
-        Host(perf=args.perf, full=args.full, debug=args.debug, log_keys=args.log_keys,
+        Host(perf=args.perf, tilt=args.tilt, full=args.full, debug=args.debug, log_keys=args.log_keys,
              sound=args.sound, duel=args.duel, pad=args.pad).run(args.frames)
     finally:
         if args.perf:

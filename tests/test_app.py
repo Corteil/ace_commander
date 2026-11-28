@@ -162,7 +162,7 @@ tick(a, fresh=["A"]); assert not a.paused
 # tilt steering, with the joystick still working and D to re-zero
 ahead, side = rocks(mod, g)
 tick(a)
-assert a.zero == (0.0, 0.0)
+assert a.zero[:2] == (0.0, 0.0)   # the level pose: (x, y, z) in g
 Imu.reading = [0.3 * G, 0.0, G]
 y = side.y
 tick(a); assert side.y != y, "tilt rolls"
@@ -190,7 +190,7 @@ assert g.msg == "", "one missile per hold"
 tick(a)
 assert a.zero == z, "and letting go after a hold doesn't re-zero"
 Imu.reading = [0.0, 0.0, G]
-tick(a, fresh=["D"]); assert a.zero == (0.0, 0.0)
+tick(a, fresh=["D"]); assert a.zero[:2] == (0.0, 0.0)
 tick(a, fresh=["A"]); a.fmenu = a._fitems_top().index("SETTINGS"); tick(a, fresh=["C"])
 tick(a, fresh=["JOYLEFT"]); assert not a.use_tilt
 tick(a, fresh=["F"]); a.fmenu = a._fitems_top().index("QUIT TO TITLE"); tick(a, fresh=["C"])

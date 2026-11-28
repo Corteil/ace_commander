@@ -880,10 +880,11 @@ tick(e, fresh=["C"]); assert d.name() == "OPTIONS" and e.mode == "docked", "C on
 assert d.tab == 0 and "F: back to status" in texts(e)
 tx = texts(e)
 before = c.docking
-assert "STEER: JOYSTICK" in tx and "DOCKING: " + mod.DOCK_NAMES[before] in tx, tx
 opts = e._settings(True)        # more than fit: the menu loops round the chosen line
+assert "STEER: JOYSTICK" in tx and "DOCKING: " + mod.DOCK_NAMES[before] in opts, opts
 assert "CONSTRICTOR: 2 MIN" in opts and "CONTROLS: NORMAL" in opts, opts
-tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["JOYDOWN"])   # past CONTROLS, NAME
+for _ in range(opts.index("DOCKING: " + mod.DOCK_NAMES[before])):     # down to DOCKING
+    tick(e, fresh=["JOYDOWN"])
 tick(e, fresh=["C"])
 after = commander.DOCKING[(commander.DOCKING.index(before) + 1) % 3]
 assert c.docking == after and "DOCKING: " + mod.DOCK_NAMES[after] in texts(e), "C changes it"

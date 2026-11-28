@@ -30,7 +30,7 @@ try:
     import pygame  # noqa: F401
     for host, pi_name, label in (("pi", "test_pi_host.py", "pi host"), ("pi", "test_pi_trip.py", "pi trip"),
                                   ("pi", "test_pi_pad.py", "pi pad"), ("pi", "test_pi_elite.py", "pi elite"), ("pi", "test_pi_wide.py", "pi wide"), ("pi", "test_pi_micro.py", "pi micro"),
-                                  ("cardputerzero", "test_cz_host.py", "cardputerzero")):
+                                  ("cardputerzero", "test_cz_host.py", "cardputerzero"), ("cardputerzero", "test_cz_tilt.py", "cz tilt")):
         pi_test = os.path.join(os.path.dirname(HERE), "hosts", host, "tests", pi_name)
         r = subprocess.run([sys.executable, pi_test], capture_output=True, text=True)
         lines = [l for l in r.stdout.strip().split("\n") if l and not l.startswith(("pygame ", "Hello from"))]

@@ -399,17 +399,18 @@ class Platform:
     # ---- tilt -------------------------------------------------------------
 
     def tilt(self):
-        """Read the accelerometer into tx, ty (in g): True, or False if it
+        """Read the accelerometer into tx, ty, tz (in g): True, or False if it
         failed (then tilt_ok is False from then on). No new object per frame."""
         if not self.tilt_ok:
             return False
         try:
-            ax, ay, _ = imu.acc_read()
+            ax, ay, az = imu.acc_read()
         except Exception:
             self.tilt_ok = False
             return False
         self.tx = ax / 9.81
         self.ty = ay / 9.81
+        self.tz = az / 9.81     # all three: tilt at any holding angle (ace._level_axes)
         return True
 
     # ---- keyboard and text entry -----------------------------------------

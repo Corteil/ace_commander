@@ -101,6 +101,11 @@ TILT_SWAP_AXES = False  # True if the badge's x axis should pitch, y roll
 # flight controls up / down (pitch), left / right (roll), or both, whichever
 # way you steer: tilt, joystick or keyboard (not the charts' cursor)
 TILT_FLIPS = ("NORMAL", "UP/DOWN FLIPPED", "L/R FLIPPED", "BOTH FLIPPED")
+# TILT SETUP's choices (Brian: "tilt needs a test and setup screen"): the tilt that gives
+# full rate and the dead zone, in g (sin of the angle); shown in degrees
+TILT_FULLS = (0.30, 0.40, 0.50, 0.60, 0.70)
+TILT_DEADS = (0.05, 0.08, 0.10, 0.15, 0.20)
+TILT_ITEMS = ("LEVEL", "FULL TILT", "DEAD ZONE", "SWAP AXES", "TILT PITCH", "TILT ROLL")
 
 INVERT_PITCH = False    # False: joystick up raises the nose. True: up dives.
 SHOW_FRAME_TIME = True  # small frame time (ms) at the top of the flight screen, to start with
@@ -271,13 +276,58 @@ except AttributeError:   # off the badge (tests)
         return a - b
 
 
-def _tilt(v):
+def _tilt(v, dead=TILT_DEADZONE, full=TILT_FULL):
     """Turn a tilt in g into -1..1, with a dead zone."""
-    a = abs(v) - TILT_DEADZONE
+    a = abs(v) - dead
     if a <= 0:
         return 0.0
-    a = min(1.0, a / (TILT_FULL - TILT_DEADZONE))
+    a = min(1.0, a / (full - dead))
     return a if v > 0 else -a
+
+
+def _ring(ctx, x, y, r, k, fill):
+    """A circle of radius r at (x, y), k times as wide (1 on the badge: ctx's own arc;
+    a wide host's 1 / config.wide, which its stretch makes round again)."""
+    if k == 1:
+        ctx.arc(x, y, r, 0, cockpit.TAU, 0)
+    else:
+        ctx.begin_path()
+        for i in range(25):
+            a = cockpit.TAU * i / 24
+            (ctx.move_to if i == 0 else ctx.line_to)(x + r * k * math.cos(a), y + r * math.sin(a))
+    if fill:
+        ctx.fill()
+    else:
+        ctx.stroke()
+
+
+def _deg(g):
+    """A tilt in g (the sine of its angle) in whole degrees."""
+    return int(math.degrees(math.asin(max(-1.0, min(1.0, g)))) + 0.5)
+
+
+def _level_axes(z):
+    """Two directions across gravity z = (x, y, z) (the level pose), as the device's x
+    and y as near as can be: tilt is measured along them, so the device can be held at
+    any angle (flat, a badge's (x, y) as before). None if z is no use."""
+    n = math.sqrt(z[0] * z[0] + z[1] * z[1] + z[2] * z[2])
+    if n < 0.3:
+        return None
+    g = (z[0] / n, z[1] / n, z[2] / n)
+    # y across gravity, unless y is nearly along it: then x
+    d = g[1]
+    e2 = (-d * g[0], 1.0 - d * g[1], -d * g[2])
+    m = math.sqrt(e2[0] * e2[0] + e2[1] * e2[1] + e2[2] * e2[2])
+    if m > 0.3:
+        e2 = (e2[0] / m, e2[1] / m, e2[2] / m)
+        e1 = (e2[1] * g[2] - e2[2] * g[1], e2[2] * g[0] - e2[0] * g[2], e2[0] * g[1] - e2[1] * g[0])
+    else:
+        d = g[0]
+        e1 = (1.0 - d * g[0], -d * g[1], -d * g[2])
+        m = math.sqrt(e1[0] * e1[0] + e1[1] * e1[1] + e1[2] * e1[2])
+        e1 = (e1[0] / m, e1[1] / m, e1[2] / m)
+        e2 = (g[1] * e1[2] - g[2] * e1[1], g[2] * e1[0] - g[0] * e1[2], g[0] * e1[1] - g[1] * e1[0])
+    return e1, e2
 
 
 class AceCommander(PLATFORM.App):
@@ -373,6 +423,14 @@ class AceCommander(PLATFORM.App):
         # The badge never sets it.
         self.analog = None
         self.zero = None                 # accelerometer reading taken as "level"
+        self.zaxes = None                # (e1, e2, the level pose they are for): _level_axes
+        self.t_full = TILT_FULL          # TILT SETUP (options.json): full-rate tilt, dead zone,
+        self.t_dead = TILT_DEADZONE      # axes swapped, pitch and roll signs (tilt only)
+        self.t_swap = TILT_SWAP_AXES
+        self.t_psign = TILT_PITCH_SIGN
+        self.t_rsign = TILT_ROLL_SIGN
+        self.ts_from = None              # TILT SETUP (mode "tiltset"): the mode to go back to,
+        self.ts_sel = 0                  # the line picked
         self.ms = 0.0                    # smoothed frame time
         self.jump_leds = [0.0] * 13      # each ring LED's white jump flash, 0-255 (1 to 12)
         self.jump_lit = False            # the last write was a jump flash
@@ -550,6 +608,32 @@ class AceCommander(PLATFORM.App):
 
     # ---- steering ---------------------------------------------------------
 
+    def _tilt_xy(self):
+        """The last reading (platform.tilt()) as (roll, pitch) tilt in g from the level
+        pose, which the first reading sets (zero). With all three axes it is measured
+        across gravity (_level_axes), at any holding angle; with two (no tz) as the
+        badge always did, x and y less the level's. TILT SETUP's swap applied."""
+        pl = self.platform
+        ax, ay = pl.tx, pl.ty
+        az = getattr(pl, "tz", None)
+        if self.zero is None:
+            self.zero = (ax, ay, az if az is not None else 0.0)
+        z = self.zero
+        if self.zaxes is None or self.zaxes[2] is not z:    # worked out once per level pose
+            axes = _level_axes(z) if az is not None and len(z) == 3 else None
+            self.zaxes = (axes[0], axes[1], z) if axes else (None, None, z)
+        e1, e2 = self.zaxes[0], self.zaxes[1]
+        if az is not None and e1 is not None:
+            gx, gy, gz = ax - self.zero[0], ay - self.zero[1], az - self.zero[2]
+            dx = gx * e1[0] + gy * e1[1] + gz * e1[2]
+            dy = gx * e2[0] + gy * e2[1] + gz * e2[2]
+        else:
+            dx = ax - self.zero[0]
+            dy = ay - self.zero[1]
+        if self.t_swap:
+            dx, dy = dy, dx
+        return dx, dy
+
     def _steer(self, tilt, dirs, arrows, wasd=True):
         """(roll, pitch) as -1..1 each, from tilt, the four direction controls
         named in dirs, and the keyboard. Pitch is negative for up."""
@@ -561,16 +645,9 @@ class AceCommander(PLATFORM.App):
                 self.tilt_ok = False
                 self.use_tilt = False
             else:
-                ax = pl.tx
-                ay = pl.ty
-                if self.zero is None:
-                    self.zero = (ax, ay)
-                dx = ax - self.zero[0]
-                dy = ay - self.zero[1]
-                if TILT_SWAP_AXES:
-                    dx, dy = dy, dx
-                jx = TILT_ROLL_SIGN * _tilt(dx)
-                jy = TILT_PITCH_SIGN * _tilt(dy)
+                dx, dy = self._tilt_xy()
+                jx = self.t_rsign * _tilt(dx, self.t_dead, self.t_full)
+                jy = self.t_psign * _tilt(dy, self.t_dead, self.t_full)
         if dirs is not None:
             if held(dirs[0]):
                 jy -= 1.0
@@ -665,6 +742,8 @@ class AceCommander(PLATFORM.App):
             self._update_options(cancel, confirm)
         elif self.mode == "odebug":
             self._update_odebug(dt, cancel, confirm)
+        elif self.mode == "tiltset":
+            self._update_tiltset(cancel, confirm)
         elif self.mode == "brief":
             b = self.brief
             held = pad.held
@@ -2102,6 +2181,8 @@ class AceCommander(PLATFORM.App):
         if self.tilt_ok:
             items = ["STEER: " + ("TILT" if self.use_tilt else "JOYSTICK"),
                      "CONTROLS: " + TILT_FLIPS[self.tilt_flip]]
+            if self.mode != "flight":   # its test and setup page (Brian)
+                items.append("TILT SETUP")
         else:   # no tilt sensor (the Pi, the Tufty): nothing to choose but the pitch (build 136)
             items = ["PITCH: " + ("SWAPPED" if self.tilt_flip & 1 else "NORMAL")]
         if cmdr and self.mode == "docked" and self._hardcore():   # no saving by itself (build 133)
@@ -2136,6 +2217,12 @@ class AceCommander(PLATFORM.App):
         """Change one setting: left goes back a choice, anything else on.
         DEBUG opens the cheats: in flight its page of the in-flight menu,
         elsewhere a page of its own that comes back here."""
+        if item == "TILT SETUP":
+            if not left:
+                self.ts_from = self.mode
+                self.ts_sel = 0
+                self.mode = "tiltset"
+            return
         if item == "DEBUG":
             if left:
                 return
@@ -2224,6 +2311,15 @@ class AceCommander(PLATFORM.App):
         if isinstance(d, dict):
             if isinstance(d.get("tilt"), bool):
                 self.use_tilt = d["tilt"] and self.tilt_ok
+            t = d.get("tilt_setup")         # TILT SETUP: [full, dead, swap, pitch sign, roll sign]
+            if isinstance(t, list) and len(t) == 5:
+                if t[0] in TILT_FULLS:
+                    self.t_full = t[0]
+                if t[1] in TILT_DEADS:
+                    self.t_dead = t[1]
+                self.t_swap = bool(t[2])
+                self.t_psign = -1.0 if t[3] < 0 else 1.0
+                self.t_rsign = -1.0 if t[4] < 0 else 1.0
             if isinstance(d.get("leds"), bool):
                 self.use_leds = d["leds"]
             if isinstance(d.get("picker"), bool):
@@ -2260,6 +2356,8 @@ class AceCommander(PLATFORM.App):
         try:
             with open(options_path(), "w") as f:
                 f.write(json.dumps({"tilt": self.use_tilt, "tilt_flip": self.tilt_flip,
+                                    "tilt_setup": [self.t_full, self.t_dead, self.t_swap,
+                                                   self.t_psign, self.t_rsign],
                                     "leds": self.use_leds, "picker": self.use_picker,
                                     "sound": self.use_sound, "names": self.use_names,
                                     "volume": self.volume,
@@ -2411,6 +2509,82 @@ class AceCommander(PLATFORM.App):
         if self.mode == "flight":
             self._mission_flags()
         return "MISSION: " + missions.stage_name(c.mission)
+
+    # ---- TILT SETUP (mode "tiltset", from Options where there is a tilt sensor) --------
+
+    def _tilt_lines(self):
+        return ["LEVEL: SET NOW",
+                "FULL TILT: %d DEG" % _deg(self.t_full),
+                "DEAD ZONE: %d DEG" % _deg(self.t_dead),
+                "SWAP AXES: " + ("ON" if self.t_swap else "OFF"),
+                "TILT PITCH: " + ("NORMAL" if self.t_psign > 0 else "FLIPPED"),
+                "TILT ROLL: " + ("NORMAL" if self.t_rsign > 0 else "FLIPPED")]
+
+    def _update_tiltset(self, cancel, confirm):
+        """Up / down picks a line, left / right (or C) changes it; C on LEVEL takes the
+        way the device is held now as level; F goes back. The sensor is read every
+        frame for the picture (_draw_tiltset)."""
+        hit = self.pad.hit
+        if not self.platform.tilt():
+            self.tilt_ok = self.use_tilt = False
+            self.mode = self.ts_from or "menu"
+            return
+        n = len(TILT_ITEMS)
+        if cancel:
+            self.mode = self.ts_from or "menu"
+            return
+        if hit("j_up"):
+            self.ts_sel = (self.ts_sel - 1) % n
+            return
+        if hit("j_down"):
+            self.ts_sel = (self.ts_sel + 1) % n
+            return
+        left = hit("j_left")
+        if not (left or hit("j_right") or confirm):
+            return
+        step = -1 if left else 1
+        item = TILT_ITEMS[self.ts_sel]
+        if item == "LEVEL":
+            self.zero = None            # the next reading is level
+        elif item == "FULL TILT":
+            i = TILT_FULLS.index(self.t_full) if self.t_full in TILT_FULLS else 2
+            self.t_full = TILT_FULLS[(i + step) % len(TILT_FULLS)]
+        elif item == "DEAD ZONE":
+            i = TILT_DEADS.index(self.t_dead) if self.t_dead in TILT_DEADS else 2
+            self.t_dead = TILT_DEADS[(i + step) % len(TILT_DEADS)]
+        elif item == "SWAP AXES":
+            self.t_swap = not self.t_swap
+        elif item == "TILT PITCH":
+            self.t_psign = -self.t_psign
+        else:
+            self.t_rsign = -self.t_rsign
+        self._save_options()
+
+    def _draw_tiltset(self, ctx):
+        """The test: a circle for full tilt, a smaller one for the dead zone, a cross,
+        and a dot where tilt steers now (as flying: roll across, pitch down for nose
+        down); then the settings."""
+        text = cockpit.text
+        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
+        text(ctx, "TILT SETUP", 0, -100, 14, cockpit.WHITE)
+        cy, r = -50, 34
+        k = 1.0 / config.wide if config.wide else 1.0   # a wide host stretches: keep it round
+        ctx.line_width = 1.5
+        dz = max(2, int(r * self.t_dead / self.t_full))
+        ctx.rgb(*cockpit.DIM)
+        _ring(ctx, 0, cy, r, k, False)
+        _ring(ctx, 0, cy, dz, k, False)
+        ctx.rectangle(-r * k, cy, 2 * r * k, 1).fill()
+        ctx.rectangle(0, cy - r, 1, 2 * r).fill()
+        dx, dy = self._tilt_xy()
+        jx = self.t_rsign * _tilt(dx, self.t_dead, self.t_full)
+        jy = self.t_psign * _tilt(dy, self.t_dead, self.t_full)
+        ctx.rgb(*(cockpit.GREEN if (jx or jy) else cockpit.GREY))
+        _ring(ctx, jx * r * k, cy + jy * r, 4, k, True)
+        text(ctx, "roll %+d%%  pitch %+d%%" % (int(jx * 100), int(jy * 100)), 0, cy + r + 10, 10,
+             cockpit.GREY)
+        cockpit.menu_lines(ctx, self._tilt_lines(), self.ts_sel, 6, 13, 6)
+        text(ctx, "C: set / change   F: back", 0, 92, 10, cockpit.GREY)
 
     # away from a flight: Options > DEBUG (mode "odebug")
 
@@ -3419,6 +3593,8 @@ class AceCommander(PLATFORM.App):
             self._draw_options(ctx)
         elif self.mode == "odebug":
             self._draw_odebug(ctx)
+        elif self.mode == "tiltset":
+            self._draw_tiltset(ctx)
         elif self.mode == "launch":
             cockpit.draw_tunnel(ctx, min(1.0, self.launch_t / LAUNCH_TIME), self.launch_t,
                                 cockpit.station_colour(self._government()), False, self.tunnel)

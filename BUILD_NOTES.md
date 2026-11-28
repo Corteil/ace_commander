@@ -1986,3 +1986,14 @@ what is now `ace.py` (renamed in build 50).
    zip); wide screens on by default on the Pi (--no-wide) and the Tufty (hosts/fit_core.py);
    the 8BitDo Micro's own layout. make_release: the Pi zip carries hosts/fit_core.py and
    hosts/cardputerzero, and is started (pi_smoke) before anything is published.
+   **Build 172** (2026-11-28, Brian: "tilt needs a test and setup screen. Think the cardputer
+   has an IMU sensor as well"). TILT SETUP in Options (title and docked; wherever there is a tilt
+   sensor): a live test (a circle for full tilt, one for the dead zone, a dot where tilt steers
+   now, roll / pitch %) and FULL TILT (17-44 degrees), DEAD ZONE (3-12 degrees), SWAP AXES, TILT
+   PITCH / TILT ROLL (flipped for tilt only; CONTROLS still flips all steering) and LEVEL: SET NOW;
+   saved in options.json ("tilt_setup"). Tilt is now measured across the level pose's gravity
+   (`_level_axes`, `_tilt_xy`), so the device can be held at any angle; flat, a badge's x and y as
+   before (the badge's platform reads z too). The CardputerZero's BMI270 (iio, run_cz.Accel, on
+   by default, --no-tilt) gives it STEER: TILT; `platform_pi.TILT` is the hook. On wide hosts the
+   test's circle is drawn 1/config.wide as wide so it stays round. Tests: test_cz_tilt (new),
+   test_app, test_leds, test_commander. PC only: not yet on the badge or the CardputerZero.
