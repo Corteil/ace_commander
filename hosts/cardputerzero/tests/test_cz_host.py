@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 import pygame       # noqa: E402
 
 import run_cz       # noqa: E402
+import fit_pygame   # noqa: E402  (the Pi's, on the path run_cz sets)
 
 
 def key(h, k, ch="", frames=2):
@@ -42,7 +43,7 @@ assert h.window.get_size() == run_cz.SIZE, h.window.get_size()
 assert h.layout == "elite" and h.ctx.text_k == run_cz.TEXT_K
 for _ in range(3):
     h.step(40)
-assert h.screen_key() == ("menu", None)
+assert fit_pygame.screen_key(a) == ("menu", None) and h.wide
 print("320 x 170, Elite layout, text x%.1f: ok" % run_cz.TEXT_K)
 
 # list menus: fewer lines, further apart (config.menu_k, 1 on the badge)
@@ -72,13 +73,12 @@ while a.dock.name() != "MARKET":
     key(h, pygame.K_d, "d")
 h.step(40)
 import ctx_pygame   # noqa: E402
-import fit_cz       # noqa: E402
 assert ctx_pygame.relabel("C: buy   D: sell", h.ctx.labels) == "C: buy   X: sell", h.ctx.labels
 # the market fitted: its hints in one row at the bottom, the rest across the LCD's width
 place = [v for (k, row), v in h.fitter.places.items() if k == ("docked", "MARKET") and "X: sell" in row][0]
 sx, sy, y0, tk = place
 assert sx > h.scale * 1.5 and sy >= h.scale and tk == run_cz.TEXT_K, place
-low = [y for y in range(130, 170) if any(h.window.get_at((x, y))[:3] == fit_cz.GREY
+low = [y for y in range(130, 170) if any(h.window.get_at((x, y))[:3] == fit_pygame.GREY
                                           for x in range(0, 320, 2))]
 assert low and min(low) > 150, "the hint row at the very bottom"
 print("market fitted: %.2f x %.2f the plain scale, hints in the bottom row: ok" % (sx / h.scale, sy / h.scale))

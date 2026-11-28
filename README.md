@@ -232,7 +232,10 @@ python3 hosts/pi/run.py           # as last time; --layout badge|elite, --full /
 Two layouts: the badge's round screen, or a 3D view over an Elite-style dashboard (scanner,
 shields, fuel, temperatures, altitude, speed, roll, dive / climb, energy banks, missiles) that
 fills the window. F10 switches between them, F11 is full screen, F12 saves a screenshot to
-`~/Pictures/Ace Commander/`; the window can be any size.
+`~/Pictures/Ace Commander/`; the window can be any size. With `--wide`, the Elite layout's
+screens (docked, the title, the in-flight Status, Market Prices and charts) use the window's whole
+width, with their hints in one row along the bottom, bigger text, and the ship beside its details
+in the Shipyard and Hangar.
 
 Arrows are the joystick, Enter confirms, Esc goes back, F1-F6 are the badge's buttons A-F, and
 the rest of the keyboard works as the Keyboard Hexpansion. A game pad (Xbox, PlayStation,

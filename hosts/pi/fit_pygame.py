@@ -1,4 +1,5 @@
-"""The badge's 240 x 240 screens fitted to the CardputerZero's 320 x 170 LCD.
+"""The badge's 240 x 240 screens fitted to a wide screen: the CardputerZero's
+320 x 170 LCD (always), and the Pi's Elite layout with --wide.
 
 A screen (the title, docked tabs, Options, an in-flight screen: anything drawn
 as one whole frame on the 240 canvas) is drawn once into a list (FitCtx in
@@ -14,7 +15,8 @@ record mode), then:
 - the spread is kept per screen (the mode, tab and hints), and only made
   smaller when something no longer fits, so a screen doesn't jump about.
 
-Flight's own frames (the 3D view, dashboard, pause menu) are drawn as before.
+Flight's own frames (the 3D view, dashboard, pause menu) are drawn as before
+(screen_key says which frames are whole screens).
 """
 import re
 
@@ -33,6 +35,23 @@ MAX_X = 2.4                     # spread across at most this many times the plai
 MAX_Y = 1.7                     # and down at most this many times
 MAX_ASPECT = 1.5                # and across at most this many times more than down
                                 # (the game's config.wide: its ships keep their shape)
+FLIGHT_MODES = ("flight", "launch", "docking", "mlaunch")
+SCREENS = ("status", "inventory", "market", "chart", "data")   # ace.SCREENS: whole-frame in flight
+
+
+def screen_key(app):
+    """Which whole-frame screen the game shows, as a key to remember its placement
+    by, or None: flight's own frames (the 3D view and dashboard, the pause menu
+    over them, the tunnels) and the speed test."""
+    mode = getattr(app, "mode", "")
+    if mode == "flight":
+        if app.fsub in SCREENS and not app.paused:
+            return (mode, app.fsub)
+        return None
+    if mode in FLIGHT_MODES or mode == "bench":
+        return None
+    dock = getattr(app, "dock", None)
+    return (mode, dock.name() if mode == "docked" and dock is not None else None)
 MIN_TEXT_K = 1.3                # a full screen's text is made smaller, down to this
 OVERLAP = 0.25                  # lines of text may overlap by this much of their height
                                 # (a font's box has room above and below its letters)

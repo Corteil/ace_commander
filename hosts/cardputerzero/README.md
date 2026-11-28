@@ -5,7 +5,7 @@ keyboard, 352 MB RAM). Phase 0's findings: `notes/cardputerzero_phase0.md`.
 
 - `run_cz.py`: the game on the LCD (KMSDRM on `/dev/dri/card1` when there's no desktop), the Elite
   layout full screen, text 1.6x in DejaVu Sans Condensed Bold (`TEXT_K`), whole-frame screens fitted to the LCD
-  (`fit_cz.py`: drawn once into a list, the hints joined in one row along the bottom, the rest
+  (`../pi/fit_pygame.py`, the Pi's `--wide`: drawn once into a list, the hints joined in one row along the bottom, the rest
   spread over the width and the height left; text made smaller, to 1.3x, only on a screen too full
   for its lines not to overlap), list menus with fewer lines further apart that scroll
   (`MENU_K`, the game's `config.menu_k`), fonts by path (pygame's lookup runs `fc-list`, which
