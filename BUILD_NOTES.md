@@ -1965,3 +1965,8 @@ what is now `ace.py` (renamed in build 50).
    Hangar put the ship turning on the left and the rest down the right
    (`Docked._wide_page`, `_ship_facts`, `_fitout(e, wide)`: shorter lines), and
    `_spin_ship` draws ships that much narrower so the stretch leaves them their shape.
+   The local chart with config.wide (Brian: "the range should be round but the star field should
+   fill out the sides"): `Chart` takes systems out to wide times further left and right
+   (`_inside`: a box, not the circle) and draws everything wide times narrower (`_Cursor.kx`:
+   dots, the range as a 48-point oval, the box, cursor and you-are-here), so the host's stretch
+   leaves the range round; the cursor and distances are unchanged. The Pi gets it with --wide too.
