@@ -144,7 +144,7 @@ class Host(pi_run.Host):
         platform_pi.TILT = find_accel() if tilt else None
         # its BMI270 sits with y across the screen and x up it; pitch the other way round
         # so tilting the top back moves the test's dot up (Brian: axes were swapped)
-        platform_pi.TILT_AXES = (1, -1.0)
+        platform_pi.TILT_AXES = (1, -1.0, -1.0)     # and roll (Brian: "left right wrong")
         super().__init__(**kw)
         self.stop_file = STOP
         try:

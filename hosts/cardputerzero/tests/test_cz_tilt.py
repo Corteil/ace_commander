@@ -60,10 +60,10 @@ h.step(40)
 t = math.radians(20)
 # its y runs across the screen (TILT_AXES): turned about z (y tips) is roll, about y
 # (z tips: the top back, as Brian reported "tilt up") pitch, the top back moving the dot up
-A[:] = [-math.cos(t), math.sin(t), 0.0]       # turned about z
+A[:] = [-math.cos(t), math.sin(t), 0.0]       # turned about z (roll)
 a.platform.tilt()               # (read once a frame, by the game's update)
 dx, dy = a._tilt_xy()
-assert abs(dx) > 0.3 and abs(dy) < 1e-6, ("roll", dx, dy)
+assert dx < -0.3 and abs(dy) < 1e-6, ("roll, reversed (Brian: left right wrong)", dx, dy)
 A[:] = [-math.cos(t), 0.0, -math.sin(t)]      # the top tipped back (z falls, as reported)
 a.platform.tilt()
 dx, dy = a._tilt_xy()

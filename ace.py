@@ -307,11 +307,11 @@ def _deg(g):
     return int(math.degrees(math.asin(max(-1.0, min(1.0, g)))) + 0.5)
 
 
-def _level_axes(z, across=0, psign=1.0):
+def _level_axes(z, across=0, psign=1.0, rsign=1.0):
     """Two directions across gravity z = (x, y, z) (the level pose) to measure tilt
     along, so the device can be held at any angle: roll along the device's axis that
-    runs across its screen (across: 0 x, as the badge; 1 y, as the CardputerZero),
-    pitch at right angles to it (psign turns it round). Flat, a badge's (x, y) as
+    runs across its screen (across: 0 x; 1 y, as the badge and the CardputerZero),
+    pitch at right angles to it (psign and rsign turn pitch and roll round). Flat, a badge's (x, y) as
     before. None if z is no use."""
     n = math.sqrt(z[0] * z[0] + z[1] * z[1] + z[2] * z[2])
     if n < 0.3:
@@ -327,6 +327,8 @@ def _level_axes(z, across=0, psign=1.0):
     e1 = (e1[0] / m, e1[1] / m, e1[2] / m)
     e2 = (psign * (g[1] * e1[2] - g[2] * e1[1]), psign * (g[2] * e1[0] - g[0] * e1[2]),
           psign * (g[0] * e1[1] - g[1] * e1[0]))
+    if rsign < 0:
+        e1 = (-e1[0], -e1[1], -e1[2])
     return e1, e2
 
 
@@ -622,8 +624,9 @@ class AceCommander(PLATFORM.App):
             self.zero = (ax, ay, az if az is not None else 0.0)
         z = self.zero
         if self.zaxes is None or self.zaxes[2] is not z:    # worked out once per level pose
-            ax_, ps_ = getattr(pl, "tilt_axes", (0, 1.0))   # the device's own (platform)
-            axes = _level_axes(z, ax_, ps_) if az is not None and len(z) == 3 else None
+            ta = getattr(pl, "tilt_axes", (0, 1.0))     # the device's own (platform):
+            axes = (_level_axes(z, *ta)                 # (across, pitch sign[, roll sign])
+                    if az is not None and len(z) == 3 else None)
             self.zaxes = (axes[0], axes[1], z) if axes else (None, None, z)
         e1, e2 = self.zaxes[0], self.zaxes[1]
         if az is not None and e1 is not None:
