@@ -222,6 +222,8 @@ def drawing(c, cx, cy, pad, labels, colour, heading):
             centres[b[0]] = _button(c, cx, cy, b)
     _letters(c, cx, cy, pad)
     above, below = set(pad.get("above", ())), set(pad.get("below", ()))
+    # a button that does nothing here isn't labelled (Brian)
+    labels = tuple([it for it in side if "not used" not in it[1]] for side in labels)
     every = list(labels[0]) + list(labels[1])
     rows = (([it for it in every if it[0] in above], cy + pad["row_y"][0] * mm, 1),
             ([it for it in every if it[0] in below], cy + pad["row_y"][1] * mm, -1))
