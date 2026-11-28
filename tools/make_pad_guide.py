@@ -54,8 +54,10 @@ MICRO = {
         ("B", "circle", 24, -9, 4.2), ("Y", "circle", 15, 0, 4.2),
         ("-", "pill", -6, 13, 6, 2.6), ("+", "pill", 6, 13, 6, 2.6),
         ("HOME", "circle", -4, -13, 2.6), ("STAR", "circle", 4, -13, 2.6),
-        ("L2", "shoulder", -30, 27, 16, 4), ("L", "shoulder", -30, 22.5, 16, 3.4),
-        ("R2", "shoulder", 30, 27, 16, 4), ("R", "shoulder", 30, 22.5, 16, 3.4),
+        # four shoulder buttons in a row on the top edge (Brian): L and R outside,
+        # L2 and R2 smaller, inside them
+        ("L", "shoulder", -29, 22, 15, 4.2), ("L2", "shoulder", -13, 21.6, 9, 3.4),
+        ("R2", "shoulder", 13, 21.6, 9, 3.4), ("R", "shoulder", 29, 22, 15, 4.2),
     ],
     "letters": {"X": "X", "A": "A", "B": "B", "Y": "Y", "-": "−", "+": "+", "HOME": "⌂",
                 "STAR": "★", "L": "L", "R": "R", "L2": "L2", "R2": "R2"},
@@ -71,8 +73,8 @@ STANDARD = {
         ("A", "circle", 28, -3, 3.6), ("X", "circle", 20, 5, 3.6),
         ("BACK", "pill", -7, 8, 6, 2.6), ("START", "pill", 7, 8, 6, 2.6),
         ("GUIDE", "circle", 0, 15, 3.2),
-        ("LT", "shoulder", -28, 30, 18, 4.5), ("LB", "shoulder", -28, 25, 18, 3.6),
-        ("RT", "shoulder", 28, 30, 18, 4.5), ("RB", "shoulder", 28, 25, 18, 3.6),
+        ("LT", "shoulder", -28, 25.5, 16, 4.5), ("LB", "shoulder", -28, 20.5, 18, 3.6),
+        ("RT", "shoulder", 28, 25.5, 16, 4.5), ("RB", "shoulder", 28, 20.5, 18, 3.6),
     ],
     "letters": {"Y": "Y", "B": "B", "A": "A", "X": "X", "BACK": "◁", "START": "▷",
                 "GUIDE": "⌂", "LB": "LB", "RB": "RB", "LT": "LT", "RT": "RT",
@@ -81,16 +83,16 @@ STANDARD = {
 
 # what each button does: (button, label) left of the pad, then right of it, in order top down
 MICRO_FLIGHT = (
-    [("L2", "L2: E.C.M."), ("L", "L: slower (hold)"), ("-", "−: next view"),
+    [("L", "L: slower (hold)"), ("L2", "L2: E.C.M."), ("-", "−: next view"),
      ("DPAD", "D-pad: pitch and roll"), ("HOME", "Home (hold 1 s): escape pod")],
-    [("R2", "R2: energy bomb"), ("R", "R: faster (hold)"), ("+", "+: pause menu"),
+    [("R", "R: faster (hold)"), ("R2", "R2: energy bomb"), ("+", "+: pause menu"),
      ("X", "X (hold): jump drive"), ("A", "A: fire laser"), ("Y", "Y: docking computer"),
      ("B", "B: missile"), ("STAR", "★: not used")],
 )
 MICRO_MENUS = (
-    [("L2", "L2: not used"), ("L", "L: tab before"), ("-", "−: Options (docked)"),
+    [("L", "L: tab before"), ("L2", "L2: not used"), ("-", "−: Options (docked)"),
      ("DPAD", "D-pad: move, pick, change"), ("HOME", "Home: not used")],
-    [("R2", "R2: not used"), ("R", "R: next tab"), ("+", "+: launch / pause menu"),
+    [("R", "R: next tab"), ("R2", "R2: not used"), ("+", "+: launch / pause menu"),
      ("X", "X: find a system (chart)"), ("A", "A: choose, buy"), ("Y", "Y: sell, system data"),
      ("B", "B: back"), ("STAR", "★: not used")],
 )
@@ -160,16 +162,25 @@ def _body(c, cx, cy, pad):
     if body[0] == "rect":
         _, x, y, w, h, r = body
         c.roundRect(cx + x * U, cy + y * U, w * U, h * U, r * U, stroke=1, fill=1)
-    else:                       # a pad with two grips
-        p = c.beginPath()
-        pts = [(-30, 20), (30, 20), (40, 16), (46, 4), (48, -14), (44, -26), (36, -28), (28, -22),
-               (20, -16), (-20, -16), (-28, -22), (-36, -28), (-44, -26), (-48, -14), (-46, 4),
-               (-40, 16)]
-        p.moveTo(cx + pts[0][0] * U, cy + pts[0][1] * U)
-        for px, py in pts[1:]:
-            p.lineTo(cx + px * U, cy + py * U)
-        p.close()
-        c.drawPath(p, stroke=1, fill=1)
+    else:                       # a pad with two grips, a smooth outline (Brian)
+        pts = [(0, 20), (24, 20), (38, 17), (45, 8), (48, -8), (47, -21), (40, -28), (31, -25),
+               (22, -16), (0, -14), (-22, -16), (-31, -25), (-40, -28), (-47, -21), (-48, -8),
+               (-45, 8), (-38, 17), (-24, 20)]
+        _smooth(c, [(cx + x * U, cy + y * U) for x, y in pts])
+
+
+def _smooth(c, pts):
+    """A closed smooth outline through pts (Catmull-Rom as cubic Beziers)."""
+    n = len(pts)
+    p = c.beginPath()
+    p.moveTo(*pts[0])
+    for i in range(n):
+        p0, p1, p2, p3 = pts[i - 1], pts[i], pts[(i + 1) % n], pts[(i + 2) % n]
+        c1 = (p1[0] + (p2[0] - p0[0]) / 6.0, p1[1] + (p2[1] - p0[1]) / 6.0)
+        c2 = (p2[0] - (p3[0] - p1[0]) / 6.0, p2[1] - (p3[1] - p1[1]) / 6.0)
+        p.curveTo(c1[0], c1[1], c2[0], c2[1], p2[0], p2[1])
+    p.close()
+    c.drawPath(p, stroke=1, fill=1)
 
 
 def _letters(c, cx, cy, pad):
