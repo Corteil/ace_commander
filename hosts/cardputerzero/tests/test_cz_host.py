@@ -45,6 +45,12 @@ for _ in range(3):
     h.step(40)
 assert fit_pygame.screen_key(a) == ("menu", None) and h.wide
 print("320 x 170, Elite layout, text x%.1f: ok" % run_cz.TEXT_K)
+# F10: the badge layout's round screen is small, so its text is the badge's size
+h.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F10, unicode="", mod=0))
+assert h.layout == "badge" and h.ctx.text_k == run_cz.BADGE_TEXT_K, h.ctx.text_k
+h.handle(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F10, unicode="", mod=0))
+assert h.layout == "elite" and h.ctx.text_k == run_cz.TEXT_K
+print("F10: badge layout text x%.1f, back to x%.1f: ok" % (run_cz.BADGE_TEXT_K, run_cz.TEXT_K))
 
 # list menus: fewer lines, further apart (config.menu_k, 1 on the badge)
 ck = h.ck

@@ -37,6 +37,8 @@ if PI not in sys.path:
 
 SIZE = (320, 170)
 TEXT_K = 1.6            # text 1.6 times the Pi's size for the canvas's scale (Brian: "C")
+BADGE_TEXT_K = 1.0      # in the badge layout (F10): the round screen is only ~150 px across, so
+                        # the badge's own proportions (Brian: messages didn't fit at 1.6)
 MENU_K = 1.6            # list menus' lines that much further apart, fewer shown (config.menu_k)
 CARD = "1"              # /dev/dri/card1: the LCD (card0 is HDMI)
 STOP = os.path.join(os.path.expanduser("~"), ".cache", "ace_commander", "stop")
@@ -118,7 +120,7 @@ class Host(pi_run.Host):
 
     def _fit(self):
         super()._fit()
-        self.ctx.text_k = TEXT_K
+        self.ctx.text_k = TEXT_K if self.layout == "elite" else BADGE_TEXT_K
 
     def toggle_full(self):
         pass                    # always the whole LCD
