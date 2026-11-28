@@ -13,7 +13,8 @@ keyboard, 352 MB RAM). Phase 0's findings: `notes/cardputerzero_phase0.md`.
   hints say so), `--perf` for a FPS / RSS / CPU line a second.
 - `ace-commander.sh`: what the launcher runs; logs in `~/.cache/ace_commander/play-*.log`.
 - `install.sh`: the launcher (APPLaunch) entry and icon; needs root:
-  `sudo sh ~/ace_commander/hosts/cardputerzero/install.sh`.
+  `sudo sh ~/ace_commander/hosts/cardputerzero/install.sh`; options after it go on the launcher's
+  command (`... install.sh --debug` for the DEBUG menu).
 - Stop it from a shell: `touch ~/.cache/ace_commander/stop` (or SIGTERM). Holding Esc in the
   launcher ends it too.
 - Test: `tests/test_cz_host.py` (SDL dummy driver), run by `tests/run_all.py`.
