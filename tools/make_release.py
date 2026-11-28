@@ -55,7 +55,8 @@ Options: --layout elite (a 3D view over a dashboard; F10 switches), --full (full
 --sound (the game's sounds; Options > SOUND turns them off), --debug (the DEBUG menu),
 --duel (MULTIPLAYER on the title screen: up to four players on computers on one network, over UDP;
 a Pi can't play a badge yet). Keys: arrows steer, F1-F6 are the badge's buttons A-F, and the
-rest are Elite's keys; a game pad works too. Every key and pad button: KEY_GUIDE.pdf. Saves go in ~/.local/share/ace_commander/.
+rest are Elite's keys; a game pad works too (PAD_GUIDE.pdf draws its buttons and what they do;
+--pad micro gives any pad the 8BitDo Micro's layout, --pad standard none). Every key: KEY_GUIDE.pdf. Saves go in ~/.local/share/ace_commander/.
 A desktop shortcut: Exec=python3 /path/to/ace_commander/hosts/pi/run.py
 
 On Windows (tested on Windows 11): install Python 3 from python.org (tick "Add python.exe to
@@ -130,6 +131,13 @@ def key_guide(platform, folder):
     make_key_guide.make(platform, os.path.join(folder, "KEY_GUIDE.pdf"))
 
 
+def pad_guide(folder):
+    """The game pad guide (the 8BitDo Micro's and other pads' layouts, drawn) into
+    folder, as PAD_GUIDE.pdf."""
+    import make_pad_guide
+    make_pad_guide.make(os.path.join(folder, "PAD_GUIDE.pdf"))
+
+
 def zip_dir(path, folder, arc_root, skip=()):
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
         for root, dirs, files in os.walk(folder):
@@ -174,6 +182,7 @@ def build_pi(v):
     with open(os.path.join(stage, "README_PI.txt"), "w") as f:
         f.write(PI_README.format(v=v))
     key_guide("pi", stage)
+    pad_guide(stage)
     pi_smoke(stage)
     path = os.path.join(OUT, "ace_commander-pi-%s.zip" % v)
     zip_dir(path, stage, "ace_commander")

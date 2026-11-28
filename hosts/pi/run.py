@@ -121,7 +121,7 @@ class Host:
     screen. The window can be any size: everything scales to fit."""
 
     def __init__(self, scale=2, full=None, save_dir=None, debug=False, log_keys=False, layout=None,
-                 sound=False, duel=None, wide=False):
+                 sound=False, duel=None, wide=False, pad="auto"):
         pygame.init()
         # --wide: in the Elite layout the badge's whole-frame screens (docked, the title,
         # the in-flight screens) are fitted to the window (fit_pygame): its width used,
@@ -151,7 +151,7 @@ class Host:
         self.feed = Feed(log_keys)      # with --log-keys, every key down and up is printed
         sys.modules[PKG + ".config"].input = self.feed.attach
         self.keys = Keys(self.feed)
-        self.pads = Pads(self.feed, lambda: self.app, log_keys)
+        self.pads = Pads(self.feed, lambda: self.app, log_keys, pad)
         self.pad_last = False       # the pad was the last thing used
         self.log_keys = log_keys
         self.app = self.ace.AceCommander()
@@ -475,6 +475,9 @@ def main(argv=None):
     ap.add_argument("--wide", dest="wide", action="store_true", default=True,
                     help="in the Elite layout, the badge's screens use the window's width, hints in one row "
                          "(the default, Brian)")
+    ap.add_argument("--pad", choices=("auto", "micro", "standard"), default="auto",
+                    help="the game pad layout: auto (an 8BitDo Micro by its name gets its own), "
+                         "micro (every pad gets the Micro's), standard (none does); see PAD_GUIDE.pdf")
     ap.add_argument("--no-wide", dest="wide", action="store_false",
                     help="the badge's screens as a 240 square in the middle")
     ap.add_argument("--duel", type=int, nargs="?", const=47001, default=None, metavar="PORT",
@@ -482,7 +485,8 @@ def main(argv=None):
                          "on one Pi, or two computers on one network); PORT default 47001")
     args = ap.parse_args(argv)
     Host(args.scale, args.full, debug=args.debug, log_keys=args.log_keys,
-         layout=args.layout, sound=args.sound, duel=args.duel, wide=args.wide).run(args.frames)
+         layout=args.layout, sound=args.sound, duel=args.duel, wide=args.wide,
+         pad=args.pad).run(args.frames)
 
 
 if __name__ == "__main__":

@@ -202,6 +202,8 @@ def main(argv=None):
                     help="the game's sounds (the default; accepted as the Pi's run.py takes it)")
     ap.add_argument("--no-sound", dest="sound", action="store_false")
     ap.add_argument("--log-keys", action="store_true", help="print every key and the button it becomes")
+    ap.add_argument("--pad", choices=("auto", "micro", "standard"), default="auto",
+                    help="the game pad layout (as the Pi's run.py): auto, micro or standard")
     ap.add_argument("--perf", action="store_true", help="a FPS / RSS / CPU line a second on stderr")
     ap.add_argument("--frames", type=int, default=None, help="stop after this many frames")
     ap.add_argument("--duel", type=int, nargs="?", const=47001, default=None, metavar="PORT",
@@ -209,7 +211,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
     try:
         Host(perf=args.perf, full=args.full, debug=args.debug, log_keys=args.log_keys,
-             sound=args.sound, duel=args.duel).run(args.frames)
+             sound=args.sound, duel=args.duel, pad=args.pad).run(args.frames)
     finally:
         if args.perf:
             sys.stderr.write("CZ exit maxrss_mb %.1f\n" % (
