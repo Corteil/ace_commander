@@ -59,6 +59,7 @@ MICRO = {
         ("L", "shoulder", -29, 22, 15, 4.2), ("L2", "shoulder", -13, 21.6, 9, 3.4),
         ("R2", "shoulder", 13, 21.6, 9, 3.4), ("R", "shoulder", 29, 22, 15, 4.2),
     ],
+    "escape": (25.5, -25),      # the middle buttons' wires go straight up / down to these first
     "letters": {"X": "X", "A": "A", "B": "B", "Y": "Y", "-": "−", "+": "+", "HOME": "⌂",
                 "STAR": "★", "L": "L", "R": "R", "L2": "L2", "R2": "R2"},
 }
@@ -73,9 +74,11 @@ STANDARD = {
         ("A", "circle", 28, -3, 3.6), ("X", "circle", 20, 5, 3.6),
         ("BACK", "pill", -7, 8, 6, 2.6), ("START", "pill", 7, 8, 6, 2.6),
         ("GUIDE", "circle", 0, 15, 3.2),
-        ("LT", "shoulder", -28, 25.5, 16, 4.5), ("LB", "shoulder", -28, 20.5, 18, 3.6),
-        ("RT", "shoulder", 28, 25.5, 16, 4.5), ("RB", "shoulder", 28, 20.5, 18, 3.6),
+        # shoulders float above the body (Brian)
+        ("LT", "shoulder", -28, 30, 16, 4.5), ("LB", "shoulder", -28, 25, 18, 3.6),
+        ("RT", "shoulder", 28, 30, 16, 4.5), ("RB", "shoulder", 28, 25, 18, 3.6),
     ],
+    "escape": (34, -18),        # above the shoulder buttons
     "letters": {"Y": "Y", "B": "B", "A": "A", "X": "X", "BACK": "◁", "START": "▷",
                 "GUIDE": "⌂", "LB": "LB", "RB": "RB", "LT": "LT", "RT": "RT",
                 "LSTICK": "L", "RSTICK": "R"},
@@ -210,6 +213,16 @@ def drawing(c, cx, cy, pad, labels, colour, heading):
         if b[1] != "shoulder":
             centres[b[0]] = _button(c, cx, cy, b)
     _letters(c, cx, cy, pad)
+    # a button in the middle (|x| < 10 mm) points out straight up or down off the pad
+    # first, so its wire doesn't run across the others (Brian: wires mustn't cross)
+    start = {}
+    up, down = pad.get("escape", (None, None))
+    for b in pad["buttons"]:
+        name, bx, by = b[0], b[2], b[3]
+        if abs(bx) < 10 and b[1] != "shoulder" and up is not None:
+            start[name] = (cx + bx * U, cy + (up if by > 0 else down) * U)
+        else:
+            start[name] = centres[name]
     left, right = labels
     for side, items in ((-1, left), (1, right)):
         n = len(items)
@@ -217,12 +230,17 @@ def drawing(c, cx, cy, pad, labels, colour, heading):
         step = 72 * mm / max(1, n - 1) if n > 1 else 0
         lx = cx + side * (COL - 4 * mm)      # where the pointer lines bend
         tx = cx + side * COL
+        slots = [top - i * step for i in range(n)]
+        items = _uncrossed(items, start, lx, slots)
         for i, (name, text) in enumerate(items):
-            ty = top - i * step
+            ty = slots[i]
             bx, by = centres[name]
+            sx, sy = start[name]
             c.setStrokeColor(colour)
             c.setLineWidth(0.5)
-            c.line(bx, by, lx, ty)
+            if (sx, sy) != (bx, by):
+                c.line(bx, by, sx, sy)          # straight off the pad first
+            c.line(sx, sy, lx, ty)
             c.line(lx, ty, tx - side * 1 * mm, ty)
             c.setFillColor(colour)
             c.circle(bx, by, 0.7, stroke=0, fill=1)
@@ -235,6 +253,73 @@ def drawing(c, cx, cy, pad, labels, colour, heading):
                     c.drawRightString(tx, y, line)
                 else:
                     c.drawString(tx, y, line)
+
+
+def _crosses(a, b, c, d):
+    """Whether segments a-b and c-d cross (touching ends don't count)."""
+    def turn(p, q, r):
+        v = (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+        return (v > 1e-9) - (v < -1e-9)
+    return (turn(a, b, c) * turn(a, b, d) < 0) and (turn(c, d, a) * turn(c, d, b) < 0)
+
+
+def _near(a, b, p, r):
+    """Whether point p is within r of segment a-b (away from its ends)."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L = dx * dx + dy * dy
+    if L == 0:
+        return False
+    t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L
+    if t <= 0.02 or t >= 1:
+        return False
+    qx, qy = a[0] + t * dx, a[1] + t * dy
+    return (qx - p[0]) ** 2 + (qy - p[1]) ** 2 < r * r
+
+
+def _uncrossed(items, centres, lx, slots):
+    """items in an order whose pointer lines (from centres[name] to (lx, slot)) don't
+    cross each other (Brian: "the label wires should not cross"), with as few as can be
+    passing over another button: a branch-and-bound search over the orders. As given,
+    top down, if no order keeps the lines apart."""
+    order = sorted(items, key=lambda it: -centres[it[0]][1])
+    n = len(order)
+    others = list(centres.items())
+    r = 3.6 * U
+    over = {}                           # (item, slot) -> buttons its line passes over
+
+    def cost(i, k):
+        key = (i, k)
+        if key not in over:
+            a = centres[order[i][0]]
+            b = (lx, slots[k])
+            over[key] = sum(1 for name, p in others if name != order[i][0] and _near(a, b, p, r))
+        return over[key]
+
+    best = [None, 10 ** 9]
+    chosen = []
+    used = [False] * n
+
+    def place(k, total):
+        if total >= best[1]:
+            return
+        if k == n:
+            best[0], best[1] = list(chosen), total
+            return
+        for i in range(n):
+            if used[i]:
+                continue
+            a = centres[order[i][0]]
+            b = (lx, slots[k])
+            if any(_crosses(a, b, centres[order[j][0]], (lx, slots[m])) for m, j in enumerate(chosen)):
+                continue
+            used[i] = True
+            chosen.append(i)
+            place(k + 1, total + cost(i, k))
+            chosen.pop()
+            used[i] = False
+
+    place(0, 0)
+    return [order[i] for i in best[0]] if best[0] is not None else order
 
 
 def _wrap(text):
