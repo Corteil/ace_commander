@@ -206,11 +206,18 @@ class Recorder:
         return self
 
 
-def extents(ops, measure):
+def counts_paths(key):
+    """Whether a screen's paths (ships' wireframes) count in its fit: not on the title,
+    whose ships fly in and off past the camera, so the screen jumped about with them
+    (Brian); elsewhere a ship turns in its place and must stay on the screen."""
+    return key is None or key[0] != "menu"
+
+
+def extents(ops, measure, paths_count=True):
     """Each thing's anchor in canvas units and how far it reaches round it in
     pixels: (x, y, left, right, up, down, op number or -1). measure(s, size) gives
     a text's (w, h) in pixels. A background (a fill over most of the canvas)
-    doesn't count; nor do hints."""
+    doesn't count; nor do hints; paths only with paths_count (counts_paths)."""
     out = []
     for n, op in enumerate(ops):
         if op[0] == "text":
@@ -236,9 +243,10 @@ def extents(ops, measure):
             x, y, r = shape[1], shape[2], shape[3]
             out.append((x - r, y - r, 0, 0, 0, 0, -1))
             out.append((x + r, y + r, 0, 0, 0, 0, -1))
-        for pts in paths:
-            for p in pts:
-                out.append((p[0], p[1], 0, 0, 0, 0, -1))
+        if paths_count:
+            for pts in paths:
+                for p in pts:
+                    out.append((p[0], p[1], 0, 0, 0, 0, -1))
     return out
 
 

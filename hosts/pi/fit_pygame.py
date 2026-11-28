@@ -45,6 +45,7 @@ class FitCtx(Ctx):
     def __init__(self, surface, scale=2):
         super().__init__(surface, scale)
         self.rec = None             # the ops of the frame being recorded, or None
+        self.paths_count = True     # paths count in extents (not on the title)
         self.hints = None
         self._sizes = {}            # (text, px) -> rendered (w, h)
 
@@ -135,9 +136,10 @@ class FitCtx(Ctx):
                 _, x, y, r = shape
                 out.append((x - r, y - r, 0, 0, 0, 0, -1))
                 out.append((x + r, y + r, 0, 0, 0, 0, -1))
-            for pts in paths:
-                for (x, y) in pts:
-                    out.append((x, y, 0, 0, 0, 0, -1))
+            if self.paths_count:    # not on the title (fit_core.counts_paths)
+                for pts in paths:
+                    for (x, y) in pts:
+                        out.append((x, y, 0, 0, 0, 0, -1))
         return out
 
 
@@ -151,6 +153,7 @@ class Fitter:
         W, H = window.get_size()
         ctx.base = base
         ctx.labels = labels
+        ctx.paths_count = fit_core.counts_paths(key)
         ctx.start()
         ctx.ox, ctx.oy, ctx.sx, ctx.s = 0.0, 0.0, base, base
         draw(ctx)

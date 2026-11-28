@@ -400,7 +400,7 @@ class Host:
         hh = (lh + 1) * len(rows)
         row = " | ".join(rows)
         area = SCREEN_H - hh
-        ext = fit_core.extents(ops, ctx.measure)
+        ext = fit_core.extents(ops, ctx.measure, fit_core.counts_paths(key))
         sx, sy, y0 = self.placer.place((key, row), ext, 1, SCREEN_W, area, top)
         nudge = fit_core.nudges(ext, sx, sy, y0, area)
         for n in nudge:

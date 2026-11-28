@@ -198,7 +198,9 @@ def main(argv=None):
     ap.add_argument("--window", dest="full", action="store_false", default=True,
                     help="not full screen (on a desktop)")
     ap.add_argument("--debug", action="store_true", help="the DEBUG menu of cheats")
-    ap.add_argument("--no-sound", dest="sound", action="store_false", default=True)
+    ap.add_argument("--sound", dest="sound", action="store_true", default=True,
+                    help="the game's sounds (the default; accepted as the Pi's run.py takes it)")
+    ap.add_argument("--no-sound", dest="sound", action="store_false")
     ap.add_argument("--log-keys", action="store_true", help="print every key and the button it becomes")
     ap.add_argument("--perf", action="store_true", help="a FPS / RSS / CPU line a second on stderr")
     ap.add_argument("--frames", type=int, default=None, help="stop after this many frames")
