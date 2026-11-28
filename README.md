@@ -229,6 +229,19 @@ git-ignored and must not be published or put in the app store.
 python3 hosts/pi/run.py           # as last time; --layout badge|elite, --full / --window
 ```
 
+**On Windows** (tested on Windows 11 by Brian): install Python 3 from python.org (tick "Add
+python.exe to PATH"), then in a Command Prompt `pip install pygame`. Unzip
+`ace_commander-pi-<version>.zip` (from the release's Assets) and run, from the folder you
+unzipped it in:
+
+```
+python ace_commander\hosts\pi\run.py --sound
+```
+
+A desktop shortcut can run `pythonw.exe` with the same path (no console window). Saves and
+options go in `%USERPROFILE%\.local\share\ace_commander\`, screenshots (F12) in
+`%USERPROFILE%\Pictures\Ace Commander\`.
+
 Two layouts: the badge's round screen, or a 3D view over an Elite-style dashboard (scanner,
 shields, fuel, temperatures, altitude, speed, roll, dive / climb, energy banks, missiles) that
 fills the window. F10 switches between them, F11 is full screen, F12 saves a screenshot to
@@ -245,6 +258,9 @@ badge, and the screens name its buttons. The 8BitDo Micro (no sticks) has its ow
 pitch and roll, A fire, B missile, X held the jump drive, Y the docking computer, L / R slower /
 faster, L2 E.C.M., R2 energy bomb, - the next view, + the pause menu, Home held a second the
 escape pod; off the flight A chooses, B goes back, Y sells, L / R change tabs, + launches.
+It is picked by the pad's name; `--pad micro` gives any pad that layout (the Micro's other modes
+report other names), `--pad standard` none. `tools/make_pad_guide.py` draws both layouts
+(`PAD_GUIDE.pdf` in the Pi zip).
 Saves go in `~/.local/share/ace_commander/`.
 With `--duel`, MULTIPLAYER is on the title screen: windows on one Pi, or computers on one
 network, play over UDP (a Pi can't yet play a badge).
