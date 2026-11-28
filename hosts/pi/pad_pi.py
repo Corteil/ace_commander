@@ -196,12 +196,15 @@ class Pads:
     with the last. A control lets go of what it pressed, whichever map is in
     use by then."""
 
-    def __init__(self, feed, app=None, log=False):
+    def __init__(self, feed, app=None, log=False, kind="auto"):
         self.feed = feed            # controls_pi.Feed: the game's controls
         self.app = app              # a callable giving the game (AceCommander), or None
         self.log = log
         self.pads = {}              # instance id -> Controller
         self.micro = set()          # instance ids of 8BitDo Micros (their own maps)
+        self.kind = kind            # --pad: "auto" (a Micro by its name), "micro" (every pad
+                                    # uses the Micro's maps: its other modes give other names),
+                                    # "standard" (none does)
         self.last = None            # the pad last pressed (its names in the hints)
         self.on = {}                # (instance id, control) -> what it pressed
         self.count = {}             # Key -> how many controls hold it
@@ -222,10 +225,18 @@ class Pads:
         if jid in self.pads:
             return
         self.pads[jid] = c
-        if MICRO in (c.name or ""):
+        if self.is_micro(c.name):
             self.micro.add(jid)
         if self.log:
             print("PAD", c.name, "plugged in", flush=True)
+
+    def is_micro(self, name):
+        """Whether a pad of this name uses the Micro's maps (--pad)."""
+        if self.kind == "micro":
+            return True
+        if self.kind == "standard":
+            return False
+        return MICRO in (name or "")
 
     def names(self):
         return [c.name for c in self.pads.values()]

@@ -138,4 +138,12 @@ press(h, "HOME", False)
 pads._tap = real
 assert sent == [KEYBOARD["ESCAPE"]], sent
 print("Home held 1 s: escape pod: ok")
+# --pad: auto picks the Micro by its name; micro gives every pad its maps (its other
+# modes report other names); standard none
+for kind, name, want in (("auto", "8BitDo Micro gamepad", True), ("auto", "Xbox 360 Controller", False),
+                         ("micro", "Xbox 360 Controller", True), ("standard", "8BitDo Micro gamepad", False)):
+    pads.kind = kind
+    assert pads.is_micro(name) is want, (kind, name)
+pads.kind = "auto"
+print("--pad auto / micro / standard: ok")
 print("ALL PI MICRO TESTS PASSED")

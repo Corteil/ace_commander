@@ -258,6 +258,9 @@ badge, and the screens name its buttons. The 8BitDo Micro (no sticks) has its ow
 pitch and roll, A fire, B missile, X held the jump drive, Y the docking computer, L / R slower /
 faster, L2 E.C.M., R2 energy bomb, - the next view, + the pause menu, Home held a second the
 escape pod; off the flight A chooses, B goes back, Y sells, L / R change tabs, + launches.
+It is picked by the pad's name; `--pad micro` gives any pad that layout (the Micro's other modes
+report other names), `--pad standard` none. `tools/make_pad_guide.py` draws both layouts
+(`PAD_GUIDE.pdf` in the Pi zip).
 Saves go in `~/.local/share/ace_commander/`.
 With `--duel`, MULTIPLAYER is on the title screen: windows on one Pi, or computers on one
 network, play over UDP (a Pi can't yet play a badge).
