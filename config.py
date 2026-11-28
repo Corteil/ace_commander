@@ -33,6 +33,13 @@ more_hints = False      # the screen is square, so its corners show (the Tufty, 
                         # room, the charts and the title screen (Brian, build 129)
 laser_leds = True       # your laser lights the LEDs in its colour (off on the Tufty and the
                         # Pi, whose "LEDs" are drawn on the screen; build 113)
+wide = 0                # a screen wider than tall (the CardputerZero): how many times wider than
+                        # tall its host draws the 240 screens at most (0: not wide). Then the
+                        # charts' line under the name and RANGE are side by side, the Shipyard
+                        # and Hangar put the ship left and the rest right, the ship drawn that
+                        # much narrower so it keeps its shape
+menu_k = 1             # list menus' lines this many times further apart, fewer of them shown
+                        # (they scroll): a small screen with bigger text (the CardputerZero)
 wire_min = 8.0          # ships that look smaller than this (pixels) are drawn as a marker
 
 # the game's input (platform layer, step 2): None on the badge, where

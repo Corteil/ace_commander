@@ -3,6 +3,7 @@
     python3 hosts/pi/run.py                   as last time (first time: the badge's round screen)
     python3 hosts/pi/run.py --layout elite    a 3D view over an Elite-style dashboard
     python3 hosts/pi/run.py --full            full screen (--window: in a window)
+    python3 hosts/pi/run.py --wide            the Elite layout's screens use the window's width
 
 F10 switches between the badge layout and the Elite one, F11 full screen, F12 saves
 a screenshot (in ~/Pictures/Ace Commander); the window can be any size. The choice is kept in pi.json in the data folder.
@@ -47,12 +48,15 @@ BACKGROUND = (24, 24, 30)           # round the screen, like the badge's case
 LED_SIZE = 4                        # an LED's radius, in game pixels
 FPS = 60
 LINE_K = 0.5                        # the Elite layout's lines: half as thick as the scale
+WIDE_TEXT_K = 1.3                   # --wide: the fitted screens' text this much bigger (room to spare)
 LOAD_HOLD = 3000                    # ms the loading screen shows (as the Tufty's hold)
 # the hints' badge letters named as the keyboard's keys in flight, where it is Elite's
 # keys, not the badge's buttons (Brian, build 126: "hints must use local buttons / keys
 # names"): C is Enter, F is Esc, A (the pause menu) is P
 KEY_LABELS_FLIGHT = {"A": "P", "C": "ENTER", "F": "ESC"}
 WIRE_MIN = 3                        # ships are wireframes down to this size (badge units; the badge: 8)
+CONFIG = {}                         # more config.py switches, set before the game loads (a host
+                                    # built on this one: the CardputerZero's menu_k)
 
 
 def data_dir():
@@ -92,6 +96,8 @@ def load_game(d, debug=False):
         config.debug_menu = want
         config.perf_log = 60 if want else 0     # the badge's timing lines, a line a second in flight
         config.wire_min = WIRE_MIN
+        for k, v in CONFIG.items():
+            setattr(config, k, v)
         spec.loader.exec_module(pkg)
         return sys.modules[full]
     # loaded already (a second Host in one process, the tests): point it at d
@@ -114,8 +120,16 @@ class Host:
     screen. The window can be any size: everything scales to fit."""
 
     def __init__(self, scale=2, full=None, save_dir=None, debug=False, log_keys=False, layout=None,
-                 sound=False, duel=None):
+                 sound=False, duel=None, wide=False):
         pygame.init()
+        # --wide: in the Elite layout the badge's whole-frame screens (docked, the title,
+        # the in-flight screens) are fitted to the window (fit_pygame): its width used,
+        # the hints in one row along the bottom, the game's wide pages (config.wide)
+        self.wide = wide
+        self.fitter = None
+        if wide:
+            import fit_pygame
+            self.fitter = fit_pygame.Fitter()
         pygame.display.set_caption("Ace Commander")
         self.leds = platform_pi.LEDS    # the ring the game writes, drawn round the screen
         self.data = save_dir or data_dir()
@@ -200,12 +214,21 @@ class Host:
         cfg = sys.modules.get(PKG + ".config")
         if cfg is not None:
             cfg.more_hints = self.layout == "elite"
+            if self.wide:           # the game's wide pages only where they are fitted
+                import fit_pygame
+                cfg.wide = fit_pygame.MAX_ASPECT if self.layout == "elite" else 0
         if self.layout == "elite":
             s = h / 240.0
             self.scale = s
             self.lw = w / s                         # the canvas: lw x 240
             self.dash_layout = dash_pi.Layout(self.lw)
-            self.ctx = Ctx(self.window, s)
+            if self.wide:           # records whole-frame screens to fit them (fit_pygame)
+                import fit_pygame
+                self.ctx = fit_pygame.FitCtx(self.window, s)
+                self.ctx.base = s
+                self.ctx.text_k = WIDE_TEXT_K
+            else:
+                self.ctx = Ctx(self.window, s)
             self.ctx.line_k = max(1.0, s * LINE_K)
             self.screen = self.window
         else:
@@ -337,6 +360,13 @@ class Host:
         """Draw a frame with draw(ctx) on the 240 canvas, framed for the layout:
         the middle of the window (Elite), or the round screen in its case."""
         if self._elite():
+            if self.wide:
+                import fit_pygame
+                key = fit_pygame.screen_key(self.app)
+                if key is not None:         # a whole-frame screen: fitted to the window
+                    self.fitter.draw(self.ctx, self.window, draw, key, self.ctx.labels, self.scale)
+                    return
+                self.ctx.sx = self.ctx.s = self.scale
             self.window.set_clip(None)
             self.window.fill((0, 0, 0))
             self._at(self.ctx, 120)         # the badge's screens: in the middle
@@ -441,12 +471,14 @@ def main(argv=None):
     ap.add_argument("--sound", action="store_true", help="the game's sounds (Options > SOUND too)")
     ap.add_argument("--log-keys", action="store_true", help="print every key and the button it becomes")
     ap.add_argument("--frames", type=int, default=None, help="stop after this many frames")
+    ap.add_argument("--wide", action="store_true",
+                    help="in the Elite layout, the badge's screens use the window's width (hints in one row)")
     ap.add_argument("--duel", type=int, nargs="?", const=47001, default=None, metavar="PORT",
                     help="MULTIPLAYER on the title screen: up to four players over UDP broadcast (two windows "
                          "on one Pi, or two computers on one network); PORT default 47001")
     args = ap.parse_args(argv)
     Host(args.scale, args.full, debug=args.debug, log_keys=args.log_keys,
-         layout=args.layout, sound=args.sound, duel=args.duel).run(args.frames)
+         layout=args.layout, sound=args.sound, duel=args.duel, wide=args.wide).run(args.frames)
 
 
 if __name__ == "__main__":

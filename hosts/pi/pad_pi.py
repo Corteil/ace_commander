@@ -26,6 +26,14 @@ Two maps (Brian, 2026-11-19):
   Y = B, Start = A, bumpers E / B (previous / next tab), Back the Options (=).
 On-screen hints name the pad's buttons once the pad was the last thing used
 (labels(), drawn by ctx_pygame): "C: buy" reads "A: buy".
+
+The 8BitDo Micro (no sticks; Brian, 2026-11-28) has its own maps, MICRO_*: its
+D-pad arrives as the left stick (on or off) and is the badge's joystick
+everywhere, flying included (pitch and roll); its X arrives as SDL's "y" and its Y
+as "x", so the maps go by what is printed on it. Flying: A fire, B missile, Y the
+docking computer, X held the jump drive, L / R slower / faster, L2 E.C.M., R2
+the energy bomb, - the next view, + the pause menu, Home held 1 s the escape pod.
+Its star button sends nothing.
 """
 import math
 
@@ -85,6 +93,46 @@ FLIGHT_MAP = {
     "leftstick": KEYBOARD["T"],     # arm the missile (Hardcore)
     "rightstick": KEYBOARD["V"],    # the next view
 }
+
+# the 8BitDo Micro, by SDL's names for what it sends ("x" is its Y, "y" its X;
+# "stick..." is its D-pad)
+MICRO = "8BitDo Micro"
+_MICRO_STICK = {"stickup": STICK["UP"], "stickdown": STICK["DOWN"],
+                "stickleft": STICK["LEFT"], "stickright": STICK["RIGHT"]}
+MICRO_FLIGHT = dict(_MICRO_STICK, **{
+    "a": KEYBOARD["SPACE"],         # A: fire
+    "b": BADGE["D"],                # B: missile (Hardcore: arms, then fires)
+    "x": "dock",                    # Y: the docking computer on / off
+    "y": KEYBOARD["J"],             # X held: the jump drive
+    "leftshoulder": KEYBOARD["-"],  # L held: slower
+    "rightshoulder": KEYBOARD["+"],     # R held: faster
+    "lefttrigger": "ecm",           # L2: E.C.M. (Hardcore; otherwise automatic)
+    "righttrigger": BADGE["B"],     # R2: energy bomb
+    "back": KEYBOARD["V"],          # -: the next view
+    "start": BADGE["A"],            # +: the pause menu
+    "guide": "escape",              # Home held HOLD_ESCAPE: the escape pod
+})
+MICRO_SCREEN = dict(_MICRO_STICK, **{
+    "a": BADGE["C"],                # A: select the target
+    "b": BADGE["F"],                # B: back to space
+    "x": BADGE["D"],                # Y: system data
+    "y": BADGE["B"],                # X: the Galactic chart's search
+    "leftshoulder": "screens_back",     # L / R: the screen before / after
+    "rightshoulder": "screens",
+    "start": BADGE["A"],            # +: the pause menu
+})
+MICRO_BADGE = dict(_MICRO_STICK, **{
+    "a": BADGE["C"],                # A: choose, buy
+    "b": BADGE["F"],                # B: back
+    "x": BADGE["D"],                # Y: sell, D's things
+    "y": BADGE["B"],                # X: the badge's B (find on the Galactic chart)
+    "leftshoulder": BADGE["E"],     # L / R: the tab before / after
+    "rightshoulder": BADGE["B"],
+    "start": BADGE["A"],            # +: launch, the pause menu
+    "back": KEYBOARD["="],          # -: docked, Options
+})
+# the badge's buttons by what is printed on the Micro, for the hints
+MICRO_LABELS = {"A": "+", "B": "X", "C": "A", "D": "Y", "E": "L", "F": "B"}
 
 HOLD_ESCAPE = 1.0           # seconds the Xbox button is held for the escape pod
 HOLD_GALACTIC = 1.0         # seconds X is held for the galactic hyperdrive
@@ -153,6 +201,8 @@ class Pads:
         self.app = app              # a callable giving the game (AceCommander), or None
         self.log = log
         self.pads = {}              # instance id -> Controller
+        self.micro = set()          # instance ids of 8BitDo Micros (their own maps)
+        self.last = None            # the pad last pressed (its names in the hints)
         self.on = {}                # (instance id, control) -> what it pressed
         self.count = {}             # Key -> how many controls hold it
         self.axes = {}              # (instance id, axis name) -> -1..1 (triggers 0..1)
@@ -172,6 +222,8 @@ class Pads:
         if jid in self.pads:
             return
         self.pads[jid] = c
+        if MICRO in (c.name or ""):
+            self.micro.add(jid)
         if self.log:
             print("PAD", c.name, "plugged in", flush=True)
 
@@ -202,6 +254,8 @@ class Pads:
 
     def labels(self):
         """The pad's names for the badge's buttons, for the on-screen hints."""
+        if self.last in self.micro:
+            return MICRO_LABELS
         if self.state() == "screen":
             return SCREEN_LABELS
         return BADGE_LABELS
@@ -241,9 +295,14 @@ class Pads:
             else:
                 self._release(what)
             return
-        what = {"flight": FLIGHT_MAP, "screen": SCREEN_MAP}.get(self.state(), BADGE_MAP).get(control)
+        if pid in self.micro:
+            maps = (MICRO_FLIGHT, MICRO_SCREEN, MICRO_BADGE)
+        else:
+            maps = (FLIGHT_MAP, SCREEN_MAP, BADGE_MAP)
+        what = {"flight": maps[0], "screen": maps[1]}.get(self.state(), maps[2]).get(control)
         if what is None:
             return
+        self.last = pid
         if self.log:
             print("PAD", control, "down ->", what, flush=True)
         self.on[key] = what
@@ -260,9 +319,12 @@ class Pads:
                 self._tap(KEYBOARD["E"])
         elif what == "screens":
             self._next_screen()
+        elif what == "screens_back":
+            self._next_screen(-1)
 
-    def _next_screen(self):
-        """Y: the next in-flight screen, and after the last back to space.
+    def _next_screen(self, step=1):
+        """Y: the next in-flight screen, and after the last back to space
+        (step -1: the one before; before the first, back to space).
         Docked, Y is the badge's B (the next tab)."""
         a = self._game()
         if a is None:
@@ -281,6 +343,14 @@ class Pads:
         order = [(n, k) for n, k in SCREEN_ORDER
                  if n != "market" or getattr(a, "witch", None) is None]
         names = [n for n, _ in order]
+        if step < 0:
+            if sub not in names:        # looking at space: the last
+                self._tap(KEYBOARD[order[-1][1]])
+            elif names.index(sub) > 0:
+                self._tap(KEYBOARD[order[names.index(sub) - 1][1]])
+            else:
+                self._tap(KEYBOARD[order[0][1]])    # the first one's own key closes it
+            return
         if sub not in names:            # looking at space: the first
             self._tap(KEYBOARD[order[0][1]])
         elif names.index(sub) + 1 < len(order):
@@ -313,6 +383,8 @@ class Pads:
         roll = pitch = yaw = 0.0
         speed = None
         for pid in self.pads:
+            if pid in self.micro:       # its D-pad is the joystick, not a stick
+                continue
             ax = self.axes
             roll += shape(ax.get((pid, "rightx"), 0.0))
             pitch += shape(ax.get((pid, "righty"), 0.0))
@@ -361,7 +433,7 @@ class Pads:
                 # off the flight the left stick is the joystick (on / off);
                 # flying it is analogue only, and lets go of any of those
                 neg, pos = ("stickleft", "stickright") if name == "leftx" else ("stickup", "stickdown")
-                flying = self.state() != "badge"
+                flying = self.state() != "badge" and pid not in self.micro  # the Micro's D-pad
                 for stick, sign in ((neg, -1), (pos, 1)):
                     held = (pid, stick) in self.on
                     push = v * sign

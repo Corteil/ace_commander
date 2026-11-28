@@ -8,7 +8,7 @@ it. On the two charts C makes the selected system the hyperspace target;
 once launched, the in-flight menu offers a jump to it.
 """
 from . import chart, cockpit, commander, describe, equipment, market, missions, ships
-from . import content
+from . import config, content
 game_data = content.DATA     # Elite's text tables, or the game's own (content.py)
 
 # the order the joystick goes round them, starting from Status (you arrive
@@ -22,11 +22,9 @@ TABS = ("STATUS", "INVENTORY", "MARKET", "EQUIP SHIP", "SHIPYARD", "HANGAR",
 PAINT_PRICE = 100   # tenths of a credit: a new colour at the Repair Shop costs 10.0 Cr
 TRANSPONDER_K = 0.25     # a new transponder for a stolen ship costs this much of its price (pirate worlds)
 SPIN = 0.8          # radians a second the Repair Shop's ship turns
-ROWS = 6            # goods shown at once on the market
+ROWS = 6            # items shown at once on Equip ship (the market's: screens.MARKET_ROWS)
 SAY_TIME = 1.5      # seconds a market message stays
-PRICE_X = 24        # where the market's columns end
-STOCK_X = 52
-HOLD_X = 88
+HOLD_X = 88         # Equip ship's "have" column
 EPRICE_X = 52       # Equip ship's price column
 
 
@@ -62,6 +60,7 @@ class Docked:
         Shipyard and Hangar (build 79), which are shown only with it."""
         self.bps = bps
         self.options = options
+        self.who = None         # a function giving the commander's name for Status's title (ace.py)
         self.osel = 0           # the line picked on Options
         self.cmdr = cmdr
         self.ship = ship
@@ -217,8 +216,10 @@ class Docked:
         self.sel = (self.sel + step) % n
         if self.sel < self.top:
             self.top = self.sel
-        elif self.sel >= self.top + ROWS:
-            self.top = self.sel - ROWS + 1
+        else:
+            from . import screens
+            if self.sel >= self.top + screens.MARKET_ROWS:
+                self.top = self.sel - screens.MARKET_ROWS + 1
 
     def pick_item(self, step):
         """Move Equip ship's highlight up (-1) or down (1), scrolling the list."""
@@ -530,39 +531,21 @@ class Docked:
                 ctx.rectangle(x + i * 11, -115, 6, 5).fill()
 
     def _draw_status(self, ctx):
-        """Where you are, who you are, and what is in the tank."""
-        text = cockpit.text
+        """Commander Status, as in flight (screens.draw_status), docked."""
+        from . import screens
         c = self.cmdr
         s = self.here
-        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        col = cockpit.station_colour(s.government if s is not None else None)
-        text(ctx, "DOCKED", 0, -100, 11, col)
-        if s is not None:
-            text(ctx, s.name, 0, -80, 22, cockpit.WHITE)
-            text(ctx, s.government_name(), 0, -59, 11, col)
-            text(ctx, "%s, tech %d" % (s.economy_name(), s.tech), 0, -45, 11, cockpit.GREY)
-        else:
-            text(ctx, "COMMANDER", 0, -70, 20, cockpit.WHITE)
-        ctx.rgb(*cockpit.DIM).rectangle(-90, -34, 180, 1).fill()
-        text(ctx, c.rank(), 0, -20, 16, cockpit.GREEN)
-        text(ctx, "%d kills  %s  %s" % (c.kills, commander.LEVELS[c.level],
-                                        _legal(c.legal)), 0, -2, 12, cockpit.YELLOW)
-        nxt = c.next_rank()
-        if nxt:
-            text(ctx, "%d more for %s" % (nxt[1], nxt[0]), 0, 13, 12, cockpit.YELLOW)
-        text(ctx, "fuel %s   %s" % (_ly(c.fuel), c.cash_text()), 0, 30, 12, cockpit.CYAN)
+        target = dist = None
         if self.target is not None:
-            t = self.gal.system(self.target)
-            d = self.gal.distance(c.system, self.target)
-            text(ctx, "target: %s %s" % (t.name, _ly(d)), 0, 45, 11,
-                 cockpit.CYAN if 0 < d <= c.fuel else cockpit.RED)
-        ctx.rgb(*cockpit.DIM).rectangle(-70, 56, 140, 1).fill()
-        text(ctx, "A: LAUNCH", 0, 68, 14, cockpit.GREEN)
+            target = self.gal.system(self.target).name
+            dist = self.gal.distance(c.system, self.target)
         hint = ["C: options"] if self.options else []
         if len(self.tabs) > 1:
             hint.append("< > screens")
-        text(ctx, "   ".join(hint), 0, 84, 11, cockpit.GREY)
-        text(ctx, "F: title screen", 0, 98, 11, cockpit.GREY)
+        col = cockpit.station_colour(s.government if s is not None else None)
+        screens.draw_status(ctx, c, s.name if s is not None else None, target, dist, "DOCKED",
+                            _legal(c.legal), self.who() if self.who else None,
+                            (col, ("   ".join(hint), "F: title screen")))
 
     def back_to_chart(self):
         """D on System data: back to the chart you came from (the local chart
@@ -588,39 +571,11 @@ class Docked:
         system_page(ctx, self.gal, s, d, c.fuel, "< >   D: chart   F: status", c)
 
     def _draw_market(self, ctx):
-        """The goods, ROWS at a time: name, price, stock and what is in the hold."""
-        text = cockpit.text
-        m = self.market
-        c = self.cmdr
-        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "MARKET", 0, -100, 11, cockpit.GREY)     # no system name: Status has it (build 85)
-        for label, x in (("price", PRICE_X), ("qty", STOCK_X), ("hold", HOLD_X)):
-            text(ctx, label, x, -74, 10, cockpit.GREY, 1)
-        if self.top > 0:                            # more above
-            ctx.rgb(*cockpit.DIM).rectangle(-3, -69, 6, 2).fill()
-        for row in range(ROWS):
-            i = self.top + row
-            y = -58 + row * 18
-            if i == self.sel:
-                ctx.rgb(*cockpit.DIM).rectangle(-102, y - 8, 204, 16).fill()
-            col = cockpit.GREEN if i == self.sel else cockpit.WHITE
-            unit = m.unit(i)
-            p = m.prices[i]
-            text(ctx, m.name(i), -96, y, 11, col, -1)
-            text(ctx, "%d.%d" % (p // 10, p % 10), PRICE_X, y, 11, cockpit.YELLOW, 1)
-            text(ctx, "%d%s" % (m.stock[i], unit) if m.stock[i] else "-", STOCK_X, y, 11,
-                 cockpit.CYAN, 1)
-            if c.cargo[i]:
-                text(ctx, "%d%s" % (c.cargo[i], unit), HOLD_X, y, 11, cockpit.GREEN, 1)
-        if self.top + ROWS < len(m.goods):          # more below
-            ctx.rgb(*cockpit.DIM).rectangle(-3, 44, 6, 2).fill()
-        text(ctx, "%s   hold %d/%dt" % (c.cash_text(), market.hold_used(c.cargo), c.hold),
-             0, 58, 12, cockpit.CYAN)
-        if self.msg:
-            text(ctx, self.msg, 0, 75, 12, cockpit.RED)
-        else:
-            text(ctx, "C: buy   D: sell", 0, 75, 11, cockpit.GREY)
-        text(ctx, "< > screens   F: status", 0, 91, 11, cockpit.GREY)
+        """The market, as in flight (screens.draw_market), with a good picked
+        and C / D to trade. No system name: Status has it (build 85)."""
+        from . import screens
+        screens.draw_market(ctx, self.market, self.cmdr, "MARKET", self.top, self.sel, self.msg,
+                            ("C: buy   D: sell", "< > screens   F: status"))
 
     def _draw_options(self, ctx):
         """The same settings as the title screen's Options and the in-flight
@@ -677,30 +632,56 @@ class Docked:
             text(ctx, "up/down: colour   C: paint", 0, 70, 11, cockpit.GREY)
         text(ctx, "F: back to shipyard", 0, 88, 11, cockpit.GREY)
 
-    def _spin_ship(self, ctx, bp, py, rgb, px=60.0):
-        """bp turning, its middle py pixels above the screen's middle, scaled
-        to about px pixels across."""
+    def _spin_ship(self, ctx, bp, py, rgb, px=60.0, qx=0):
+        """bp turning, its middle py pixels above the screen's middle (and qx
+        right of it), scaled to about px pixels across."""
         import math
         o = _Show(bp)
         z = max(200.0, bp.size * cockpit.FOCAL / px)
         o.z = z
+        o.x = qx * z / cockpit.FOCAL
         o.y = py * z / cockpit.FOCAL
         a = self.spin
         ca, sa = math.cos(a), math.sin(a)
         t = 0.35
         ct, st = math.cos(t), math.sin(t)
         o.m = [ca, -sa * st, sa * ct, 0.0, ct, st, -sa, -ca * st, ca * ct]
+        if config.wide:             # the host stretches across by up to this: keep the ship's shape
+            q = 1.0 / config.wide
+            o.m[0] *= q
+            o.m[3] *= q
+            o.m[6] *= q
         cockpit.draw_ship(ctx, o, rgb, 3, True)
+
+    def _ship_facts(self, name, bp):
+        """What a ship type flies like: top speed, hold, jump range, laser
+        mounts, missile pylons."""
+        speed = ships.flight(bp, self.bps(ships.COBRA))[0]
+        mounts = {1: "front", 2: "front+rear", 4: "4 views"}[ships.mounts(name)]
+        t = ships.tank(name)
+        return ("speed %d" % int(speed + 0.5), "hold %dt" % ships.base_hold(name),
+                "%d.%d LY" % (t // 10, t % 10) if t else "no jumps",
+                "lasers %s" % mounts, "missiles %d" % ships.pylons(name))
 
     def _ship_lines(self, name, bp):
         """Two lines on what a ship type flies like: top speed and hold,
         then laser mounts and missile pylons."""
-        speed = ships.flight(bp, self.bps(ships.COBRA))[0]
-        mounts = {1: "front", 2: "front+rear", 4: "4 views"}[ships.mounts(name)]
-        t = ships.tank(name)
-        return ("speed %d   hold %dt   %s" % (int(speed + 0.5), ships.base_hold(name),
-                                           "%d.%d LY" % (t // 10, t % 10) if t else "no jumps"),
-                "lasers %s   missiles %d" % (mounts, ships.pylons(name)))
+        f = self._ship_facts(name, bp)
+        return "   ".join(f[:3]), "   ".join(f[3:])
+
+    def _wide_page(self, ctx, bp, rgb, title, title_rgb, lines, px=80.0):
+        """A ship page on a wide screen (config.wide, Brian: "use the wide
+        screen"): bp turning on the left, title and lines [(text, colour)]
+        down the right."""
+        text = cockpit.text
+        if bp is not None:
+            self._spin_ship(ctx, bp, 10, rgb, px, -60)
+        y = -68
+        text(ctx, title, 4, y, 14, title_rgb, -1)
+        y += 18
+        for s, col in lines:
+            text(ctx, s, 4, y, 11, col, -1)
+            y += 15
 
     def _foot(self, ctx, hint):
         """The message (green if it worked) or the hint, then the tabs' line."""
@@ -720,6 +701,9 @@ class Docked:
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
         text(ctx, "SHIPYARD", 0, -100, 11, cockpit.GREY)     # no system name: Status has it (build 85)
         text(ctx, "%d of %d" % (self.ysel + 1, len(self.yard) + 1), 0, -86, 10, cockpit.GREY)
+        if config.wide:
+            self._shipyard_wide(ctx)
+            return
         if self.ysel == 0:          # your own ship
             bp = self.ship
             if bp is not None:
@@ -745,6 +729,28 @@ class Docked:
         text(ctx, "%d Cr   trade-in %d Cr" % (price // 10, self.trade_in_value() // 10),
              0, 36, 12, cockpit.YELLOW)
         text(ctx, c.cash_text(), 0, 53, 12, cockpit.CYAN)
+        self._foot(ctx, "C: stats and buying")
+
+    def _shipyard_wide(self, ctx):
+        """The Shipyard's page on a wide screen: the ship left, the rest right."""
+        c = self.cmdr
+        G, Y, C = cockpit.GREY, cockpit.YELLOW, cockpit.CYAN
+        if self.ysel == 0:
+            bp = self.ship
+            facts = [(s, G) for s in self._ship_facts(c.ship, bp)]
+            self._wide_page(ctx, bp, cockpit.ship_rgb(c.colour), bp.title if bp is not None else c.ship,
+                            cockpit.WHITE, facts + [("trade-in %d Cr" % (self.trade_in_value() // 10), Y),
+                                                    (c.cash_text(), C)])
+            self._foot(ctx, "C: stats" + ("   D: repair shop" if self.repair else ""))
+            return
+        name, price, stolen = self.yard[self.ysel - 1]
+        bp = self.bps(name)
+        facts = [(s, G) for s in self._ship_facts(name, bp)]
+        self._wide_page(ctx, bp, cockpit.RED if stolen else cockpit.CYAN,
+                        (bp.title if bp is not None else name) + (" (STOLEN)" if stolen else ""),
+                        cockpit.RED if stolen else cockpit.WHITE,
+                        facts + [("%d Cr" % (price // 10), Y),
+                                 ("trade-in %d Cr" % (self.trade_in_value() // 10), Y), (c.cash_text(), C)])
         self._foot(ctx, "C: stats and buying")
 
     def _draw_stats(self, ctx):
@@ -799,9 +805,10 @@ class Docked:
             text(ctx, "C: buy   D: trade in", 0, 58, 11, cockpit.GREY)
         text(ctx, "F: back to shipyard", 0, 74, 11, cockpit.GREY)
 
-    def _fitout(self, e):
+    def _fitout(self, e, wide=False):
         """A ship's fit-out as lines for the Hangar: its fuel, its lasers by
-        view, missiles and hold, then its other equipment."""
+        view, missiles and hold, then its other equipment. wide: shorter lines
+        for half a wide screen (missiles and hold apart, equipment two a line)."""
         short = {"pulse": "pulse", "beam": "beam", "military": "mil", "mining": "mine"}
         lasers = ["%s %s" % (v, short.get(k, k)) for v, k in zip("FBLR", e["lasers"]) if k]
         from . import market
@@ -812,6 +819,9 @@ class Docked:
                  "lasers " + "  ".join(lasers) if lasers else "no lasers",
                  "missiles %d/%d   hold %dt, %dt used" % (e["missiles"], ships.pylons(e["type"]),
                                                        e["hold"], used)]
+        if wide:
+            lines[2:] = ["missiles %d/%d" % (e["missiles"], ships.pylons(e["type"])),
+                         "hold %dt, %dt used" % (e["hold"], used)]
         names = {"ecm": "ECM", "scoops": "scoops", "pod": "pod", "bomb": "bomb",
                  "energy": "energy unit", "navy": "navy unit", "docking": "dock comp",
                  "hyperdrive": "gal. drive"}
@@ -820,9 +830,9 @@ class Docked:
         if not kit:
             lines.append("no other equipment")
         else:
-            lines.append("  ".join(kit[:4]))
-            if kit[4:]:
-                lines.append("  ".join(kit[4:]))
+            per = 2 if wide else 4
+            for i in range(0, len(kit), per):
+                lines.append("  ".join(kit[i:i + per]))
         return lines
 
     def _draw_hangar(self, ctx):
@@ -836,21 +846,33 @@ class Docked:
         e = own[self.hsel]
         text(ctx, "%d of %d" % (self.hsel + 1, len(own)), 0, -86, 10, cockpit.GREY)
         bp = self.bps(e["type"])
+        if config.wide:             # the ship left, the rest right
+            where, col = self._hangar_where(e)
+            self._wide_page(ctx, bp, cockpit.ship_rgb(e["colour"]), bp.title if bp is not None else e["type"],
+                            cockpit.WHITE, [(where, col)] + [(s, cockpit.CYAN) for s in self._fitout(e, True)])
+            self._hangar_foot(ctx, own)
+            return
         if bp is not None:
             self._spin_ship(ctx, bp, 50, cockpit.ship_rgb(e["colour"]), 54.0)
         text(ctx, bp.title if bp is not None else e["type"], 0, -16, 14, cockpit.WHITE)
-        if self.hsel == 0:
-            where, col = "flying", cockpit.GREEN
-        else:
-            why = self._where(e)
-            v = ships.value(e, self.equip)
-            where = ("here, worth %d Cr" % (v // 10)) if why is None else why.lower()
-            col = cockpit.YELLOW if why is None else cockpit.GREY
+        where, col = self._hangar_where(e)
         text(ctx, where, 0, -4, 11, col)
         y = 8
         for line in self._fitout(e):      # up to six lines
             text(ctx, line, 0, y, 11, cockpit.CYAN)
             y += 11
+        self._hangar_foot(ctx, own)
+
+    def _hangar_where(self, e):
+        """Where a ship in the Hangar is (flying, here and its worth, or where), and its colour."""
+        if self.hsel == 0:
+            return "flying", cockpit.GREEN
+        why = self._where(e)
+        v = ships.value(e, self.equip)
+        where = ("here, worth %d Cr" % (v // 10)) if why is None else why.lower()
+        return where, (cockpit.YELLOW if why is None else cockpit.GREY)
+
+    def _hangar_foot(self, ctx, own):
         if len(own) == 1:
             self._foot(ctx, "your only ship")
         else:

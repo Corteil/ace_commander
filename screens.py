@@ -1,17 +1,23 @@
 """The in-flight screens on the number row, as Elite's f7, f8 and f9: Market
 Prices, Commander Status and Inventory. The game keeps running while one is
 up (Brian: as Elite), so these only draw; ace.py does the rest. Imported the
-first time one is opened, so it costs no memory until then.
+first time one is opened, so it costs no memory until then. Docked, the same
+three are the Market, Status and Inventory tabs (Brian: one screen each, docked
+and in flight), with the docked parts (the cursor, A: LAUNCH, the hints) added.
 
 No badge imports apart from cockpit's drawing helpers, so it runs on a PC.
 """
 try:
-    from . import cockpit, market
+    from . import cockpit, commander, market
 except ImportError:         # imported on its own, as the PC tests do
     import cockpit
+    import commander
     import market
 
-ROWS = 8            # goods shown at a time on Market Prices and Inventory
+ROWS = 8            # goods shown at a time on Inventory (less one)
+MARKET_ROWS = 7     # goods shown at a time on the market, docked and in flight
+MARKET_Y = -52      # the market's first row
+MARKET_STEP = 16
 ROW_Y = -58         # the first row
 ROW_STEP = 16
 NAME_X = -96
@@ -59,28 +65,41 @@ def _kills(c):
     return "%d, %d more" % (c.kills, nxt[1]) if nxt else "%d" % c.kills
 
 
-def draw_status(ctx, c, here, target, dist, cond, legal, name=None):
-    """Elite's Commander Status: the systems, condition, fuel, cash, legal
-    status, rating and the equipment fitted. here and target are system
-    names (or None), dist the target's distance in tenths of a light year,
-    cond Game.condition(). name: the commander's, for the title as Elite's
-    "COMMANDER JAMESON" (build 89)."""
+def draw_status(ctx, c, here, target, dist, cond, legal, name=None, docked=None):
+    """Elite's Commander Status, in flight and docked: the systems, condition,
+    fuel, cash, legal status, rating and kills. here and target are system
+    names (or None), dist the target's distance in tenths of a light year
+    (red if it is beyond the fuel), cond Game.condition() ("DOCKED" docked).
+    name: the commander's, for the title as Elite's "COMMANDER JAMESON" (build
+    89). In flight the equipment fitted follows; docked is (the station's
+    colour, the hint lines): the condition in that colour, the level, then
+    A: LAUNCH and the hints (Equip ship lists the equipment)."""
     text = cockpit.text
     _blank(ctx)
     text(ctx, "COMMANDER " + name if name else "COMMANDER STATUS", 0, -99, 10, cockpit.WHITE)
-    rows = (("present", here or "-", cockpit.CYAN),
-            ("hyperspace", ("%s %s" % (target, _ly(dist))) if target else "-", cockpit.CYAN),
-            ("condition", cond, _rgb(cond)),
+    far = target and not (0 < dist <= c.fuel)
+    rows = [("present", here or "-", cockpit.CYAN),
+            ("hyperspace", ("%s %s" % (target, _ly(dist))) if target else "-",
+             cockpit.RED if far else cockpit.CYAN),
+            ("condition", cond, docked[0] if docked else _rgb(cond)),
             ("fuel", _ly(c.fuel), cockpit.CYAN),
             ("cash", c.cash_text(), cockpit.CYAN),
             ("legal status", legal, cockpit.YELLOW if legal == "CLEAN" else cockpit.RED),
             ("rating", c.rank(), cockpit.GREEN),
-            ("kills", _kills(c), cockpit.YELLOW))
+            ("kills", _kills(c), cockpit.YELLOW)]
+    if docked:
+        rows.append(("level", commander.LEVELS[c.level], cockpit.YELLOW))
     y = -80
     for label, value, rgb in rows:
         text(ctx, label, -8, y, 11, cockpit.GREY, 1)
         text(ctx, value, 0, y, 11, rgb, -1)
         y += 13
+    if docked:                      # right under the rows (no gap: a small screen fits it bigger)
+        ctx.rgb(*cockpit.DIM).rectangle(-70, y - 3, 140, 1).fill()
+        text(ctx, "A: LAUNCH", 0, y + 10, 14, cockpit.GREEN)
+        for i, hint in enumerate(docked[1]):
+            text(ctx, hint, 0, y + 26 + 14 * i, 11, cockpit.GREY)
+        return
     ctx.rgb(*cockpit.DIM).rectangle(-80, y - 5, 160, 1).fill()
     y += 5
     for s in equipment_lines(c):    # at most 6 lines: every item fits
@@ -94,39 +113,46 @@ def cargo_rows(c):
     return [i for i, n in enumerate(c.cargo) if n]
 
 
-def draw_market(ctx, m, c, here, top):
-    """Elite's Market Prices in flight: the prices and stock here and what is
-    in the hold, ROWS at a time from row top. Nothing can be bought or sold
-    (Brian): that is docked only. Everything sits DY lower than the docked
-    market so the title fits where the circle is narrow (Brian)."""
-    DY = 10
+def draw_market(ctx, m, c, title, top, sel=None, msg=None, hints=("C or F: back",)):
+    """The market, docked and in flight (Elite's Market Prices): each good's
+    price, stock and what is in the hold, MARKET_ROWS at a time from row top.
+    Docked, sel is the good picked (a bar behind it) and msg why the last trade
+    didn't happen (instead of the first hint); in flight nothing can be bought
+    or sold (Brian)."""
     text = cockpit.text
     _blank(ctx)
-    text(ctx, "MARKET PRICES  " + here, 0, -100 + DY, 11, cockpit.WHITE)
+    text(ctx, title, 0, -92, 11, cockpit.WHITE)
     for label, x in (("price", PRICE_X), ("qty", STOCK_X), ("hold", HOLD_X)):
-        text(ctx, label, x, -76 + DY, 10, cockpit.GREY, 1)
-    rows = range(len(m.goods))
-    if top > 0:
-        ctx.rgb(*cockpit.DIM).rectangle(-43, -69 + DY, 6, 2).fill()   # clear of the price column
-    for row in range(ROWS):
-        k = top + row
-        if k >= len(rows):
+        text(ctx, label, x, -68, 10, cockpit.GREY, 1)       # inside the round screen
+    n = len(m.goods)
+    if top > 0:                     # more above
+        ctx.rgb(*cockpit.DIM).rectangle(-43, -63, 6, 2).fill()   # clear of the price column
+    for row in range(MARKET_ROWS):
+        i = top + row
+        if i >= n:
             break
-        i = rows[k]
-        y = ROW_Y + DY + row * ROW_STEP
+        y = MARKET_Y + row * MARKET_STEP
+        if i == sel:
+            ctx.rgb(*cockpit.DIM).rectangle(-102, y - 8, 204, 16).fill()
         unit = m.unit(i)
         p = m.prices[i]
-        text(ctx, m.name(i), NAME_X, y, 11, cockpit.WHITE, -1)
+        text(ctx, m.name(i), NAME_X, y, 11, cockpit.GREEN if i == sel else cockpit.WHITE, -1)
         text(ctx, "%d.%d" % (p // 10, p % 10), PRICE_X, y, 11, cockpit.YELLOW, 1)
         text(ctx, "%d%s" % (m.stock[i], unit) if m.stock[i] else "-", STOCK_X, y, 11,
              cockpit.CYAN, 1)
         if c.cargo[i]:
             text(ctx, "%d%s" % (c.cargo[i], unit), HOLD_X, y, 11, cockpit.GREEN, 1)
-    if top + ROWS < len(rows):
-        ctx.rgb(*cockpit.DIM).rectangle(-43, ROW_Y + DY + ROWS * ROW_STEP - 10, 6, 2).fill()
+    if top + MARKET_ROWS < n:       # more below
+        ctx.rgb(*cockpit.DIM).rectangle(-43, MARKET_Y + MARKET_ROWS * MARKET_STEP - 10, 6, 2).fill()
     text(ctx, "%s   hold %d/%dt" % (c.cash_text(), market.hold_used(c.cargo), c.hold),
-         0, 76 + DY, 11, cockpit.CYAN)
-    text(ctx, "C or F: back", 0, 92 + DY, 10, cockpit.GREY)
+         0, 62, 12, cockpit.CYAN)
+    y = 78
+    for i, hint in enumerate(hints):
+        if i == 0 and msg:
+            text(ctx, msg, 0, y, 12, cockpit.RED)
+        else:
+            text(ctx, hint, 0, y, 11, cockpit.GREY)
+        y += 16
 
 
 def draw_inventory(ctx, c, goods, top, foot="C or F: back"):

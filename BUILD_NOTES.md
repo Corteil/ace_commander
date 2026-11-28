@@ -1941,3 +1941,32 @@ what is now `ace.py` (renamed in build 50).
    LIVES, the defenders' colour; repeated names numbered, Options > NAMES. The ESP-NOW buffer
    error crash fixed (the firmware's service paused). HUD in gauges and digits, whole-number
    placement and turning (frames 83-90 -> 56-61 ms in a four-badge station game).
+   **Build 170** (2026-11-27/28, branch cardputerzero-phase1; CardputerZero Phase 1, notes/
+   cardputerzero_phase0.md). Game-side, all off on the badge, the Pi and the Tufty:
+   `config.menu_k` (list menus' lines further apart, fewer shown, scrolling: `cockpit.menu_rows`,
+   used by `menu_lines`, the pause / Settings menu, the DEBUG lists, the lobby and HOSTING; a
+   small arrow at the right says there is more) and `config.wide` (the charts' line under the
+   name and RANGE side by side; Brian). The badge's screens change in one way (Brian: "would it
+   not be more efficient for the duplicated screens to be the same, docked and in flight?" ...
+   "merge both"): **Status and Market are one screen each, docked and in flight**
+   (`screens.draw_status`, `screens.draw_market`). Status is Elite's Commander Status; docked,
+   its condition says DOCKED in the station's colour, a level row is added, then A: LAUNCH and
+   the hints right under the rows (no equipment: Equip ship lists it). The docked Status no
+   longer shows the government and economy / tech (System data has them); the hyperspace line
+   is red when the target is beyond the fuel (was docked only). The market shows
+   `screens.MARKET_ROWS` (7) goods docked and in flight (docked 6, in flight 8 before), its
+   header and rows lower so "hold" is inside the round screen; docked it keeps the bar behind
+   the good picked, the message and C / D. Inventory, the charts and System data were already
+   shared. Tests changed to match (test_commander, test_keys). PC only: not yet on the badge.
+   The CardputerZero host (`hosts/cardputerzero/`) and `fit_cz.py` are in its README.
+   Then (Brian: "hangar and ship yard don't make use of the wide screen"): `config.wide` is a
+   number, how many times wider than tall the host draws the 240 screens at most (0 on the
+   badge; the CardputerZero 1.5, `fit_cz.MAX_ASPECT`). With it the Shipyard's pages and the
+   Hangar put the ship turning on the left and the rest down the right
+   (`Docked._wide_page`, `_ship_facts`, `_fitout(e, wide)`: shorter lines), and
+   `_spin_ship` draws ships that much narrower so the stretch leaves them their shape.
+   The local chart with config.wide (Brian: "the range should be round but the star field should
+   fill out the sides"): `Chart` takes systems out to wide times further left and right
+   (`_inside`: a box, not the circle) and draws everything wide times narrower (`_Cursor.kx`:
+   dots, the range as a 48-point oval, the box, cursor and you-are-here), so the host's stretch
+   leaves the range round; the cursor and distances are unchanged. The Pi gets it with --wide too.

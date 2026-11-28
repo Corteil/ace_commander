@@ -28,14 +28,15 @@ for name in ("test_game.py", "test_app.py", "test_commander.py", "test_galaxy.py
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 try:
     import pygame  # noqa: F401
-    for pi_name, label in (("test_pi_host.py", "pi host"), ("test_pi_trip.py", "pi trip"),
-                            ("test_pi_pad.py", "pi pad"), ("test_pi_elite.py", "pi elite")):
-        pi_test = os.path.join(os.path.dirname(HERE), "hosts", "pi", "tests", pi_name)
+    for host, pi_name, label in (("pi", "test_pi_host.py", "pi host"), ("pi", "test_pi_trip.py", "pi trip"),
+                                  ("pi", "test_pi_pad.py", "pi pad"), ("pi", "test_pi_elite.py", "pi elite"), ("pi", "test_pi_wide.py", "pi wide"), ("pi", "test_pi_micro.py", "pi micro"),
+                                  ("cardputerzero", "test_cz_host.py", "cardputerzero")):
+        pi_test = os.path.join(os.path.dirname(HERE), "hosts", host, "tests", pi_name)
         r = subprocess.run([sys.executable, pi_test], capture_output=True, text=True)
         lines = [l for l in r.stdout.strip().split("\n") if l and not l.startswith(("pygame ", "Hello from"))]
         print("%-14s %s" % (label, "ok" if r.returncode == 0 else "FAILED"), "-", lines[-1] if lines else "")
         if r.returncode:
-            failed.append("hosts/pi/tests/" + pi_name)
+            failed.append("hosts/%s/tests/%s" % (host, pi_name))
             print(r.stdout[-1500:])
             print(r.stderr[-3000:])
 except ImportError:

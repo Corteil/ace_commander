@@ -955,9 +955,10 @@ class AceCommander(PLATFORM.App):
             text(ctx, d.name, 0, -62, 12, me)
             hosts = d.hosts()
             rows = ["HOST A GAME"] + ["JOIN " + p.name for p in hosts]
-            top = max(0, min(self.d_sel - 2, len(rows) - 4))
-            for i in range(top, min(len(rows), top + 4)):
-                y = -38 + (i - top) * 20
+            most, step = cockpit.menu_rows(4, 20)
+            top = max(0, min(self.d_sel - most // 2, len(rows) - most))
+            for i in range(top, min(len(rows), top + most)):
+                y = -38 + (i - top) * step
                 on = i == self.d_sel
                 rgb = cockpit.ship_rgb(hosts[i - 1].colour) if i and not on else (
                     cockpit.GREEN if on else cockpit.GREY)
@@ -980,14 +981,14 @@ class AceCommander(PLATFORM.App):
             rows = self._host_rows(d)
             sel = rows[self.d_row] if self.d_row < len(rows) else "mode"
             many = len(rows) > 3            # closer together
-            step = 13 if many else 15
+            shown, step = cockpit.menu_rows(self.SHOWN, 13 if many else 15)
             # at most SHOWN lines, scrolling with the one picked ("..." where there are more)
-            first = max(0, min(self.d_row - 2, len(rows) - self.SHOWN))
-            last = min(len(rows), first + self.SHOWN)
+            first = max(0, min(self.d_row - min(2, shown // 2), len(rows) - shown))
+            last = min(len(rows), first + shown)
             y = -68
             if first > 0:               # more above: under the title, the lines a little lower
                 text(ctx, "...", 0, -76, 10, cockpit.GREY)
-                y = -64
+                y = -64 if cockpit.MENU_K == 1 else -60
             for row in rows[first:last]:
                 if row == "mode":
                     v = dm.MODE_NAMES[d.mode]
@@ -1189,7 +1190,7 @@ class AceCommander(PLATFORM.App):
                                   self._ship_bp(),
                                   (lambda: self._settings(True), self._change),
                                   self._bp if SHIPS else None)
-
+        self.dock.who = lambda: cmdr_name(self.cmdr).upper()   # Status's title, as in flight
     def _mission_flags(self):
         """Tell the game what the missions need of this system (see missions.py)."""
         g = self.game
@@ -2382,18 +2383,19 @@ class AceCommander(PLATFORM.App):
         n = len(items)
         if not n:
             return
-        if n <= DEBUG_ROWS:     # all of it fits: in order, top to bottom
+        most, step = cockpit.menu_rows(DEBUG_ROWS, 16)
+        if n <= most:           # all of it fits: in order, top to bottom
             for i in range(n):
-                y = (i - (n - 1) / 2) * 16
+                y = (i - (n - 1) / 2) * step
                 text(ctx, items[i], 0, y, 14, cockpit.GREEN if i == sel else cockpit.GREY)
             if help_line:
                 text(ctx, help_line + "   F: back", 0, 70, 11, cockpit.GREY)
             return
-        rows = min(DEBUG_ROWS, n)
+        rows = min(most, n)
         for k in range(rows):
             off = k - rows // 2
             i = (sel + off) % n
-            y = off * 16
+            y = off * step
             text(ctx, items[i], 0, y, 14, cockpit.GREEN if off == 0 else cockpit.GREY)
         if help_line:
             text(ctx, help_line + "   F: back", 0, 70, 11, cockpit.GREY)
@@ -3038,7 +3040,7 @@ class AceCommander(PLATFORM.App):
         if s == "market" or s == "inventory":
             from . import screens
             if s == "market":
-                n, shown = len(GOODS), screens.ROWS
+                n, shown = len(GOODS), screens.MARKET_ROWS
             else:
                 n, shown = len(screens.cargo_rows(self.cmdr)), screens.ROWS - 1
             if self._repeat("j_up", self.dt):
@@ -3311,7 +3313,8 @@ class AceCommander(PLATFORM.App):
         c = self.cmdr
         gal = self.galaxy
         if s == "market":
-            screens.draw_market(ctx, self.fmarket, c, gal.system(c.system).name, self.top)
+            screens.draw_market(ctx, self.fmarket, c, "MARKET PRICES  " + gal.system(c.system).name,
+                                self.top)
         elif s == "inventory":
             screens.draw_inventory(ctx, c, GOODS, self.top)
         else:
@@ -3468,6 +3471,9 @@ class AceCommander(PLATFORM.App):
         pause = self.fsub == "settings"
         text(ctx, "SETTINGS" if pause else "PAUSED", 0, -60, 18, cockpit.WHITE)
         items = self._fitems()
+        if cockpit.MENU_K != 1:     # bigger text (the CardputerZero): fewer lines, scrolling
+            cockpit.menu_lines(ctx, items, self.fmenu % len(items), -34, 14, 7)
+            return
         many = len(items) > 6       # equipment adds lines: closer together
         step = 13 if many else 16
         top = -44 if many else -40

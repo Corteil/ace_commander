@@ -306,9 +306,9 @@ tick(a, fresh=["KEY_8"])
 prices = list(a.fmarket.prices)
 for _ in range(20):
     tick(a, fresh=["JOYDOWN"])
-assert a.top == len(a.fmarket.goods) - screens.ROWS, a.top
-tick(a, fresh=["DOWN"]); assert a.top == len(a.fmarket.goods) - screens.ROWS
-tick(a, fresh=["UP"]); assert a.top == len(a.fmarket.goods) - screens.ROWS - 1, "cursor keys scroll"
+assert a.top == len(a.fmarket.goods) - screens.MARKET_ROWS, a.top
+tick(a, fresh=["DOWN"]); assert a.top == len(a.fmarket.goods) - screens.MARKET_ROWS
+tick(a, fresh=["UP"]); assert a.top == len(a.fmarket.goods) - screens.MARKET_ROWS - 1, "cursor keys scroll"
 tick(a, fresh=["D"]); tick(a, fresh=["B"])
 assert a.cmdr.cash == cash and a.cmdr.cargo == cargo, "nothing bought or sold"
 print("market prices: ok")

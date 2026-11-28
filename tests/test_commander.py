@@ -139,7 +139,8 @@ tick(a, fresh=["JOYLEFT"]); tick(a, fresh=["C"])
 assert a.mode == "docked" and a.docked, "a new commander starts docked"
 tx = texts(a)
 assert "DOCKED" in tx and "LAVE" in tx and "HARMLESS" in tx and "A: LAUNCH" in tx, tx
-assert "Dictatorship" in tx and "Rich Agricultural, tech 5" in tx and "fuel 7.0 LY   100.0 Cr" in tx, tx
+# Status is Elite's Commander Status, as in flight (Brian: one screen), with the docked parts
+assert "COMMANDER JAMESON" in tx and "7.0 LY" in tx and "100.0 Cr" in tx and "level" in tx, tx
 tick(a, fresh=["F"]); assert a.mode == "menu"
 choose(a, "CONTINUE"); assert a.mode == "docked", "F and back again is still docked"
 tick(a, fresh=["A"]); assert a.mode == "launch", "A launches too"
@@ -797,7 +798,7 @@ for _ in range(5):
 assert d.sel == 5 and d.top == 0
 for _ in range(8):
     tick(e, fresh=["JOYDOWN"])
-assert d.sel == 13 and d.top == 8 and m.unit(13) == "kg", "the list scrolls"
+assert d.sel == 13 and d.top == 13 - 7 + 1 and m.unit(13) == "kg", "the list scrolls (7 rows: screens.MARKET_ROWS)"
 if m.stock[13]:
     tick(e, fresh=["C"]); assert c.cargo[13] == 1
 c.cash = 5
@@ -806,7 +807,7 @@ assert d.msg in ("NOT ENOUGH CASH", "NONE LEFT")
 # trades are saved: on leaving for the title, and on launching
 bought = list(c.cargo)
 c.cash = 1234
-tick(e, fresh=["F"]); assert d.name() == "STATUS" and any(t.endswith("   123.4 Cr") for t in texts(e))
+tick(e, fresh=["F"]); assert d.name() == "STATUS" and "123.4 Cr" in texts(e)
 tick(e, fresh=["F"]); assert e.mode == "menu"
 saved = commander.load(SAVE)
 assert saved.cargo == bought and saved.cash == 1234 and saved.market == c.market, "saved on leaving"
@@ -917,7 +918,7 @@ assert e.target == 147 and d.name() == "SYSTEM DATA" and d.data.name == "DISO"
 dd = gal.distance(7, 147)
 tx = texts(e)
 assert "Democracy" in tx and ("%d.%d LY away" % (dd // 10, dd % 10)) in tx, tx
-d.go(0); assert any(t.startswith("target: DISO") for t in texts(e))
+d.go(0); assert any(t.startswith("DISO ") for t in texts(e)), "Status: the target on its hyperspace line"
 d.open("LOCAL CHART"); assert d.view.sel[2] == 147, "the chart opens on the target"
 # a far system can be looked up, but not jumped to
 d.open("GALACTIC CHART")
@@ -964,7 +965,7 @@ gd = mod.game_data; mod.game_data = None
 n = ace_commander.AceCommander()
 choose(n, "CONTINUE")
 assert n.mode == "docked" and n.galaxy is None and n.dock.tabs == ("STATUS",)
-assert "COMMANDER" in texts(n) and "LAVE" not in texts(n) and "C: options" in texts(n)
+assert any(t.startswith("COMMANDER ") for t in texts(n)) and "LAVE" not in texts(n) and "C: options" in texts(n)
 assert "F: title screen" in texts(n)
 tick(n, fresh=["JOYRIGHT"]); tick(n, fresh=["B"]); assert n.dock.tab == 0
 launch(n)
