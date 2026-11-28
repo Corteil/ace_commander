@@ -87,6 +87,11 @@ class Link:
         addr, msg = f
         return addr, memoryview(msg)
 
+    def stop_dongle(self):
+        """Tell the dongle program to stop (its REPL is free afterwards): a frame from
+        tools/bridge/main.py's STOP_ADDR."""
+        self.ser.write(frame(b"STOP!!", b""))
+
     def close(self):
         try:
             self.ser.close()

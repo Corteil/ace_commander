@@ -11,9 +11,11 @@ whether the Pi is talking, and the badges heard (Brian: "the 22 badge's screen s
 display info"). Without that screen it runs the same, blind.
 
 The badges all use one Wi-Fi channel (net_espnow.CHANNEL): CHANNEL below must match.
-Ctrl-C is switched off while it runs (a packet may hold 0x03). To get the REPL back,
-start it in BOOT mode and flash it again, or hold the front button while it starts
-(it then stops at once).
+Ctrl-C is switched off while it runs (a packet may hold 0x03). To get the REPL back:
+- connect within GRACE_MS of it starting (plugging in): Ctrl-C still works then;
+- or hold any button (A, B, front, joystick centre) while it starts;
+- or send it STOP (net_bridge.Link.stop_dongle(): a frame from STOP_ADDR).
+A screen that won't start leaves its error in screen_error.txt.
 """
 import sys
 import time
@@ -28,16 +30,26 @@ SYNC = 0xA5
 BROADCAST = b"\xff" * 6
 SHOW_MS = 1000          # the screen redrawn this often
 GONE_MS = 10000         # a badge not heard for this long drops off the list
+GRACE_MS = 3000         # Ctrl-C still works this long after starting
+STOP_ADDR = b"STOP!!"   # a frame from the Pi with this address ends the bridge
+BUTTONS = (2, 1, 6, 9)  # the 2022 badge's A, B, front and joystick centre
 
-# the 2022 badge's front button held at start: don't start (the REPL stays usable)
-if Pin(6, Pin.IN, Pin.PULL_UP).value() == 0:
-    raise SystemExit("bridge not started: front button held")
+# a button held at start: don't start (the REPL stays usable)
+if any(Pin(n, Pin.IN, Pin.PULL_UP).value() == 0 for n in BUTTONS):
+    raise SystemExit("bridge not started: a button held")
+# Ctrl-C still works for GRACE_MS: connect then for the REPL
+time.sleep_ms(GRACE_MS)
 
 try:
     import tidal_screen
     screen = tidal_screen.Screen()
-except Exception:       # another ESP32, or no screen: run blind
+except Exception as err:        # another ESP32, or no screen: run blind, but say why
     screen = None
+    try:
+        with open("screen_error.txt", "w") as f:
+            sys.print_exception(err, f)
+    except Exception:
+        pass
 
 micropython.kbd_intr(-1)        # binary on stdin: no Ctrl-C
 sta = network.WLAN(network.STA_IF)
@@ -116,6 +128,9 @@ while True:
         if len(buf) < 2 or len(buf) < 2 + buf[1]:
             break
         n = buf[1]
+        if n >= 6 and bytes(buf[2:8]) == STOP_ADDR:   # the Pi says stop: back to the REPL
+            micropython.kbd_intr(3)
+            raise SystemExit("bridge stopped by the Pi")
         if n > 6:
             try:
                 e.send(BROADCAST, bytes(buf[8:2 + n]), False)
@@ -128,5 +143,13 @@ while True:
         shown = now
         for m in [m for m, t in heard.items() if time.ticks_diff(now, t) > 60000]:
             del heard[m]            # forget badges long gone
-        draw(now)
+        try:
+            draw(now)
+        except Exception as err:    # a drawing fault mustn't stop the bridge
+            screen = None
+            try:
+                with open("screen_error.txt", "w") as f:
+                    sys.print_exception(err, f)
+            except Exception:
+                pass
     poll.poll(2)                # a short wait for USB, then look at the radio again
