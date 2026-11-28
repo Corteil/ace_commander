@@ -226,6 +226,9 @@ class Platform:
         self.leds_on = False        # we have taken over the LEDs
         self.led_level = None       # (r, g, b) last written to the whole ring
         self.tilt_ok = imu is not None
+        # its IMU's y runs across the screen (Brian, TILT SETUP: "left is up, right is
+        # down" with x taken as across): roll along y (ace._level_axes)
+        self.tilt_axes = (1, 1.0)
         self.tx = self.ty = 0.0     # the last tilt reading, in g
         self.picker_choice = True   # Options > TEXT ENTRY: its own dialog or the letter picker
         self.fast = scheduler is not None
