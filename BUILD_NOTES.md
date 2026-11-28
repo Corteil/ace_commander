@@ -2026,10 +2026,15 @@ what is now `ace.py` (renamed in build 50).
    (not yet copied to it). The 2022 dongle was one-way: the Pi heard Brian's badge, the badge
    never heard the Pi (104 packets sent, no failures, same channel); cause not found.
    **Build 175** (2026-11-28, Brian: "pi version not connecting to local network at same
-   time", "network info as a button option", "change here to lobby"): `--bridge --duel` plays
-   badges and computers in one game, this Pi relaying (`hosts/pi/net_relay.py`): badges'
-   packets go on to the network as those badges (`net_udp.Link.send_as`), other computers'
-   go on the radio wrapped (RELAY "AR", the sender's id; `net_espnow.unwrap` on the badges);
-   one id, the link badge's; one relay a game. The badge-link desktop icon uses both. In the
-   lobby, B opens NETWORK INFO (B or F closes it), and HERE: is LOBBY:. Badges need this
-   build's net_espnow to hear relayed computers.
+   time", "should the packets not have an uid for each player so the sender id does not matter
+   including the badges", "and flag update required", "network info as a button option",
+   "change here to lobby"): every packet on every link is in an envelope (`hosts/pi/envelope.py`;
+   inline in `net_espnow.py`, no garbage): VERSION 0xA1, the sender's 6-byte player id, the
+   game's packet. The id, not the radio address, says who sent it, so `--bridge --duel` relays
+   packets unchanged (`hosts/pi/net_relay.py`: radio to network, network to radio, echoes
+   dropped; one id, the link badge's; one relay a game). Players on another version (no
+   envelope, or another VERSION) are skipped and flagged: UPDATE REQUIRED: n PLAYERS (older) or
+   UPDATE REQUIRED: THIS ONE (newer heard), in the lobby (before its notice) and on NETWORK
+   INFO. Every badge and computer needs build 175 to play together. Also: B opens NETWORK INFO
+   from the lobby (B or F closes it); HERE: is LOBBY:; the badge-link desktop icon uses both
+   links. Tested on the PC and over UDP on this Pi; not yet on badges.

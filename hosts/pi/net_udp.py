@@ -2,16 +2,19 @@
 with run.py --duel. Two windows on one Pi play each other too (both listen on
 PORT with SO_REUSEPORT; a broadcast reaches every socket on it).
 
-Each packet goes out as this run's id (ID_LEN random bytes) and then the
-game's bytes; our own broadcasts come back and are dropped here. Not a badge
-link: badges speak ESP-NOW (net_espnow.py); a Pi joins them through a bridge,
-later (plans/MULTIPLAYER.md).
+Each packet goes out in the envelope (envelope.py: version, this run's id, the
+game's bytes); our own broadcasts come back and are dropped here, and players on
+another version are noted (version_issues) for UPDATE REQUIRED. send_raw /
+recv_raw pass whole envelopes, for net_relay. Badges speak ESP-NOW (net_espnow.py);
+a Pi joins them through a link badge (net_bridge, net_relay).
 """
 import os
 import socket
 
+import envelope
+
 PORT = 47001
-ID_LEN = 6
+ID_LEN = envelope.ID_LEN
 
 
 class Link:
@@ -27,38 +30,43 @@ class Link:
         s.setblocking(False)
         self.sock = s
         self.warned = False
+        self.mismatch = envelope.Mismatch()
 
     def send(self, msg):
+        self.send_raw(envelope.wrap(self.id, msg))
+
+    def send_raw(self, data):
+        """A whole envelope, as it is (net_relay passes other players' on)."""
         try:
-            self.sock.sendto(self.id + bytes(msg), self.to)
+            self.sock.sendto(bytes(data), self.to)
         except OSError as e:
             if not self.warned:     # no network: say so once, keep playing alone
                 self.warned = True
                 print("duel: can't send:", e)
 
-    def send_as(self, ident, msg):
-        """Send a packet as if from ident (net_relay passes the badges' packets on)."""
+    def recv_raw(self):
+        """The next datagram as it came, or None."""
         try:
-            self.sock.sendto(bytes(ident) + bytes(msg), self.to)
-        except OSError as e:
-            if not self.warned:
-                self.warned = True
-                print("duel: can't send:", e)
+            data, _ = self.sock.recvfrom(512)
+        except (BlockingIOError, InterruptedError):
+            return None
+        except OSError:
+            return None
+        return data
 
     def recv(self):
         while True:
-            try:
-                data, _ = self.sock.recvfrom(512)
-            except (BlockingIOError, InterruptedError):
+            data = self.recv_raw()
+            if data is None:
                 return None, None
-            except OSError:
-                return None, None
-            if len(data) <= ID_LEN:
-                continue
-            host = data[:ID_LEN]
-            if host == self.id:
-                continue            # our own broadcast
-            return host, memoryview(data)[ID_LEN:]
+            who, msg = envelope.open_(data[1:1 + ID_LEN], data, self.mismatch)
+            if who is None or who == self.id:
+                continue            # not a current game packet, or our own broadcast
+            return who, msg
+
+    def version_issues(self):
+        """(older, newer) players heard on another version (envelope.Mismatch)."""
+        return self.mismatch.issues()
 
     def net_info(self):
         """The NETWORK INFO page's lines: (text, kind), kind "ok", "warn" or ""."""

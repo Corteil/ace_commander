@@ -1019,6 +1019,23 @@ class AceCommander(PLATFORM.App):
     SHOWN = 6           # the HOSTING page's lines shown at once (it scrolls)
 
     @staticmethod
+    def _update_line(d):
+        """UPDATE REQUIRED (Brian, build 175): players heard on another version of the
+        game (the envelope's VERSION, net_espnow / envelope.py), or None."""
+        f = getattr(d.link, "version_issues", None)
+        if f is None:
+            return None
+        try:
+            older, newer = f()
+        except Exception:
+            return None
+        if newer:
+            return "UPDATE REQUIRED: THIS ONE"      # a newer game is about
+        if older:
+            return "UPDATE REQUIRED: %d PLAYER%s" % (older, "" if older == 1 else "S")
+        return None
+
+    @staticmethod
     def _can_leave_wifi(d):
         f = getattr(d.link, "can_leave_wifi", None)
         return f is not None and f()
@@ -1045,6 +1062,10 @@ class AceCommander(PLATFORM.App):
         for t, kind in lines[:most]:
             text(ctx, t[:26], 0, y, 11, colour.get(kind, cockpit.GREY))
             y += step
+        upd = self._update_line(d)
+        if upd:
+            text(ctx, upd, 0, y + 2, 10, cockpit.RED)
+            y += 12
         heard = d.lobby()
         if heard:
             names = ", ".join("%s %ds" % (p.name[:8], int(p.t)) for p in heard[:3])
@@ -1124,7 +1145,10 @@ class AceCommander(PLATFORM.App):
                 text(ctx, "%s  %d/%d" % (dm.MODE_NAMES[p.mode], 1 + len(p.guests), dm.MODE_MAX[p.mode]),
                      0, 44, 11, cockpit.YELLOW)
             others = d.lobby()
-            if d.notice:                # why the last game ended
+            upd = self._update_line(d)
+            if upd:                     # someone is on another version: first, it is why
+                text(ctx, upd, 0, 62, 11, cockpit.RED)      # they can't be seen
+            elif d.notice:              # why the last game ended
                 text(ctx, d.notice, 0, 62, 12, cockpit.RED)
             elif others:
                 names = ", ".join(p.name for p in others[:3]) + ("..." if len(others) > 3 else "")

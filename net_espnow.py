@@ -29,21 +29,45 @@ badges), read from the firmware and MicroPython 1.28's source:
 On a firmware without the service, only the counting and the restart apply.
 """
 CHANNEL = 1
-RELAY = b"AR"           # a packet passed on by a Pi from its network (hosts/pi/net_relay.py):
-                        # RELAY, the real sender's 6-byte id, the packet
+VERSION = 0xA1          # the envelope (hosts/pi/envelope.py, build 175): VERSION, the sender's
+HEAD = 7                # 6-byte player id, the game's packet. The id, not the radio address,
+FRESH_MS = 10000        # says who sent it. Other versions are noted for UPDATE REQUIRED
 RXBUF = 4096
 BROADCAST = b"\xff" * 6
 _NONE = (None, None)
 
 
-def unwrap(r):
-    """(sender, packet), or for a packet a Pi relayed from its network (RELAY), the
-    real sender and its packet: to the game they come straight from that player."""
+def open_env(r, mismatch, ids):
+    """(sender's player id, packet) from an envelope (r: the radio's [address, data]),
+    or None: another version of the game is noted in mismatch (address -> (ms, newer)).
+    The id is bytes (the game compares and keeps it), kept in ids by radio address and
+    made again only when it changes (a relaying Pi sends many players' from one address):
+    no new bytes per packet."""
     msg = r[1]
-    if len(msg) > 8 and msg[0] == 0x41 and msg[1] == 0x52:      # b"AR"
-        m = memoryview(msg)
-        return m[2:8], m[8:]
-    return r
+    n = len(msg)
+    if n >= HEAD + 2 and msg[0] == VERSION and msg[HEAD] == 0x41 and msg[HEAD + 1] == 0x4D:
+        mac = r[0]
+        ident = ids.get(mac)
+        if ident is None or not _same(ident, msg):
+            ident = bytes(memoryview(msg)[1:HEAD])
+            ids[mac] = ident
+        return ident, memoryview(msg)[HEAD:]
+    newer = None
+    if n >= 2 and msg[0] == 0x41 and msg[1] == 0x4D:            # "AM": from before the envelope
+        newer = False
+    elif n >= HEAD + 2 and 0xA0 <= msg[0] <= 0xAF and msg[HEAD] == 0x41 and msg[HEAD + 1] == 0x4D:
+        newer = msg[0] > VERSION
+    if newer is not None:
+        import time
+        mismatch[bytes(r[0])] = (time.ticks_ms(), newer)
+    return None
+
+
+def _same(ident, msg):
+    for i in range(6):
+        if ident[i] != msg[1 + i]:
+            return False
+    return True
 
 
 def _hex(b):
@@ -72,6 +96,8 @@ class Link:
         self.paused = None      # the service's reader task we cancelled (to restart)
         self.listening = None
         self.restarts = 0       # radio restarts after a bad read (for the log)
+        self.mismatch = {}      # address -> (ms, newer): players on another version
+        self.ids = {}           # radio address -> the player id last heard from it
         self._open()
 
     def _open(self):
@@ -93,6 +119,9 @@ class Link:
         self.e = espnow.ESPNow()
         self._restart()
         self.id = bytes(sta.config("mac"))
+        self.out = bytearray(HEAD + 250)
+        self.out[0] = VERSION
+        self.out[1:HEAD] = self.id
         self.channel = sta.config("channel")
 
     def _restart(self):
@@ -201,8 +230,11 @@ class Link:
     def send(self, msg):
         if self.e is None:
             self._open()        # back after minimise
+        n = len(msg)
+        out = self.out          # the envelope, made once: no garbage per packet
+        out[HEAD:HEAD + n] = msg
         try:
-            self.e.send(BROADCAST, msg, False)
+            self.e.send(BROADCAST, memoryview(out)[:HEAD + n], False)
         except OSError:
             pass                # a full send queue: the next pose will do
 
@@ -231,4 +263,14 @@ class Link:
         if r[0] is None:
             self.ready = 0      # (dropped as the buffer was full: none left)
             return r
-        return unwrap(r)
+        got = open_env(r, self.mismatch, self.ids)
+        if got is None:
+            return self.recv()  # another version, or not the game's: the next one
+        return got
+
+    def version_issues(self):
+        """(older, newer): players heard lately on another version of the game."""
+        import time
+        now = time.ticks_ms()
+        live = [nw for t, nw in self.mismatch.values() if time.ticks_diff(now, t) < FRESH_MS]
+        return sum(1 for x in live if not x), sum(1 for x in live if x)

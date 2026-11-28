@@ -12,6 +12,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 import net_bridge as nb     # noqa: E402
+import envelope             # noqa: E402
+
+
+def E(ident, msg):
+    """A game packet ("AM" + msg) in the envelope, from player ident."""
+    return envelope.wrap(ident, b"AM" + msg)
 
 MAC = bytes(range(1, 7))
 
@@ -56,7 +62,7 @@ def dongle():
     got = b""
     while nb.frame(nb.MAC_ASK, b"") not in got:
         got += os.read(master, 100)
-    os.write(master, nb.frame(MAC, b"early") + nb.frame(nb.MAC_IS, DONGLE))
+    os.write(master, nb.frame(MAC, E(MAC, b"early")) + nb.frame(nb.MAC_IS, DONGLE))
 
 
 th = threading.Thread(target=dongle)
@@ -65,27 +71,32 @@ link = nb.Link(os.ttyname(slave))
 th.join()
 assert link.id == DONGLE, link.id
 who, msg = link.recv()
-assert who == MAC and bytes(msg) == b"early", (who, msg)
+assert who == MAC and bytes(msg) == b"AMearly", (who, msg)
 os.write(master, nb.frame(nb.INFO_IS, b"\x06\x01"))
 time.sleep(0.05)
 assert link.recv() == (None, None) and link.channel == 6 and link.found
 print("id: the dongle's address; a packet meanwhile kept; INFO_IS gives channel 6: ok")
-link.send(b"HELLO")
+link.send(b"AMHELLO")
 time.sleep(0.05)
 out = os.read(master, 100)
-assert out == nb.frame(nb.BROADCAST, b"HELLO"), out
-print("send: a broadcast frame to the dongle: ok")
-os.write(master, nb.frame(MAC, b"from a badge")[:7])     # half a frame
+assert out == nb.frame(nb.BROADCAST, envelope.wrap(DONGLE, b"AMHELLO")), out
+print("send: in the envelope with the link's id, broadcast: ok")
+os.write(master, nb.frame(MAC, E(MAC, b"from a badge"))[:7])     # half a frame
 time.sleep(0.05)
 assert link.recv() == (None, None), "not yet"
-os.write(master, nb.frame(MAC, b"from a badge")[7:] + nb.frame(b"\x09" * 6, b"next"))
+PC = b"\x09" * 6
+os.write(master, nb.frame(MAC, E(MAC, b"from a badge"))[7:]
+         + nb.frame(MAC, E(PC, b"relayed"))                       # another id, the same radio address
+         + nb.frame(MAC, b"AM\x02old badge")                       # from before the envelope
+         + nb.frame(MAC, E(DONGLE, b"echo")))                      # our own
 time.sleep(0.05)
 who, msg = link.recv()
-assert who == MAC and bytes(msg) == b"from a badge", (who, msg)
+assert who == MAC and bytes(msg) == b"AMfrom a badge", (who, msg)
 who, msg = link.recv()
-assert who == b"\x09" * 6 and bytes(msg) == b"next", (who, msg)
-assert link.recv() == (None, None)
+assert who == PC and bytes(msg) == b"AMrelayed", (who, msg)
+assert link.recv() == (None, None), "the old one and our own skipped"
+assert link.version_issues() == (1, 0), link.version_issues()
 link.close()
 os.close(master)
-print("recv: the sender's address and packet, half frames waited for: ok")
+print("recv: the envelope's id is the sender, half frames waited for, old flagged, own skipped: ok")
 print("ALL PI BRIDGE TESTS PASSED")

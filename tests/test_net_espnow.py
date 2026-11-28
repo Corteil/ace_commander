@@ -15,6 +15,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(os.path.dirname(HERE)))
 import badge_stubs as bs
+import time
+if not hasattr(time, "ticks_ms"):       # MicroPython's, for version_issues
+    time.ticks_ms = lambda: int(time.monotonic() * 1000)
+    time.ticks_diff = lambda a, b: a - b
 
 bs.install()
 from ace_commander import net_espnow
@@ -84,9 +88,29 @@ class ESPNow:
         return p
 
 
-def arrive(mac, msg):
-    RADIO.buf.append((mac, msg))
+def env(mac, msg, ident=None, version=0xA1):
+    """A game packet in the envelope (build 175): version, the sender's id ("AM" + msg)."""
+    return (mac, bytes((version,)) + (ident or mac) + b"AM" + msg)
+
+
+def arrive(mac, msg, ident=None, version=0xA1):
+    RADIO.buf.append(env(mac, msg, ident, version))
     RADIO.rx += 1
+
+
+def arrive_raw(mac, data):
+    RADIO.buf.append((mac, data))
+    RADIO.rx += 1
+
+
+def rcv(link):
+    """link.recv() with the game packet's "AM" taken off, as bytes."""
+    who, msg = link.recv()
+    if who is None:
+        return (None, None)
+    m = bytes(msg)
+    assert m[:2] == b"AM", m
+    return (bytes(who), m[2:])
 
 
 def arrive_half():
@@ -172,25 +196,46 @@ async def main():
     check("nothing yet", link.recv() == (None, None))
     arrive(b"A" * 6, b"one")
     arrive(b"B" * 6, b"two")
-    got = [link.recv(), link.recv(), link.recv()]
+    got = [rcv(link), rcv(link), rcv(link)]
     check("two whole packets, then none", got == [(b"A" * 6, b"one"), (b"B" * 6, b"two"), (None, None)], str(got))
     # a packet being written: its header is there, not counted yet: left alone
     arrive_half()
     check("half a packet isn't read", link.recv() == (None, None) and RADIO.buf == ["half"])
-    RADIO.buf = [(b"C" * 6, b"three")]      # (the Wi-Fi task finishes it)
+    RADIO.buf = [env(b"C" * 6, b"three")]      # (the Wi-Fi task finishes it)
     RADIO.rx += 1
-    check("once it is all written, it is", link.recv() == (b"C" * 6, b"three"))
+    check("once it is all written, it is", rcv(link) == (b"C" * 6, b"three"))
     # out of step anyway: restarted, not a crash
-    RADIO.buf = ["half", (b"D" * 6, b"lost")]
+    RADIO.buf = ["half", env(b"D" * 6, b"lost")]
     RADIO.rx += 2
     starts = RADIO.starts
     r = link.recv()
     check("a buffer error restarts the radio, no crash", r == (None, None) and RADIO.starts == starts + 1
           and link.restarts == 1 and RADIO.buf == [] and net_espnow.BROADCAST in RADIO.peers)
     arrive(b"E" * 6, b"after")
-    check("and packets come again", link.recv() == (b"E" * 6, b"after") and link.recv() == (None, None))
+    check("and packets come again", rcv(link) == (b"E" * 6, b"after") and link.recv() == (None, None))
     link.send(b"hi")
-    check("send broadcasts", RADIO.sent[-1] == b"hi")
+    check("send broadcasts, in the envelope: version, our id, the packet",
+          RADIO.sent[-1] == bytes((0xA1,)) + link.id + b"hi", str(RADIO.sent[-1]))
+    link.send(b"x")
+    check("a shorter one after: only its own bytes", RADIO.sent[-1] == bytes((0xA1,)) + link.id + b"x")
+    # the sender is the id in the envelope, not the radio address (a relaying Pi's link
+    # badge sends many players' packets from one address)
+    arrive(b"L" * 6, b"pc one", ident=b"1" * 6)
+    arrive(b"L" * 6, b"pc two", ident=b"2" * 6)
+    arrive(b"L" * 6, b"pc one again", ident=b"1" * 6)
+    got = [rcv(link), rcv(link), rcv(link)]
+    check("the id in the envelope is the sender", got == [(b"1" * 6, b"pc one"), (b"2" * 6, b"pc two"),
+                                                          (b"1" * 6, b"pc one again")], str(got))
+    who = link.recv()
+    check("ids are bytes", got and isinstance(link.ids[b"L" * 6], bytes))
+    # another version: skipped, and noted for UPDATE REQUIRED
+    arrive_raw(b"O" * 6, b"AM\x02old badge")           # from before the envelope
+    arrive(b"N" * 6, b"newer", version=0xA2)
+    arrive(b"G" * 6, b"good")
+    check("older and newer skipped, the current one read", rcv(link) == (b"G" * 6, b"good"))
+    check("version_issues: one older, one newer", link.version_issues() == (1, 1), str(link.version_issues()))
+    arrive_raw(b"J" * 6, b"not the game's")
+    check("junk skipped, not counted", link.recv() == (None, None) and link.version_issues() == (1, 1))
 
     link.close()
     await asyncio.sleep(0)
@@ -201,7 +246,7 @@ async def main():
     link.send(b"again")             # back after minimise: opened again on use
     await asyncio.sleep(0)
     check("reopened on use: the service paused again", svc not in sched.background_tasks
-          and RADIO.sent[-1] == b"again")
+          and RADIO.sent[-1][7:] == b"again")
     link.close()
     for t in list(sched.background_tasks.values()):
         t.cancel()
@@ -211,7 +256,7 @@ async def main():
     RADIO.reset()
     link = net_espnow.Link()
     arrive(b"F" * 6, b"plain")
-    check("no service: works", link.recv() == (b"F" * 6, b"plain") and link.paused is None)
+    check("no service: works", rcv(link) == (b"F" * 6, b"plain") and link.paused is None)
     link.close()
 
 

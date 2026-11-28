@@ -7,8 +7,8 @@ ESP-NOW and USB serial, so a Pi, a PC or the CardputerZero plays with badges
 The same interface as net_udp.Link and the badge's net_espnow.Link: id, send(bytes),
 recv() -> (sender, bytes) or (None, None), close(). id is the link's radio address,
 what the badges see this player's packets come from: asked for with MAC_ASK, answered
-with MAC_IS holding it (a random id if nothing answers). The sender is the 6-byte radio
-address of the badge that sent it, as on the badge.
+with MAC_IS holding it (a random id if nothing answers). The sender is the player id in
+the packet's envelope (envelope.py), not the radio address.
 
 On the wire each packet is a line of text (build 174; it was binary): ">" going to the
 link, "<" coming from it, then the 6-byte address (the sender's; going out, broadcast)
@@ -17,6 +17,8 @@ own messages on the same port (they are skipped: not a "<" line of hex), and bec
 byte of it is Ctrl-C, so the link's REPL still answers mpremote.
 """
 import binascii
+
+import envelope
 
 ADDR = 6
 BROADCAST = b"\xff" * ADDR
@@ -146,6 +148,7 @@ class Link:
         self.frames = Frames()
         self.warned = False
         self.held = []              # packets read while waiting for the address
+        self.mismatch = envelope.Mismatch()
         self.channel = None         # the dongle's channel, from INFO_IS (info())
         self.found = False
         self.device = device
@@ -193,18 +196,23 @@ class Link:
             pass
 
     def send(self, msg):
+        self.send_raw(envelope.wrap(self.id, msg))
+
+    def send_raw(self, data):
+        """A whole envelope onto the radio, as it is (net_relay passes others' on)."""
         try:
-            self.ser.write(frame(BROADCAST, msg))
+            self.ser.write(frame(BROADCAST, data))
         except Exception as e:      # unplugged, or the dongle stopped reading
             if not self.warned:
                 self.warned = True
                 print("bridge: can't send:", e)
 
-    def recv(self):
+    def recv_raw(self):
+        """(radio address, data) for the next packet heard, or None."""
         while True:
             f = self.held.pop(0) if self.held else self._next()
             if f is None:
-                return None, None
+                return None
             addr, msg = f
             if addr == INFO_IS:
                 if len(msg) >= 2:
@@ -212,7 +220,21 @@ class Link:
                 continue
             if addr == MAC_IS:
                 continue
-            return addr, memoryview(msg)
+            return addr, msg
+
+    def recv(self):
+        """(sender's player id, packet) from the envelope; another version is noted."""
+        while True:
+            f = self.recv_raw()
+            if f is None:
+                return None, None
+            who, msg = envelope.open_(f[0], f[1], self.mismatch)
+            if who is None or who == self.id:
+                continue
+            return who, msg
+
+    def version_issues(self):
+        return self.mismatch.issues()
 
     def net_info(self):
         """The NETWORK INFO page's lines: (text, kind), kind "ok", "warn" or "". Asks

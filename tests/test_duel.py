@@ -476,6 +476,26 @@ check("NETWORK INFO: C left Wi-Fi, and isn't offered again",
       left == [1] and not any("LEAVE WI-FI" in t[0] for t in c.texts))
 bs.tick(b, fresh=["CANCEL"])
 check("NETWORK INFO: F back to the lobby", not b.d_info and b.mode == "duel")
+# UPDATE REQUIRED: players on another version (the link's version_issues)
+b.d_info = False
+mine3.version_issues = lambda: (2, 0)
+c = bs.CountCtx()
+b.draw(c)
+check("lobby: UPDATE REQUIRED: 2 PLAYERS", "UPDATE REQUIRED: 2 PLAYERS" in [t[0] for t in c.texts],
+      str([t[0] for t in c.texts]))
+mine3.version_issues = lambda: (0, 1)
+b.d_info = True
+b.d_info_lines = None
+c = bs.CountCtx()
+b.draw(c)
+check("NETWORK INFO: a newer game about: UPDATE REQUIRED: THIS ONE",
+      "UPDATE REQUIRED: THIS ONE" in [t[0] for t in c.texts], str([t[0] for t in c.texts]))
+mine3.version_issues = lambda: (0, 0)
+c = bs.CountCtx()
+b.draw(c)
+check("no mismatch: no UPDATE line", not any("UPDATE" in t[0] for t in c.texts))
+del mine3.version_issues
+b.d_info = False
 del mine3.net_info
 b.d_info = True
 b.d_info_lines = None

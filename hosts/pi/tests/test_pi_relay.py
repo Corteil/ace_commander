@@ -1,23 +1,29 @@
-"""Badges and computers in one game (net_relay.py, run.py --bridge --duel): this Pi's
-packets go both ways; a badge's goes on to the network as that badge; another
-computer's goes on the radio wrapped (RELAY, its id), and the badge's net_espnow
-unwraps it to that computer's id; the network's echoes are dropped; one id, the
-link badge's. A pretend radio and network.
+"""Badges and computers in one game (net_relay.py, run.py --bridge --duel), with the
+envelope (envelope.py): this Pi's packets go to both, in its envelope with the link
+badge's id; a badge's goes on to the network as it is, and another computer's goes on
+the radio as it is (the id inside says who sent it); the network's echoes are dropped;
+packets of another version aren't passed on but are flagged. A pretend radio and
+network; and the envelope's rules the same on the badge (net_espnow) and here.
 
     python3 hosts/pi/tests/test_pi_relay.py
 """
+import importlib.util
 import os
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 
-import importlib.util                              # noqa: E402
-import net_relay                                   # noqa: E402
+import envelope     # noqa: E402
+import net_relay    # noqa: E402
 
+if not hasattr(time, "ticks_ms"):       # MicroPython's, for net_espnow
+    time.ticks_ms = lambda: int(time.monotonic() * 1000)
+    time.ticks_diff = lambda a, b: a - b
 _spec = importlib.util.spec_from_file_location("net_espnow", os.path.join(ROOT, "net_espnow.py"))
-net_espnow = importlib.util.module_from_spec(_spec)     # the badge's (unwrap only: no radio)
+net_espnow = importlib.util.module_from_spec(_spec)     # the badge's (its envelope rules only)
 _spec.loader.exec_module(net_espnow)
 
 
@@ -32,17 +38,21 @@ BADGE = bytes.fromhex("7c4fad337ac0")
 PC = bytes.fromhex("aabbccddeeff")
 
 
+def E(ident, msg):
+    return envelope.wrap(ident, b"AM" + msg)
+
+
 class Radio:
     def __init__(self):
         self.id = LINK_ID
-        self.inbox = []
+        self.inbox = []         # (radio address, data)
         self.sent = []
 
-    def send(self, msg):
-        self.sent.append(bytes(msg))
+    def send_raw(self, data):
+        self.sent.append(bytes(data))
 
-    def recv(self):
-        return self.inbox.pop(0) if self.inbox else (None, None)
+    def recv_raw(self):
+        return self.inbox.pop(0) if self.inbox else None
 
     def net_info(self):
         return [("LINK: BADGE LINK (USB)", "ok"), ("CHANNEL: 1 (BADGES FOUND)", "ok"), ("YOU: x", "")]
@@ -55,16 +65,13 @@ class Lan:
     def __init__(self):
         self.id = os.urandom(6)
         self.inbox = []
-        self.sent = []          # (as id, packet)
+        self.sent = []
 
-    def send(self, msg):
-        self.sent.append((self.id, bytes(msg)))
+    def send_raw(self, data):
+        self.sent.append(bytes(data))
 
-    def send_as(self, ident, msg):
-        self.sent.append((bytes(ident), bytes(msg)))
-
-    def recv(self):
-        return self.inbox.pop(0) if self.inbox else (None, None)
+    def recv_raw(self):
+        return self.inbox.pop(0) if self.inbox else None
 
     def net_info(self):
         return [("LINK: UDP", "ok"), ("WI-FI: Skynet3", ""), ("IP: 192.168.68.89", "")]
@@ -73,45 +80,44 @@ class Lan:
         pass
 
 
+check("the envelope's rules agree: badge and Pi", net_espnow.VERSION == envelope.VERSION
+      and net_espnow.HEAD == envelope.HEAD)
+
 radio, lan = Radio(), Lan()
 r = net_relay.Link(radio, lan)
 check("one id: the link badge's, on the network too", r.id == LINK_ID and lan.id == LINK_ID)
 
 r.send(b"AM\x01mine")
-check("our packet goes on the radio and the network",
-      radio.sent == [b"AM\x01mine"] and lan.sent == [(LINK_ID, b"AM\x01mine")])
+check("our packet goes to both, in our envelope",
+      radio.sent == [envelope.wrap(LINK_ID, b"AM\x01mine")] == lan.sent)
 radio.sent.clear()
 lan.sent.clear()
 
-radio.inbox.append((BADGE, memoryview(b"AM\x02badge")))
+radio.inbox.append((BADGE, E(BADGE, b"\x02badge")))
 who, msg = r.recv()
-check("a badge's packet: played here", who == BADGE and bytes(msg) == b"AM\x02badge")
-check("... and on to the network as that badge", lan.sent == [(BADGE, b"AM\x02badge")], lan.sent)
+check("a badge's packet: played here, from its id", who == BADGE and bytes(msg) == b"AM\x02badge")
+check("... and on to the network as it is", lan.sent == [E(BADGE, b"\x02badge")], lan.sent)
 
-lan.inbox += [(LINK_ID, memoryview(b"AM\x01mine")), (BADGE, memoryview(b"AM\x02badge")),
-              (PC, memoryview(b"AM\x02pc"))]
+lan.inbox += [envelope.wrap(LINK_ID, b"AM\x01mine"), E(BADGE, b"\x02badge"), E(PC, b"\x02pc")]
 who, msg = r.recv()
 check("echoes dropped (ours, the badge's we passed on); a computer's played",
       who == PC and bytes(msg) == b"AM\x02pc")
-check("... and on the radio wrapped with its id", radio.sent == [b"AR" + PC + b"AM\x02pc"], radio.sent)
+check("... and on the radio as it is", radio.sent == [E(PC, b"\x02pc")], radio.sent)
 check("nothing more", r.recv() == (None, None))
 
-# the badge's side: net_espnow unwraps it to the computer's id
-w, m = net_espnow.unwrap((LINK_ID, radio.sent[0]))
-check("badge: a relayed packet comes from the computer itself", bytes(w) == PC and bytes(m) == b"AM\x02pc")
-w, m = net_espnow.unwrap((BADGE, b"AM\x02plain"))
-check("badge: other packets as they are", w == BADGE and m == b"AM\x02plain")
+# the badge's side reads the computer's packet as from the computer, though the radio
+# address is the link badge's
+got = net_espnow.open_env((LINK_ID, radio.sent[0]), {}, {})
+check("badge: the computer's packet comes from the computer", got[0] == PC and bytes(got[1]) == b"AM\x02pc")
 
-# another relay's wrapped packet on the radio isn't used (one relay a game)
-radio.inbox.append((bytes(6), memoryview(b"AR" + PC + b"AM\x02x")))
-check("another relay's packet ignored", r.recv() == (None, None))
-
-# too big to wrap: played, not passed on
+# another version: not passed on, flagged
 radio.sent.clear()
-lan.inbox.append((PC, memoryview(b"AM" + bytes(net_relay.MAX))))
-who, msg = r.recv()
-check("a packet too big to wrap: played, not sent on", who == PC and radio.sent == [])
-check("the biggest game packet (224 bytes) fits wrapped", 224 <= net_relay.MAX)
+lan.sent.clear()
+radio.inbox.append((BADGE, b"AM\x02from before the envelope"))
+lan.inbox.append(bytes((0xA2,)) + PC + b"AM\x02newer")
+check("other versions: not played", r.recv() == (None, None))
+check("... not passed on", radio.sent == [] and lan.sent == [])
+check("... flagged: one older, one newer", r.version_issues() == (1, 1), r.version_issues())
 
 lines = [t for t, k in r.net_info()]
 check("NETWORK INFO: relay, channel, Wi-Fi, IP, counts, id",

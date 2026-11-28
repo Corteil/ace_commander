@@ -3,23 +3,18 @@ version not connecting to local network at same time"): this Pi has the badge li
 (net_bridge, ESP-NOW through a link badge) and the network (net_udp) and passes
 packets between them, so every badge hears every computer and the other way round.
 
-- A badge's packet heard on the radio is played here and sent on to the network as
-  that badge (net_udp.Link.send_as), so the other computers see the badge itself.
-- A packet from another computer is played here and sent on the radio wrapped as
-  RELAY, its sender's id, the packet; the badges unwrap it (net_espnow.unwrap), since
-  over the radio everything this Pi sends comes from the link badge's address.
-- This Pi's own packets go to both. Its id on the network is the link badge's
-  address, the id the badges know it by.
-- The network echoes our broadcasts back: our own id, and badges' packets we sent on
-  (their ids are remembered as radio ones), are dropped.
+Every packet carries its sender's player id in its envelope (envelope.py), so they
+are passed on as they are: what is heard on the radio goes to the network, what is
+heard on the network goes on the radio, and this Pi's own go to both. The network
+echoes our broadcasts back: our own (our id) and those we passed on from the radio
+(their ids are remembered as radio ones) are dropped. Packets of another version
+aren't passed on; they are noted for UPDATE REQUIRED (version_issues).
 
 Only one Pi in a game may relay: two would each pass the other's packets on again.
 """
 import time
 
-RELAY = b"AR"               # net_espnow.RELAY
-ADDR = 6
-MAX = 250 - 6 - 2 - ADDR    # the most a computer's packet can be to fit wrapped (net_bridge.MAX)
+import envelope
 
 
 class Link:
@@ -27,38 +22,41 @@ class Link:
         self.radio = radio
         self.lan = lan
         self.id = radio.id
-        lan.id = radio.id           # one id, the one the badges see
-        self.on_radio = {}          # badge id -> when last heard (for the page)
-        self.on_lan = {}            # computer id -> when last heard
-        self.to_lan = 0             # packets passed on each way
-        self.to_radio = 0
+        lan.id = radio.id           # one id on both
+        self.on_radio = {}          # player id -> when last heard (badges, for the page)
+        self.on_lan = {}            # player id -> when last heard (computers)
+        self.mismatch = envelope.Mismatch()
 
     def send(self, msg):
-        self.radio.send(msg)
-        self.lan.send(msg)
+        data = envelope.wrap(self.id, msg)
+        self.radio.send_raw(data)
+        self.lan.send_raw(data)
 
     def recv(self):
-        who, msg = self.radio.recv()
-        if msg is not None:
-            who = bytes(who)
-            if bytes(msg[:2]) == RELAY:
-                return self.recv()      # another relay's: not ours to use (one relay only)
+        while True:
+            f = self.radio.recv_raw()
+            if f is None:
+                break
+            addr, data = f
+            who, msg = envelope.open_(addr, data, self.mismatch)
+            if who is None or who == self.id:
+                continue
             self.on_radio[who] = time.time()
-            self.lan.send_as(who, msg)
-            self.to_lan += 1
+            self.lan.send_raw(data)
             return who, msg
         while True:
-            who, msg = self.lan.recv()
-            if msg is None:
+            data = self.lan.recv_raw()
+            if data is None:
                 return None, None
-            who = bytes(who)
-            if who == self.id or who in self.on_radio:
-                continue                # our own, or a badge's we passed on, come back
+            who, msg = envelope.open_(data[1:1 + envelope.ID_LEN], data, self.mismatch)
+            if who is None or who == self.id or who in self.on_radio:
+                continue                # not current, ours, or a badge's we passed on
             self.on_lan[who] = time.time()
-            if len(msg) <= MAX:
-                self.radio.send(RELAY + who + bytes(msg))
-                self.to_radio += 1
+            self.radio.send_raw(data)
             return who, msg
+
+    def version_issues(self):
+        return self.mismatch.issues()
 
     def net_info(self):
         """NETWORK INFO: the badge link's lines, the network's, and what is relayed."""
@@ -67,8 +65,7 @@ class Link:
         pcs = sum(1 for t in self.on_lan.values() if now - t < 10)
         lines = [("LINK: BADGES + NETWORK (RELAY)", "ok")]
         lines += [l for l in self.radio.net_info() if not l[0].startswith(("LINK:", "YOU:"))]
-        lines += [l for l in self.lan.net_info()
-                  if l[0].startswith(("WI-FI:", "IP:"))]
+        lines += [l for l in self.lan.net_info() if l[0].startswith(("WI-FI:", "IP:"))]
         lines.append(("RELAYING: %d BADGES, %d PCS" % (badges, pcs), "ok" if badges or pcs else ""))
         lines.append(("YOU: " + ":".join("%02x" % x for x in self.id[3:]), ""))
         return lines
