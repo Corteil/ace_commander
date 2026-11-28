@@ -245,9 +245,11 @@ def drawing(c, cx, cy, pad, labels, colour, heading):
             bx, by = centres[name]
             c.setStrokeColor(colour)
             c.setLineWidth(0.5)
-            end = y - up * 1.5 * mm             # the wire ends just short of the text
-            c.line(bx, by, x, end)
-            fixed.append(((bx, by), (x, end)))
+            end = y - up * 1.5 * mm             # the wire ends just short of the text,
+            half = max(pdfmetrics.stringWidth(t, "Sans", TEXT) for t in lines) / 2
+            ex = min(max(bx, x - half + 1 * mm), x + half - 1 * mm)     # under the part of
+            c.line(bx, by, ex, end)             # it nearest its button (Brian), not its middle
+            fixed.append(((bx, by), (ex, end)))
             c.setFillColor(colour)
             c.circle(bx, by, 0.7, stroke=0, fill=1)
             c.setFillColor(INK)
@@ -267,7 +269,7 @@ def drawing(c, cx, cy, pad, labels, colour, heading):
         for drop in range(0, 9):            # lower the column until its wires cross none
             mid = cy + (pad.get("side_mid", 0) - drop * 4) * mm
             slots = [mid + (n - 1) * step / 2 - i * step for i in range(n)]
-            found = _uncrossed(items, centres, lx, slots, fixed)
+            found = _uncrossed(items, centres, lx, slots, fixed, cx + side * (COL + ROOM))
             if found is not None:
                 break
         if found is None:
@@ -316,7 +318,7 @@ def _near(a, b, p, r):
     return (qx - p[0]) ** 2 + (qy - p[1]) ** 2 < r * r
 
 
-def _uncrossed(items, centres, lx, slots, fixed=()):
+def _uncrossed(items, centres, lx, slots, fixed=(), text_end=None):
     """items in an order whose pointer lines (from centres[name] to (lx, slot)) don't
     cross each other (Brian: "the label wires should not cross"), with as few as can be
     passing over another button: a branch-and-bound search over the orders. As given,
@@ -354,6 +356,11 @@ def _uncrossed(items, centres, lx, slots, fixed=()):
                 continue
             if any(_crosses(a, b, f0, f1) for f0, f1 in fixed):
                 continue
+            if text_end is not None:        # nor through this label (its line and text)
+                y = slots[k]
+                band = [((lx, y + d), (text_end, y + d)) for d in (-4, 0, 5)]
+                if any(_crosses(f0, f1, g0, g1) for f0, f1 in fixed for g0, g1 in band):
+                    continue
             used[i] = True
             chosen.append(i)
             place(k + 1, total + cost(i, k))
