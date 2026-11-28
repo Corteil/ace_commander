@@ -1190,7 +1190,7 @@ class AceCommander(PLATFORM.App):
                                   self._ship_bp(),
                                   (lambda: self._settings(True), self._change),
                                   self._bp if SHIPS else None)
-
+        self.dock.who = lambda: cmdr_name(self.cmdr).upper()   # Status's title, as in flight
     def _mission_flags(self):
         """Tell the game what the missions need of this system (see missions.py)."""
         g = self.game
@@ -3040,7 +3040,7 @@ class AceCommander(PLATFORM.App):
         if s == "market" or s == "inventory":
             from . import screens
             if s == "market":
-                n, shown = len(GOODS), screens.ROWS
+                n, shown = len(GOODS), screens.MARKET_ROWS
             else:
                 n, shown = len(screens.cargo_rows(self.cmdr)), screens.ROWS - 1
             if self._repeat("j_up", self.dt):
@@ -3313,7 +3313,8 @@ class AceCommander(PLATFORM.App):
         c = self.cmdr
         gal = self.galaxy
         if s == "market":
-            screens.draw_market(ctx, self.fmarket, c, gal.system(c.system).name, self.top)
+            screens.draw_market(ctx, self.fmarket, c, "MARKET PRICES  " + gal.system(c.system).name,
+                                self.top)
         elif s == "inventory":
             screens.draw_inventory(ctx, c, GOODS, self.top)
         else:

@@ -22,11 +22,9 @@ TABS = ("STATUS", "INVENTORY", "MARKET", "EQUIP SHIP", "SHIPYARD", "HANGAR",
 PAINT_PRICE = 100   # tenths of a credit: a new colour at the Repair Shop costs 10.0 Cr
 TRANSPONDER_K = 0.25     # a new transponder for a stolen ship costs this much of its price (pirate worlds)
 SPIN = 0.8          # radians a second the Repair Shop's ship turns
-ROWS = 6            # goods shown at once on the market
+ROWS = 6            # items shown at once on Equip ship (the market's: screens.MARKET_ROWS)
 SAY_TIME = 1.5      # seconds a market message stays
-PRICE_X = 24        # where the market's columns end
-STOCK_X = 52
-HOLD_X = 88
+HOLD_X = 88         # Equip ship's "have" column
 EPRICE_X = 52       # Equip ship's price column
 
 
@@ -62,6 +60,7 @@ class Docked:
         Shipyard and Hangar (build 79), which are shown only with it."""
         self.bps = bps
         self.options = options
+        self.who = None         # a function giving the commander's name for Status's title (ace.py)
         self.osel = 0           # the line picked on Options
         self.cmdr = cmdr
         self.ship = ship
@@ -217,8 +216,10 @@ class Docked:
         self.sel = (self.sel + step) % n
         if self.sel < self.top:
             self.top = self.sel
-        elif self.sel >= self.top + ROWS:
-            self.top = self.sel - ROWS + 1
+        else:
+            from . import screens
+            if self.sel >= self.top + screens.MARKET_ROWS:
+                self.top = self.sel - screens.MARKET_ROWS + 1
 
     def pick_item(self, step):
         """Move Equip ship's highlight up (-1) or down (1), scrolling the list."""
@@ -530,39 +531,21 @@ class Docked:
                 ctx.rectangle(x + i * 11, -115, 6, 5).fill()
 
     def _draw_status(self, ctx):
-        """Where you are, who you are, and what is in the tank."""
-        text = cockpit.text
+        """Commander Status, as in flight (screens.draw_status), docked."""
+        from . import screens
         c = self.cmdr
         s = self.here
-        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        col = cockpit.station_colour(s.government if s is not None else None)
-        text(ctx, "DOCKED", 0, -100, 11, col)
-        if s is not None:
-            text(ctx, s.name, 0, -80, 22, cockpit.WHITE)
-            text(ctx, s.government_name(), 0, -59, 11, col)
-            text(ctx, "%s, tech %d" % (s.economy_name(), s.tech), 0, -45, 11, cockpit.GREY)
-        else:
-            text(ctx, "COMMANDER", 0, -70, 20, cockpit.WHITE)
-        ctx.rgb(*cockpit.DIM).rectangle(-90, -34, 180, 1).fill()
-        text(ctx, c.rank(), 0, -20, 16, cockpit.GREEN)
-        text(ctx, "%d kills  %s  %s" % (c.kills, commander.LEVELS[c.level],
-                                        _legal(c.legal)), 0, -2, 12, cockpit.YELLOW)
-        nxt = c.next_rank()
-        if nxt:
-            text(ctx, "%d more for %s" % (nxt[1], nxt[0]), 0, 13, 12, cockpit.YELLOW)
-        text(ctx, "fuel %s   %s" % (_ly(c.fuel), c.cash_text()), 0, 30, 12, cockpit.CYAN)
+        target = dist = None
         if self.target is not None:
-            t = self.gal.system(self.target)
-            d = self.gal.distance(c.system, self.target)
-            text(ctx, "target: %s %s" % (t.name, _ly(d)), 0, 45, 11,
-                 cockpit.CYAN if 0 < d <= c.fuel else cockpit.RED)
-        ctx.rgb(*cockpit.DIM).rectangle(-70, 56, 140, 1).fill()
-        text(ctx, "A: LAUNCH", 0, 68, 14, cockpit.GREEN)
+            target = self.gal.system(self.target).name
+            dist = self.gal.distance(c.system, self.target)
         hint = ["C: options"] if self.options else []
         if len(self.tabs) > 1:
             hint.append("< > screens")
-        text(ctx, "   ".join(hint), 0, 84, 11, cockpit.GREY)
-        text(ctx, "F: title screen", 0, 98, 11, cockpit.GREY)
+        col = cockpit.station_colour(s.government if s is not None else None)
+        screens.draw_status(ctx, c, s.name if s is not None else None, target, dist, "DOCKED",
+                            _legal(c.legal), self.who() if self.who else None,
+                            (col, ("   ".join(hint), "F: title screen")))
 
     def back_to_chart(self):
         """D on System data: back to the chart you came from (the local chart
@@ -588,39 +571,11 @@ class Docked:
         system_page(ctx, self.gal, s, d, c.fuel, "< >   D: chart   F: status", c)
 
     def _draw_market(self, ctx):
-        """The goods, ROWS at a time: name, price, stock and what is in the hold."""
-        text = cockpit.text
-        m = self.market
-        c = self.cmdr
-        ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
-        text(ctx, "MARKET", 0, -100, 11, cockpit.GREY)     # no system name: Status has it (build 85)
-        for label, x in (("price", PRICE_X), ("qty", STOCK_X), ("hold", HOLD_X)):
-            text(ctx, label, x, -74, 10, cockpit.GREY, 1)
-        if self.top > 0:                            # more above
-            ctx.rgb(*cockpit.DIM).rectangle(-3, -69, 6, 2).fill()
-        for row in range(ROWS):
-            i = self.top + row
-            y = -58 + row * 18
-            if i == self.sel:
-                ctx.rgb(*cockpit.DIM).rectangle(-102, y - 8, 204, 16).fill()
-            col = cockpit.GREEN if i == self.sel else cockpit.WHITE
-            unit = m.unit(i)
-            p = m.prices[i]
-            text(ctx, m.name(i), -96, y, 11, col, -1)
-            text(ctx, "%d.%d" % (p // 10, p % 10), PRICE_X, y, 11, cockpit.YELLOW, 1)
-            text(ctx, "%d%s" % (m.stock[i], unit) if m.stock[i] else "-", STOCK_X, y, 11,
-                 cockpit.CYAN, 1)
-            if c.cargo[i]:
-                text(ctx, "%d%s" % (c.cargo[i], unit), HOLD_X, y, 11, cockpit.GREEN, 1)
-        if self.top + ROWS < len(m.goods):          # more below
-            ctx.rgb(*cockpit.DIM).rectangle(-3, 44, 6, 2).fill()
-        text(ctx, "%s   hold %d/%dt" % (c.cash_text(), market.hold_used(c.cargo), c.hold),
-             0, 58, 12, cockpit.CYAN)
-        if self.msg:
-            text(ctx, self.msg, 0, 75, 12, cockpit.RED)
-        else:
-            text(ctx, "C: buy   D: sell", 0, 75, 11, cockpit.GREY)
-        text(ctx, "< > screens   F: status", 0, 91, 11, cockpit.GREY)
+        """The market, as in flight (screens.draw_market), with a good picked
+        and C / D to trade. No system name: Status has it (build 85)."""
+        from . import screens
+        screens.draw_market(ctx, self.market, self.cmdr, "MARKET", self.top, self.sel, self.msg,
+                            ("C: buy   D: sell", "< > screens   F: status"))
 
     def _draw_options(self, ctx):
         """The same settings as the title screen's Options and the in-flight
