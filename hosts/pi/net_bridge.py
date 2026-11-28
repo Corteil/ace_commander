@@ -221,6 +221,8 @@ class Link:
         self.info()
         if self.channel is None:
             ch = ("CHANNEL: ASKING THE LINK", "warn")
+        elif self.channel == 0:         # the link's radio won't start
+            ch = ("NO ESP-NOW ON THE LINK", "warn")
         elif self.found:
             ch = ("CHANNEL: %d (BADGES FOUND)" % self.channel, "ok")
         else:
