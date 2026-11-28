@@ -56,8 +56,9 @@ LOAD_HOLD = 3000                    # ms the loading screen shows (as the Tufty'
 # names"): C is Enter, F is Esc, A (the pause menu) is P
 KEY_LABELS_FLIGHT = {"A": "P", "C": "ENTER", "F": "ESC"}
 WIRE_MIN = 3                        # ships are wireframes down to this size (badge units; the badge: 8)
-CONFIG = {}                         # more config.py switches, set before the game loads (a host
-                                    # built on this one: the CardputerZero's menu_k)
+CONFIG = {"device_file": os.path.join(HERE, "device.json")}  # more config.py switches, set
+                                    # before the game loads (the device file; a host built on
+                                    # this one: the CardputerZero's menu_k and its own device file)
 
 
 def data_dir():

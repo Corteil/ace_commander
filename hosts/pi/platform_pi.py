@@ -13,8 +13,7 @@ LEDS = [(0, 0, 0)] * 13
 
 # a tilt sensor, if the host has one (the CardputerZero's BMI270): a function giving the
 # acceleration (x, y, z) in g, or None if it can't be read; set before the game starts
-TILT = None
-TILT_AXES = (0, 1.0)    # its axis across the screen (0 x, 1 y) and pitch's sign: ace._level_axes
+TILT = None             # (its axes: the host's device.json, "tilt_axes")
 
 
 def owner_name():
@@ -36,7 +35,6 @@ class Platform:
         self.leds = True        # drawn round the screen in the badge layout
         self.leds_on = False    # the game has written to them since it last let go
         self.tilt_ok = TILT is not None
-        self.tilt_axes = TILT_AXES
         self.tx = self.ty = self.tz = 0.0
         self.fast = False       # run.py runs the frames itself
         self.quit = False       # the game asked to leave: run.py ends

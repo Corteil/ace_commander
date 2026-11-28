@@ -58,7 +58,10 @@ h.step(40)
 a.zero = None                   # (LEVEL: SET NOW does this)
 h.step(40)
 t = math.radians(20)
-# its y runs across the screen (TILT_AXES): turned about z (y tips) is roll, about y
+# its own device file (hosts/cardputerzero/device.json) gives its tilt axes
+assert a.tilt_axes == (1, -1.0, -1.0), a.tilt_axes
+print("its device.json: tilt_axes", a.tilt_axes, ": ok")
+# its y runs across the screen (device.json): turned about z (y tips) is roll, about y
 # (z tips: the top back, as Brian reported "tilt up") pitch, the top back moving the dot up
 A[:] = [-math.cos(t), math.sin(t), 0.0]       # turned about z (roll)
 a.platform.tilt()               # (read once a frame, by the game's update)

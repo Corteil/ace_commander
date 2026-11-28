@@ -163,6 +163,7 @@ tick(a, fresh=["A"]); assert not a.paused
 ahead, side = rocks(mod, g)
 tick(a)
 assert a.zero[:2] == (0.0, 0.0)   # the level pose: (x, y, z) in g
+assert a.tilt_axes == (1, 1.0, 1.0), a.tilt_axes     # the badge's device.json
 Imu.reading = [0.0, 0.3 * G, G]     # the badge's IMU y runs across the screen: roll
 y = side.y
 tick(a); assert side.y != y, "tilt rolls"

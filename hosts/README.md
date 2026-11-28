@@ -8,6 +8,11 @@ runs the same game files on another device:
   See `pi/PLAN.md`.
 - `tufty/`: the Pimoroni Tufty 2350 on Badgeware v3 (since build 109).
 - `cardputerzero/`: the M5 CardputerZero (320 x 170), on the Pi's host.
+- `device.json` (the badge's in the app folder; each host's in its folder): the device's own
+  defaults, read by the game at start (`config.device()`). So far `"tilt_axes": [across,
+  pitch sign, roll sign]`: the accelerometer axis that runs across the screen (0 x, 1 y) and
+  which way pitch and roll go; a new device or a correction is a change here, not in code.
+  The player's own choices (TILT SETUP) are in options.json and come on top.
 - `fit_core.py`: fitting the badge's 240 screens to a wider screen (hints in one row along
   the bottom, the rest spread over the width; the game's `config.wide` pages), shared by the
   Pi (`pi/fit_pygame.py`), the CardputerZero and the Tufty; plain Python that runs on

@@ -121,6 +121,7 @@ def find_accel():
     return None
 
 pi_run.CONFIG["menu_k"] = MENU_K
+pi_run.CONFIG["device_file"] = os.path.join(HERE, "device.json")    # its own defaults
 
 # W/A/S/D as the arrows on menus and screens; the badge buttons they hide (A, D)
 # and C on the keys beside them
@@ -141,10 +142,7 @@ class Host(pi_run.Host):
         self._held = {}         # physical key -> the key sent at its key-down
         self._perf = None
         # its accelerometer: STEER: TILT and TILT SETUP in Options (set before the game starts)
-        platform_pi.TILT = find_accel() if tilt else None
-        # its BMI270 sits with y across the screen and x up it; pitch the other way round
-        # so tilting the top back moves the test's dot up (Brian: axes were swapped)
-        platform_pi.TILT_AXES = (1, -1.0, -1.0)     # and roll (Brian: "left right wrong")
+        platform_pi.TILT = find_accel() if tilt else None   # its axes: device.json
         super().__init__(**kw)
         self.stop_file = STOP
         try:

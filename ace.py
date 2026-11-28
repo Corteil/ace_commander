@@ -286,6 +286,18 @@ def _tilt(v, dead=TILT_DEADZONE, full=TILT_FULL):
     return a if v > 0 else -a
 
 
+def _tilt_axes(t):
+    """device.json's "tilt_axes" ([across: 0 x or 1 y, pitch sign, roll sign], the last
+    may be left out) as (across, pitch sign, roll sign); x across, no flips if missing."""
+    if not isinstance(t, list) or len(t) not in (2, 3):
+        return (0, 1.0, 1.0)
+    try:
+        return (1 if t[0] == 1 else 0, -1.0 if t[1] < 0 else 1.0,
+                -1.0 if len(t) > 2 and t[2] < 0 else 1.0)
+    except TypeError:
+        return (0, 1.0, 1.0)
+
+
 def _ring(ctx, x, y, r, k, fill):
     """A circle of radius r at (x, y), k times as wide (1 on the badge: ctx's own arc;
     a wide host's 1 / config.wide, which its stretch makes round again)."""
@@ -426,6 +438,9 @@ class AceCommander(PLATFORM.App):
         self.analog = None
         self.zero = None                 # accelerometer reading taken as "level"
         self.zaxes = None                # (e1, e2, the level pose they are for): _level_axes
+        # the device's tilt: its axis across the screen and pitch / roll signs (device.json:
+        # Brian, "a settings file so a different platform just needs the settings changed")
+        self.tilt_axes = _tilt_axes(config.device().get("tilt_axes"))
         self.t_full = TILT_FULL          # TILT SETUP (options.json): full-rate tilt, dead zone,
         self.t_dead = TILT_DEADZONE      # axes swapped, pitch and roll signs (tilt only)
         self.t_swap = TILT_SWAP_AXES
@@ -624,8 +639,7 @@ class AceCommander(PLATFORM.App):
             self.zero = (ax, ay, az if az is not None else 0.0)
         z = self.zero
         if self.zaxes is None or self.zaxes[2] is not z:    # worked out once per level pose
-            ta = getattr(pl, "tilt_axes", (0, 1.0))     # the device's own (platform):
-            axes = (_level_axes(z, *ta)                 # (across, pitch sign[, roll sign])
+            axes = (_level_axes(z, *self.tilt_axes)     # the device's own (device.json)
                     if az is not None and len(z) == 3 else None)
             self.zaxes = (axes[0], axes[1], z) if axes else (None, None, z)
         e1, e2 = self.zaxes[0], self.zaxes[1]

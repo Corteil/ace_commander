@@ -57,6 +57,22 @@ platform = None
 layout = None
 
 
+# the device's own defaults (device.json: "tilt_axes" and so on); None: device.json in the
+# app's folder (the badge's); a host sets its own (hosts/<host>/device.json)
+device_file = None
+
+
+def device():
+    """The device file (device.json) as a dict, or {} if it is missing or unreadable."""
+    try:
+        import json
+        with open(device_file or (app_dir() + "/device.json")) as f:
+            d = json.loads(f.read())
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
 def app_dir():
     """The folder this file is in: the app's."""
     try:
