@@ -55,6 +55,9 @@ Options: --layout elite (a 3D view over a dashboard; F10 switches), --full (full
 --sound (the game's sounds; Options > SOUND turns them off), --debug (the DEBUG menu). Keys: arrows steer, F1-F6 are the badge's buttons A-F, and the
 rest are Elite's keys; a game pad works too. Every key and pad button: KEY_GUIDE.pdf. Saves go in ~/.local/share/ace_commander/.
 A desktop shortcut: Exec=python3 /path/to/ace_commander/hosts/pi/run.py
+
+The M5 CardputerZero runs this same download: see ace_commander/hosts/cardputerzero/README.md
+(run_cz.py on its LCD; install.sh puts it on the launcher).
 """
 
 
@@ -145,15 +148,17 @@ def build_tufty(v):
 
 
 def build_pi(v):
-    """The game as source (the Pi runs CPython) and hosts/pi, less its tests."""
+    """The game as source (the Pi runs CPython) and hosts/pi, the CardputerZero's
+    host on top of it and the hosts' shared fit_core.py, less their tests; then a
+    smoke test of the copy (pi_smoke)."""
     stage = os.path.join(OUT, "pi", "ace_commander")
     shutil.rmtree(os.path.dirname(stage), ignore_errors=True)
     os.makedirs(stage)
     for f in build_mpy.release_files() + list(EXTRA):
         shutil.copy2(os.path.join(REPO, f), stage)
     os.makedirs(os.path.join(stage, "hosts"))
-    for f in git("ls-files", "hosts/pi").split():      # what git keeps, less the tests
-        if f.startswith("hosts/pi/tests/"):
+    for f in git("ls-files", "hosts/pi", "hosts/cardputerzero", "hosts/fit_core.py").split():
+        if "/tests/" in f:              # what git keeps, less the tests
             continue
         dst = os.path.join(stage, f)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
@@ -161,10 +166,29 @@ def build_pi(v):
     with open(os.path.join(stage, "README_PI.txt"), "w") as f:
         f.write(PI_README.format(v=v))
     key_guide("pi", stage)
+    pi_smoke(stage)
     path = os.path.join(OUT, "ace_commander-pi-%s.zip" % v)
     zip_dir(path, stage, "ace_commander")
     print("pi: %s, %d KB" % (os.path.basename(path), os.path.getsize(path) // 1024))
     return path
+
+
+def pi_smoke(stage):
+    """Start the staged Pi copy (and the CardputerZero's) for a few frames with SDL's
+    dummy driver, in an empty home: a missing file (as hosts/fit_core.py nearly was
+    in 0.7.0) stops the release here."""
+    import tempfile
+    home = tempfile.mkdtemp(prefix="ace_release_home_")
+    env = dict(os.environ, HOME=home, SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy",
+               XDG_DATA_HOME=os.path.join(home, "data"))
+    for cmd in (["hosts/pi/run.py", "--frames", "30"],
+                ["hosts/pi/run.py", "--frames", "30", "--layout", "elite"],
+                ["hosts/cardputerzero/run_cz.py", "--frames", "30", "--window", "--no-sound"]):
+        r = subprocess.run([sys.executable, os.path.join(stage, cmd[0])] + cmd[1:], env=env,
+                           cwd=home, capture_output=True, text=True, timeout=120)
+        if r.returncode:
+            sys.exit("the Pi zip's %s doesn't start:\n%s%s" % (cmd[0], r.stdout[-1500:], r.stderr[-3000:]))
+    print("pi: the copy starts (badge and Elite layouts, CardputerZero)")
 
 
 def commit_release(v, badge):

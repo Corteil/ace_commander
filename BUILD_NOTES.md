@@ -1980,3 +1980,9 @@ what is now `ace.py` (renamed in build 50).
    hints in one row along the bottom; `config.wide` 4 / 3, so its charts, Shipyard and Hangar
    use the wide pages; build_tufty copies fit_core.py in. Not yet on the Tufty itself (tested
    on the sim_badgeware stand-ins only).
+   **Release 0.7.0** (2026-11-28): builds 170-171 and the hosts since 0.6.0. The badge: one
+   Status and one Market screen docked and in flight (170); in-flight menus on black, DEBUG
+   pages 5 lines, long menus loop (171). The M5 CardputerZero (hosts/cardputerzero, in the Pi
+   zip); wide screens on by default on the Pi (--no-wide) and the Tufty (hosts/fit_core.py);
+   the 8BitDo Micro's own layout. make_release: the Pi zip carries hosts/fit_core.py and
+   hosts/cardputerzero, and is started (pi_smoke) before anything is published.
