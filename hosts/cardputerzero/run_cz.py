@@ -79,7 +79,7 @@ import run as pi_run        # noqa: E402  (the Pi's host)
 import fit_cz               # noqa: E402
 
 pi_run.CONFIG["menu_k"] = MENU_K
-pi_run.CONFIG["wide"] = True    # the charts' two lines side by side (Brian)
+pi_run.CONFIG["wide"] = fit_cz.MAX_ASPECT   # wide pages: charts' lines, Shipyard, Hangar (Brian)
 
 # W/A/S/D as the arrows on menus and screens; the badge buttons they hide (A, D)
 # and C on the keys beside them

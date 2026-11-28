@@ -31,6 +31,8 @@ GAP = "    "                    # between the hints in the row
 MARGIN = 3                      # pixels kept clear round the edge
 MAX_X = 2.4                     # spread across at most this many times the plain scale
 MAX_Y = 1.7                     # and down at most this many times
+MAX_ASPECT = 1.5                # and across at most this many times more than down
+                                # (the game's config.wide: its ships keep their shape)
 MIN_TEXT_K = 1.3                # a full screen's text is made smaller, down to this
 OVERLAP = 0.25                  # lines of text may overlap by this much of their height
                                 # (a font's box has room above and below its letters)
@@ -164,6 +166,7 @@ def fit(ext, base, w, h):
             fixed = (bot - top) - (ymax - ymin) * sy
             sy = max(base * 0.8, (room - fixed) / (ymax - ymin))
     sy = min(sy, base * MAX_Y)
+    sx = max(min(sx, sy * MAX_ASPECT), min(base, sy))
     top = min(y * sy + t for _, y, _, _, t, _, _ in ext)
     bot = max(y * sy + d for _, y, _, _, _, d, _ in ext)
     y0 = MARGIN + (room - (bot - top)) / 2.0 - top

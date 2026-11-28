@@ -1959,3 +1959,9 @@ what is now `ace.py` (renamed in build 50).
    the good picked, the message and C / D. Inventory, the charts and System data were already
    shared. Tests changed to match (test_commander, test_keys). PC only: not yet on the badge.
    The CardputerZero host (`hosts/cardputerzero/`) and `fit_cz.py` are in its README.
+   Then (Brian: "hangar and ship yard don't make use of the wide screen"): `config.wide` is a
+   number, how many times wider than tall the host draws the 240 screens at most (0 on the
+   badge; the CardputerZero 1.5, `fit_cz.MAX_ASPECT`). With it the Shipyard's pages and the
+   Hangar put the ship turning on the left and the rest down the right
+   (`Docked._wide_page`, `_ship_facts`, `_fitout(e, wide)`: shorter lines), and
+   `_spin_ship` draws ships that much narrower so the stretch leaves them their shape.
