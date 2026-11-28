@@ -34,7 +34,9 @@ def screen_key(app):
     over them, the tunnels) and the speed test."""
     mode = getattr(app, "mode", "")
     if mode == "flight":
-        if getattr(app, "fsub", None) in SCREENS and not getattr(app, "paused", False):
+        if getattr(app, "paused", False):       # the pause menu, Settings, DEBUG: on black
+            return (mode, "paused", getattr(app, "fsub", None))
+        if getattr(app, "fsub", None) in SCREENS:
             return (mode, app.fsub)
         return None
     if mode in FLIGHT_MODES or mode == "bench":
