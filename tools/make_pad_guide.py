@@ -52,8 +52,8 @@ MICRO = {
         ("DPAD", "dpad", -24, -1, 15),
         ("X", "circle", 24, 9, 4.2), ("A", "circle", 33, 0, 4.2),
         ("B", "circle", 24, -9, 4.2), ("Y", "circle", 15, 0, 4.2),
-        ("-", "pill", -6, 13, 6, 2.6), ("+", "pill", 6, 13, 6, 2.6),
-        ("HOME", "circle", -4, -13, 2.6), ("STAR", "circle", 4, -13, 2.6),
+        ("-", "circle", -6, 13, 2.8), ("+", "circle", 6, 13, 2.8),       # round (Brian)
+        ("STAR", "circle", -4, -13, 2.6), ("HOME", "circle", 4, -13, 2.6),  # star on the left
         # four shoulder buttons in a row on the top edge (Brian): L and R outside,
         # L2 and R2 smaller, inside them
         ("L", "shoulder", -29, 22, 15, 4.2), ("L2", "shoulder", -13, 21.6, 9, 3.4),
@@ -84,17 +84,17 @@ STANDARD = {
 # what each button does: (button, label) left of the pad, then right of it, in order top down
 MICRO_FLIGHT = (
     [("L", "L: slower (hold)"), ("L2", "L2: E.C.M."), ("-", "−: next view"),
-     ("DPAD", "D-pad: pitch and roll"), ("HOME", "Home (hold 1 s): escape pod")],
+     ("DPAD", "D-pad: pitch and roll"), ("STAR", "★: not used")],
     [("R", "R: faster (hold)"), ("R2", "R2: energy bomb"), ("+", "+: pause menu"),
      ("X", "X (hold): jump drive"), ("A", "A: fire laser"), ("Y", "Y: docking computer"),
-     ("B", "B: missile"), ("STAR", "★: not used")],
+     ("B", "B: missile"), ("HOME", "Home (hold 1 s): escape pod")],
 )
 MICRO_MENUS = (
     [("L", "L: tab before"), ("L2", "L2: not used"), ("-", "−: Options (docked)"),
-     ("DPAD", "D-pad: move, pick, change"), ("HOME", "Home: not used")],
+     ("DPAD", "D-pad: move, pick, change"), ("STAR", "★: not used")],
     [("R", "R: next tab"), ("R2", "R2: not used"), ("+", "+: launch / pause menu"),
      ("X", "X: find a system (chart)"), ("A", "A: choose, buy"), ("Y", "Y: sell, system data"),
-     ("B", "B: back"), ("STAR", "★: not used")],
+     ("B", "B: back"), ("HOME", "Home: not used")],
 )
 STANDARD_FLIGHT = (
     [("LT", "LT: missile"), ("LB", "LB: E.C.M. (Hardcore)"), ("BACK", "View / Back: not used"),
