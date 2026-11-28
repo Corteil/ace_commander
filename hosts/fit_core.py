@@ -299,9 +299,8 @@ def nudges(ext, sx, sy, y0, bottom):
     return out
 
 
-def hint_row(ops, labels=None, relabel=None):
-    """The hints of a recorded screen joined into one row (each hint's wide gaps
-    made two spaces), named by labels if given."""
+def hint_parts(ops):
+    """The hints of a recorded screen, each with its wide gaps made two spaces."""
     parts = []
     for op in ops:
         if is_hint_op(op):
@@ -309,7 +308,12 @@ def hint_row(ops, labels=None, relabel=None):
             while "   " in s:
                 s = s.replace("   ", "  ")
             parts.append(s)
-    row = GAP.join(parts)
+    return parts
+
+
+def hint_row(ops, labels=None, relabel=None):
+    """The hints of a recorded screen joined into one row, named by labels if given."""
+    row = GAP.join(hint_parts(ops))
     if row and labels and relabel is not None:
         row = relabel(row, labels)
     return row

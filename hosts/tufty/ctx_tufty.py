@@ -53,6 +53,8 @@ class Ctx:
         self._cy = 0.0
         self._stack = []
         self.labels = None      # {"C": "B", ...}: the hints' badge letters renamed (relabel)
+        self.small = 0          # no text in a font for sizes below this (the fitted screens:
+                                # Brian, the smallest font "almost unreadable")
         self._fonts = []
         for size, name in FONTS:
             f = getattr(font, name, None)
@@ -200,6 +202,8 @@ class Ctx:
     # text ----------------------------------------------------------------
     def _pick_font(self):
         size = self.font_size
+        if size < self.small:
+            size = self.small
         for top, f in self._fonts:
             if size <= top:
                 return f

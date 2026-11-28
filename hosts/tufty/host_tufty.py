@@ -44,6 +44,8 @@ SCREEN_W, SCREEN_H = 320, 240
 WIDE = True             # the badge's screens fitted to the Tufty's width (fit_core; Brian: on by default)
 ASPECT = SCREEN_W / SCREEN_H    # at most this much wider than tall: the game's config.wide
 HINT_SIZE = 11          # the hint row's game text size
+SMALL = 11              # fitted screens: no smaller font than this size's (Brian: the smallest,
+                        # "desert", is almost unreadable; there is room for the next one up)
 # Qw/ST Pad: I2C0 on GP4 / GP5 at 0x21 (G1, 2026-11-19). Never GP6 / GP7: BUTTON_A
 # is GPIO7, and opening I2C there dropped the Tufty off USB.
 PAD_SDA, PAD_SCL, PAD_ADDR = 4, 5, 0x21
@@ -383,15 +385,19 @@ class Host:
         self.app.draw(rec)
         ops = rec.ops
         ctx = self.ctx
-        row = fit_core.hint_row(ops)
-        hh = 0
-        size = HINT_SIZE
-        if row:
-            w, h = ctx.measure(row, size)
-            while w > SCREEN_W - 4 and size > 8:    # a smaller font if the row is too long
-                size -= 1
-                w, h = ctx.measure(row, size)
-            hh = h + 1
+        ctx.small = SMALL
+        parts = fit_core.hint_parts(ops)
+        rows = []
+        if parts:
+            row = fit_core.GAP.join(parts)
+            if ctx.measure(row, HINT_SIZE)[0] <= SCREEN_W - 4 or len(parts) == 1:
+                rows = [row]
+            else:                       # too long for one row: two, half the hints each
+                k = (len(parts) + 1) // 2
+                rows = [fit_core.GAP.join(parts[:k]), fit_core.GAP.join(parts[k:])]
+        lh = ctx.measure("Ag", HINT_SIZE)[1] if rows else 0
+        hh = (lh + 1) * len(rows)
+        row = " | ".join(rows)
         area = SCREEN_H - hh
         ext = fit_core.extents(ops, ctx.measure)
         sx, sy, y0 = self.placer.place((key, row), ext, 1, SCREEN_W, area)
@@ -401,11 +407,12 @@ class Host:
         ctx.ox = SCREEN_W // 2
         ctx.oy = 0
         fit_core.replay(ctx, ops, sx, sy, y0, nudge)
-        if row:
-            ctx.font_size = size
-            ctx.text_align = ctx.CENTER
-            ctx.text_baseline = "bottom"
-            ctx.rgb(*fit_core.GREY).move_to(0, SCREEN_H - 1).text(row)
+        ctx.font_size = HINT_SIZE
+        ctx.text_align = ctx.CENTER
+        ctx.text_baseline = "bottom"
+        for i, r in enumerate(rows):
+            ctx.rgb(*fit_core.GREY).move_to(0, SCREEN_H - 1 - (len(rows) - 1 - i) * (lh + 1)).text(r)
+        ctx.small = 0
         ctx.oy = SCREEN_H // 2
 
     def on_exit(self):
