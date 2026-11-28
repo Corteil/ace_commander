@@ -58,6 +58,12 @@ a Pi can't play a badge yet). Keys: arrows steer, F1-F6 are the badge's buttons 
 rest are Elite's keys; a game pad works too. Every key and pad button: KEY_GUIDE.pdf. Saves go in ~/.local/share/ace_commander/.
 A desktop shortcut: Exec=python3 /path/to/ace_commander/hosts/pi/run.py
 
+On Windows (tested on Windows 11): install Python 3 from python.org (tick "Add python.exe to
+PATH"), run `pip install pygame` in a Command Prompt, unzip this file, then from that folder:
+    python ace_commander\\hosts\\pi\\run.py --sound
+(a shortcut can use pythonw.exe: no console window). Saves go in
+%USERPROFILE%\\.local\\share\\ace_commander\\, screenshots (F12) in %USERPROFILE%\\Pictures\\Ace Commander\\.
+
 The M5 CardputerZero runs this same download: see ace_commander/hosts/cardputerzero/README.md
 (run_cz.py on its LCD; install.sh puts it on the launcher).
 """
