@@ -3,8 +3,9 @@ running stock MicroPython 1.21 or later: Brian's 2022 EMF badge (TiDAL, an ESP32
 with the ESP32_GENERIC_S3 build. Copied on as main.py (with tidal_screen.py for the
 2022 badge's screen) it starts with the dongle and passes packets both ways: what the
 Pi sends is broadcast over ESP-NOW, and everything heard goes to the Pi with the
-sender's address. Frames on USB: 0xA5, length, 6-byte address, packet (the address
-going out is ignored: everything is broadcast).
+sender's address. On USB each packet is a line: ">" (from the Pi) or "<" (to it), the
+6-byte address and the packet in hex (build 174; the address going out is ignored:
+everything is broadcast). The 2024 badge's ESP-NOW Link app (Corteil/espnow_link) speaks the same.
 
 On the 2022 badge its screen shows the channel, its own address, packets each way,
 whether the Pi is talking, and the badges heard (Brian: "the 22 badge's screen should
@@ -14,10 +15,9 @@ ESP-NOW only reaches radios on the same Wi-Fi channel. A badge off any network i
 net_espnow.CHANNEL (1); one on a network is on that network's (Brian's: 6). So the
 dongle hunts: while it hears no badge it moves on every HOP_MS through HUNT, and it
 stays on a channel while badges are heard there.
-Ctrl-C is switched off while it runs (a packet may hold 0x03). To get the REPL back:
-- connect within GRACE_MS of it starting (plugging in): Ctrl-C still works then;
-- or hold any button (A, B, front, joystick centre) while it starts;
-- or send it STOP (net_bridge.Link.stop_dongle(): a frame from STOP_ADDR).
+Ctrl-C works throughout (hex has no 0x03), so mpremote can always stop it; also:
+- hold any button (A, B, front, joystick centre) while it starts;
+- or send it STOP (net_bridge.Link.stop_dongle()).
 A screen that won't start leaves its error in screen_error.txt.
 
 A SystemExit in main.py makes MicroPython soft-reboot and run main.py again, so the
@@ -26,7 +26,7 @@ bridge is one function that returns: the REPL is then free (until the next reset
 import sys
 import time
 import select
-import micropython
+from binascii import hexlify, unhexlify
 import network
 import espnow
 from machine import Pin
@@ -34,11 +34,9 @@ from machine import Pin
 HUNT = (6, 1, 11, 2, 3, 4, 5, 7, 8, 9, 10, 12, 13)   # channels tried, in this order
 HOP_MS = 1500           # listened this long on a channel before trying the next
 STAY_MS = 8000          # stays this long after the last badge heard
-SYNC = 0xA5
 BROADCAST = b"\xff" * 6
 SHOW_MS = 1000          # the screen redrawn this often
 GONE_MS = 10000         # a badge not heard for this long drops off the list
-GRACE_MS = 3000         # Ctrl-C still works this long after starting
 STOP_ADDR = b"STOP!!"   # a frame from the Pi with this address ends the bridge
 MAC_ASK = b"MAC?!!"     # the Pi asks our radio address (its id in the game) ...
 MAC_IS = b"MAC=!!"      # ... answered from this address
@@ -53,8 +51,6 @@ def bridge():
     if any(Pin(n, Pin.IN, Pin.PULL_UP).value() == 0 for n in BUTTONS):
         print("bridge not started: a button held")
         return
-    # Ctrl-C still works for GRACE_MS: connect then for the REPL
-    time.sleep_ms(GRACE_MS)
 
     try:
         import tidal_screen
@@ -67,7 +63,6 @@ def bridge():
         except Exception:
             pass
 
-    micropython.kbd_intr(-1)        # binary on stdin: no Ctrl-C
     sta = network.WLAN(network.STA_IF)
     sta.active(True)
     try:
@@ -94,6 +89,8 @@ def bridge():
     buf = bytearray()
     heard = {}              # badge address -> when last heard (ms)
     to_pi = from_pi = 0     # packets passed each way
+    fails = 0               # sends the radio refused
+    fail_why = ""
     pi_t = None             # when the Pi last sent something
     start = time.ticks_ms()
     shown = start - SHOW_MS
@@ -119,6 +116,8 @@ def bridge():
         s.text("PI " + ("TALKING" if pi_ok else "quiet"), 4, 38, T.GREEN if pi_ok else T.RED)
         s.text("to Pi %d" % to_pi, 4, 52, T.CYAN)
         s.text("from Pi %d" % from_pi, 120, 52, T.CYAN)
+        if fails:
+            s.text("SEND FAILS %d %s" % (fails, fail_why[:12]), 4, 112, T.RED)
         live = [(m, t) for m, t in heard.items() if time.ticks_diff(now, t) < GONE_MS]
         s.text("BADGES HEARD: %d" % len(live), 4, 68, T.WHITE)
         y = 82
@@ -133,45 +132,51 @@ def bridge():
 
     while True:
         now = time.ticks_ms()
-        # the radio to USB: every packet heard, with who sent it
+        # the radio to USB: every packet heard, with who sent it, as a "<" line of hex
         while e.any():
             mac, msg = e.recv(0)
             if msg:
-                out.write(bytes((SYNC, 6 + len(msg))) + mac + msg)
+                out.write(b"<" + hexlify(bytes(mac) + msg) + b"\n")
                 heard[bytes(mac)] = now
                 last_badge = now
                 to_pi += 1
-        # USB to the radio: a byte at a time while there are any (packets are small)
+        # USB to the radio: ">" lines of hex, a byte at a time while there are any
         while poll.poll(0):
-            buf += inp.read(1)
-        while buf:
-            if buf[0] != SYNC:
-                buf = buf[1:]
+            c = inp.read(1)
+            if c != b"\n":
+                if len(buf) < 600:
+                    buf += c
                 continue
-            if len(buf) < 2 or len(buf) < 2 + buf[1]:
-                break
-            n = buf[1]
-            if n >= 6 and bytes(buf[2:8]) == STOP_ADDR:   # the Pi says stop: back to the REPL
-                micropython.kbd_intr(3)
-                print("bridge stopped by the Pi")
+            line = bytes(buf).strip()
+            buf = bytearray()
+            if len(line) < 13 or line[:1] != b">":
+                continue
+            try:
+                raw = unhexlify(line[1:])
+            except ValueError:
+                continue
+            addr, msg = raw[:6], raw[6:]
+            if addr == STOP_ADDR:           # the Pi says stop: back to the REPL
+                print("bridge stopped by the Pi: to Pi %d, from Pi %d, send failures %d %s, channel %d"
+                      % (to_pi, from_pi, fails, fail_why, CHANNEL))
                 return
-            if n >= 6 and bytes(buf[2:8]) == MAC_ASK:
-                out.write(bytes((SYNC, 12)) + MAC_IS + MAC)
-                buf = buf[2 + n:]
+            if addr == MAC_ASK:
+                out.write(b"<" + hexlify(MAC_IS + MAC) + b"\n")
                 continue
-            if n >= 6 and bytes(buf[2:8]) == INFO_ASK:
+            if addr == INFO_ASK:
                 found = last_badge is not None and time.ticks_diff(now, last_badge) < STAY_MS
-                out.write(bytes((SYNC, 8)) + INFO_IS + bytes((CHANNEL, 1 if found else 0)))
-                buf = buf[2 + n:]
+                out.write(b"<" + hexlify(INFO_IS + bytes((CHANNEL, 1 if found else 0))) + b"\n")
                 continue
-            if n > 6:
+            if msg:
                 try:
-                    e.send(BROADCAST, bytes(buf[8:2 + n]), False)
+                    if e.send(BROADCAST, msg, False) is False:
+                        fails += 1
+                        fail_why = "False"
                     from_pi += 1
                     pi_t = now
-                except OSError:
-                    pass
-            buf = buf[2 + n:]
+                except OSError as err:
+                    fails += 1
+                    fail_why = str(err)[:20]
         # no badge here lately: try the next channel
         quiet = last_badge is None or time.ticks_diff(now, last_badge) >= STAY_MS
         if quiet and time.ticks_diff(now, on_ch) >= HOP_MS:

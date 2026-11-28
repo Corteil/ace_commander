@@ -1,38 +1,45 @@
-"""The Pi's radio link through a USB dongle (run.py --bridge DEVICE): an ESP32 (Brian's
-2022 EMF badge, or any ESP32 with MicroPython) running tools/bridge/main.py passes the
-game's packets between ESP-NOW and USB serial, so a Pi, a PC or the CardputerZero plays
-with badges (plans/MULTIPLAYER.md, "the Pi on ESP-NOW through a bridge").
+"""The Pi's radio link through a badge or dongle on USB (run.py --bridge [DEVICE]): a
+2024 badge running the ESP-NOW Link app (Corteil/espnow_link), or an ESP32 with MicroPython
+running tools/bridge/main.py (Brian's 2022 badge), passes the game's packets between
+ESP-NOW and USB serial, so a Pi, a PC or the CardputerZero plays with badges
+(plans/MULTIPLAYER.md, "the Pi on ESP-NOW through a bridge").
 
 The same interface as net_udp.Link and the badge's net_espnow.Link: id, send(bytes),
-recv() -> (sender, bytes) or (None, None), close(). id is the dongle's radio address,
-what the badges see this player's packets come from: asked for with a MAC_ASK frame,
-answered with a MAC_IS frame holding it (a random id if an old dongle doesn't answer). The sender is the 6-byte radio
-address of the badge (or dongle) that sent it, as on the badge.
+recv() -> (sender, bytes) or (None, None), close(). id is the link's radio address,
+what the badges see this player's packets come from: asked for with MAC_ASK, answered
+with MAC_IS holding it (a random id if nothing answers). The sender is the 6-byte radio
+address of the badge that sent it, as on the badge.
 
-On the wire, both ways, each packet is a frame: SYNC, a length byte n, then n bytes:
-the 6-byte address (the sender's; going out, broadcast) and the packet. A byte that
-isn't SYNC where a frame should start is skipped, so a frame cut short is resynced.
+On the wire each packet is a line of text (build 174; it was binary): ">" going to the
+link, "<" coming from it, then the 6-byte address (the sender's; going out, broadcast)
+and the packet in hex, then a newline. Text because the 2024 badge's firmware prints its
+own messages on the same port (they are skipped: not a "<" line of hex), and because no
+byte of it is Ctrl-C, so the link's REPL still answers mpremote.
 """
-SYNC = 0xA5
+import binascii
+
 ADDR = 6
 BROADCAST = b"\xff" * ADDR
-MAC_ASK = b"MAC?!!"         # to the dongle: what is your radio address?
+MAC_ASK = b"MAC?!!"         # to the link: what is your radio address?
 MAC_IS = b"MAC=!!"          # from it: the address, as the packet
-INFO_ASK = b"INFO?!"        # to the dongle: its channel and whether it found badges
+INFO_ASK = b"INFO?!"        # to the link: its channel and whether it found badges
 INFO_IS = b"INFO=!"         # from it: channel, found (0 / 1)
+STOP = b"STOP!!"            # to the 2022 dongle: stop (its REPL free afterwards)
 MAX = 250 - ADDR            # ESP-NOW carries at most 250 bytes
+OUT, IN = b">", b"<"        # a line's mark going to the link, coming from it
 
 
-def frame(addr, msg):
-    """One frame: SYNC, length, address, packet."""
+def frame(addr, msg, mark=OUT):
+    """One line: mark, address and packet in hex, newline."""
     msg = bytes(msg)
     if len(msg) > MAX:
         raise ValueError("packet too long for ESP-NOW: %d bytes" % len(msg))
-    return bytes((SYNC, ADDR + len(msg))) + bytes(addr) + msg
+    return mark + binascii.hexlify(bytes(addr) + msg) + b"\n"
 
 
 class Frames:
-    """Frames out of a byte stream that comes in pieces: feed(bytes), then next()."""
+    """Packets out of the lines of a byte stream that comes in pieces: feed(bytes),
+    then next(). A line that isn't a mark and whole bytes of hex is skipped."""
 
     def __init__(self):
         self.buf = bytearray()
@@ -41,49 +48,89 @@ class Frames:
         self.buf += data
 
     def next(self):
-        """(address, packet) for the next whole frame, or None."""
+        """(address, packet) for the next whole line, or None."""
         b = self.buf
-        while b:
-            if b[0] != SYNC:
-                i = b.find(bytes((SYNC,)))
-                del b[:len(b) if i < 0 else i]          # skip to the next SYNC
-                continue
-            if len(b) < 2:
+        while True:
+            i = b.find(b"\n")
+            if i < 0:
+                if len(b) > 4096:           # no newline in all that: junk
+                    del b[:]
                 return None
-            n = b[1]
-            if n < ADDR:
-                del b[:1]                               # not a frame: look further on
+            line = bytes(b[:i]).strip()
+            del b[:i + 1]
+            if len(line) < 1 + 2 * ADDR or line[:1] not in (OUT, IN):
                 continue
-            if len(b) < 2 + n:
-                return None                             # the rest is still coming
-            addr, msg = bytes(b[2:2 + ADDR]), bytes(b[2 + ADDR:2 + n])
-            del b[:2 + n]
-            return addr, msg
-        return None
+            try:
+                raw = binascii.unhexlify(line[1:])
+            except (binascii.Error, ValueError):
+                continue
+            return raw[:ADDR], raw[ADDR:]
 
 
-ESPRESSIF = 0x303A          # the USB vendor id of an ESP32-S3's own USB (the dongle)
+ESPRESSIF = 0x303A          # the USB vendor id of an ESP32-S3's own USB (the 2022 dongle)
+TILDAGON = 0x16D0           # the 2024 badge's
 
 
-def find_dongle():
-    """The dongle's serial port, or None: the first port with Espressif's USB vendor id
-    (pyserial's list, so Linux, Windows and macOS alike), else a by-id name saying
-    Espressif. The badges (Tildagon, 16d0) and the Tufty (Pimoroni) aren't picked."""
+def _ports():
+    """Serial ports that might be a link: Espressif's first, then badges."""
     try:
         from serial.tools import list_ports
-        for p in sorted(list_ports.comports(), key=lambda p: p.device):
-            if p.vid == ESPRESSIF:
-                return p.device
+        ps = sorted(list_ports.comports(), key=lambda p: p.device)
+        return ([p.device for p in ps if p.vid == ESPRESSIF]
+                + [p.device for p in ps if p.vid == TILDAGON])
     except Exception:
         pass
     import os
     d = "/dev/serial/by-id"
     try:
-        for n in sorted(os.listdir(d)):
-            if "espressif" in n.lower():
-                return os.path.join(d, n)
+        names = sorted(os.listdir(d))
     except OSError:
-        pass
+        return []
+    return ([os.path.join(d, n) for n in names if "espressif" in n.lower()]
+            + [os.path.join(d, n) for n in names if "tildagon" in n.lower()])
+
+
+def _answers(device, wait=1.5):
+    """Does something on device answer MAC_ASK? (A badge in the game ignores it.)"""
+    import time
+    import serial
+    try:
+        s = serial.Serial(device, 115200, timeout=0, write_timeout=0.2)
+    except Exception:
+        return False
+    try:
+        s.reset_input_buffer()
+        f = Frames()
+        end = time.time() + wait
+        asked = 0
+        while time.time() < end:
+            if time.time() >= asked + 0.5:
+                s.write(frame(MAC_ASK, b""))
+                asked = time.time()
+            n = s.in_waiting
+            if n:
+                f.feed(s.read(n))
+            while True:
+                got = f.next()
+                if got is None:
+                    break
+                if got[0] == MAC_IS:
+                    return True
+            time.sleep(0.02)
+        return False
+    except Exception:
+        return False
+    finally:
+        s.close()
+
+
+def find_dongle():
+    """The link's serial port, or None: the first port (Espressif's, then the badges')
+    whose program answers MAC_ASK: ESP-NOW Link or tools/bridge/main.py. Linux,
+    Windows and macOS alike (pyserial's list)."""
+    for d in _ports():
+        if _answers(d):
+            return d
     return None
 
 
@@ -93,7 +140,7 @@ class Link:
         if device in (None, "auto"):
             device = find_dongle()
             if device is None:
-                raise OSError("no bridge dongle found (an ESP32 running tools/bridge/main.py)")
+                raise OSError("no link found: start ESP-NOW Link on a badge (or a bridge dongle)")
         self.ser = serial.Serial(device, baud, timeout=0, write_timeout=0.05)
         self.ser.reset_input_buffer()
         self.frames = Frames()
@@ -123,7 +170,7 @@ class Link:
             if addr == MAC_IS and len(msg) == ADDR:
                 return bytes(msg)
             self.held.append(f)
-        print("bridge: the dongle didn't give its address (an old tools/bridge/main.py?)")
+        print("bridge: the link didn't give its address (an old ESP-NOW Link or bridge?)")
         return os.urandom(ADDR)
 
     def _next(self):
@@ -173,12 +220,12 @@ class Link:
         import os
         self.info()
         if self.channel is None:
-            ch = ("CHANNEL: ASKING THE DONGLE", "warn")
+            ch = ("CHANNEL: ASKING THE LINK", "warn")
         elif self.found:
             ch = ("CHANNEL: %d (BADGES FOUND)" % self.channel, "ok")
         else:
             ch = ("CHANNEL: %d HUNTING" % self.channel, "warn")
-        return [("LINK: BRIDGE (USB DONGLE)", "ok"),
+        return [("LINK: BADGE LINK (USB)", "ok"),
                 ("PORT: " + os.path.basename(os.path.realpath(self.device))[:20], ""),
                 ch,
                 ("YOU: " + ":".join("%02x" % x for x in self.id[3:]), "")]
@@ -186,7 +233,7 @@ class Link:
     def stop_dongle(self):
         """Tell the dongle program to stop (its REPL is free afterwards): a frame from
         tools/bridge/main.py's STOP_ADDR."""
-        self.ser.write(frame(b"STOP!!", b""))
+        self.ser.write(frame(STOP, b""))
 
     def close(self):
         try:

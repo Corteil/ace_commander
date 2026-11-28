@@ -2018,3 +2018,10 @@ what is now `ace.py` (renamed in build 50).
    lobby's last line NETWORK INFO: the link (ESP-NOW, UDP or bridge), channel, Wi-Fi and IP,
    your id, who is heard; on a badge on Wi-Fi, C leaves it for channel 1. Dongle tried with
    Brian's badge (packets both ways, channel 6 found); NETWORK INFO tested on the PC only.
+   **Build 174** (2026-11-28): the badge link is now text lines (">" / "<", address and packet in
+   hex), so a 2024 badge's firmware prints can share the port and no byte is Ctrl-C;
+   `--bridge` probes Espressif ports, then badges, for one that answers MAC_ASK. The 2024
+   badge's side is its own app, ESP-NOW Link (`~/Code/espnow_link`, Brian: "the link app
+   should be it own app", "a general tool"); the 2022 dongle's main.py speaks the same lines
+   (not yet copied to it). The 2022 dongle was one-way: the Pi heard Brian's badge, the badge
+   never heard the Pi (104 packets sent, no failures, same channel); cause not found.

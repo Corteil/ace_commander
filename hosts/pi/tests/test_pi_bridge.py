@@ -15,23 +15,25 @@ import net_bridge as nb     # noqa: E402
 
 MAC = bytes(range(1, 7))
 
-# a frame, and frames out of a stream that comes in pieces, with junk between
+# a line, and lines out of a stream that comes in pieces, with the firmware's own
+# prints between (as the 2024 badge's ESP-NOW Link app has)
 f = nb.frame(MAC, b"POSE-1")
-assert f == bytes((0xA5, 12)) + MAC + b"POSE-1", f
+assert f == b">010203040506504f53452d31\n", f
 fr = nb.Frames()
-stream = b"\x00\x13" + f + b"\xa5\x02junk" + nb.frame(MAC, b"second") + nb.frame(MAC, b"")
+stream = (b"ESP-NOW: listener(s) present\r\n" + nb.frame(MAC, b"POSE-1", nb.IN)
+          + b"<zz not hex\n<0102\n" + nb.frame(MAC, b"second", nb.IN) + b"ACE LINK\r\n"
+          + nb.frame(MAC, b"", nb.IN))
 for i in range(0, len(stream), 3):          # three bytes at a time
     fr.feed(stream[i:i + 3])
 got = []
 while True:
     x = fr.next()
     if x is None:
-        if len(got) >= 3 or not fr.buf:
-            break
-        continue
+        break
     got.append(x)
-assert got[0] == (MAC, b"POSE-1") and (MAC, b"second") in got and got[-1] == (MAC, b""), got
-print("frames: in pieces, junk skipped, empty packets: ok")
+assert got == [(MAC, b"POSE-1"), (MAC, b"second"), (MAC, b"")], got
+assert b"\x03" not in nb.frame(MAC, bytes(range(256))[:nb.MAX]), "no Ctrl-C on the wire"
+print("lines: in pieces, prints and bad lines skipped, empty packets, no Ctrl-C: ok")
 try:
     nb.frame(MAC, bytes(nb.MAX + 1))
     raise AssertionError("too long")
