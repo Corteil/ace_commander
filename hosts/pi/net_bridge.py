@@ -62,9 +62,38 @@ class Frames:
         return None
 
 
+ESPRESSIF = 0x303A          # the USB vendor id of an ESP32-S3's own USB (the dongle)
+
+
+def find_dongle():
+    """The dongle's serial port, or None: the first port with Espressif's USB vendor id
+    (pyserial's list, so Linux, Windows and macOS alike), else a by-id name saying
+    Espressif. The badges (Tildagon, 16d0) and the Tufty (Pimoroni) aren't picked."""
+    try:
+        from serial.tools import list_ports
+        for p in sorted(list_ports.comports(), key=lambda p: p.device):
+            if p.vid == ESPRESSIF:
+                return p.device
+    except Exception:
+        pass
+    import os
+    d = "/dev/serial/by-id"
+    try:
+        for n in sorted(os.listdir(d)):
+            if "espressif" in n.lower():
+                return os.path.join(d, n)
+    except OSError:
+        pass
+    return None
+
+
 class Link:
-    def __init__(self, device, baud=115200):
+    def __init__(self, device="auto", baud=115200):
         import serial           # pyserial (python3-serial)
+        if device in (None, "auto"):
+            device = find_dongle()
+            if device is None:
+                raise OSError("no bridge dongle found (an ESP32 running tools/bridge/main.py)")
         self.ser = serial.Serial(device, baud, timeout=0, write_timeout=0.05)
         self.ser.reset_input_buffer()
         self.frames = Frames()

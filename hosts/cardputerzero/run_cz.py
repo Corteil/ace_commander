@@ -248,7 +248,7 @@ def main(argv=None):
     ap.add_argument("--log-keys", action="store_true", help="print every key and the button it becomes")
     ap.add_argument("--pad", choices=("auto", "micro", "standard"), default="auto",
                     help="the game pad layout (as the Pi's run.py): auto, micro or standard")
-    ap.add_argument("--bridge", metavar="DEVICE", default=None,
+    ap.add_argument("--bridge", metavar="DEVICE", nargs="?", const="auto", default=None,
                     help="MULTIPLAYER with badges through a USB ESP-NOW dongle (tools/bridge)")
     ap.add_argument("--no-tilt", dest="tilt", action="store_false", default=True,
                     help="don't use its accelerometer for tilt steering")

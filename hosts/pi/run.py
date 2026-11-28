@@ -476,9 +476,9 @@ def main(argv=None):
     ap.add_argument("--sound", action="store_true", help="the game's sounds (Options > SOUND too)")
     ap.add_argument("--log-keys", action="store_true", help="print every key and the button it becomes")
     ap.add_argument("--frames", type=int, default=None, help="stop after this many frames")
-    ap.add_argument("--bridge", metavar="DEVICE", default=None,
+    ap.add_argument("--bridge", metavar="DEVICE", nargs="?", const="auto", default=None,
                     help="MULTIPLAYER with badges, over ESP-NOW through a USB dongle running "
-                         "tools/bridge/main.py (e.g. /dev/ttyACM0; Windows COM3)")
+                         "tools/bridge/main.py; found by itself, or name it (e.g. /dev/ttyACM1; Windows COM3)")
     ap.add_argument("--wide", dest="wide", action="store_true", default=True,
                     help="in the Elite layout, the badge's screens use the window's width, hints in one row "
                          "(the default, Brian)")
