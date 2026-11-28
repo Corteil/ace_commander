@@ -52,6 +52,8 @@ class _Cursor:
         self.info = None    # its galaxy.System
         self.cx = 0.0
         self.cy = 0.0
+        self.kx = 1             # across, things are drawn this many times narrower (the
+                                # local chart on a wide screen: the host stretches it back)
 
     def _start(self, sel):
         """Put the cursor on system sel if it is on the chart, else on you."""
@@ -126,11 +128,13 @@ class _Cursor:
         return s[2], s[3]
 
     def _box(self, ctx, x, y, h, rgb):
+        k = self.kx
+        hx = h if k == 1 else h * k
         ctx.rgb(*rgb)
-        ctx.rectangle(x - h, y - h, 2 * h + 1, 1).fill()
-        ctx.rectangle(x - h, y + h, 2 * h + 1, 1).fill()
-        ctx.rectangle(x - h, y - h, 1, 2 * h + 1).fill()
-        ctx.rectangle(x + h, y - h, 1, 2 * h + 1).fill()
+        ctx.rectangle(x - hx, y - h, 2 * hx + 1, 1).fill()
+        ctx.rectangle(x - hx, y + h, 2 * hx + 1, 1).fill()
+        ctx.rectangle(x - hx, y - h, 1, 2 * h + 1).fill()
+        ctx.rectangle(x + hx, y - h, 1, 2 * h + 1).fill()
 
     def _cursor(self, ctx, gap, arm):
         """A cross with a gap in the middle: yellow while the joystick moves
@@ -138,6 +142,14 @@ class _Cursor:
         x = int(self.cx)
         y = int(self.cy)
         ctx.rgb(*(cockpit.YELLOW if self.active else cockpit.GREY))
+        k = self.kx
+        if k != 1:                  # drawn narrower across (a wide screen's local chart)
+            x = x * k
+            ctx.rectangle(x - (gap + arm) * k, y, arm * k, 1).fill()
+            ctx.rectangle(x + (gap + 1) * k, y, arm * k, 1).fill()
+            ctx.rectangle(x, y - gap - arm, 1, arm).fill()
+            ctx.rectangle(x, y + gap + 1, 1, arm).fill()
+            return
         ctx.rectangle(x - gap - arm, y, arm, 1).fill()
         ctx.rectangle(x + gap + 1, y, arm, 1).fill()
         ctx.rectangle(x, y - gap - arm, 1, arm).fill()
@@ -145,7 +157,8 @@ class _Cursor:
 
     def _you(self, ctx, x, y, arm):
         ctx.rgb(*cockpit.GREEN)
-        ctx.rectangle(x - arm, y, 2 * arm + 1, 1).fill()
+        ax = arm if self.kx == 1 else arm * self.kx
+        ctx.rectangle(x - ax, y, 2 * ax + 1, 1).fill()
         ctx.rectangle(x, y - arm, 1, 2 * arm + 1).fill()
 
     def _texts(self, ctx, name_y, line_y, fuel_y):
@@ -200,23 +213,48 @@ class Chart(_Cursor):
             x0 = gal.xs[here]
             y0 = gal.ys[here]
         _Cursor.__init__(self, gal, here, fuel, sel, verb)
+        # a wide screen (config.wide, Brian: "the range should be round but the star field
+        # should fill out the sides"): systems out to wide times further left and right,
+        # all drawn wide times narrower, so the host's stretch leaves the range round
+        self.wide = config.wide or 0
+        if self.wide:
+            self.kx = 1.0 / self.wide
         for i in range(len(gal.xs)):
             px = (gal.xs[i] - x0) * SX2 // 2
             py = (gal.ys[i] - y0) * SY2 // 2
-            if px * px + py * py <= EDGE * EDGE:
+            if self._inside(px, py):
                 d = gal.distance(here, i) if at is None else gal.distance_xy(x0, y0, i)
                 self.dots.append((px, py, i, d))
         self._start(sel)
 
+    def _inside(self, x, y):
+        if self.wide:           # the whole width of a wide screen
+            return -EDGE * self.wide <= x <= EDGE * self.wide and -EDGE <= y <= EDGE
+        return x * x + y * y <= EDGE * EDGE
+
     def draw(self, ctx):
         ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()
         ctx.line_width = 1.5
+        k = self.kx
         if self.fuel > 0:       # how far a jump can go
-            ctx.rgb(*cockpit.DIM).arc(0, 0, self.fuel * PX_PER_FUEL, 0, cockpit.TAU, 0).stroke()
+            r = self.fuel * PX_PER_FUEL
+            ctx.rgb(*cockpit.DIM)
+            if k == 1:
+                ctx.arc(0, 0, r, 0, cockpit.TAU, 0).stroke()
+            else:               # an oval wide times narrower: round once stretched
+                import math
+                ctx.begin_path()
+                n = 48
+                for j in range(n + 1):
+                    a = cockpit.TAU * j / n
+                    (ctx.move_to if j == 0 else ctx.line_to)(r * k * math.cos(a), r * math.sin(a))
+                ctx.stroke()
         fuel = self.fuel
         for px, py, i, d in self.dots:
             if i == self.here:
                 continue
+            if k != 1:
+                px = px * k
             if 0 < d <= fuel:
                 ctx.rgb(*cockpit.WHITE).rectangle(px - 1, py - 1, 3, 3).fill()
             else:
@@ -225,7 +263,7 @@ class Chart(_Cursor):
         s = self.sel
         if s is not None:
             ok = self.target() is not None or s[2] == self.here
-            self._box(ctx, s[0], s[1], 5, cockpit.GREEN if ok else cockpit.RED)
+            self._box(ctx, s[0] * k if k != 1 else s[0], s[1], 5, cockpit.GREEN if ok else cockpit.RED)
         if config.more_hints:
             self._texts(ctx, -100, 88, 100)
             self._hint(ctx, 113)
