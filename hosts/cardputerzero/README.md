@@ -18,6 +18,8 @@ keyboard, 352 MB RAM). Phase 0's findings: `notes/cardputerzero_phase0.md`.
 - Stop it from a shell: `touch ~/.cache/ace_commander/stop` (or SIGTERM). Holding Esc in the
   launcher ends it too.
 - Test: `tests/test_cz_host.py` (SDL dummy driver), run by `tests/run_all.py`.
+- Key guide: `python3 tools/make_key_guide.py --platform cardputerzero` (in the Pi zip as
+  `KEY_GUIDE_CARDPUTERZERO.pdf`); game pads: `tools/make_pad_guide.py` (`PAD_GUIDE.pdf`).
 
 Saves and options are the Pi's: `~/.local/share/ace_commander/`.
 
