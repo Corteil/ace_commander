@@ -1,0 +1,2 @@
+{"device": "Raspberry Pi or another computer (no tilt sensor)",
+ "tilt_axes": [0, 1]}

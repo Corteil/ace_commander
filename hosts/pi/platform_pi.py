@@ -3,13 +3,17 @@ of the device it runs on, as platform_tildagon.py gives it on the badge. run.py
 sets config.platform to this module before the game is imported, so the game
 imports none of the badge's firmware and needs no stand-ins for it.
 
-The Pi has an LED ring drawn round the badge's screen (run.py reads LEDS), no
-tilt sensor, no firmware text entry (with a keyboard the game uses its own
+The Pi has an LED ring drawn round the badge's screen (run.py reads LEDS), a
+tilt sensor only if the host sets TILT (the CardputerZero's), no firmware text entry (with a keyboard the game uses its own
 typing pages) and its own frame loop (run.py's Host.run).
 """
 
 # the ring the game writes, LED 1 to 12 (0 unused), which run.py draws
 LEDS = [(0, 0, 0)] * 13
+
+# a tilt sensor, if the host has one (the CardputerZero's BMI270): a function giving the
+# acceleration (x, y, z) in g, or None if it can't be read; set before the game starts
+TILT = None             # (its axes: the host's device.json, "tilt_axes")
 
 
 def owner_name():
@@ -30,7 +34,8 @@ class Platform:
         self.app = app
         self.leds = True        # drawn round the screen in the badge layout
         self.leds_on = False    # the game has written to them since it last let go
-        self.tilt_ok = False
+        self.tilt_ok = TILT is not None
+        self.tx = self.ty = self.tz = 0.0
         self.fast = False       # run.py runs the frames itself
         self.quit = False       # the game asked to leave: run.py ends
         self.host = None        # run.Host (its pad_last: the pad was used last), set by run.py
@@ -56,7 +61,19 @@ class Platform:
                 LEDS[i] = (0, 0, 0)
 
     def tilt(self):
-        return False
+        """Read TILT into tx, ty, tz (in g): True, or False if there is none or it
+        failed (then tilt_ok is False from then on)."""
+        if not self.tilt_ok:
+            return False
+        try:
+            a = TILT()
+        except Exception:
+            a = None
+        if a is None:
+            self.tilt_ok = False
+            return False
+        self.tx, self.ty, self.tz = a
+        return True
 
     def keyboard_fitted(self):
         return False

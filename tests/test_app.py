@@ -162,11 +162,12 @@ tick(a, fresh=["A"]); assert not a.paused
 # tilt steering, with the joystick still working and D to re-zero
 ahead, side = rocks(mod, g)
 tick(a)
-assert a.zero == (0.0, 0.0)
-Imu.reading = [0.3 * G, 0.0, G]
+assert a.zero[:2] == (0.0, 0.0)   # the level pose: (x, y, z) in g
+assert a.tilt_axes == (1, 1.0, 1.0), a.tilt_axes     # the badge's device.json
+Imu.reading = [0.0, 0.3 * G, G]     # the badge's IMU y runs across the screen: roll
 y = side.y
 tick(a); assert side.y != y, "tilt rolls"
-Imu.reading = [0.0, 0.3 * G, G]
+Imu.reading = [0.3 * G, 0.0, G]     # and x up it: pitch
 y = ahead.y
 tick(a); assert ahead.y != y, "tilt pitches"
 Imu.reading = [0.4 * G, 0.4 * G, G]
@@ -190,7 +191,7 @@ assert g.msg == "", "one missile per hold"
 tick(a)
 assert a.zero == z, "and letting go after a hold doesn't re-zero"
 Imu.reading = [0.0, 0.0, G]
-tick(a, fresh=["D"]); assert a.zero == (0.0, 0.0)
+tick(a, fresh=["D"]); assert a.zero[:2] == (0.0, 0.0)
 tick(a, fresh=["A"]); a.fmenu = a._fitems_top().index("SETTINGS"); tick(a, fresh=["C"])
 tick(a, fresh=["JOYLEFT"]); assert not a.use_tilt
 tick(a, fresh=["F"]); a.fmenu = a._fitems_top().index("QUIT TO TITLE"); tick(a, fresh=["C"])

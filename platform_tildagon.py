@@ -225,7 +225,7 @@ class Platform:
         self.leds = tildagonos is not None
         self.leds_on = False        # we have taken over the LEDs
         self.led_level = None       # (r, g, b) last written to the whole ring
-        self.tilt_ok = imu is not None
+        self.tilt_ok = imu is not None      # (its axes: device.json, "tilt_axes")
         self.tx = self.ty = 0.0     # the last tilt reading, in g
         self.picker_choice = True   # Options > TEXT ENTRY: its own dialog or the letter picker
         self.fast = scheduler is not None
@@ -399,17 +399,18 @@ class Platform:
     # ---- tilt -------------------------------------------------------------
 
     def tilt(self):
-        """Read the accelerometer into tx, ty (in g): True, or False if it
+        """Read the accelerometer into tx, ty, tz (in g): True, or False if it
         failed (then tilt_ok is False from then on). No new object per frame."""
         if not self.tilt_ok:
             return False
         try:
-            ax, ay, _ = imu.acc_read()
+            ax, ay, az = imu.acc_read()
         except Exception:
             self.tilt_ok = False
             return False
         self.tx = ax / 9.81
         self.ty = ay / 9.81
+        self.tz = az / 9.81     # all three: tilt at any holding angle (ace._level_axes)
         return True
 
     # ---- keyboard and text entry -----------------------------------------

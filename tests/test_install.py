@@ -39,6 +39,7 @@ for d in ("tests/test_app.py", "tools/shipmaker.py", "CLAUDE.md"):
 
 # only the app: no tests, tools, notes, or anything made from Elite
 assert "app.py" in names and "tildagon.toml" in names and "LICENSE" in names
+assert "device.json" in names, "the badge's own defaults (tilt axes) go with the app"
 for bad in ("ship_data.py", "game_data.py", "elite_sfx.py", "CLAUDE.md", "DESIGN.md", "deploy.bat"):
     assert bad not in names, bad
 assert not any(n.startswith(("tests", "tools")) for n in names), names
