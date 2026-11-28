@@ -44,7 +44,30 @@ import pty, tty     # noqa: E401,E402
 master, slave = pty.openpty()
 tty.setraw(slave)
 tty.setraw(master)
+# the dongle answers MAC_ASK with its address, which becomes the link's id; a badge's
+# packet that arrives meanwhile is kept for recv()
+import threading    # noqa: E402
+DONGLE = b"\xf4\x12\xfa\x4e\x4d\xb0"
+
+
+def dongle():
+    got = b""
+    while nb.frame(nb.MAC_ASK, b"") not in got:
+        got += os.read(master, 100)
+    os.write(master, nb.frame(MAC, b"early") + nb.frame(nb.MAC_IS, DONGLE))
+
+
+th = threading.Thread(target=dongle)
+th.start()
 link = nb.Link(os.ttyname(slave))
+th.join()
+assert link.id == DONGLE, link.id
+who, msg = link.recv()
+assert who == MAC and bytes(msg) == b"early", (who, msg)
+os.write(master, nb.frame(nb.INFO_IS, b"\x06\x01"))
+time.sleep(0.05)
+assert link.recv() == (None, None) and link.channel == 6 and link.found
+print("id: the dongle's address; a packet meanwhile kept; INFO_IS gives channel 6: ok")
 link.send(b"HELLO")
 time.sleep(0.05)
 out = os.read(master, 100)
