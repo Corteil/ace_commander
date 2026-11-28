@@ -18,43 +18,25 @@ record mode), then:
 Flight's own frames (the 3D view, dashboard, pause menu) are drawn as before
 (screen_key says which frames are whole screens).
 """
-import re
+import os
+import sys
 
 import pygame
 
 from ctx_pygame import Ctx, relabel
 
+_HOSTS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _HOSTS not in sys.path:
+    sys.path.insert(0, _HOSTS)
+import fit_core     # noqa: E402  (the placing shared with the Tufty)
+from fit_core import (MAX_ASPECT, FLIGHT_MODES, SCREENS, OVERLAP, clear, fits, screen_key,  # noqa: E402,F401
+                      fit as _fit, nudges, centre as _centre)
+
 GREY = (179, 179, 191)          # cockpit.GREY, (0.7, 0.7, 0.75), as Ctx stores it
-# a hint: the badge's letters before a colon ("C: buy", "C or F: back"), or the
-# screen-turning arrows ("< > screens"), "up / down:", "UP/DOWN letter", "stick:"
-HINT = re.compile(r"(?<![A-Za-z0-9])[A-F](?:(?:, | or | / |/)[A-F])*:|< >|up ?/ ?down|UP/DOWN|stick:")
 HINT_SIZE = 11                  # the hint row's font size (canvas points, times Ctx.text_k)
-GAP = "    "                    # between the hints in the row
-MARGIN = 3                      # pixels kept clear round the edge
-MAX_X = 2.4                     # spread across at most this many times the plain scale
-MAX_Y = 1.7                     # and down at most this many times
-MAX_ASPECT = 1.5                # and across at most this many times more than down
-                                # (the game's config.wide: its ships keep their shape)
-FLIGHT_MODES = ("flight", "launch", "docking", "mlaunch")
-SCREENS = ("status", "inventory", "market", "chart", "data")   # ace.SCREENS: whole-frame in flight
-
-
-def screen_key(app):
-    """Which whole-frame screen the game shows, as a key to remember its placement
-    by, or None: flight's own frames (the 3D view and dashboard, the pause menu
-    over them, the tunnels) and the speed test."""
-    mode = getattr(app, "mode", "")
-    if mode == "flight":
-        if app.fsub in SCREENS and not app.paused:
-            return (mode, app.fsub)
-        return None
-    if mode in FLIGHT_MODES or mode == "bench":
-        return None
-    dock = getattr(app, "dock", None)
-    return (mode, dock.name() if mode == "docked" and dock is not None else None)
+GAP = fit_core.GAP
+MARGIN = fit_core.MARGIN
 MIN_TEXT_K = 1.3                # a full screen's text is made smaller, down to this
-OVERLAP = 0.25                  # lines of text may overlap by this much of their height
-                                # (a font's box has room above and below its letters)
 
 
 class FitCtx(Ctx):
@@ -101,7 +83,7 @@ class FitCtx(Ctx):
         if self.rec is None:
             return Ctx.text(self, s)
         s = str(s)
-        if self.col == GREY and self.alpha >= 255 and HINT.search(s):
+        if self.col == GREY and self.alpha >= 255 and fit_core.is_hint(s):
             self.hints.append(s)
         else:
             self.rec.append(("text", s, self.cur, self.font_size, self.text_align,
@@ -126,10 +108,10 @@ class FitCtx(Ctx):
 
     def extents(self, ops, k=None):
         """Each thing's anchor in canvas units and how far it reaches round it in
-        pixels: (x, y, left, right, up, down, is_text), its text k times bigger.
+        pixels: (x, y, left, right, up, down, op number or -1), its text k times bigger.
         A background (a fill over most of the canvas) doesn't count."""
         out = []
-        for op in ops:
+        for n, op in enumerate(ops):
             if op[0] == "text":
                 _, s, (x, y), size, align, base, _, _ = op
                 w, h = self.text_size(s, self.px(size, k))
@@ -140,83 +122,23 @@ class FitCtx(Ctx):
                     t = 0
                 else:
                     t = -h * 0.8
-                out.append((x, y, l, l + w, t, t + h, True))
+                out.append((x, y, l, l + w, t, t + h, n))
                 continue
             _, shape, paths, _, _, _ = op
             if shape and shape[0] == "rect":
                 _, x, y, w, h = shape
                 if abs(w) >= 200 and abs(h) >= 200:
                     continue        # the screen's background
-                out.append((x, y, 0, 0, 0, 0, False))
-                out.append((x + w, y + h, 0, 0, 0, 0, False))
+                out.append((x, y, 0, 0, 0, 0, -1))
+                out.append((x + w, y + h, 0, 0, 0, 0, -1))
             elif shape and shape[0] == "circle":
                 _, x, y, r = shape
-                out.append((x - r, y - r, 0, 0, 0, 0, False))
-                out.append((x + r, y + r, 0, 0, 0, 0, False))
+                out.append((x - r, y - r, 0, 0, 0, 0, -1))
+                out.append((x + r, y + r, 0, 0, 0, 0, -1))
             for pts in paths:
                 for (x, y) in pts:
-                    out.append((x, y, 0, 0, 0, 0, False))
+                    out.append((x, y, 0, 0, 0, 0, -1))
         return out
-
-
-def fit(ext, base, w, h):
-    """The scales across and down and the canvas's 0 in pixels (sx, sy, y0) that put
-    the things in ext (FitCtx.extents) inside a w x h area, centred across on x = 0."""
-    if not ext:
-        return base, base, h / 2.0
-    half = w / 2.0 - MARGIN
-    sx = base * MAX_X
-    for x, _, l, r, _, _, _ in ext:
-        if x > 0.5:
-            sx = min(sx, (half - r) / x)
-        elif x < -0.5:
-            sx = min(sx, (half + l) / -x)
-    sx = max(base, sx)
-    ymin = min(e[1] for e in ext)
-    ymax = max(e[1] for e in ext)
-    room = h - 2 * MARGIN
-    sy = base * MAX_Y
-    if ymax > ymin:
-        for _ in range(4):          # the text's own height doesn't scale: settle on sy
-            top = min(y * sy + t for _, y, _, _, t, _, _ in ext)
-            bot = max(y * sy + d for _, y, _, _, _, d, _ in ext)
-            if bot - top <= room + 0.5:
-                break
-            fixed = (bot - top) - (ymax - ymin) * sy
-            sy = max(base * 0.8, (room - fixed) / (ymax - ymin))
-    sy = min(sy, base * MAX_Y)
-    sx = max(min(sx, sy * MAX_ASPECT), min(base, sy))
-    top = min(y * sy + t for _, y, _, _, t, _, _ in ext)
-    bot = max(y * sy + d for _, y, _, _, _, d, _ in ext)
-    y0 = MARGIN + (room - (bot - top)) / 2.0 - top
-    return sx, sy, y0
-
-
-def clear(ext, sx, sy):
-    """Whether no two lines of text overlap (by more than OVERLAP of their height)."""
-    texts = sorted((e for e in ext if e[6]), key=lambda e: e[1])
-    for i, a in enumerate(texts):
-        ax, ay, al, ar, at, ad, _ = a
-        for b in texts[i + 1:]:
-            bx, by, bl, br, bt, bd, _ = b
-            if by <= ay:
-                continue            # side by side on one line: columns
-            if ax * sx + al >= bx * sx + br or bx * sx + bl >= ax * sx + ar:
-                continue            # not above one another
-            lap = (ay * sy + ad) - (by * sy + bt)
-            if lap > OVERLAP * min(ad - at, bd - bt):
-                return False
-    return True
-
-
-def fits(ext, sx, sy, y0, w, h):
-    """Whether everything in ext lands inside w x h with this placement."""
-    for x, y, l, r, t, d, _ in ext:
-        X = w / 2.0 + x * sx
-        Y = y0 + y * sy
-        if X + l < -1 or X + r > w + 1 or Y + t < -1 or Y + d > h + 1:
-            return False
-    return True
 
 
 class Fitter:
@@ -234,7 +156,7 @@ class Fitter:
         draw(ctx)
         ops, hints = ctx.stop()
         # the hint row along the bottom (each hint's own wide gaps made two spaces)
-        row = GAP.join(re.sub(" {2,}", "  ", h.strip()) for h in hints)
+        row = GAP.join(_squeeze(h) for h in hints)
         if labels and row:
             row = relabel(row, labels)
         hh = 0
@@ -256,7 +178,7 @@ class Fitter:
             tk = ctx.text_k if place is None else place[3]
             while True:             # the biggest text whose lines don't overlap
                 ext = ctx.extents(ops, tk)
-                sx, sy, y0 = fit(ext, base, W, area)
+                sx, sy, y0 = _fit(ext, base, W, area, MAX_ASPECT)
                 if place is not None:   # only ever closer together: no jumping about
                     sx, sy = min(sx, place[0]), min(sy, place[1])
                     y0 = _centre(ext, sy, area)
@@ -272,8 +194,7 @@ class Fitter:
         ctx.ox, ctx.oy, ctx.sx, ctx.s = W / 2.0, y0, sx, sy
         keep_k = ctx.text_k
         ctx.text_k = tk * base / sy            # text in pixels at tk, whatever the spread
-        nudge = _nudges([(i, ctx.extents([op], tk)[0]) for i, op in enumerate(ops) if op[0] == "text"],
-                        sx, sy, y0, H - hh)
+        nudge = nudges(ctx.extents(ops, tk), sx, sy, y0, H - hh)
         try:
             for i, op in enumerate(ops):
                 if op[0] == "text":
@@ -302,32 +223,9 @@ class Fitter:
         return place
 
 
-def _nudges(texts, sx, sy, y0, bottom):
-    """Pixels to move lines of text down by so none overlaps the one above it
-    (more than OVERLAP), keyed by op number; texts is [(op number, extent)];
-    nothing goes past bottom."""
-    texts = [(y0 + e[1] * sy + e[4], y0 + e[1] * sy + e[5], e[0] * sx + e[2], e[0] * sx + e[3], i)
-             for i, e in texts]
-    texts.sort()
-    out = {}
-    placed = []                 # (top, bottom, left, right) where each line ended up
-    for top, bot, left, right, i in texts:
-        d = 0.0
-        for pt, pb, pl, pr in placed:
-            if left >= pr or pl >= right or pt >= top + d:
-                continue
-            lap = pb - (top + d)
-            room = OVERLAP * min(pb - pt, bot - top)
-            if lap > room:
-                d += lap - room
-        d = min(d, max(0.0, bottom - bot))
-        if d:
-            out[i] = d
-        placed.append((top + d, bot + d, left, right))
-    return out
-
-
-def _centre(ext, sy, area):
-    top = min(y * sy + t for _, y, _, _, t, _, _ in ext) if ext else 0
-    bot = max(y * sy + d for _, y, _, _, _, d, _ in ext) if ext else 0
-    return MARGIN + (area - 2 * MARGIN - (bot - top)) / 2.0 - top
+def _squeeze(h):
+    """A hint with its own wide gaps made two spaces."""
+    h = h.strip()
+    while "   " in h:
+        h = h.replace("   ", "  ")
+    return h

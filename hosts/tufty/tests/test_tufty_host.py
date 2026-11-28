@@ -12,6 +12,7 @@ TUFTY = os.path.dirname(HERE)
 REPO = os.path.dirname(os.path.dirname(TUFTY))
 sys.path.insert(0, HERE)
 sys.path.insert(0, TUFTY)
+sys.path.insert(0, os.path.dirname(TUFTY))     # hosts/: fit_core (copied in by build_tufty)
 sys.path.insert(0, os.path.dirname(REPO))
 SHOTS = os.path.join(HERE, "shots")
 os.makedirs(SHOTS, exist_ok=True)
@@ -260,7 +261,20 @@ press("B")
 assert a.mode == "docked", a.mode
 assert h.ace.SAVE_PATH.startswith(data) and os.path.exists(h.ace.SAVE_PATH), "saved in the data folder"
 shot("tufty_docked")
+# wide (Brian: on by default): docked screens fitted to the 320 width, the hints in one
+# row along the bottom, the game's wide pages on (config.wide = 4 / 3)
+assert h.wide and sys.modules["ace_commander.config"].wide == host_tufty.ASPECT
 d = a.dock
+d.open("MARKET")
+frames(3)
+place = [v for (k, row), v in h.placer.places.items() if k == ("docked", "MARKET")]
+assert place and place[0][0] > 1.2, place           # spread across (1 is the 240 square)
+assert lit(0, 228, 320, 240) > 10, "the hint row along the bottom"
+assert lit(0, 60, 30, 200) > 0 or lit(290, 60, 320, 200) > 0, "something out at the sides"
+shot("tufty_market_wide")
+d.open("STATUS")
+frames(2)
+print("Tufty wide: the market spread %.2f across, hints along the bottom: ok" % place[0][0])
 d.open("GALACTIC CHART")
 pad_press("A")              # the chart's cursor (the badge's C)
 assert d.name() == "GALACTIC CHART" and d.cursor, (d.name(), d.cursor)

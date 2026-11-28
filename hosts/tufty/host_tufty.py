@@ -13,6 +13,7 @@ import os
 import time
 
 import controls_tufty
+import fit_core
 import platform_tufty
 from ctx_tufty import Ctx
 from layout_tufty import TuftyLayout
@@ -40,6 +41,9 @@ DIM = (0.15, 0.3, 0.18)
 LOAD_HOLD = 3000        # ms the loading screen stays at least, to see the ship (Brian)
 DATA_DIR = "/state/ace_commander"
 SCREEN_W, SCREEN_H = 320, 240
+WIDE = True             # the badge's screens fitted to the Tufty's width (fit_core; Brian: on by default)
+ASPECT = SCREEN_W / SCREEN_H    # at most this much wider than tall: the game's config.wide
+HINT_SIZE = 11          # the hint row's game text size
 # Qw/ST Pad: I2C0 on GP4 / GP5 at 0x21 (G1, 2026-11-19). Never GP6 / GP7: BUTTON_A
 # is GPIO7, and opening I2C there dropped the Tufty off USB.
 PAD_SDA, PAD_SCL, PAD_ADDR = 4, 5, 0x21
@@ -87,6 +91,9 @@ class Host:
         self.data_dir = data_dir
         self.feed = controls_tufty.Feed()
         self.ctx = Ctx(screen, color, shape, font, SCREEN_W // 2, SCREEN_H // 2)
+        self.wide = WIDE
+        self.rec = fit_core.Recorder() if WIDE else None    # whole-frame screens drawn into it
+        self.placer = fit_core.Placer(ASPECT) if WIDE else None
         self.app = None         # the game, once the loading screen has imported it
         self.done = 0           # modules imported so far
         self.error = None       # why loading failed, if it did
@@ -245,6 +252,8 @@ class Host:
             m.practice_upgrades = True  # practice waves drop upgrade canisters (build 113)
             m.laser_leds = False        # no laser colour on the LED border (Brian, build 113)
             m.more_hints = True         # a square screen: hints on the charts and title (build 129)
+            if self.wide:
+                m.wide = ASPECT         # the game's wide pages (charts, Shipyard, Hangar)
             self.ctx.labels = controls_tufty.LABELS     # hints name the Tufty's buttons
             m.platform = platform_tufty
             m.input = self.feed.attach
@@ -356,10 +365,48 @@ class Host:
         ctx = self.ctx
         ctx.ox = SCREEN_W // 2
         ctx.oy = SCREEN_H // 2
-        self.app.draw(ctx)
+        key = fit_core.screen_key(self.app) if self.wide else None
+        if key is None:
+            self.app.draw(ctx)
+        else:
+            self._draw_fitted(key)
         self._lights()
         self.frames += 1
         return None
+
+    def _draw_fitted(self, key):
+        """A whole-frame screen fitted to the Tufty's width (fit_core): drawn into
+        the recorder, its hints in one row along the bottom, the rest spread over
+        the width and the height left; the pixel fonts keep their sizes."""
+        rec = self.rec
+        rec.start()
+        self.app.draw(rec)
+        ops = rec.ops
+        ctx = self.ctx
+        row = fit_core.hint_row(ops)
+        hh = 0
+        size = HINT_SIZE
+        if row:
+            w, h = ctx.measure(row, size)
+            while w > SCREEN_W - 4 and size > 8:    # a smaller font if the row is too long
+                size -= 1
+                w, h = ctx.measure(row, size)
+            hh = h + 1
+        area = SCREEN_H - hh
+        ext = fit_core.extents(ops, ctx.measure)
+        sx, sy, y0 = self.placer.place((key, row), ext, 1, SCREEN_W, area)
+        nudge = fit_core.nudges(ext, sx, sy, y0, area)
+        for n in nudge:
+            nudge[n] = nudge[n] / sy        # pixels to canvas units
+        ctx.ox = SCREEN_W // 2
+        ctx.oy = 0
+        fit_core.replay(ctx, ops, sx, sy, y0, nudge)
+        if row:
+            ctx.font_size = size
+            ctx.text_align = ctx.CENTER
+            ctx.text_baseline = "bottom"
+            ctx.rgb(*fit_core.GREY).move_to(0, SCREEN_H - 1).text(row)
+        ctx.oy = SCREEN_H // 2
 
     def on_exit(self):
         """HOME pressed (Badgeware calls this, then resets to the launcher)."""

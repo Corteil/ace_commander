@@ -205,6 +205,21 @@ class Ctx:
                 return f
         return self._fonts[-1][1] if self._fonts else None
 
+    def measure(self, s, size):
+        """A text's (w, h) in pixels at game size `size`, as text() would draw it
+        (for the fitted screens: fit_core)."""
+        keep = self.font_size
+        self.font_size = size
+        f = self._pick_font()
+        self.font_size = keep
+        scr = self.screen
+        if f is not None and f is not self._font:
+            scr.font = f
+            self._font = f
+        if self.labels:
+            s = relabel(s, self.labels)
+        return scr.measure_text(s)
+
     def text(self, s):
         s = str(s)
         if self.labels:

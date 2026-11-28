@@ -30,6 +30,7 @@ OUT = os.path.join(REPO, "build", "tufty", "ace_commander")
 HOST_FILES = ("host_tufty.py", "platform_tufty.py", "controls_tufty.py", "layout_tufty.py",
               "dash_tufty.py", "ctx_tufty.py", "dialog_tufty.py", "buzzer_tufty.py")
 APP_FILES = ("__init__.py", "icon.png")
+SHARED_FILES = ("fit_core.py",)     # from hosts/: the fitted wide screens
 ELITE = ("ship_data.py", "game_data.py", "elite_sfx.py")    # with --elite, if made
 TUFTY_MPY = "v6.3"              # what the Tufty's MicroPython 1.29 loads
 MPY_CROSS = (os.path.expanduser("~/.local/share/venvs/mpycross129/bin/mpy-cross"), "mpy-cross")
@@ -55,6 +56,8 @@ def build(elite):
         shutil.copy2(os.path.join(HERE, "app", f), os.path.join(OUT, f))
     for f in HOST_FILES:
         shutil.copy2(os.path.join(HERE, f), os.path.join(OUT, f))
+    for f in SHARED_FILES:          # the hosts' shared files (hosts/)
+        shutil.copy2(os.path.join(os.path.dirname(HERE), f), os.path.join(OUT, f))
     files = game_files(elite)
     for f in files:
         shutil.copy2(os.path.join(REPO, f), os.path.join(pkg, f))
