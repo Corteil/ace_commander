@@ -66,7 +66,7 @@ PATH"), run `pip install pygame` in a Command Prompt, unzip this file, then from
 %USERPROFILE%\\.local\\share\\ace_commander\\, screenshots (F12) in %USERPROFILE%\\Pictures\\Ace Commander\\.
 
 The M5 CardputerZero runs this same download: see ace_commander/hosts/cardputerzero/README.md
-(run_cz.py on its LCD; install.sh puts it on the launcher).
+(run_cz.py on its LCD; install.sh puts it on the launcher). Its keys: KEY_GUIDE_CARDPUTERZERO.pdf.
 """
 
 
@@ -182,6 +182,8 @@ def build_pi(v):
     with open(os.path.join(stage, "README_PI.txt"), "w") as f:
         f.write(PI_README.format(v=v))
     key_guide("pi", stage)
+    import make_key_guide               # the CardputerZero's own keys (it runs this zip too)
+    make_key_guide.make("cardputerzero", os.path.join(stage, "KEY_GUIDE_CARDPUTERZERO.pdf"))
     pad_guide(stage)
     pi_smoke(stage)
     path = os.path.join(OUT, "ace_commander-pi-%s.zip" % v)

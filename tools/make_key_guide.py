@@ -1,6 +1,6 @@
 """The Ace Commander key guides, an A4 page each (the Pi's two): the badge (its buttons and the
-Keyboard Hexpansion), the Raspberry Pi (keyboard and game pad) and the Tufty 2350
-(its five buttons and the Qw/ST Pad).
+Keyboard Hexpansion), the Raspberry Pi (keyboard and game pad), the Tufty 2350
+(its five buttons and the Qw/ST Pad) and the M5 CardputerZero (its keyboard).
 
 Usage: python tools/make_key_guide.py [--platform badge|pi|tufty|all] [out.pdf]
 With no file given: key_guide.pdf (the badge), key_guide_pi.pdf, key_guide_tufty.pdf
@@ -309,6 +309,71 @@ def pi():
         device="the Raspberry Pi")
 
 
+def cardputerzero():
+    H = ["Action", "Keys"]
+    A2, B2 = W * 0.46, W * 0.54
+    arrows = k("Fn") + " + " + k(";", ".", ",", "/")
+    left = [
+        section("FLYING", table([
+            ["Pitch (nose up / down)", k("W", "S") + " or " + k("Fn") + " + " + k(";", ".")],
+            ["Roll left / right", k("A", "D") + " or " + k("Fn") + " + " + k(",", "/")],
+            ["Fire lasers (hold)", k("Space") + " " + k("F") + " " + k("Enter")],
+            ["Speed up / slow down", k("+") + " / " + k("−") + " or " + k("E") + " / " + k("Q")],
+            ["Fire missile", k("M")],
+            ["Energy bomb", k("Backspace") + " or " + k("Tab")],
+            ["Escape pod (if fitted)", k("Esc") + " (a tap)"],
+            ["Jump drive (in-system)", "Hold " + k("J")],
+            ["Views: front / rear / left / right", k("1", "2", "3", "4") + " · next " + k("V")],
+            ["Docking computer on / off", k("C") + " / " + k("P")],
+            ["Pause menu", k("P") + " (docking computer off)"],
+        ], [A2, B2], H)),
+        Paragraph(k("H") + " hyperspace to the target, " + k("Shift") + " + " + k("H")
+                  + " the galactic hyperdrive. The jump drive needs full speed, no ships on the "
+                  "radar and no planet or sun close by. Hardcore: " + k("E") + " is the E.C.M., "
+                  + k("T") + " / " + k("U") + " arm / disarm a missile.", note),
+    ]
+    right = [
+        section("MENUS, DOCKED, TITLE", table([
+            ["Move, pick a line, change it", k("W", "A", "S", "D") + " or " + arrows],
+            ["Choose / buy", k("Enter") + ", " + k("C") + " or " + k("Z")],
+            ["Sell / D's things", k("X")],
+            ["Launch / the badge's A", k("Q") + " or " + k("1")],
+            ["Next / previous screen (docked)", k("D") + " / " + k("A")],
+            ["Options (docked)", k("=")],
+            ["Back", k("Esc")],
+        ], [A2, B2], H)),
+        Paragraph("On menus and screens " + k("W") + k("A") + k("S") + k("D")
+                  + " are the arrows, so the badge's A, C and D buttons move to " + k("Q") + ", "
+                  + k("Z") + " and " + k("X") + "; the hints on screen name them. Typing a "
+                  "name, every key types.", note),
+        Paragraph("Docked by number: " + k("2") + " market, " + k("4") + " equip, "
+                  + k("−") + " shipyard, " + k("9") + " status, " + k("0") + " inventory.", note),
+        section("SCREENS IN FLIGHT", table([
+            [k("5") + " " + k("6"), "Galactic / local chart"], [k("7"), "System data"],
+            [k("8"), "Market prices (view only)"], [k("9"), "Commander status"],
+            [k("0"), "Inventory"],
+        ], [W * 0.22, W * 0.78])),
+        Paragraph("On a screen " + k("W") + k("A") + k("S") + k("D") + " (or " + arrows
+                  + ") move the cursor, " + k("Enter") + " / " + k("Z") + " targets, "
+                  + k("X") + " system data, " + k("Esc") + " back to space.", note),
+        Paragraph("A game pad works too: PAD_GUIDE.pdf draws the 8BitDo Micro's and other pads' "
+                  "buttons. Options go on the launcher entry: "
+                  "<font name=\"Mono\" size=\"7.6\">sudo sh install.sh --debug --duel --pad micro</font>. "
+                  "Quit: hold " + k("Esc") + " (the launcher) or QUIT on the title screen.",
+                  note),
+    ]
+    return dict(
+        heading="ACE COMMANDER · KEYS · CARDPUTERZERO",
+        sub="The M5 CardputerZero's own keyboard, in flight and docked. Keys follow BBC Elite’s "
+            "layout where the game has the same feature.",
+        pages=[(left, right)],
+        heading2="",
+        footer=["Fn + ; . , / are the arrow keys. Holding Esc quits through the launcher, so tap it "
+                "for the escape pod.",
+                "Saves go in ~/.local/share/ace_commander/, logs in ~/.cache/ace_commander/."],
+        device="the M5 CardputerZero")
+
+
 # ---- the Tufty 2350 ---------------------------------------------------------------------
 
 def tufty():
@@ -388,7 +453,8 @@ def tufty():
 
 
 PLATFORMS = {"badge": (badge, "key_guide.pdf"), "pi": (pi, "key_guide_pi.pdf"),
-             "tufty": (tufty, "key_guide_tufty.pdf")}
+             "tufty": (tufty, "key_guide_tufty.pdf"),
+             "cardputerzero": (cardputerzero, "key_guide_cardputerzero.pdf")}
 
 
 def make(platform, out=None):
