@@ -101,10 +101,11 @@ TILT_SWAP_AXES = False  # True if the badge's x axis should pitch, y roll
 # flight controls up / down (pitch), left / right (roll), or both, whichever
 # way you steer: tilt, joystick or keyboard (not the charts' cursor)
 TILT_FLIPS = ("NORMAL", "UP/DOWN FLIPPED", "L/R FLIPPED", "BOTH FLIPPED")
-# TILT SETUP's choices (Brian: "tilt needs a test and setup screen"): the tilt that gives
-# full rate and the dead zone, in g (sin of the angle); shown in degrees
-TILT_FULLS = (0.30, 0.40, 0.50, 0.60, 0.70)
-TILT_DEADS = (0.05, 0.08, 0.10, 0.15, 0.20)
+# TILT SETUP (Brian: "tilt needs a test and setup screen"): the tilt that gives full rate
+# and the dead zone, set a degree at a time (Brian: "fine tune") within these ranges,
+# kept in g (the sine of the angle)
+TILT_FULL_DEG = (17, 44)
+TILT_DEAD_DEG = (3, 12)
 TILT_ITEMS = ("LEVEL", "FULL TILT", "DEAD ZONE", "SWAP AXES", "TILT PITCH", "TILT ROLL")
 
 INVERT_PITCH = False    # False: joystick up raises the nose. True: up dives.
@@ -743,7 +744,7 @@ class AceCommander(PLATFORM.App):
         elif self.mode == "odebug":
             self._update_odebug(dt, cancel, confirm)
         elif self.mode == "tiltset":
-            self._update_tiltset(cancel, confirm)
+            self._update_tiltset(dt, cancel, confirm)
         elif self.mode == "brief":
             b = self.brief
             held = pad.held
@@ -2313,10 +2314,10 @@ class AceCommander(PLATFORM.App):
                 self.use_tilt = d["tilt"] and self.tilt_ok
             t = d.get("tilt_setup")         # TILT SETUP: [full, dead, swap, pitch sign, roll sign]
             if isinstance(t, list) and len(t) == 5:
-                if t[0] in TILT_FULLS:
-                    self.t_full = t[0]
-                if t[1] in TILT_DEADS:
-                    self.t_dead = t[1]
+                if isinstance(t[0], (int, float)) and TILT_FULL_DEG[0] <= _deg(t[0]) <= TILT_FULL_DEG[1]:
+                    self.t_full = float(t[0])
+                if isinstance(t[1], (int, float)) and TILT_DEAD_DEG[0] <= _deg(t[1]) <= TILT_DEAD_DEG[1]:
+                    self.t_dead = float(t[1])
                 self.t_swap = bool(t[2])
                 self.t_psign = -1.0 if t[3] < 0 else 1.0
                 self.t_rsign = -1.0 if t[4] < 0 else 1.0
@@ -2520,10 +2521,11 @@ class AceCommander(PLATFORM.App):
                 "TILT PITCH: " + ("NORMAL" if self.t_psign > 0 else "FLIPPED"),
                 "TILT ROLL: " + ("NORMAL" if self.t_rsign > 0 else "FLIPPED")]
 
-    def _update_tiltset(self, cancel, confirm):
-        """Up / down picks a line, left / right (or C) changes it; C on LEVEL takes the
-        way the device is held now as level; F goes back. The sensor is read every
-        frame for the picture (_draw_tiltset)."""
+    def _update_tiltset(self, dt, cancel, confirm):
+        """Up / down picks a line, left / right (or C) changes it, FULL TILT and DEAD
+        ZONE a degree at a time, repeating while held; C on LEVEL takes the way the
+        device is held now as level; F goes back. The sensor is read every frame for
+        the picture (_draw_tiltset)."""
         hit = self.pad.hit
         if not self.platform.tilt():
             self.tilt_ok = self.use_tilt = False
@@ -2539,19 +2541,26 @@ class AceCommander(PLATFORM.App):
         if hit("j_down"):
             self.ts_sel = (self.ts_sel + 1) % n
             return
-        left = hit("j_left")
-        if not (left or hit("j_right") or confirm):
-            return
-        step = -1 if left else 1
         item = TILT_ITEMS[self.ts_sel]
+        if item in ("FULL TILT", "DEAD ZONE"):      # a degree at a time, held: repeating
+            left = self._repeat("j_left", dt)
+            if not (left or self._repeat("j_right", dt) or confirm):
+                return
+        else:
+            left = hit("j_left")
+            if not (left or hit("j_right") or confirm):
+                return
+        step = -1 if left else 1
         if item == "LEVEL":
             self.zero = None            # the next reading is level
         elif item == "FULL TILT":
-            i = TILT_FULLS.index(self.t_full) if self.t_full in TILT_FULLS else 2
-            self.t_full = TILT_FULLS[(i + step) % len(TILT_FULLS)]
+            lo, hi = TILT_FULL_DEG
+            d = min(hi, max(lo, _deg(self.t_full) + step))
+            self.t_full = math.sin(math.radians(d))
         elif item == "DEAD ZONE":
-            i = TILT_DEADS.index(self.t_dead) if self.t_dead in TILT_DEADS else 2
-            self.t_dead = TILT_DEADS[(i + step) % len(TILT_DEADS)]
+            lo, hi = TILT_DEAD_DEG
+            d = min(hi, max(lo, _deg(self.t_dead) + step))
+            self.t_dead = math.sin(math.radians(d))
         elif item == "SWAP AXES":
             self.t_swap = not self.t_swap
         elif item == "TILT PITCH":

@@ -64,7 +64,8 @@ before = (a.t_full, a.t_dead, a.t_swap, a.t_psign, a.t_rsign)
 for sel in range(1, 6):
     a.ts_sel = sel
     a.pad.hit = lambda n, _s=sel: n == "j_right"
-    a._update_tiltset(False, False)
+    a._update_tiltset(0.04, False, False)
+    a.held_t.clear()
 del a.pad.hit
 after = (a.t_full, a.t_dead, a.t_swap, a.t_psign, a.t_rsign)
 assert all(x != y for x, y in zip(before, after)), (before, after)
@@ -72,7 +73,23 @@ with open(os.path.join(data, "options.json")) as f:
     saved = json.load(f)["tilt_setup"]
 assert saved == [a.t_full, a.t_dead, a.t_swap, a.t_psign, a.t_rsign], saved
 assert "FULL TILT: %d DEG" % ace._deg(a.t_full) in a._tilt_lines()
-a._update_tiltset(True, False)  # F: back
+# FULL TILT and DEAD ZONE go a degree at a time and stop at their ends
+def right(sel, times=1):
+    a.ts_sel = sel
+    for _ in range(times):
+        a.pad.hit = lambda n: n == "j_right"
+        a._update_tiltset(0.04, False, False)
+        a.held_t.clear()
+    del a.pad.hit
+d0 = ace._deg(a.t_full)
+right(1)
+assert ace._deg(a.t_full) == min(d0 + 1, ace.TILT_FULL_DEG[1]), (d0, ace._deg(a.t_full))
+right(1, 60)
+assert ace._deg(a.t_full) == ace.TILT_FULL_DEG[1], ace._deg(a.t_full)
+right(2, 30)
+assert ace._deg(a.t_dead) == ace.TILT_DEAD_DEG[1], ace._deg(a.t_dead)
+print("FULL TILT / DEAD ZONE a degree at a time, %d and %d at most: ok" % (ace.TILT_FULL_DEG[1], ace.TILT_DEAD_DEG[1]))
+a._update_tiltset(0.04, True, False)  # F: back
 assert a.mode == "menu", a.mode
 print("settings changed and saved %s; F goes back: ok" % saved)
 
