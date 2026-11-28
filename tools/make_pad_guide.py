@@ -59,7 +59,10 @@ MICRO = {
         ("L", "shoulder", -29, 22, 15, 4.2), ("L2", "shoulder", -13, 21.6, 9, 3.4),
         ("R2", "shoulder", 13, 21.6, 9, 3.4), ("R", "shoulder", 29, 22, 15, 4.2),
     ],
-    "escape": (25.5, -25),      # the middle buttons' wires go straight up / down to these first
+    "above": ("L", "L2", "-", "+", "R2", "R"),     # labelled in a row above the pad
+    "below": ("STAR", "HOME"),                      # and below it
+    "row_y": (30, -26),         # the rows' heights, mm from the pad's centre
+    "side_mid": 0,
     "letters": {"X": "X", "A": "A", "B": "B", "Y": "Y", "-": "−", "+": "+", "HOME": "⌂",
                 "STAR": "★", "L": "L", "R": "R", "L2": "L2", "R2": "R2"},
 }
@@ -78,7 +81,10 @@ STANDARD = {
         ("LT", "shoulder", -28, 30, 16, 4.5), ("LB", "shoulder", -28, 25, 18, 3.6),
         ("RT", "shoulder", 28, 30, 16, 4.5), ("RB", "shoulder", 28, 25, 18, 3.6),
     ],
-    "escape": (34, -18),        # above the shoulder buttons
+    "above": ("LT", "LB", "BACK", "GUIDE", "START", "RB", "RT"),
+    "below": ("LSTICK", "DPAD", "RSTICK"),
+    "row_y": (35, -26),
+    "side_mid": 4,
     "letters": {"Y": "Y", "B": "B", "A": "A", "X": "X", "BACK": "◁", "START": "▷",
                 "GUIDE": "⌂", "LB": "LB", "RB": "RB", "LT": "LT", "RT": "RT",
                 "LSTICK": "L", "RSTICK": "R"},
@@ -199,13 +205,15 @@ def _letters(c, cx, cy, pad):
 
 
 def drawing(c, cx, cy, pad, labels, colour, heading):
-    """The pad at (cx, cy) with each button's job pointed out: labels (left, right)."""
+    """The pad at (cx, cy) with each button's job pointed out. labels: (left, right);
+    the pad's "above" and "below" buttons (shoulders, the little ones in the middle)
+    have theirs in a row above or below it instead (Brian: the labels can float round
+    the pad), ordered left to right so their wires don't cross."""
     c.setFillColor(colour)
     c.setFont("Sans-Bold", 12)
-    c.drawCentredString(cx, cy + 46 * mm, heading)
-    # shoulders first, behind the body
+    c.drawCentredString(cx, cy + 50 * mm, heading)
     centres = {}
-    for b in pad["buttons"]:
+    for b in pad["buttons"]:            # shoulders first, behind the body
         if b[1] == "shoulder":
             centres[b[0]] = _button(c, cx, cy, b)
     _body(c, cx, cy, pad)
@@ -213,34 +221,64 @@ def drawing(c, cx, cy, pad, labels, colour, heading):
         if b[1] != "shoulder":
             centres[b[0]] = _button(c, cx, cy, b)
     _letters(c, cx, cy, pad)
-    # a button in the middle (|x| < 10 mm) points out straight up or down off the pad
-    # first, so its wire doesn't run across the others (Brian: wires mustn't cross)
-    start = {}
-    up, down = pad.get("escape", (None, None))
-    for b in pad["buttons"]:
-        name, bx, by = b[0], b[2], b[3]
-        if abs(bx) < 10 and b[1] != "shoulder" and up is not None:
-            start[name] = (cx + bx * U, cy + (up if by > 0 else down) * U)
-        else:
-            start[name] = centres[name]
-    left, right = labels
-    for side, items in ((-1, left), (1, right)):
+    above, below = set(pad.get("above", ())), set(pad.get("below", ()))
+    every = list(labels[0]) + list(labels[1])
+    rows = (([it for it in every if it[0] in above], cy + pad["row_y"][0] * mm, 1),
+            ([it for it in every if it[0] in below], cy + pad["row_y"][1] * mm, -1))
+    fixed = []                          # the rows' wires: the side columns mustn't cross them
+    for items, y, up in rows:
+        if not items:
+            continue
+        # left to right; of buttons one above another (LT over LB) the one nearer the row
+        # gets the inner label, so their wires don't cross
+        near = lambda it: up * centres[it[0]][1]         # noqa: E731  (nearer the row: larger)
+        items.sort(key=lambda it: (round(centres[it[0]][0], 1),
+                                   near(it) if centres[it[0]][0] < cx else -near(it)))
         n = len(items)
-        top = cy + 36 * mm
-        step = 72 * mm / max(1, n - 1) if n > 1 else 0
+        span = min(W - 28 * mm, n * 34 * mm)
+        room = span / n - 2 * mm
+        for i, (name, text) in enumerate(items):
+            x = cx - span / 2 + span * (i + 0.5) / n
+            lines = _wrap(text, room)
+            bx, by = centres[name]
+            c.setStrokeColor(colour)
+            c.setLineWidth(0.5)
+            end = y - up * 1.5 * mm             # the wire ends just short of the text
+            c.line(bx, by, x, end)
+            fixed.append(((bx, by), (x, end)))
+            c.setFillColor(colour)
+            c.circle(bx, by, 0.7, stroke=0, fill=1)
+            c.setFillColor(INK)
+            c.setFont("Sans", TEXT)
+            for j, line in enumerate(lines):
+                k = (len(lines) - 1 - j) if up > 0 else j      # grow away from the pad
+                c.drawCentredString(x, y + up * k * (TEXT + 1.5) - (0 if up > 0 else TEXT), line)
+    for side, items in ((-1, labels[0]), (1, labels[1])):
+        items = [it for it in items if it[0] not in above and it[0] not in below]
+        n = len(items)
+        if not n:
+            continue
+        step = min(14 * mm, 52 * mm / max(1, n - 1))
         lx = cx + side * (COL - 4 * mm)      # where the pointer lines bend
         tx = cx + side * COL
-        slots = [top - i * step for i in range(n)]
-        items = _uncrossed(items, start, lx, slots)
+        found = None
+        for drop in range(0, 9):            # lower the column until its wires cross none
+            mid = cy + (pad.get("side_mid", 0) - drop * 4) * mm
+            slots = [mid + (n - 1) * step / 2 - i * step for i in range(n)]
+            found = _uncrossed(items, centres, lx, slots, fixed)
+            if found is not None:
+                break
+        if found is None:
+            mid = cy + pad.get("side_mid", 0) * mm
+            slots = [mid + (n - 1) * step / 2 - i * step for i in range(n)]
+            found = _uncrossed(items, centres, lx, slots) or items
+        items = found
         for i, (name, text) in enumerate(items):
             ty = slots[i]
             bx, by = centres[name]
-            sx, sy = start[name]
             c.setStrokeColor(colour)
             c.setLineWidth(0.5)
-            if (sx, sy) != (bx, by):
-                c.line(bx, by, sx, sy)          # straight off the pad first
-            c.line(sx, sy, lx, ty)
+            c.line(bx, by, lx, ty)
             c.line(lx, ty, tx - side * 1 * mm, ty)
             c.setFillColor(colour)
             c.circle(bx, by, 0.7, stroke=0, fill=1)
@@ -248,11 +286,11 @@ def drawing(c, cx, cy, pad, labels, colour, heading):
             c.setFont("Sans", TEXT)
             lines = _wrap(text)
             for j, line in enumerate(lines):
-                y = ty - 3 - j * (TEXT + 1.5) + (len(lines) - 1) * (TEXT + 1.5) / 2
+                yy = ty - 3 - j * (TEXT + 1.5) + (len(lines) - 1) * (TEXT + 1.5) / 2
                 if side < 0:
-                    c.drawRightString(tx, y, line)
+                    c.drawRightString(tx, yy, line)
                 else:
-                    c.drawString(tx, y, line)
+                    c.drawString(tx, yy, line)
 
 
 def _crosses(a, b, c, d):
@@ -276,7 +314,7 @@ def _near(a, b, p, r):
     return (qx - p[0]) ** 2 + (qy - p[1]) ** 2 < r * r
 
 
-def _uncrossed(items, centres, lx, slots):
+def _uncrossed(items, centres, lx, slots, fixed=()):
     """items in an order whose pointer lines (from centres[name] to (lx, slot)) don't
     cross each other (Brian: "the label wires should not cross"), with as few as can be
     passing over another button: a branch-and-bound search over the orders. As given,
@@ -312,6 +350,8 @@ def _uncrossed(items, centres, lx, slots):
             b = (lx, slots[k])
             if any(_crosses(a, b, centres[order[j][0]], (lx, slots[m])) for m, j in enumerate(chosen)):
                 continue
+            if any(_crosses(a, b, f0, f1) for f0, f1 in fixed):
+                continue
             used[i] = True
             chosen.append(i)
             place(k + 1, total + cost(i, k))
@@ -319,19 +359,19 @@ def _uncrossed(items, centres, lx, slots):
             used[i] = False
 
     place(0, 0)
-    return [order[i] for i in best[0]] if best[0] is not None else order
+    return [order[i] for i in best[0]] if best[0] is not None else None
 
 
-def _wrap(text):
-    """text in lines no wider than ROOM (at TEXT), broken after its colon if it can be,
-    else between words."""
-    if pdfmetrics.stringWidth(text, "Sans", TEXT) <= ROOM:
+def _wrap(text, room=None):
+    """text in lines no wider than room (default ROOM, at TEXT), broken between words."""
+    room = ROOM if room is None else room
+    if pdfmetrics.stringWidth(text, "Sans", TEXT) <= room:
         return [text]
     words = text.split(" ")
     lines = [""]
     for w in words:
         t = (lines[-1] + " " + w).strip()
-        if pdfmetrics.stringWidth(t, "Sans", TEXT) <= ROOM or not lines[-1]:
+        if pdfmetrics.stringWidth(t, "Sans", TEXT) <= room or not lines[-1]:
             lines[-1] = t
         else:
             lines.append(w)
