@@ -1970,3 +1970,13 @@ what is now `ace.py` (renamed in build 50).
    (`_inside`: a box, not the circle) and draws everything wide times narrower (`_Cursor.kx`:
    dots, the range as a 48-point oval, the box, cursor and you-are-here), so the host's stretch
    leaves the range round; the cursor and distances are unchanged. The Pi gets it with --wide too.
+   **Wide by default** (2026-11-28, Brian: "the wide screen should be for the pi and tufty" ...
+   "wide should be on by default"). The fitting's shared part is `hosts/fit_core.py` (plain
+   Python, MicroPython too: `is_hint` without `re`, `screen_key`, `fit` with an `aspect`,
+   `fits`, `clear`, `nudges`, `Recorder` that stands in for a ctx, `replay` through any ctx,
+   `Placer`); `hosts/pi/fit_pygame.py` uses its maths. The Pi: wide is the default (`--no-wide`
+   turns it off). The Tufty (`host_tufty.WIDE`): whole-frame screens drawn into a Recorder,
+   placed (aspect 4 / 3, its fonts keep their pixel sizes: `Ctx.measure`) and replayed, the
+   hints in one row along the bottom; `config.wide` 4 / 3, so its charts, Shipyard and Hangar
+   use the wide pages; build_tufty copies fit_core.py in. Not yet on the Tufty itself (tested
+   on the sim_badgeware stand-ins only).

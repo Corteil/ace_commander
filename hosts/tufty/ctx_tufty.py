@@ -53,6 +53,8 @@ class Ctx:
         self._cy = 0.0
         self._stack = []
         self.labels = None      # {"C": "B", ...}: the hints' badge letters renamed (relabel)
+        self.small = 0          # no text in a font for sizes below this (the fitted screens:
+                                # Brian, the smallest font "almost unreadable")
         self._fonts = []
         for size, name in FONTS:
             f = getattr(font, name, None)
@@ -200,10 +202,27 @@ class Ctx:
     # text ----------------------------------------------------------------
     def _pick_font(self):
         size = self.font_size
+        if size < self.small:
+            size = self.small
         for top, f in self._fonts:
             if size <= top:
                 return f
         return self._fonts[-1][1] if self._fonts else None
+
+    def measure(self, s, size):
+        """A text's (w, h) in pixels at game size `size`, as text() would draw it
+        (for the fitted screens: fit_core)."""
+        keep = self.font_size
+        self.font_size = size
+        f = self._pick_font()
+        self.font_size = keep
+        scr = self.screen
+        if f is not None and f is not self._font:
+            scr.font = f
+            self._font = f
+        if self.labels:
+            s = relabel(s, self.labels)
+        return scr.measure_text(s)
 
     def text(self, s):
         s = str(s)

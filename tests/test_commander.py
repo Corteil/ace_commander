@@ -373,15 +373,16 @@ assert "DEBUG - BUILD %s" % _ver in tx, "the DEBUG page shows the build"
 assert d._fitems() == ["SHIP", "SPAWN", "TRAVEL", "COMMANDER", "DISPLAY"], d._fitems()
 debug(d, "INVINCIBLE")
 assert "INVINCIBLE: ON" in texts(d) and g.god
-# seven lines at a time, the chosen one in the middle, going round the end of the list
+# DEBUG_ROWS (5) lines at a time, the chosen one in the middle, going round the end of the list
 debug(d, "ADD AN ENEMY")
 d.fmenu = 0
 tx = texts(d)
 items = d._fitems()
 assert len(items) > mod.DEBUG_ROWS, items
+half = mod.DEBUG_ROWS // 2
 shown = [t for t in tx if t in items]
-assert shown == [items[i % len(items)] for i in range(-3, 4)], shown
-assert items[3] in shown and items[4] not in shown
+assert shown == [items[i % len(items)] for i in range(-half, half + 1)], shown
+assert items[half] in shown and items[half + 1] not in shown
 tick(d, fresh=["JOYUP"]); assert d.fmenu == len(items) - 1, "up from the top goes round"
 tick(d, fresh=["JOYDOWN"]); assert d.fmenu == 0
 g.objs[:] = [o for o in g.objs if o.kind != "ship"]
@@ -880,7 +881,8 @@ assert d.tab == 0 and "F: back to status" in texts(e)
 tx = texts(e)
 before = c.docking
 assert "STEER: JOYSTICK" in tx and "DOCKING: " + mod.DOCK_NAMES[before] in tx, tx
-assert "CONSTRICTOR: 2 MIN" in tx and "CONTROLS: NORMAL" in tx
+opts = e._settings(True)        # more than fit: the menu loops round the chosen line
+assert "CONSTRICTOR: 2 MIN" in opts and "CONTROLS: NORMAL" in opts, opts
 tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["JOYDOWN"]); tick(e, fresh=["JOYDOWN"])   # past CONTROLS, NAME
 tick(e, fresh=["C"])
 after = commander.DOCKING[(commander.DOCKING.index(before) + 1) % 3]

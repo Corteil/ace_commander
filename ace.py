@@ -104,7 +104,8 @@ TILT_FLIPS = ("NORMAL", "UP/DOWN FLIPPED", "L/R FLIPPED", "BOTH FLIPPED")
 
 INVERT_PITCH = False    # False: joystick up raises the nose. True: up dives.
 SHOW_FRAME_TIME = True  # small frame time (ms) at the top of the flight screen, to start with
-DEBUG_ROWS = 7          # DEBUG page lines shown at once, the chosen one in the middle
+DEBUG_ROWS = 5          # DEBUG page lines shown at once, the chosen one in the middle
+DEBUG_STEP = 20         # and how far apart (Brian: 7 at 16 was "over crowded")
 VOLUME_MAX = 11         # Options > VOLUME 1-11 (build 145): as sfx.VOLUME_MAX and
 VOLUME_DEFAULT = 8      # VOLUME_DEFAULT (not imported here: sfx costs heap without sound)
 USE_LEDS = True         # flash the badge's LEDs red when hit (else a ring on screen)
@@ -2383,7 +2384,7 @@ class AceCommander(PLATFORM.App):
         n = len(items)
         if not n:
             return
-        most, step = cockpit.menu_rows(DEBUG_ROWS, 16)
+        most, step = cockpit.menu_rows(DEBUG_ROWS, DEBUG_STEP)
         if n <= most:           # all of it fits: in order, top to bottom
             for i in range(n):
                 y = (i - (n - 1) / 2) * step
@@ -3383,6 +3384,11 @@ class AceCommander(PLATFORM.App):
                 self._draw_screen(ctx)
                 ctx.restore()
                 return
+            if self.paused:     # the pause menu, Settings and DEBUG on black (Brian: the
+                ctx.rgb(0, 0, 0).rectangle(-120, -120, 240, 240).fill()  # flight behind
+                self._draw_fmenu(ctx)                                    # was too busy)
+                ctx.restore()
+                return
             t0 = _us()
             cockpit.draw_world(ctx, self.game)
             t1 = _us()
@@ -3463,7 +3469,6 @@ class AceCommander(PLATFORM.App):
 
     def _draw_fmenu(self, ctx):
         text = cockpit.text
-        ctx.rgba(0, 0, 0, 0.85).rectangle(-100, -80, 200, 142).fill()
         if self.fsub in ("debug", "dgroup"):
             self._draw_list(ctx, self._debug_title(self.fsub, self.dgroup), self._fitems(),
                             self.fmenu, None)

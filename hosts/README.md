@@ -7,6 +7,11 @@ runs the same game files on another device:
 - `pi/`: a Raspberry Pi (or any computer with Python 3 and pygame), in a window or full screen.
   See `pi/PLAN.md`.
 - `tufty/`: the Pimoroni Tufty 2350 on Badgeware v3 (since build 109).
+- `cardputerzero/`: the M5 CardputerZero (320 x 170), on the Pi's host.
+- `fit_core.py`: fitting the badge's 240 screens to a wider screen (hints in one row along
+  the bottom, the rest spread over the width; the game's `config.wide` pages), shared by the
+  Pi (`pi/fit_pygame.py`), the CardputerZero and the Tufty; plain Python that runs on
+  MicroPython. On by default everywhere but the badge (the Pi's `--no-wide` turns it off).
 - `presto/`: the Pimoroni Presto (RP2350, 4" square touchscreen, buzzer): a plan only so far,
   `presto/PLAN.md` (2026-11-22).
 

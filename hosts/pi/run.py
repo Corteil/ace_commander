@@ -3,7 +3,8 @@
     python3 hosts/pi/run.py                   as last time (first time: the badge's round screen)
     python3 hosts/pi/run.py --layout elite    a 3D view over an Elite-style dashboard
     python3 hosts/pi/run.py --full            full screen (--window: in a window)
-    python3 hosts/pi/run.py --wide            the Elite layout's screens use the window's width
+    python3 hosts/pi/run.py --no-wide         the Elite layout's screens 240 square in the middle
+                                              (by default they use the window's width: Brian)
 
 F10 switches between the badge layout and the Elite one, F11 full screen, F12 saves
 a screenshot (in ~/Pictures/Ace Commander); the window can be any size. The choice is kept in pi.json in the data folder.
@@ -471,8 +472,11 @@ def main(argv=None):
     ap.add_argument("--sound", action="store_true", help="the game's sounds (Options > SOUND too)")
     ap.add_argument("--log-keys", action="store_true", help="print every key and the button it becomes")
     ap.add_argument("--frames", type=int, default=None, help="stop after this many frames")
-    ap.add_argument("--wide", action="store_true",
-                    help="in the Elite layout, the badge's screens use the window's width (hints in one row)")
+    ap.add_argument("--wide", dest="wide", action="store_true", default=True,
+                    help="in the Elite layout, the badge's screens use the window's width, hints in one row "
+                         "(the default, Brian)")
+    ap.add_argument("--no-wide", dest="wide", action="store_false",
+                    help="the badge's screens as a 240 square in the middle")
     ap.add_argument("--duel", type=int, nargs="?", const=47001, default=None, metavar="PORT",
                     help="MULTIPLAYER on the title screen: up to four players over UDP broadcast (two windows "
                          "on one Pi, or two computers on one network); PORT default 47001")
