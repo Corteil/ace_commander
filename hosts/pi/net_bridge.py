@@ -138,6 +138,22 @@ class Link:
                 continue
             return addr, memoryview(msg)
 
+    def net_info(self):
+        """The NETWORK INFO page's lines: (text, kind), kind "ok", "warn" or "". Asks
+        the dongle its channel again, for the next time (the answer comes in recv)."""
+        import os
+        self.info()
+        if self.channel is None:
+            ch = ("CHANNEL: ASKING THE DONGLE", "warn")
+        elif self.found:
+            ch = ("CHANNEL: %d (BADGES FOUND)" % self.channel, "ok")
+        else:
+            ch = ("CHANNEL: %d HUNTING" % self.channel, "warn")
+        return [("LINK: BRIDGE (USB DONGLE)", "ok"),
+                ("PORT: " + os.path.basename(os.path.realpath(self.device))[:20], ""),
+                ch,
+                ("YOU: " + ":".join("%02x" % x for x in self.id[3:]), "")]
+
     def stop_dongle(self):
         """Tell the dongle program to stop (its REPL is free afterwards): a frame from
         tools/bridge/main.py's STOP_ADDR."""

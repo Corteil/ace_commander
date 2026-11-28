@@ -437,6 +437,44 @@ check("app join: HAL leaves, the guest is back in the lobby saying so",
       b.mode == "duel" and not b.dueling and b.duel.role == duel.LOBBY
       and "HOST LEFT" in [t[0] for t in c.texts], str([t[0] for t in c.texts]))
 
+# ---- NETWORK INFO (Brian, 2026-11-28): the lobby's last line; the link's own lines,
+# who is heard; on a badge on Wi-Fi C leaves it
+c = bs.CountCtx()
+b.draw(c)
+check("lobby: NETWORK INFO is its last line", "NETWORK INFO" in [t[0] for t in c.texts],
+      str([t[0] for t in c.texts]))
+left = []
+mine3.net_info = lambda: [("LINK: TEST", "ok"), ("CHANNEL: 6", "")]
+mine3.can_leave_wifi = lambda: not left
+mine3.leave_wifi = lambda: left.append(1)
+for _ in range(6):
+    if b.d_info:
+        break
+    bs.tick(b, fresh=["JOYUP"])         # up from HOST A GAME goes round to NETWORK INFO
+    if not b.d_info:
+        bs.tick(b, fresh=["CONFIRM"])
+check("lobby: C on NETWORK INFO opens it", b.d_info and b.duel.role == duel.LOBBY)
+c = bs.CountCtx()
+b.draw(c)
+got = [t[0] for t in c.texts]
+check("NETWORK INFO: the link's lines, who is heard, C to leave Wi-Fi",
+      "LINK: TEST" in got and "CHANNEL: 6" in got and any(t.startswith("HEARD: HAL") for t in got)
+      and any("LEAVE WI-FI" in t for t in got), str(got))
+bs.tick(b, fresh=["CONFIRM"])
+c = bs.CountCtx()
+b.draw(c)
+check("NETWORK INFO: C left Wi-Fi, and isn't offered again",
+      left == [1] and not any("LEAVE WI-FI" in t[0] for t in c.texts))
+bs.tick(b, fresh=["CANCEL"])
+check("NETWORK INFO: F back to the lobby", not b.d_info and b.mode == "duel")
+del mine3.net_info
+b.d_info = True
+b.d_info_lines = None
+c = bs.CountCtx()
+b.draw(c)
+check("NETWORK INFO: a link without net_info says LINK: ?", "LINK: ?" in [t[0] for t in c.texts])
+b.d_info = False
+
 print()
 if fails:
     print("%d FAILED: %s" % (len(fails), ", ".join(fails)))

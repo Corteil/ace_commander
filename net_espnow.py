@@ -34,6 +34,10 @@ BROADCAST = b"\xff" * 6
 _NONE = (None, None)
 
 
+def _hex(b):
+    return ":".join("%02x" % x for x in b)
+
+
 async def _never(event):
     pass                        # (the service's reader is paused: nothing comes)
 
@@ -111,6 +115,56 @@ class Link:
         if self.listening is None:  # so the service keeps the radio awake
             eventbus.on_async(event, _never, self)
             self.listening = (eventbus, event)
+
+    def net_info(self):
+        """The NETWORK INFO page's lines (ace._draw_netinfo): (text, kind), kind
+        "ok", "warn" or "" (plain)."""
+        import network
+        sta = network.WLAN(network.STA_IF)
+        try:
+            ch = sta.config("channel")
+        except Exception:
+            ch = self.channel if self.e is not None else None
+        lines = [("LINK: ESP-NOW (RADIO)", "ok"),
+                 ("CHANNEL: %s" % ("?" if ch is None else ch), "")]
+        if sta.isconnected():
+            try:
+                ssid = sta.config("ssid")
+            except Exception:
+                ssid = "?"
+            lines.append(("WI-FI: " + str(ssid)[:16], "warn"))
+            try:
+                lines.append(("IP: " + sta.ifconfig()[0], ""))
+            except Exception:
+                pass
+            lines.append(("OTHERS MUST BE ON CH %s" % ch, "warn"))
+        else:
+            lines.append(("WI-FI: NOT CONNECTED", ""))
+        if self.id:
+            lines.append(("YOU: " + _hex(self.id[3:]), ""))
+        return lines
+
+    def can_leave_wifi(self):
+        """On a network (so on its channel, not CHANNEL): NETWORK INFO offers to leave."""
+        import network
+        return network.WLAN(network.STA_IF).isconnected()
+
+    def leave_wifi(self):
+        """Off the network and onto CHANNEL, where badges off any network are."""
+        import network
+        sta = network.WLAN(network.STA_IF)
+        try:
+            sta.disconnect()
+        except Exception:
+            pass
+        try:
+            sta.config(channel=self.channel_wanted)
+        except Exception:
+            pass
+        try:
+            self.channel = sta.config("channel")
+        except Exception:
+            self.channel = self.channel_wanted
 
     def close(self):
         """Give the radio back: the firmware's ESP-NOW service reads it again."""

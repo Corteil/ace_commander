@@ -379,7 +379,11 @@ class AceCommander(PLATFORM.App):
         self.d_mode = 0         # the mode the next game hosted starts on (duel.MODE_NAMES)
         self.d_row = 0          # the HOSTING page's line: mode, team, pirates
         self.duel_err = None    # the radio wouldn't open: why
-        self.d_sel = 0          # the duel lobby's line: 0 HOST A GAME, then a JOIN for each host
+        self.d_sel = 0          # the duel lobby's line: 0 HOST A GAME, then a JOIN for each host,
+                                # then NETWORK INFO
+        self.d_info = False     # the NETWORK INFO page is open (from the lobby)
+        self.d_info_lines = None    # its link lines, asked again every second
+        self.d_info_t = 0
         self.n_hardcore = False # the new-commander page's HARDCORE
         self.n_sel = 0          # and its line: 0 NAME (build 89), 1 LEVEL, 2 HARDCORE
         self.game = None
@@ -941,9 +945,16 @@ class AceCommander(PLATFORM.App):
             self.dueling = True
             return
         hit = self.pad.hit
+        if d.role == dm.LOBBY and self.d_info:     # NETWORK INFO: F back, C leaves Wi-Fi
+            if cancel:
+                self.d_info = False
+            elif confirm and self._can_leave_wifi(d):
+                d.link.leave_wifi()
+                self.d_info_lines = None
+            return
         if d.role == dm.LOBBY:
             hosts = d.hosts()
-            n = 1 + len(hosts)
+            n = 2 + len(hosts)          # HOST A GAME, the JOINs, NETWORK INFO
             if self.d_sel >= n:
                 self.d_sel = n - 1
             if cancel:
@@ -956,6 +967,9 @@ class AceCommander(PLATFORM.App):
                 if self.d_sel == 0:
                     d.host(self.d_mode)
                     self.d_row = 0
+                elif self.d_sel == n - 1:
+                    self.d_info = True
+                    self.d_info_lines = None
                 else:
                     d.join(hosts[self.d_sel - 1])
         elif cancel:
@@ -1000,6 +1014,42 @@ class AceCommander(PLATFORM.App):
                 d.choose_team(1 - t)
 
     SHOWN = 6           # the HOSTING page's lines shown at once (it scrolls)
+
+    @staticmethod
+    def _can_leave_wifi(d):
+        f = getattr(d.link, "can_leave_wifi", None)
+        return f is not None and f()
+
+    def _draw_netinfo(self, ctx, d):
+        """NETWORK INFO (Brian, 2026-11-28): how this device talks to the others, so
+        a channel that doesn't match shows (a badge on Wi-Fi is on its network's
+        channel, the others on 1): the link's own lines (its net_info()), then the
+        players heard and how long ago. On a badge on Wi-Fi, C leaves it for channel 1."""
+        text = cockpit.text
+        now = _ms()
+        if self.d_info_lines is None or now - self.d_info_t > 1000:
+            f = getattr(d.link, "net_info", None)
+            try:
+                self.d_info_lines = f() if f is not None else [("LINK: ?", "warn")]
+            except Exception as e:
+                self.d_info_lines = [("LINK: " + str(e)[:20], "warn")]
+            self.d_info_t = now
+        colour = {"ok": cockpit.GREEN, "warn": cockpit.YELLOW}
+        text(ctx, "NETWORK INFO", 0, -84, 15, cockpit.WHITE)
+        lines = self.d_info_lines
+        most, step = cockpit.menu_rows(7, 13)
+        y = -64
+        for t, kind in lines[:most]:
+            text(ctx, t[:26], 0, y, 11, colour.get(kind, cockpit.GREY))
+            y += step
+        heard = d.lobby()
+        if heard:
+            names = ", ".join("%s %ds" % (p.name[:8], int(p.t)) for p in heard[:3])
+            text(ctx, ("HEARD: " + names)[:28], 0, y + 2, 10, cockpit.GREEN)
+        else:
+            text(ctx, "HEARD: NOBODY YET", 0, y + 2, 10, cockpit.YELLOW)
+        hint = "C: LEAVE WI-FI   F: back" if self._can_leave_wifi(d) else "F: back"
+        text(ctx, hint, 0, 82, 12, cockpit.GREY)
 
     @staticmethod
     def _host_rows(d):
@@ -1050,20 +1100,23 @@ class AceCommander(PLATFORM.App):
             return
         me = cockpit.ship_rgb(d.colour)
         dots = "." * (1 + (_ms() // 500) % 3)
+        if d.role == dm.LOBBY and self.d_info:
+            self._draw_netinfo(ctx, d)
+            return
         if d.role == dm.LOBBY:
             text(ctx, "MULTIPLAYER", 0, -80, 17, cockpit.WHITE)
             text(ctx, d.name, 0, -62, 12, me)
             hosts = d.hosts()
-            rows = ["HOST A GAME"] + ["JOIN " + p.name for p in hosts]
+            rows = ["HOST A GAME"] + ["JOIN " + p.name for p in hosts] + ["NETWORK INFO"]
             most, step = cockpit.menu_rows(4, 20)
             top = max(0, min(self.d_sel - most // 2, len(rows) - most))
             for i in range(top, min(len(rows), top + most)):
                 y = -38 + (i - top) * step
                 on = i == self.d_sel
-                rgb = cockpit.ship_rgb(hosts[i - 1].colour) if i and not on else (
+                rgb = cockpit.ship_rgb(hosts[i - 1].colour) if 0 < i <= len(hosts) and not on else (
                     cockpit.GREEN if on else cockpit.GREY)
                 text(ctx, ("< %s >" if on else "%s") % rows[i][:18], 0, y, 14 if on else 12, rgb)
-            if self.d_sel:          # the game picked: its mode and how full it is
+            if 0 < self.d_sel <= len(hosts):    # the game picked: its mode and how full it is
                 p = hosts[self.d_sel - 1]
                 text(ctx, "%s  %d/%d" % (dm.MODE_NAMES[p.mode], 1 + len(p.guests), dm.MODE_MAX[p.mode]),
                      0, 44, 11, cockpit.YELLOW)

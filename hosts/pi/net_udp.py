@@ -51,5 +51,44 @@ class Link:
                 continue            # our own broadcast
             return host, memoryview(data)[ID_LEN:]
 
+    def net_info(self):
+        """The NETWORK INFO page's lines: (text, kind), kind "ok", "warn" or ""."""
+        ip = local_ip()
+        wifi = wifi_name()
+        return [("LINK: UDP ON THE NETWORK", "ok"),
+                ("PORT: %d" % self.to[1], ""),
+                (("WI-FI: " + wifi[:16]) if wifi else "WI-FI: NONE (WIRED?)", ""),
+                ("IP: " + ip, "") if ip else ("IP: NO NETWORK", "warn"),
+                ("PIS AND PCS ONLY: NO BADGES", "warn"),
+                ("YOU: " + hexid(self.id[3:]), "")]
+
     def close(self):
         self.sock.close()
+
+
+def local_ip():
+    """This computer's address on its network, or None (a UDP socket's connect sends
+    nothing: it only picks the route)."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("10.255.255.255", 1))
+        return s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+
+
+def wifi_name():
+    """The Wi-Fi network this computer is on, or None (Linux: iwgetid)."""
+    import subprocess
+    try:
+        r = subprocess.run(["iwgetid", "-r"], capture_output=True, text=True, timeout=1)
+        return r.stdout.strip() or None
+    except Exception:
+        return None
+
+
+def hexid(b):
+    return ":".join("%02x" % x for x in bytes(b))

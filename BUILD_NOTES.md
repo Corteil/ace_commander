@@ -2008,3 +2008,13 @@ what is now `ace.py` (renamed in build 50).
    holding angle, the badge's tilt axes corrected and each device's in device.json; the
    CardputerZero's accelerometer and its key guide; the game pad guide (PAD_GUIDE.pdf) and
    --pad; the fitted title screen steady; README and README_PI for Windows and --duel.
+   **Build 173** (2026-11-28, Brian: "22 badge link", "should there be an ip info sub menu"):
+   the Pi and the CardputerZero play badges through a dongle, Brian's 2022 EMF badge (TiDAL)
+   flashed with stock MicroPython 1.28 (its own 1.18 firmware has no espnow; full flash backup
+   kept off the repo) running `tools/bridge/main.py` with a status page on its screen
+   (`tools/bridge/tidal_screen.py`); `run.py --bridge DEVICE` (`hosts/pi/net_bridge.py`). The
+   dongle hunts the badges' Wi-Fi channel (6, 1, 11, then the rest): a badge on a network is on
+   its channel (Brian's: 6), not 1. The link's id is the dongle's radio address (MAC_ASK). The
+   lobby's last line NETWORK INFO: the link (ESP-NOW, UDP or bridge), channel, Wi-Fi and IP,
+   your id, who is heard; on a badge on Wi-Fi, C leaves it for channel 1. Dongle tried with
+   Brian's badge (packets both ways, channel 6 found); NETWORK INFO tested on the PC only.
