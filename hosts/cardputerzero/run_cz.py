@@ -142,6 +142,9 @@ class Host(pi_run.Host):
         self._perf = None
         # its accelerometer: STEER: TILT and TILT SETUP in Options (set before the game starts)
         platform_pi.TILT = find_accel() if tilt else None
+        # its BMI270 sits with y across the screen and x up it; pitch the other way round
+        # so tilting the top back moves the test's dot up (Brian: axes were swapped)
+        platform_pi.TILT_AXES = (1, -1.0)
         super().__init__(**kw)
         self.stop_file = STOP
         try:

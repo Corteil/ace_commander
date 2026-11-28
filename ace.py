@@ -306,27 +306,26 @@ def _deg(g):
     return int(math.degrees(math.asin(max(-1.0, min(1.0, g)))) + 0.5)
 
 
-def _level_axes(z):
-    """Two directions across gravity z = (x, y, z) (the level pose), as the device's x
-    and y as near as can be: tilt is measured along them, so the device can be held at
-    any angle (flat, a badge's (x, y) as before). None if z is no use."""
+def _level_axes(z, across=0, psign=1.0):
+    """Two directions across gravity z = (x, y, z) (the level pose) to measure tilt
+    along, so the device can be held at any angle: roll along the device's axis that
+    runs across its screen (across: 0 x, as the badge; 1 y, as the CardputerZero),
+    pitch at right angles to it (psign turns it round). Flat, a badge's (x, y) as
+    before. None if z is no use."""
     n = math.sqrt(z[0] * z[0] + z[1] * z[1] + z[2] * z[2])
     if n < 0.3:
         return None
     g = (z[0] / n, z[1] / n, z[2] / n)
-    # y across gravity, unless y is nearly along it: then x
-    d = g[1]
-    e2 = (-d * g[0], 1.0 - d * g[1], -d * g[2])
-    m = math.sqrt(e2[0] * e2[0] + e2[1] * e2[1] + e2[2] * e2[2])
-    if m > 0.3:
-        e2 = (e2[0] / m, e2[1] / m, e2[2] / m)
-        e1 = (e2[1] * g[2] - e2[2] * g[1], e2[2] * g[0] - e2[0] * g[2], e2[0] * g[1] - e2[1] * g[0])
-    else:
-        d = g[0]
-        e1 = (1.0 - d * g[0], -d * g[1], -d * g[2])
+    for i in (across, 1 - across):  # the across axis less its part along gravity
+        d = g[i]
+        e1 = [-d * g[0], -d * g[1], -d * g[2]]
+        e1[i] += 1.0
         m = math.sqrt(e1[0] * e1[0] + e1[1] * e1[1] + e1[2] * e1[2])
-        e1 = (e1[0] / m, e1[1] / m, e1[2] / m)
-        e2 = (g[1] * e1[2] - g[2] * e1[1], g[2] * e1[0] - g[0] * e1[2], g[0] * e1[1] - g[1] * e1[0])
+        if m > 0.3:
+            break
+    e1 = (e1[0] / m, e1[1] / m, e1[2] / m)
+    e2 = (psign * (g[1] * e1[2] - g[2] * e1[1]), psign * (g[2] * e1[0] - g[0] * e1[2]),
+          psign * (g[0] * e1[1] - g[1] * e1[0]))
     return e1, e2
 
 
@@ -620,7 +619,8 @@ class AceCommander(PLATFORM.App):
             self.zero = (ax, ay, az if az is not None else 0.0)
         z = self.zero
         if self.zaxes is None or self.zaxes[2] is not z:    # worked out once per level pose
-            axes = _level_axes(z) if az is not None and len(z) == 3 else None
+            ax_, ps_ = getattr(pl, "tilt_axes", (0, 1.0))   # the device's own (platform)
+            axes = _level_axes(z, ax_, ps_) if az is not None and len(z) == 3 else None
             self.zaxes = (axes[0], axes[1], z) if axes else (None, None, z)
         e1, e2 = self.zaxes[0], self.zaxes[1]
         if az is not None and e1 is not None:
