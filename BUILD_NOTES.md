@@ -2025,3 +2025,11 @@ what is now `ace.py` (renamed in build 50).
    should be it own app", "a general tool"); the 2022 dongle's main.py speaks the same lines
    (not yet copied to it). The 2022 dongle was one-way: the Pi heard Brian's badge, the badge
    never heard the Pi (104 packets sent, no failures, same channel); cause not found.
+   **Build 175** (2026-11-28, Brian: "pi version not connecting to local network at same
+   time", "network info as a button option", "change here to lobby"): `--bridge --duel` plays
+   badges and computers in one game, this Pi relaying (`hosts/pi/net_relay.py`): badges'
+   packets go on to the network as those badges (`net_udp.Link.send_as`), other computers'
+   go on the radio wrapped (RELAY "AR", the sender's id; `net_espnow.unwrap` on the badges);
+   one id, the link badge's; one relay a game. The badge-link desktop icon uses both. In the
+   lobby, B opens NETWORK INFO (B or F closes it), and HERE: is LOBBY:. Badges need this
+   build's net_espnow to hear relayed computers.

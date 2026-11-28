@@ -29,9 +29,21 @@ badges), read from the firmware and MicroPython 1.28's source:
 On a firmware without the service, only the counting and the restart apply.
 """
 CHANNEL = 1
+RELAY = b"AR"           # a packet passed on by a Pi from its network (hosts/pi/net_relay.py):
+                        # RELAY, the real sender's 6-byte id, the packet
 RXBUF = 4096
 BROADCAST = b"\xff" * 6
 _NONE = (None, None)
+
+
+def unwrap(r):
+    """(sender, packet), or for a packet a Pi relayed from its network (RELAY), the
+    real sender and its packet: to the game they come straight from that player."""
+    msg = r[1]
+    if len(msg) > 8 and msg[0] == 0x41 and msg[1] == 0x52:      # b"AR"
+        m = memoryview(msg)
+        return m[2:8], m[8:]
+    return r
 
 
 def _hex(b):
@@ -218,4 +230,5 @@ class Link:
             return _NONE
         if r[0] is None:
             self.ready = 0      # (dropped as the buffer was full: none left)
-        return r
+            return r
+        return unwrap(r)

@@ -437,6 +437,15 @@ check("app join: HAL leaves, the guest is back in the lobby saying so",
       b.mode == "duel" and not b.dueling and b.duel.role == duel.LOBBY
       and "HOST LEFT" in [t[0] for t in c.texts], str([t[0] for t in c.texts]))
 
+# ---- B opens NETWORK INFO from the lobby, and B closes it (Brian: a button for it)
+bs.tick(b, fresh=["B"])
+check("lobby: B opens NETWORK INFO", b.d_info)
+bs.tick(b, fresh=["B"])
+check("NETWORK INFO: B closes it", not b.d_info and b.mode == "duel")
+c = bs.CountCtx()
+b.draw(c)
+check("lobby hints name B", "C: choose  B: network  F: back" in [t[0] for t in c.texts])
+
 # ---- NETWORK INFO (Brian, 2026-11-28): the lobby's last line; the link's own lines,
 # who is heard; on a badge on Wi-Fi C leaves it
 c = bs.CountCtx()

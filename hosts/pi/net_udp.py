@@ -15,8 +15,8 @@ ID_LEN = 6
 
 
 class Link:
-    def __init__(self, port=PORT, to="255.255.255.255"):
-        self.id = os.urandom(ID_LEN)
+    def __init__(self, port=PORT, to="255.255.255.255", ident=None):
+        self.id = bytes(ident) if ident else os.urandom(ID_LEN)   # (net_relay: the link badge's)
         self.to = (to, port)
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -33,6 +33,15 @@ class Link:
             self.sock.sendto(self.id + bytes(msg), self.to)
         except OSError as e:
             if not self.warned:     # no network: say so once, keep playing alone
+                self.warned = True
+                print("duel: can't send:", e)
+
+    def send_as(self, ident, msg):
+        """Send a packet as if from ident (net_relay passes the badges' packets on)."""
+        try:
+            self.sock.sendto(bytes(ident) + bytes(msg), self.to)
+        except OSError as e:
+            if not self.warned:
                 self.warned = True
                 print("duel: can't send:", e)
 

@@ -945,8 +945,8 @@ class AceCommander(PLATFORM.App):
             self.dueling = True
             return
         hit = self.pad.hit
-        if d.role == dm.LOBBY and self.d_info:     # NETWORK INFO: F back, C leaves Wi-Fi
-            if cancel:
+        if d.role == dm.LOBBY and self.d_info:     # NETWORK INFO: F or B back, C leaves Wi-Fi
+            if cancel or self.pad.hit("B"):
                 self.d_info = False
             elif confirm and self._can_leave_wifi(d):
                 d.link.leave_wifi()
@@ -959,6 +959,9 @@ class AceCommander(PLATFORM.App):
                 self.d_sel = n - 1
             if cancel:
                 self.mode = "menu"
+            elif hit("B"):              # B: NETWORK INFO at once (Brian: a button for it)
+                self.d_info = True
+                self.d_info_lines = None
             elif hit("up"):
                 self.d_sel = (self.d_sel - 1) % n
             elif hit("down"):
@@ -1048,7 +1051,7 @@ class AceCommander(PLATFORM.App):
             text(ctx, ("HEARD: " + names)[:28], 0, y + 2, 10, cockpit.GREEN)
         else:
             text(ctx, "HEARD: NOBODY YET", 0, y + 2, 10, cockpit.YELLOW)
-        hint = "C: LEAVE WI-FI   F: back" if self._can_leave_wifi(d) else "F: back"
+        hint = "C: LEAVE WI-FI   F: back" if self._can_leave_wifi(d) else "B / F: back"
         text(ctx, hint, 0, 82, 12, cockpit.GREY)
 
     @staticmethod
@@ -1125,10 +1128,10 @@ class AceCommander(PLATFORM.App):
                 text(ctx, d.notice, 0, 62, 12, cockpit.RED)
             elif others:
                 names = ", ".join(p.name for p in others[:3]) + ("..." if len(others) > 3 else "")
-                text(ctx, "HERE: " + names[:26], 0, 62, 10, cockpit.GREY)
+                text(ctx, "LOBBY: " + names[:25], 0, 62, 10, cockpit.GREY)
             else:
                 text(ctx, "nobody else yet" + dots, 0, 62, 10, cockpit.YELLOW)
-            text(ctx, "C: choose   F: back", 0, 82, 12, cockpit.GREY)
+            text(ctx, "C: choose  B: network  F: back", 0, 82, 11, cockpit.GREY)
         elif d.role == dm.HOST:
             text(ctx, "HOSTING", 0, -86, 14, cockpit.WHITE)
             rows = self._host_rows(d)

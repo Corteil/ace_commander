@@ -173,7 +173,12 @@ class Host:
             p.set_volume = self.player.set_volume       # Options > VOLUME (build 145)
             p.sound_stop = self.player.stop
             self.app._apply_volume()        # options.json's, read before the player was there
-        if bridge:                          # --bridge DEVICE: with badges, through a dongle
+        if bridge and duel:                 # both: badges and the network, relayed (net_relay)
+            import net_bridge
+            import net_relay
+            import net_udp
+            self.app.platform.radio = lambda: net_relay.Link(net_bridge.Link(bridge), net_udp.Link(duel))
+        elif bridge:                        # --bridge DEVICE: with badges, through a link badge
             import net_bridge
             self.app.platform.radio = lambda: net_bridge.Link(bridge)
         elif duel:                          # --duel: DUEL on the title screen, over UDP
@@ -478,7 +483,8 @@ def main(argv=None):
     ap.add_argument("--frames", type=int, default=None, help="stop after this many frames")
     ap.add_argument("--bridge", metavar="DEVICE", nargs="?", const="auto", default=None,
                     help="MULTIPLAYER with badges, over ESP-NOW through a USB dongle running "
-                         "tools/bridge/main.py; found by itself, or name it (e.g. /dev/ttyACM1; Windows COM3)")
+                         "tools/bridge/main.py; found by itself, or name it (e.g. /dev/ttyACM1; Windows COM3). "
+                         "With --duel too: badges and the network in one game, this Pi relaying")
     ap.add_argument("--wide", dest="wide", action="store_true", default=True,
                     help="in the Elite layout, the badge's screens use the window's width, hints in one row "
                          "(the default, Brian)")
