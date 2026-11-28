@@ -52,7 +52,9 @@ PI_README = """Ace Commander {v} for the Raspberry Pi (or any computer with Pyth
 
 Options: --layout elite (a 3D view over a dashboard; F10 switches), --full (full screen),
 --no-wide (in the Elite layout the screens use the window's whole width unless this is given),
---sound (the game's sounds; Options > SOUND turns them off), --debug (the DEBUG menu). Keys: arrows steer, F1-F6 are the badge's buttons A-F, and the
+--sound (the game's sounds; Options > SOUND turns them off), --debug (the DEBUG menu),
+--duel (MULTIPLAYER on the title screen: up to four players on computers on one network, over UDP;
+a Pi can't play a badge yet). Keys: arrows steer, F1-F6 are the badge's buttons A-F, and the
 rest are Elite's keys; a game pad works too. Every key and pad button: KEY_GUIDE.pdf. Saves go in ~/.local/share/ace_commander/.
 A desktop shortcut: Exec=python3 /path/to/ace_commander/hosts/pi/run.py
 

@@ -58,6 +58,18 @@ assert ck.MENU_K == run_cz.MENU_K
 assert ck.menu_rows(8, 16) == (int(8 / run_cz.MENU_K), 16 * run_cz.MENU_K)
 print("menus: %d of 8 lines shown, %.1f apart: ok" % ck.menu_rows(8, 16))
 
+# the title keeps one placement while its ships come and go (Brian: it jumped about as
+# the ship changed; paths, the ships' wireframes, don't count in the fit)
+for _ in range(500):
+    h.step(40)
+title = [v for (k, row), v in h.fitter.places.items() if k == ("menu", None)]
+assert len(title) == 1, title
+before = title[0]
+for _ in range(500):
+    h.step(40)
+assert [v for (k, row), v in h.fitter.places.items() if k == ("menu", None)] == [before]
+print("title: one placement through 40 s of ships: ok")
+
 # the title: D is right (the next line), A left; Z picks (the badge's C)
 first = a.choices()[a.menu]
 key(h, pygame.K_d, "d")
