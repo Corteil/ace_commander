@@ -155,6 +155,8 @@ class Fitter:
         ctx.ox, ctx.oy, ctx.sx, ctx.s = 0.0, 0.0, base, base
         draw(ctx)
         ops, hints = ctx.stop()
+        ops, tabs = fit_core.split_tabs(ops)    # drawn apart: one size on every screen
+        top = fit_core.tab_band(base) if tabs else 0
         # the hint row along the bottom (each hint's own wide gaps made two spaces)
         row = GAP.join(_squeeze(h) for h in hints)
         if labels and row:
@@ -170,7 +172,7 @@ class Fitter:
             img = f.render(row, True, GREY)
             hh = img.get_height() + 1
         # the rest, spread over what is left
-        area = H - hh
+        area = H - hh - top
         k = (key, row)
         place = self.places.get(k)
         ext = ctx.extents(ops, place[3]) if place is not None else None
@@ -189,12 +191,13 @@ class Fitter:
                 self.places.clear()
             place = self.places[k] = (sx, sy, y0, tk)
         sx, sy, y0, tk = place
+        nudge = nudges(ctx.extents(ops, tk), sx, sy, y0, area)
+        y0 += top
         window.set_clip(None)
         window.fill((0, 0, 0))
         ctx.ox, ctx.oy, ctx.sx, ctx.s = W / 2.0, y0, sx, sy
         keep_k = ctx.text_k
         ctx.text_k = tk * base / sy            # text in pixels at tk, whatever the spread
-        nudge = nudges(ctx.extents(ops, tk), sx, sy, y0, H - hh)
         try:
             for i, op in enumerate(ops):
                 if op[0] == "text":
@@ -215,6 +218,12 @@ class Fitter:
                     else:
                         ctx.line_width = lw
                         Ctx.stroke(ctx)
+            if tabs:                # the tab dots: one size and place on every screen
+                kt = fit_core.TAB_K * base
+                ctx.ox, ctx.oy, ctx.sx, ctx.s = W / 2.0, fit_core.tab_offset(base), kt, kt
+                for op in tabs:
+                    ctx.shape, ctx.paths, ctx.col, ctx.alpha = op[1], [], op[3], op[4]
+                    Ctx.fill(ctx)
         finally:
             ctx.text_k = keep_k
             ctx.ox, ctx.oy, ctx.sx, ctx.s = W / 2.0, H / 2.0, base, base

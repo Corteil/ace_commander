@@ -383,7 +383,8 @@ class Host:
         rec = self.rec
         rec.start()
         self.app.draw(rec)
-        ops = rec.ops
+        ops, tabs = fit_core.split_tabs(rec.ops)
+        top = fit_core.tab_band(1) if tabs else 0
         ctx = self.ctx
         ctx.small = SMALL
         parts = fit_core.hint_parts(ops)
@@ -400,13 +401,16 @@ class Host:
         row = " | ".join(rows)
         area = SCREEN_H - hh
         ext = fit_core.extents(ops, ctx.measure)
-        sx, sy, y0 = self.placer.place((key, row), ext, 1, SCREEN_W, area)
+        sx, sy, y0 = self.placer.place((key, row), ext, 1, SCREEN_W, area, top)
         nudge = fit_core.nudges(ext, sx, sy, y0, area)
         for n in nudge:
             nudge[n] = nudge[n] / sy        # pixels to canvas units
         ctx.ox = SCREEN_W // 2
         ctx.oy = 0
         fit_core.replay(ctx, ops, sx, sy, y0, nudge)
+        if tabs:                        # the tab dots: one size and place on every screen
+            k = fit_core.TAB_K
+            fit_core.replay(ctx, tabs, k, k, fit_core.tab_offset(1))
         ctx.font_size = HINT_SIZE
         ctx.text_align = ctx.CENTER
         ctx.text_baseline = "bottom"

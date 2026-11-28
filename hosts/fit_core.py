@@ -22,6 +22,8 @@ OVERLAP = 0.25                  # lines of text may overlap by this much of thei
 GAP = "    "                    # between hints in the row
 FLIGHT_MODES = ("flight", "launch", "docking", "mlaunch")
 SCREENS = ("status", "inventory", "market", "chart", "data")   # ace.SCREENS: whole-frame in flight
+TAB_Y, TAB_W, TAB_H = -115, 6, 5   # docked.py's tab dots: rectangle(x + i * 11, -115, 6, 5)
+TAB_K = 1.3                     # drawn at this many times the plain scale on every screen
 _LETTERS = "ABCDEF"
 _JOINS = (", ", " or ", " / ", "/")
 
@@ -62,6 +64,34 @@ def is_hint(s):
             else:
                 break
     return False
+
+
+def is_tab_op(op):
+    """One of the docked screens' tab dots (Brian: "the screen index at the top is
+    not a constant size between screens"): drawn apart, the same on every screen."""
+    sh = op[1] if op[0] == "fill" else None
+    return (sh is not None and sh[0] == "rect" and sh[2] == TAB_Y and sh[3] == TAB_W
+            and sh[4] == TAB_H)
+
+
+def split_tabs(ops):
+    """(the screen's ops without its tab dots, the tab dots' ops)."""
+    rest = []
+    tabs = []
+    for op in ops:
+        (tabs if is_tab_op(op) else rest).append(op)
+    return rest, tabs
+
+
+def tab_band(base):
+    """Pixels at the top a screen's tab dots take (the rest is placed below)."""
+    return int(TAB_H * TAB_K * base + 2 * MARGIN + 0.5)
+
+
+def tab_offset(base):
+    """dy for replay(ctx, tabs, k, k, dy) with k = TAB_K * base, on a ctx whose
+    canvas 0 is the top of the screen: the dots MARGIN pixels down."""
+    return MARGIN - TAB_Y * TAB_K * base
 
 
 def is_hint_op(op):
@@ -326,19 +356,20 @@ class Placer:
         self.aspect = aspect
         self.places = {}
 
-    def place(self, key, ext, base, w, h):
+    def place(self, key, ext, base, w, h, top=0):
+        """(sx, sy, y0) for ext in w x h, below `top` pixels kept free (tab dots)."""
+        h = h - top
         p = self.places.get(key)
-        if p is not None and fits(ext, p[0], p[1], p[2], w, h):
-            return p
-        sx, sy, y0 = fit(ext, base, w, h, self.aspect)
-        if p is not None:
-            sx = min(sx, p[0])
-            sy = min(sy, p[1])
-            y0 = centre(ext, sy, h)
-        if len(self.places) > 100:
-            self.places.clear()
-        p = self.places[key] = (sx, sy, y0)
-        return p
+        if p is None or not fits(ext, p[0], p[1], p[2], w, h):
+            sx, sy, y0 = fit(ext, base, w, h, self.aspect)
+            if p is not None:
+                sx = min(sx, p[0])
+                sy = min(sy, p[1])
+                y0 = centre(ext, sy, h)
+            if len(self.places) > 100:
+                self.places.clear()
+            p = self.places[key] = (sx, sy, y0)
+        return p[0], p[1], p[2] + top
 
 
 def replay(ctx, ops, kx, ky, dy, nudge=None, skip_hints=True):
